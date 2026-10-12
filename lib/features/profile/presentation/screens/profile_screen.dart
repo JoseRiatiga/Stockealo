@@ -376,8 +376,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         content: Text(
           '¿Deseas eliminar únicamente tus copias en la nube?\n\n'
-          '• Se borrarán tus registros de Supabase.\n'
-          '• Tus datos en este teléfono seguirán 100% INTACTOS.\n'
+          '• Se borrarán tus registros en la nube.\n'
+          '• Tus datos en este dispositivo seguirán 100% INTACTOS.\n'
           '• La app volverá al Modo Local Privado.',
           style: TextStyle(
             fontSize: 13,
@@ -441,7 +441,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   'Esta acción es IRREVERSIBLE y permanente.\n\n'
-                  'Se borrarán por completo tus empresas, catálogo de productos, registro de ventas, clientes e historial contable tanto de este teléfono móvil como de la nube.\n\n'
+                  'Se borrarán por completo tus empresas, catálogo de productos, registro de ventas, clientes e historial contable tanto de este dispositivo como de la nube.\n\n'
                   'Para confirmar, escribe la palabra "ELIMINAR" a continuación:',
                   style: TextStyle(
                     fontSize: 13,
@@ -851,7 +851,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF9A3412)),
                   ),
                   subtitle: Text(
-                    'Borra registros en Supabase y conserva datos en este celular',
+                    'Borrar registros en la nube y conservar los datos en este dispositivo',
                     style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFED7AA) : const Color(0xFF7C2D12)),
                   ),
                   onTap: _showPurgeCloudDialog,
@@ -868,7 +868,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? const Color(0xFFF87171) : Colors.red),
                   ),
                   subtitle: Text(
-                    'Borra todo de forma permanente (Nube y Teléfono)',
+                    'Borra todo de forma permanente (Nube y dispositivo)',
                     style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFECACA) : const Color(0xFF991B1B)),
                   ),
                   onTap: _showDeleteAccountDialog,

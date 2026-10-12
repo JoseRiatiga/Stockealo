@@ -3,6 +3,8 @@ import '../../../dashboard/presentation/screens/dashboard_screen.dart';
 import '../../../products/presentation/screens/products_list_screen.dart';
 import '../../../sales/presentation/screens/sales_history_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../../core/services/update_service.dart';
+import '../../../../core/widgets/update_dialog.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -20,6 +22,23 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAppUpdateSilently();
+  }
+
+  void _checkAppUpdateSilently() {
+    Future.delayed(const Duration(seconds: 4), () async {
+      try {
+        final update = await UpdateService.instance.checkForUpdate();
+        if (update.hasUpdate && mounted) {
+          UpdateDialog.show(context, update);
+        }
+      } catch (_) {}
+    });
+  }
 
   void _navigateToTab(int index) {
     setState(() {

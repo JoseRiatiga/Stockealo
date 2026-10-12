@@ -50,6 +50,9 @@ dependencies:
   supabase_flutter: ^2.15.4
   app_links: ^6.4.1
   file_picker: ^8.1.7
+  http: ^1.2.2
+  package_info_plus: ^8.1.2
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:

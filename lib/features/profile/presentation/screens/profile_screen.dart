@@ -12,6 +12,8 @@ import '../../../reports/data/excel_export_service.dart';
 import '../../../reports/presentation/widgets/excel_import_modal.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../../core/services/update_service.dart';
+import '../../../../core/widgets/update_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -37,6 +39,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditingProfile = false;
   bool _isCloudSyncEnabled = false;
   bool _isManualSyncing = false;
+  bool _isCheckingUpdate = false;
+  String _currentAppVersion = '1.0.0';
 
   @override
   void initState() {
@@ -47,6 +51,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _avatarPath = _user?.avatarPath;
     _loadActiveBusiness();
     _loadCloudSyncStatus();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final ver = await UpdateService.instance.getCurrentVersion();
+    if (mounted) {
+      setState(() => _currentAppVersion = ver);
+    }
+  }
+
+  Future<void> _handleCheckForUpdates() async {
+    setState(() => _isCheckingUpdate = true);
+    final updateInfo = await UpdateService.instance.checkForUpdate();
+    if (!mounted) return;
+    setState(() => _isCheckingUpdate = false);
+
+    if (updateInfo.hasUpdate) {
+      UpdateDialog.show(context, updateInfo);
+    } else if (updateInfo.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(updateInfo.errorMessage!),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Tienes la versión más reciente (v${updateInfo.currentVersion}).'),
+          backgroundColor: const Color(0xFF059669),
+        ),
+      );
+    }
   }
 
   Future<void> _loadCloudSyncStatus() async {
@@ -878,7 +915,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 18),
 
-          // 6. Botón Cerrar Sesión
+          // 6. Tarjeta de Versión y Actualizaciones
+          Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            elevation: 0,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: const Color(0xFF059669).withOpacity(0.15),
+                child: const Icon(Icons.system_update_rounded, color: Color(0xFF10B981), size: 22),
+              ),
+              title: Text(
+                'Stockéalo v$_currentAppVersion',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                ),
+              ),
+              subtitle: Text(
+                'Buscar actualizaciones en GitHub',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+              ),
+              trailing: _isCheckingUpdate
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)),
+                    )
+                  : Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 16,
+                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                    ),
+              onTap: _isCheckingUpdate ? null : _handleCheckForUpdates,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 7. Botón Cerrar Sesión
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             elevation: 0,
@@ -891,10 +974,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
 
           const SizedBox(height: 18),
-          const Center(
+          Center(
             child: Text(
-              'Stockealo v1.0.0 • Control de Inventario y Stock',
-              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+              'Stockealo v$_currentAppVersion • Control de Inventario y Stock',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
             ),
           ),
           const SizedBox(height: 24),

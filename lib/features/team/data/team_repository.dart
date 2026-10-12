@@ -1,5 +1,10 @@
+import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/supabase_service.dart';
+import '../../business/data/business_repository.dart';
+import '../../business/models/business.dart';
 import '../models/business_member.dart';
 
 class TeamRepository {
@@ -33,7 +38,7 @@ class TeamRepository {
 
     final db = await _dbProvider.database;
 
-    // Verificar si ya está en el equipo de este negocio
+    // Verificar si ya está en el equipo de este negocio localmente
     final existing = await db.query(
       'business_members',
       where: 'business_id = ? AND LOWER(email) = ?',
@@ -45,14 +50,33 @@ class TeamRepository {
       throw Exception('Este usuario ya forma parte del equipo de esta empresa.');
     }
 
-    // Verificar si el usuario ya está registrado en la app para asociar su user_id
+    // 1. Verificar si el usuario ya está registrado en la app localmente
     final userQuery = await db.query(
       'users',
       where: 'LOWER(email) = ?',
       whereArgs: [cleanEmail],
       limit: 1,
     );
-    final String? linkedUserId = userQuery.isNotEmpty ? userQuery.first['id'] as String : null;
+    String? linkedUserId = userQuery.isNotEmpty ? userQuery.first['id'] as String : null;
+    String? linkedUserName = userQuery.isNotEmpty ? userQuery.first['name'] as String? : null;
+
+    // 2. Si no está en SQLite local, consultar si ya está registrado en Supabase Cloud
+    if (linkedUserId == null) {
+      try {
+        final client = SupabaseService.instance.client;
+        if (client != null) {
+          final cloudUser = await client
+              .from('users')
+              .select('id, name')
+              .eq('email', cleanEmail)
+              .maybeSingle();
+          if (cloudUser != null) {
+            linkedUserId = cloudUser['id'] as String?;
+            linkedUserName = cloudUser['name'] as String?;
+          }
+        }
+      } catch (_) {}
+    }
 
     final member = BusinessMember(
       id: const Uuid().v4(),
@@ -65,6 +89,14 @@ class TeamRepository {
     );
 
     await db.insert('business_members', member.toMap());
+
+    // 3. Sincronizar en tiempo real a Supabase Cloud
+    final memberCloudData = {
+      ...member.toMap(),
+      'name': linkedUserName ?? cleanEmail.split('@').first,
+    };
+    SupabaseService.instance.upsertBusinessMemberToCloud(memberCloudData);
+
     return member;
   }
 
@@ -77,6 +109,17 @@ class TeamRepository {
       where: 'id = ?',
       whereArgs: [memberId],
     );
+
+    // Sincronizar actualización de rol en Supabase en tiempo real
+    final updated = await db.query(
+      'business_members',
+      where: 'id = ?',
+      whereArgs: [memberId],
+      limit: 1,
+    );
+    if (updated.isNotEmpty) {
+      SupabaseService.instance.upsertBusinessMemberToCloud(updated.first);
+    }
   }
 
   /// Elimina un miembro del equipo de la empresa
@@ -87,6 +130,9 @@ class TeamRepository {
       where: 'id = ?',
       whereArgs: [memberId],
     );
+
+    // Eliminar de Supabase en tiempo real
+    SupabaseService.instance.deleteBusinessMemberFromCloud(memberId);
   }
 
   /// Determina el rol del usuario en la empresa actual
@@ -123,5 +169,150 @@ class TeamRepository {
 
     // Por defecto, si tiene acceso pero no rol definido
     return 'CASHIER';
+  }
+
+  /// Une a un usuario a un negocio existente mediante código de invitación o escaneo QR
+  Future<Business> joinBusinessByCode({
+    required String codeOrId,
+    required String userId,
+    required String userEmail,
+    String? userName,
+  }) async {
+    String cleanInput = codeOrId.trim();
+
+    // Si viene de un QR con formato URL/Deep link: stockealo://join?biz=UUID o code=CODE
+    if (cleanInput.contains('biz=')) {
+      final uri = Uri.tryParse(cleanInput);
+      if (uri != null && uri.queryParameters.containsKey('biz')) {
+        cleanInput = uri.queryParameters['biz']!;
+      } else {
+        final match = RegExp(r'biz=([a-zA-Z0-9\-]+)').firstMatch(cleanInput);
+        if (match != null) {
+          cleanInput = match.group(1)!;
+        }
+      }
+    } else if (cleanInput.contains('code=')) {
+      final uri = Uri.tryParse(cleanInput);
+      if (uri != null && uri.queryParameters.containsKey('code')) {
+        cleanInput = uri.queryParameters['code']!;
+      }
+    }
+
+    cleanInput = cleanInput.replaceAll('-', '').replaceAll(' ', '').trim().toLowerCase();
+    if (cleanInput.isEmpty) {
+      throw Exception('Ingresa un código de invitación válido.');
+    }
+
+    if (!SupabaseService.instance.isInitialized) {
+      await SupabaseService.instance.initialize();
+    }
+    final client = SupabaseService.instance.client;
+    if (client == null) {
+      throw Exception('No hay conexión con la nube. Verifica tu conexión a internet.');
+    }
+
+    // 1. Buscar la empresa en Supabase por ID completo o prefijo de ID
+    Map<String, dynamic>? cloudBiz;
+    if (cleanInput.length >= 32) {
+      try {
+        final allBiz = await client.from('businesses').select().eq('is_deleted', 0);
+        for (final b in allBiz) {
+          final idNoDash = (b['id'] as String).replaceAll('-', '').toLowerCase();
+          if (idNoDash == cleanInput) {
+            cloudBiz = b;
+            break;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error buscando por UUID completo: $e');
+      }
+    }
+
+    if (cloudBiz == null) {
+      try {
+        final List<dynamic> results = await client
+            .from('businesses')
+            .select()
+            .ilike('id', '$cleanInput%')
+            .eq('is_deleted', 0)
+            .limit(1);
+        if (results.isNotEmpty) {
+          cloudBiz = results.first as Map<String, dynamic>;
+        }
+      } catch (e) {
+        debugPrint('Error buscando negocio por prefijo: $e');
+      }
+    }
+
+    if (cloudBiz == null) {
+      throw Exception('Código no encontrado. Verifica con el dueño o administrador de la empresa.');
+    }
+
+    final bizId = cloudBiz['id'] as String;
+    final bizName = cloudBiz['name'] as String;
+    final bizCurrency = (cloudBiz['currency'] as String?) ?? 'COP';
+
+    final db = await _dbProvider.database;
+
+    // 2. Guardar o actualizar la empresa en la base local SQLite
+    final business = Business(
+      id: bizId,
+      userId: (cloudBiz['user_id'] as String?) ?? userId,
+      name: bizName,
+      currency: bizCurrency,
+      createdAt: cloudBiz['created_at'] != null
+          ? DateTime.tryParse(cloudBiz['created_at'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+    await db.insert('businesses', business.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+
+    // 3. Crear o actualizar membresía en SQLite local
+    final cleanEmail = userEmail.trim().toLowerCase();
+    final existingMember = await db.query(
+      'business_members',
+      where: 'business_id = ? AND (user_id = ? OR LOWER(email) = ?)',
+      whereArgs: [bizId, userId, cleanEmail],
+      limit: 1,
+    );
+
+    if (existingMember.isEmpty) {
+      final member = BusinessMember(
+        id: const Uuid().v4(),
+        businessId: bizId,
+        userId: userId,
+        email: cleanEmail,
+        role: 'CASHIER',
+        status: 'ACTIVE',
+        createdAt: DateTime.now(),
+      );
+      await db.insert('business_members', member.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+
+      // Sincronizar membresía a Supabase Cloud
+      await SupabaseService.instance.upsertBusinessMemberToCloud({
+        ...member.toMap(),
+        'name': userName ?? cleanEmail.split('@').first,
+      });
+    } else {
+      await db.update(
+        'business_members',
+        {'user_id': userId, 'status': 'ACTIVE'},
+        where: 'id = ?',
+        whereArgs: [existingMember.first['id']],
+      );
+      final updatedMap = {
+        ...existingMember.first,
+        'user_id': userId,
+        'status': 'ACTIVE',
+      };
+      await SupabaseService.instance.upsertBusinessMemberToCloud(updatedMap);
+    }
+
+    // 4. Descargar todos los productos y datos de la empresa desde la nube
+    await SupabaseService.instance.syncFromCloud(userId, userEmail);
+
+    // 5. Establecer empresa como activa
+    BusinessRepository.instance.setActiveBusiness(business);
+
+    return business;
   }
 }

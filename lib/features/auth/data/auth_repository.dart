@@ -91,7 +91,27 @@ class AuthRepository {
     await _dbProvider.setSetting('active_user_id', user.id);
 
     // Sincronizar usuario a Supabase en tiempo real
-    SupabaseService.instance.upsertUserToCloud(userMap);
+    await SupabaseService.instance.upsertUserToCloud(userMap);
+
+    // Descargar datos si este correo ya había sido invitado a algún negocio
+    await SupabaseService.instance.syncFromCloud(user.id, user.email);
+
+    // Si había membresías pendientes con este email, vincular su nuevo user_id local y en la nube
+    await db.update(
+      'business_members',
+      {'user_id': user.id},
+      where: 'LOWER(email) = ? AND (user_id IS NULL OR user_id = "")',
+      whereArgs: [cleanEmail],
+    );
+
+    if (client != null) {
+      try {
+        await client
+            .from('business_members')
+            .update({'user_id': user.id})
+            .eq('user_email', cleanEmail);
+      } catch (_) {}
+    }
 
     return user;
   }
@@ -129,8 +149,16 @@ class AuthRepository {
         _currentUser = user;
         await _dbProvider.setSetting('active_user_id', user.id);
 
-        // Descargar datos actualizados de la nube en segundo plano
-        SupabaseService.instance.syncFromCloud(user.id, user.email);
+        // Descargar datos actualizados de la nube
+        await SupabaseService.instance.syncFromCloud(user.id, user.email);
+
+        // Vincular membresías locales si correspondía
+        await db.update(
+          'business_members',
+          {'user_id': user.id},
+          where: 'LOWER(email) = ? AND (user_id IS NULL OR user_id = "")',
+          whereArgs: [cleanEmail],
+        );
 
         return user;
       }
@@ -188,6 +216,14 @@ class AuthRepository {
 
             // Descargar todas las empresas, productos, categorías y datos asociados desde la nube
             await SupabaseService.instance.syncFromCloud(user.id, user.email);
+
+            // Vincular membresías locales si correspondía
+            await db.update(
+              'business_members',
+              {'user_id': user.id},
+              where: 'LOWER(email) = ? AND (user_id IS NULL OR user_id = "")',
+              whereArgs: [cleanEmail],
+            );
 
             return user;
           }

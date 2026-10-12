@@ -50,7 +50,7 @@ class _SupabaseSyncScreenState extends State<SupabaseSyncScreen> {
       _isSuccess = result.success;
       if (result.success) {
         _statusMessage =
-            '✅ Sincronización exitosa:\n• ${result.businessesCount} empresas\n• ${result.productsCount} productos\n• ${result.customersCount} clientes\n• ${result.salesCount} ventas respaldadas en la nube.';
+            '✅ Sincronización exitosa:\n• ${result.businessesCount} empresas\n• ${result.membersCount} colaboradores/miembros\n• ${result.productsCount} productos\n• ${result.customersCount} clientes\n• ${result.salesCount} ventas respaldadas en la nube.';
       } else {
         _statusMessage = result.errorMessage ?? 'Error durante la sincronización.';
         if (_statusMessage!.contains('schema cache') ||

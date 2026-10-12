@@ -27,6 +27,15 @@ class Business {
     return remaining < 0 ? 0 : remaining;
   }
 
+  /// Código de invitación corto de 8 caracteres para vincular colaboradores (ej. '6CC1-4831')
+  String get inviteCode {
+    final clean = id.replaceAll('-', '').toUpperCase();
+    if (clean.length >= 8) {
+      return '${clean.substring(0, 4)}-${clean.substring(4, 8)}';
+    }
+    return clean;
+  }
+
   Business copyWith({
     String? id,
     String? userId,

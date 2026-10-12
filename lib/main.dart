@@ -96,7 +96,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // 2. Si el usuario está autenticado, verificamos si ya tiene al menos una empresa creada
         return FutureBuilder<Business?>(
-          future: _businessRepo.getActiveBusiness(currentUser.id),
+          future: _businessRepo.getActiveBusiness(currentUser.id, currentUser.email),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Scaffold(
@@ -113,6 +113,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
             if (activeBusiness == null) {
               return CreateInitialBusinessScreen(
                 userId: currentUser.id,
+                userEmail: currentUser.email,
+                userName: currentUser.name,
                 onBusinessCreated: _refresh,
               );
             }

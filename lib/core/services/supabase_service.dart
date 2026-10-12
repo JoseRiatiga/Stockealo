@@ -9,6 +9,7 @@ class SyncResult {
   final int productsCount;
   final int customersCount;
   final int salesCount;
+  final int membersCount;
   final String? errorMessage;
 
   const SyncResult({
@@ -17,6 +18,7 @@ class SyncResult {
     this.productsCount = 0,
     this.customersCount = 0,
     this.salesCount = 0,
+    this.membersCount = 0,
     this.errorMessage,
   });
 }
@@ -194,6 +196,35 @@ class SupabaseService {
         debugPrint('Nota: error o tabla categories no configurada en Supabase: $e');
       }
 
+      // 1.2 Sincronizar Miembros de Equipos (business_members)
+      int localMembersCount = 0;
+      try {
+        final localMembers = await db.query('business_members');
+        if (localMembers.isNotEmpty) {
+          final formattedMembers = localMembers.map((m) {
+            final email = (m['email'] ?? '').toString();
+            final rawUserId = m['user_id'] as String?;
+            return {
+              'id': m['id'],
+              'business_id': m['business_id'],
+              'user_id': (rawUserId != null && rawUserId.trim().isNotEmpty) ? rawUserId.trim() : '',
+              'user_email': email,
+              'user_name': (email.isNotEmpty ? email.split('@').first : 'Colaborador'),
+              'role': m['role'] ?? 'CASHIER',
+              'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
+            };
+          }).toList();
+
+          await client!.from('business_members').upsert(
+            formattedMembers,
+            onConflict: 'id',
+          );
+          localMembersCount = formattedMembers.length;
+        }
+      } catch (e) {
+        debugPrint('Nota: error o tabla business_members no configurada en Supabase: $e');
+      }
+
       // 2. Sincronizar Products
       // Primero eliminar de Supabase los productos que fueron eliminados localmente (is_active = 0)
       final inactiveProducts = await db.query('products', where: 'is_active = 0');
@@ -272,6 +303,7 @@ class SupabaseService {
         productsCount: localProducts.length,
         customersCount: localCustomers.length,
         salesCount: localSales.length,
+        membersCount: localMembersCount,
       );
     } on PostgrestException catch (e) {
       return SyncResult(
@@ -353,22 +385,30 @@ class SupabaseService {
       }
 
       // 1.2 Descargar Miembros de equipo
+      int membersCount = 0;
       try {
         final List<dynamic> cloudMembers = await client!.from('business_members').select();
         for (final m in cloudMembers) {
+          final rawUserId = m['user_id'] as String?;
+          final memberEmail = (m['user_email'] ?? m['email'] ?? '').toString().trim().toLowerCase();
+          String? resolvedUserId = (rawUserId != null && rawUserId.trim().isNotEmpty) ? rawUserId.trim() : null;
+          if (resolvedUserId == null && userEmail != null && memberEmail == userEmail.trim().toLowerCase()) {
+            resolvedUserId = userId;
+          }
           await db.insert(
             'business_members',
             {
               'id': m['id'],
               'business_id': m['business_id'],
-              'user_id': m['user_id'],
-              'email': m['user_email'] ?? m['email'] ?? '',
+              'user_id': resolvedUserId,
+              'email': memberEmail,
               'role': m['role'] ?? 'CASHIER',
-              'status': m['status'] ?? 'ACTIVE',
+              'status': 'ACTIVE',
               'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
+          membersCount++;
         }
       } catch (e) {
         debugPrint('Error descargando miembros de Supabase: $e');
@@ -470,6 +510,7 @@ class SupabaseService {
         productsCount: productsCount,
         customersCount: customersCount,
         salesCount: salesCount,
+        membersCount: membersCount,
       );
     } catch (e) {
       return SyncResult(
@@ -642,6 +683,41 @@ class SupabaseService {
       await client?.from('categories').delete().eq('id', categoryId);
     } catch (e) {
       debugPrint('Error al eliminar categoría en Supabase: $e');
+    }
+  }
+
+  /// Guarda o actualiza un miembro de equipo en Supabase en tiempo real
+  Future<void> upsertBusinessMemberToCloud(Map<String, dynamic> m) async {
+    try {
+      if (!(await isCloudSyncEnabled())) return;
+      if (!_isInitialized) await initialize();
+      final userEmail = (m['email'] ?? m['user_email'] ?? '').toString();
+      final userName = (m['name'] ?? m['user_name'] ?? (userEmail.isNotEmpty ? userEmail.split('@').first : 'Colaborador')).toString();
+      final rawUserId = m['user_id'] as String?;
+      await client?.from('business_members').upsert({
+        'id': m['id'],
+        'business_id': m['business_id'],
+        'user_id': (rawUserId != null && rawUserId.trim().isNotEmpty) ? rawUserId.trim() : '',
+        'user_email': userEmail,
+        'user_name': userName,
+        'role': m['role'] ?? 'CASHIER',
+        'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
+      }, onConflict: 'id');
+      debugPrint('Miembro $userEmail sincronizado en Supabase.');
+    } catch (e) {
+      debugPrint('Error al guardar miembro en Supabase: $e');
+    }
+  }
+
+  /// Elimina un miembro de equipo de Supabase en tiempo real
+  Future<void> deleteBusinessMemberFromCloud(String memberId) async {
+    try {
+      if (!(await isCloudSyncEnabled())) return;
+      if (!_isInitialized) await initialize();
+      await client?.from('business_members').delete().eq('id', memberId);
+      debugPrint('Miembro $memberId eliminado de Supabase.');
+    } catch (e) {
+      debugPrint('Error al eliminar miembro en Supabase: $e');
     }
   }
 

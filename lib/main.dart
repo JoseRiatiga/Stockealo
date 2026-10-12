@@ -8,8 +8,11 @@ import 'features/business/models/business.dart';
 import 'features/business/presentation/screens/create_initial_business_screen.dart';
 import 'features/home/presentation/screens/main_navigation_screen.dart';
 
+import 'core/services/supabase_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseService.instance.initialize();
   runApp(const StockealoApp());
 }
 

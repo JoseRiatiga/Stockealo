@@ -9,6 +9,7 @@ import '../../../business/models/business.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
+import 'supabase_sync_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -434,6 +435,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onTap: _exportToExcel,
               ),
             ),
+
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFECFDF5),
+                child: Icon(Icons.cloud_sync_outlined, color: Color(0xFF059669)),
+              ),
+              title: const Text('Conexión Supabase (Nube)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Probar conexión y sincronizar datos a la nube', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SupabaseSyncScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
 
           Card(
             margin: const EdgeInsets.only(bottom: 8),

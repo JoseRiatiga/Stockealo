@@ -100,8 +100,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -116,33 +118,36 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 76,
                     height: 76,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
+                      color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                       borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: const Color(0xFFA7F3D0), width: 2),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0),
+                        width: 2,
+                      ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.inventory_2,
                       size: 42,
-                      color: Color(0xFF059669),
+                      color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Stockealo',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Control de inventario y ventas para tu negocio',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF64748B),
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     ),
                   ),
                   const SizedBox(height: 28),
@@ -151,8 +156,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : Colors.transparent,
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -170,12 +178,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: !_isRegisterMode ? Colors.white : Colors.transparent,
+                                color: !_isRegisterMode
+                                    ? (isDark ? const Color(0xFF334155) : Colors.white)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                                 boxShadow: !_isRegisterMode
                                     ? [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.04),
+                                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
                                           blurRadius: 4,
                                         )
                                       ]
@@ -187,8 +197,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                   color: !_isRegisterMode
-                                      ? const Color(0xFF059669)
-                                      : const Color(0xFF64748B),
+                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                 ),
                               ),
                             ),
@@ -208,12 +218,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: _isRegisterMode ? Colors.white : Colors.transparent,
+                                color: _isRegisterMode
+                                    ? (isDark ? const Color(0xFF334155) : Colors.white)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                                 boxShadow: _isRegisterMode
                                     ? [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.04),
+                                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
                                           blurRadius: 4,
                                         )
                                       ]
@@ -225,8 +237,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                   color: _isRegisterMode
-                                      ? const Color(0xFF059669)
-                                      : const Color(0xFF64748B),
+                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                 ),
                               ),
                             ),
@@ -249,9 +261,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               margin: const EdgeInsets.only(bottom: 16),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFEF2F2),
+                                color: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEF2F2),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFFCA5A5)),
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFCA5A5),
+                                ),
                                 boxShadow: [
                                   BoxShadow(
                                     color: const Color(0xFFDC2626).withOpacity(0.06),
@@ -263,17 +277,17 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.error_outline_rounded,
-                                    color: Color(0xFFDC2626),
+                                    color: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
                                     size: 20,
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
                                       _errorMessage!,
-                                      style: const TextStyle(
-                                        color: Color(0xFF991B1B),
+                                      style: TextStyle(
+                                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
                                         fontSize: 13,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -283,9 +297,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   InkWell(
                                     onTap: () => setState(() => _errorMessage = null),
                                     borderRadius: BorderRadius.circular(12),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(4),
-                                      child: Icon(Icons.close, size: 16, color: Color(0xFF991B1B)),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(4),
+                                      child: Icon(
+                                        Icons.close,
+                                        size: 16,
+                                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -409,28 +427,40 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              const Text('Acepto los ', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                              Text(
+                                'Acepto los ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                ),
+                              ),
                               InkWell(
                                 onTap: () => LegalDocumentScreen.show(context, initialTabIndex: 0),
-                                child: const Text(
+                                child: Text(
                                   'Términos de Uso',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF059669),
+                                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),
                               ),
-                              const Text(' y la ', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                              Text(
+                                ' y la ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                ),
+                              ),
                               InkWell(
                                 onTap: () => LegalDocumentScreen.show(context, initialTabIndex: 1),
-                                child: const Text(
+                                child: Text(
                                   'Política de Privacidad',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF059669),
+                                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),
@@ -476,31 +506,34 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       InkWell(
                         onTap: () => LegalDocumentScreen.show(context, initialTabIndex: 0),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                           child: Text(
                             'Términos y Condiciones',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF64748B),
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
                       ),
-                      const Text(
+                      Text(
                         '•',
-                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                          fontSize: 12,
+                        ),
                       ),
                       InkWell(
                         onTap: () => LegalDocumentScreen.show(context, initialTabIndex: 1),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                           child: Text(
                             'Política de Privacidad',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF64748B),
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                               fontWeight: FontWeight.w500,
                             ),
                           ),

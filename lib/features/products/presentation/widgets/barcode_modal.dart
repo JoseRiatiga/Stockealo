@@ -26,11 +26,13 @@ class _BarcodeModalState extends State<BarcodeModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -39,7 +41,7 @@ class _BarcodeModalState extends State<BarcodeModal> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.shade300,
+              color: isDark ? const Color(0xFF334155) : Colors.grey.shade300,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -47,18 +49,18 @@ class _BarcodeModalState extends State<BarcodeModal> {
           Text(
             widget.product.name,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             'Código: ${widget.product.code}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF64748B),
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -87,16 +89,19 @@ class _BarcodeModalState extends State<BarcodeModal> {
           ),
           const SizedBox(height: 24),
 
-          // Contenedor visual del código
+          // Contenedor visual del código (fondo blanco limpio para escaneo con cámara)
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(
+                color: isDark ? const Color(0xFF475569) : Colors.grey.shade200,
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),

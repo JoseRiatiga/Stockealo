@@ -243,25 +243,48 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                 children: [
                   Text(
                     'La empresa "${biz.name}" se moverá a la papelera. Tendrás 7 días para restaurarla antes de su eliminación definitiva.',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(ctx).brightness == Brightness.dark
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFF475569),
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Para confirmar, escribe exactamente el nombre de la empresa:',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(ctx).brightness == Brightness.dark
+                          ? const Color(0xFFF8FAFC)
+                          : const Color(0xFF1E293B),
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: Theme.of(ctx).brightness == Brightness.dark
+                          ? const Color(0xFF0F172A)
+                          : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(
+                        color: Theme.of(ctx).brightness == Brightness.dark
+                            ? const Color(0xFF334155)
+                            : Colors.grey.shade300,
+                      ),
                     ),
                     child: SelectableText(
                       biz.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 13),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(ctx).brightness == Brightness.dark
+                            ? const Color(0xFFF8FAFC)
+                            : const Color(0xFF0F172A),
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -328,6 +351,8 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
     final deleted = await _businessRepo.getDeletedBusinesses(widget.userId);
     if (!mounted) return;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -337,9 +362,9 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
           builder: (trashCtx, setTrashState) {
             return Container(
               padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -350,30 +375,33 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
+                        color: isDark ? const Color(0xFF334155) : Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
-                      SizedBox(width: 8),
+                      const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                      const SizedBox(width: 8),
                       Text(
                         'Papelera de Empresas',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
+                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'Las empresas se conservan aquí durante 7 días antes de eliminarse de forma permanente.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   if (deleted.isEmpty)
@@ -398,16 +426,18 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEF2F2),
+                              color: isDark ? const Color(0xFF450A0A).withOpacity(0.4) : const Color(0xFFFEF2F2),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFFECACA)),
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const CircleAvatar(
-                                  backgroundColor: Color(0xFFFEE2E2),
-                                  foregroundColor: Color(0xFFDC2626),
-                                  child: Icon(Icons.storefront, size: 20),
+                                CircleAvatar(
+                                  backgroundColor: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
+                                  foregroundColor: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                                  child: const Icon(Icons.storefront, size: 20),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -416,18 +446,18 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                     children: [
                                       Text(
                                         biz.name,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF1E293B),
+                                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                                         ),
                                       ),
                                       Text(
                                         'Expira en $daysLeft ${daysLeft == 1 ? "día" : "días"}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
-                                          color: Color(0xFFDC2626),
+                                          color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
                                         ),
                                       ),
                                     ],
@@ -481,11 +511,13 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -496,7 +528,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: isDark ? const Color(0xFF334155) : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -505,12 +537,12 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Tus Empresas / Negocios',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                 ),
               ),
               TextButton.icon(
@@ -518,15 +550,18 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Nueva'),
                 style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF059669),
+                  foregroundColor: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                   textStyle: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
-          const Text(
+          Text(
             'Los productos y ventas de cada empresa están 100% aislados.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -536,18 +571,23 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Center(
                 child: Column(
                   children: [
                     const Icon(Icons.storefront_outlined, size: 40, color: Color(0xFF94A3B8)),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'No tienes empresas activas.',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
@@ -571,10 +611,14 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
 
                   return Container(
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                      color: isSelected
+                          ? (isDark ? const Color(0xFF064E3B).withOpacity(0.5) : const Color(0xFFECFDF5))
+                          : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: isSelected ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                        color: isSelected
+                            ? (isDark ? const Color(0xFF10B981) : const Color(0xFF059669))
+                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                         width: isSelected ? 1.5 : 1,
                       ),
                     ),
@@ -592,8 +636,12 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                               child: Row(
                                 children: [
                                   CircleAvatar(
-                                    backgroundColor: isSelected ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
-                                    foregroundColor: isSelected ? Colors.white : const Color(0xFF64748B),
+                                    backgroundColor: isSelected
+                                        ? const Color(0xFF059669)
+                                        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                    foregroundColor: isSelected
+                                        ? Colors.white
+                                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                     child: const Icon(Icons.storefront, size: 20),
                                   ),
                                   const SizedBox(width: 14),
@@ -609,7 +657,9 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                                 style: TextStyle(
                                                   fontSize: 15,
                                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                                  color: isSelected ? const Color(0xFF065F46) : const Color(0xFF1E293B),
+                                                  color: isSelected
+                                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF065F46))
+                                                      : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
                                                 ),
                                               ),
                                             ),
@@ -635,7 +685,10 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                         const SizedBox(height: 2),
                                         Text(
                                           'Moneda: ${getCurrencyLabel(biz.currency)}',
-                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -656,13 +709,17 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                             }
                           },
                           itemBuilder: (ctx) => [
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'edit',
                               child: Row(
                                 children: [
-                                  Icon(Icons.edit_outlined, size: 18, color: Color(0xFF1E293B)),
-                                  SizedBox(width: 8),
-                                  Text('Editar negocio'),
+                                  Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('Editar negocio'),
                                 ],
                               ),
                             ),
@@ -692,36 +749,44 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
             Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
+                color: isDark ? const Color(0xFF450A0A).withOpacity(0.4) : const Color(0xFFFEF2F2),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFECACA)),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
+                ),
               ),
               child: ListTile(
                 dense: true,
                 leading: const Icon(Icons.delete_sweep_outlined, color: Color(0xFFDC2626), size: 22),
                 title: Text(
                   'Papelera (${_deletedBusinesses.length} ${_deletedBusinesses.length == 1 ? "empresa" : "empresas"})',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    color: Color(0xFF991B1B),
+                    color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
                   ),
                 ),
-                subtitle: const Text(
+                subtitle: Text(
                   'Recupera empresas antes de 7 días',
-                  style: TextStyle(fontSize: 11, color: Color(0xFFDC2626)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+                  ),
                 ),
                 trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFFDC2626)),
                 onTap: _showTrashModal,
               ),
             ),
 
-          const Divider(height: 1),
+          Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           const SizedBox(height: 4),
 
           // Términos y Privacidad
           ListTile(
-            leading: const Icon(Icons.shield_outlined, color: Color(0xFF059669)),
+            leading: Icon(
+              Icons.shield_outlined,
+              color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+            ),
             title: const Text('Términos y Privacidad', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFF94A3B8)),
             onTap: () {

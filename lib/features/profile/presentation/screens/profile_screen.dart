@@ -799,9 +799,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFEFF6FF),
-                    child: Icon(Icons.lock_reset, color: Color(0xFF2563EB)),
+                  leading: CircleAvatar(
+                    backgroundColor: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
+                    child: Icon(
+                      Icons.lock_reset,
+                      color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                    ),
                   ),
                   title: const Text('Cambiar Contraseña', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                   subtitle: const Text('Actualiza tu clave de acceso seguro', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
@@ -811,9 +814,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const Divider(height: 12),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFF1F5F9),
-                    child: Icon(Icons.description_outlined, color: Color(0xFF475569)),
+                  leading: CircleAvatar(
+                    backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    child: Icon(
+                      Icons.description_outlined,
+                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                    ),
                   ),
                   title: const Text('Términos y Privacidad', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                   subtitle: const Text('Protección de datos y condiciones del servicio', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),

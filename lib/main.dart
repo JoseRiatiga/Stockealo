@@ -77,9 +77,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       future: _sessionFuture,
       builder: (context, sessionSnapshot) {
         if (sessionSnapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: Colors.white,
-            body: Center(
+          return Scaffold(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            body: const Center(
               child: CircularProgressIndicator(color: Color(0xFF059669)),
             ),
           );
@@ -99,9 +99,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
           future: _businessRepo.getActiveBusiness(currentUser.id),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                backgroundColor: Colors.white,
-                body: Center(
+              return Scaffold(
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                body: const Center(
                   child: CircularProgressIndicator(color: Color(0xFF059669)),
                 ),
               );

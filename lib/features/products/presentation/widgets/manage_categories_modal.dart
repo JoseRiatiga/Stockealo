@@ -185,11 +185,12 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
@@ -200,7 +201,7 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -212,16 +213,16 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.category, color: Color(0xFF059669), size: 22),
-                    SizedBox(width: 10),
+                    const Icon(Icons.category, color: Color(0xFF059669), size: 22),
+                    const SizedBox(width: 10),
                     Text(
                       'Gestionar Categorías',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                       ),
                     ),
                   ],
@@ -234,7 +235,7 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
             ),
           ),
 
-          const Divider(height: 1),
+          Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
 
           // Contenido de la lista
           Expanded(
@@ -245,11 +246,11 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.category_outlined, size: 48, color: Colors.grey.shade400),
+                            Icon(Icons.category_outlined, size: 48, color: isDark ? const Color(0xFF475569) : Colors.grey.shade400),
                             const SizedBox(height: 12),
-                            const Text(
+                            Text(
                               'No tienes categorías creadas aún',
-                              style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                              style: TextStyle(fontSize: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                             ),
                           ],
                         ),
@@ -265,15 +266,15 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
+                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                             ),
                             child: Row(
                               children: [
                                 CircleAvatar(
                                   radius: 18,
-                                  backgroundColor: const Color(0xFFECFDF5),
+                                  backgroundColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                                   child: Text(
                                     cat.name.isNotEmpty ? cat.name[0].toUpperCase() : '?',
                                     style: const TextStyle(
@@ -290,17 +291,17 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
                                     children: [
                                       Text(
                                         cat.name,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 14,
-                                          color: Color(0xFF1E293B),
+                                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                                         ),
                                       ),
                                       Text(
                                         '$count ${count == 1 ? "producto" : "productos"}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
-                                          color: Color(0xFF64748B),
+                                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                         ),
                                       ),
                                     ],

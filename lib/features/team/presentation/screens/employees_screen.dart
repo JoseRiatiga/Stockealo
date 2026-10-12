@@ -198,6 +198,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -214,29 +218,39 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
+                    color: isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFECFDF5),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0),
+                    ),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      CircleAvatar(
+                      const CircleAvatar(
                         backgroundColor: Color(0xFF059669),
                         child: Icon(Icons.people_alt_outlined, color: Colors.white),
                       ),
-                      SizedBox(width: 14),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Gestión de Empleados y Roles',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF065F46)),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                              ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
                               'Los cajeros solo registran ventas. Tus costos de compra e ingresos globales están protegidos.',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF047857), height: 1.3),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                                height: 1.3,
+                              ),
                             ),
                           ],
                         ),
@@ -251,7 +265,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   children: [
                     Text(
                       'Miembros del Equipo (${_members.length + 1})',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryTextColor),
                     ),
                     if (isOwner)
                       TextButton.icon(
@@ -272,22 +286,26 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    leading: const CircleAvatar(
-                      backgroundColor: Color(0xFFECFDF5),
-                      child: Icon(Icons.military_tech, color: Color(0xFF059669)),
+                    leading: CircleAvatar(
+                      backgroundColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                      child: Icon(Icons.military_tech, color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669)),
                     ),
                     title: const Text('Dueño de la Empresa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    subtitle: const Text('Acceso total e irrestricto', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    subtitle: Text('Acceso total e irrestricto', style: TextStyle(fontSize: 12, color: secondaryTextColor)),
                     trailing: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
+                        color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFF059669)),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Dueño',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                        ),
                       ),
                     ),
                   ),
@@ -315,8 +333,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 else
                   ..._members.map((member) {
                     final isCashier = member.isCashier;
-                    final roleColor = isCashier ? const Color(0xFF2563EB) : const Color(0xFFD97706);
-                    final roleBg = isCashier ? const Color(0xFFEFF6FF) : const Color(0xFFFEF3C7);
+                    final roleColor = isCashier
+                        ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB))
+                        : (isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706));
+                    final roleBg = isCashier
+                        ? (isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF))
+                        : (isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7));
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -333,7 +355,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                         title: Text(member.email, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                         subtitle: Text(
                           member.roleDescription,
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          style: TextStyle(fontSize: 11, color: secondaryTextColor),
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,

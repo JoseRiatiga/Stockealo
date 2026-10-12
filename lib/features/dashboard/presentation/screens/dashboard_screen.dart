@@ -111,6 +111,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final user = _authRepo.currentUser;
     final userName = user?.displayName ?? 'Comerciante';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Scaffold(
       appBar: AppBar(
@@ -170,36 +173,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         children: [
                           Text(
                             '¡Hola, $userName! 👋',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
+                              color: textPrimary,
                             ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
+                          Text(
                             'Resumen operativo de hoy',
-                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                            style: TextStyle(fontSize: 13, color: textSecondary),
                           ),
                         ],
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFECFDF5),
+                          color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                          border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.circle, color: Color(0xFF059669), size: 8),
+                            Icon(Icons.circle, color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669), size: 8),
                             const SizedBox(width: 6),
                             Text(
                               _userRole == 'OWNER' ? 'Dueño' : (_userRole == 'ADMIN' ? 'Admin' : 'Cajero'),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF065F46),
+                                color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
                               ),
                             ),
                           ],
@@ -214,9 +217,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 20),
 
                   // Acciones Rápidas (Estilo POS)
-                  const Text(
+                  Text(
                     'Acciones Rápidas',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
                   ),
                   const SizedBox(height: 12),
                   _buildQuickActions(),
@@ -310,15 +313,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Color bg,
     VoidCallback? onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.02),
@@ -339,12 +343,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
                   ),
                 ),
                 CircleAvatar(
                   radius: 14,
-                  backgroundColor: bg,
+                  backgroundColor: isDark ? bg.withOpacity(0.15) : bg,
                   child: Icon(icon, size: 16, color: color),
                 ),
               ],
@@ -368,7 +376,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  ),
                 ),
               ],
             ),
@@ -468,15 +479,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required VoidCallback onTap,
     String? badge,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         ),
         child: Column(
           children: [
@@ -505,7 +517,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 6),
             Text(
               label,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF334155),
+              ),
             ),
           ],
         ),
@@ -514,6 +530,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildWeeklySalesChart() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final List<dynamic> weeklySales = _summary['weeklySales'] ?? [];
     double maxAmount = 1000.0;
     for (final item in weeklySales) {
@@ -524,9 +541,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -534,9 +551,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Ventas de la Semana (Últimos 7 días)',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                ),
               ),
               InkWell(
                 onTap: widget.onNavigateToSales,
@@ -573,14 +594,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       width: 22,
                       height: 70 * heightFactor,
                       decoration: BoxDecoration(
-                        color: total > 0 ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                        color: total > 0
+                            ? const Color(0xFF059669)
+                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       day,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
                     ),
                   ],
                 );
@@ -593,15 +620,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTopProductsSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final List<dynamic> topProducts = _summary['topProducts'] ?? [];
 
     if (topProducts.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         ),
         child: const Center(
           child: Text(
@@ -617,16 +645,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Productos Más Vendidos',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+            ),
           ),
           const SizedBox(height: 12),
           ...topProducts.asMap().entries.map((entry) {
@@ -643,7 +675,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: Text(
                       item['name'] as String,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                      ),
                     ),
                   ),
                   Text(

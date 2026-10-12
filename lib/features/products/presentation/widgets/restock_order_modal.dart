@@ -105,6 +105,9 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF1E293B)
+          : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -336,10 +339,14 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
+                    color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF059669), size: 24),
+                  child: Icon(
+                    Icons.local_shipping_outlined,
+                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -522,7 +529,9 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: isOutOfStock ? const Color(0xFFFEE2E2) : const Color(0xFFFEF3C7),
+                                                color: isOutOfStock
+                                                    ? (isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEE2E2))
+                                                    : (isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7)),
                                                 borderRadius: BorderRadius.circular(6),
                                               ),
                                               child: Text(
@@ -530,7 +539,9 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                                                 style: TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.bold,
-                                                  color: isOutOfStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+                                                  color: isOutOfStock
+                                                      ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626))
+                                                      : (isDark ? const Color(0xFFFCD34D) : const Color(0xFFD97706)),
                                                 ),
                                               ),
                                             ),

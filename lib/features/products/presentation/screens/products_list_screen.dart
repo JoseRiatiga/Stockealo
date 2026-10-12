@@ -521,6 +521,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   }
 
   Widget _buildStatsHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final total = _stats['totalProducts'] ?? 0;
     final outOfStock = _stats['outOfStock'] ?? 0;
     final lowStock = _stats['lowStock'] ?? 0;
@@ -530,9 +531,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -546,19 +547,19 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatItem('Total Artículos', '$total', const Color(0xFF1E293B)),
+              _buildStatItem('Total Artículos', '$total', isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
               _buildStatItem('Bajo Stock', '$lowStock', const Color(0xFFD97706)),
               _buildStatItem('Agotados', '$outOfStock', const Color(0xFFDC2626)),
             ],
           ),
           if (totalValue > 0) ...[
-            const Divider(height: 20),
+            Divider(height: 20, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Valor comercial en inventario:',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                 ),
                 Text(
                   CurrencyFormatter.format(totalValue),
@@ -579,9 +580,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
+                  color: isDark ? const Color(0xFF78350F).withOpacity(0.5) : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
+                  border: Border.all(color: isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A)),
                 ),
                 child: Row(
                   children: [
@@ -590,10 +591,14 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                     Expanded(
                       child: Text(
                         '${lowStock + outOfStock} productos para reponer • Generar pedido',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                        ),
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF92400E)),
+                    Icon(Icons.arrow_forward_ios, size: 12, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E)),
                   ],
                 ),
               ),
@@ -605,6 +610,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   }
 
   Widget _buildStatItem(String title, String count, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         Text(
@@ -618,9 +624,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         const SizedBox(height: 2),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
-            color: Color(0xFF64748B),
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -629,6 +635,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -637,8 +644,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                color: Color(0xFFECFDF5),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -653,10 +660,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                   ? 'No se encontraron productos'
                   : 'Aún no tienes productos registrados',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
               ),
             ),
             const SizedBox(height: 8),
@@ -665,9 +672,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                   ? 'Intenta con otro término de búsqueda o limpia el filtro.'
                   : 'Toca el botón "+ Nuevo Producto" para comenzar a registrar tu catálogo y stock.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF64748B),
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
               ),
             ),
           ],

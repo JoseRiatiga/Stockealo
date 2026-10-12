@@ -113,6 +113,12 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
     return Container(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
@@ -120,9 +126,9 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
         left: 20,
         right: 20,
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
         child: Column(
@@ -134,29 +140,33 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
+                    color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.file_upload_outlined, color: Color(0xFF059669), size: 24),
+                  child: Icon(
+                    Icons.file_upload_outlined,
+                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Importar Inventario desde Excel',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textMain),
                       ),
                       Text(
                         'Carga masiva de productos y clientes (.xlsx)',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        style: TextStyle(fontSize: 12, color: textMuted),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                  icon: Icon(Icons.close, color: textMuted),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -168,9 +178,11 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
                 padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
+                  color: isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEF2F2),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFECACA)),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFFB91C1C) : const Color(0xFFFECACA),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -179,7 +191,10 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
                     Expanded(
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(color: Color(0xFF991B1B), fontSize: 13),
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
@@ -191,23 +206,23 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: borderColor),
                 ),
                 child: Column(
                   children: [
                     const Icon(Icons.table_view_outlined, size: 48, color: Color(0xFF059669)),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'Selecciona tu archivo de Excel',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E293B)),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textMain),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       'Puedes usar una copia exportada de Stockealo o cualquier plantilla con columnas de Nombre, Precio y Stock.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
+                      style: TextStyle(fontSize: 12, color: textMuted, height: 1.4),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
@@ -231,20 +246,26 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
+                  color: isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFF0FDF4),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF059669) : const Color(0xFFBBF7D0),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.check_circle_outline, color: Color(0xFF16A34A), size: 22),
-                        SizedBox(width: 8),
+                        const Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 22),
+                        const SizedBox(width: 8),
                         Text(
                           'Archivo analizado correctamente',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF166534)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF166534),
+                          ),
                         ),
                       ],
                     ),
@@ -255,16 +276,17 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
                           child: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark ? const Color(0xFF0F172A) : Colors.white,
                               borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: borderColor),
                             ),
                             child: Column(
                               children: [
                                 Text(
                                   '${_preview!.productsFound}',
-                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
                                 ),
-                                const Text('Productos', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                Text('Productos', style: TextStyle(fontSize: 12, color: textMuted)),
                               ],
                             ),
                           ),
@@ -274,16 +296,17 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
                           child: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark ? const Color(0xFF0F172A) : Colors.white,
                               borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: borderColor),
                             ),
                             child: Column(
                               children: [
                                 Text(
                                   '${_preview!.customersFound}',
-                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8)),
                                 ),
-                                const Text('Clientes', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                Text('Clientes', style: TextStyle(fontSize: 12, color: textMuted)),
                               ],
                             ),
                           ),
@@ -294,7 +317,7 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
                       const SizedBox(height: 12),
                       Text(
                         'Muestra detectada: ${_preview!.productSampleNames.take(3).join(', ')}...',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF475569), fontStyle: FontStyle.italic),
+                        style: TextStyle(fontSize: 12, color: textMuted, fontStyle: FontStyle.italic),
                       ),
                     ],
                   ],

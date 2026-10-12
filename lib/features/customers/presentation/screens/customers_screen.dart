@@ -212,28 +212,29 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final filtered = _filteredCustomers;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Clientes y Fiados', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1E293B),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        foregroundColor: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
       ),
       body: Column(
         children: [
           // Banner de resumen de cartera/deuda
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
+                color: isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFFDE68A)),
+                border: Border.all(color: isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A)),
               ),
               child: Row(
                 children: [
@@ -243,17 +244,28 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       color: const Color(0xFFF59E0B).withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.receipt_long, color: Color(0xFFB45309), size: 24),
+                    child: Icon(Icons.receipt_long, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309), size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Total por Cobrar (Fiados)', style: TextStyle(fontSize: 12, color: Color(0xFF92400E), fontWeight: FontWeight.w600)),
+                        Text(
+                          'Total por Cobrar (Fiados)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         Text(
                           CurrencyFormatter.formatCOP(_totalDebt),
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309),
+                          ),
                         ),
                       ],
                     ),
@@ -261,12 +273,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '$_debtorsCount deudores',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309),
+                      ),
                     ),
                   ),
                 ],
@@ -277,7 +293,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           // Buscador y Filtros
           Container(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             child: Column(
               children: [
                 TextField(
@@ -290,7 +306,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         ? IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => setState(() => _searchController.clear()))
                         : null,
                     filled: true,
-                    fillColor: const Color(0xFFF1F5F9),
+                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   ),
@@ -298,11 +314,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _buildFilterChip('TODOS', 'Todos (${_customers.length})'),
+                    _buildFilterChip('TODOS', 'Todos (${_customers.length})', isDark),
                     const SizedBox(width: 8),
-                    _buildFilterChip('DEUDA', 'Con Deuda ($_debtorsCount)'),
+                    _buildFilterChip('DEUDA', 'Con Deuda ($_debtorsCount)', isDark),
                     const SizedBox(width: 8),
-                    _buildFilterChip('AL_DIA', 'Al Día (${_customers.length - _debtorsCount})'),
+                    _buildFilterChip('AL_DIA', 'Al Día (${_customers.length - _debtorsCount})', isDark),
                   ],
                 ),
               ],
@@ -322,7 +338,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             const SizedBox(height: 12),
                             Text(
                               _customers.isEmpty ? 'Aún no tienes clientes registrados' : 'No se encontraron clientes con este filtro',
-                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                              style: TextStyle(
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                fontSize: 14,
+                              ),
                             ),
                           ],
                         ),
@@ -332,7 +351,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
                           final c = filtered[index];
-                          return _buildCustomerCard(c);
+                          return _buildCustomerCard(c, isDark);
                         },
                       ),
           ),
@@ -348,30 +367,37 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Widget _buildFilterChip(String key, String label) {
+  Widget _buildFilterChip(String key, String label, bool isDark) {
     final selected = _filter == key;
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: const Color(0xFFECFDF5),
+      selectedColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
       labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.bold,
-        color: selected ? const Color(0xFF059669) : const Color(0xFF64748B),
+        color: selected
+            ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF059669))
+            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
       ),
       onSelected: (_) => setState(() => _filter = key),
     );
   }
 
-  Widget _buildCustomerCard(Customer customer) {
+  Widget _buildCustomerCard(Customer customer, bool isDark) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: customer.hasDebt ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0)),
+        side: BorderSide(
+          color: customer.hasDebt
+              ? (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A))
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
       ),
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -380,12 +406,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: customer.hasDebt ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
+                  backgroundColor: customer.hasDebt
+                      ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7))
+                      : (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5)),
                   child: Text(
                     customer.name.isNotEmpty ? customer.name[0].toUpperCase() : 'C',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: customer.hasDebt ? const Color(0xFFB45309) : const Color(0xFF059669),
+                      color: customer.hasDebt
+                          ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                          : const Color(0xFF059669),
                     ),
                   ),
                 ),
@@ -394,9 +424,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E293B))),
+                      Text(
+                        customer.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                        ),
+                      ),
                       if (customer.phone?.isNotEmpty == true)
-                        Text('📞 ${customer.phone}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        Text(
+                          '📞 ${customer.phone}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -404,9 +447,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: customer.hasDebt ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
+                    color: customer.hasDebt
+                        ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7))
+                        : (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5)),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: customer.hasDebt ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0)),
+                    border: Border.all(
+                      color: customer.hasDebt
+                          ? (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A))
+                          : (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -416,7 +465,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: customer.hasDebt ? const Color(0xFFB45309) : const Color(0xFF059669),
+                          color: customer.hasDebt
+                              ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                              : const Color(0xFF059669),
                         ),
                       ),
                       Text(
@@ -424,7 +475,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: customer.hasDebt ? const Color(0xFFB45309) : const Color(0xFF059669),
+                          color: customer.hasDebt
+                              ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                              : const Color(0xFF059669),
                         ),
                       ),
                     ],
@@ -432,7 +485,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 ),
               ],
             ),
-            const Divider(height: 20),
+            Divider(height: 20, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -466,8 +519,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   icon: const Icon(Icons.history, size: 16),
                   label: const Text('Historial', style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF475569),
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    foregroundColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                    side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   ),

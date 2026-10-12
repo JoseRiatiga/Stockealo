@@ -15,6 +15,7 @@ class CategoryFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final allCategories = ['Todos', ...categories.map((c) => c.name)];
 
     return SizedBox(
@@ -32,17 +33,21 @@ class CategoryFilterBar extends StatelessWidget {
             label: Text(cat),
             selected: isSelected,
             onSelected: (_) => onCategorySelected(cat),
-            backgroundColor: Colors.white,
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
             selectedColor: const Color(0xFF059669),
             labelStyle: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF475569),
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
               fontSize: 13,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
               side: BorderSide(
-                color: isSelected ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                color: isSelected
+                    ? const Color(0xFF059669)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
             ),
             showCheckmark: false,

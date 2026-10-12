@@ -116,6 +116,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final p = widget.product;
     final isOutOfStock = p.isOutOfStock;
     final totalAmount = p.salePrice * _quantity;
@@ -132,9 +133,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
         left: 20,
         right: 20,
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -146,7 +147,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -164,7 +165,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                   child: hasPhoto
                       ? Image.file(File(p.photoPath!), fit: BoxFit.cover)
                       : Container(
-                          color: const Color(0xFFF1F5F9),
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                           child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF94A3B8)),
                         ),
                 ),
@@ -176,24 +177,24 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                   children: [
                     Text(
                       p.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${p.code} • ${CurrencyFormatter.format(p.salePrice)} / unid.',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                     ),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: isOutOfStock
-                            ? const Color(0xFFFEE2E2)
-                            : const Color(0xFFECFDF5),
+                            ? (isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEE2E8))
+                            : (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5)),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -202,8 +203,8 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: isOutOfStock
-                              ? const Color(0xFFDC2626)
-                              : const Color(0xFF059669),
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF10B981),
                         ),
                       ),
                     ),
@@ -219,9 +220,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
+                color: isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : const Color(0xFFFEF2F2),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFECACA)),
+                border: Border.all(color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFECACA)),
               ),
               child: const Row(
                 children: [
@@ -230,7 +231,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                   Expanded(
                     child: Text(
                       'No es posible registrar ventas porque el stock físico es 0. Repón inventario primero.',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF991B1B)),
+                      style: TextStyle(fontSize: 13, color: Color(0xFFEF4444)),
                     ),
                   ),
                 ],
@@ -239,9 +240,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
             const SizedBox(height: 20),
           ] else ...[
             // Selector de Cantidad a Descontar
-            const Text(
+            Text(
               'Cantidad a descontar por venta:',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
             ),
             const SizedBox(height: 10),
 
@@ -252,8 +253,8 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                   onPressed: _decrement,
                   icon: const Icon(Icons.remove),
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    foregroundColor: const Color(0xFF1E293B),
+                    backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    foregroundColor: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                     padding: const EdgeInsets.all(12),
                   ),
                 ),
@@ -263,10 +264,10 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
                     '$_quantity',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                     ),
                   ),
                 ),
@@ -274,8 +275,8 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                   onPressed: _increment,
                   icon: const Icon(Icons.add),
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFECFDF5),
-                    foregroundColor: const Color(0xFF059669),
+                    backgroundColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                    foregroundColor: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                     padding: const EdgeInsets.all(12),
                   ),
                 ),
@@ -297,19 +298,19 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
             const SizedBox(height: 18),
 
             // Selector de Método de Pago
-            const Text(
+            Text(
               'Método de pago utilizado:',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
             ),
             const SizedBox(height: 10),
 
             Row(
               children: [
-                _buildPaymentMethodChip('EFECTIVO', '💵 Efectivo'),
+                _buildPaymentMethodChip('EFECTIVO', '💵 Efectivo', isDark),
                 const SizedBox(width: 8),
-                _buildPaymentMethodChip('TRANSFERENCIA', '📱 Transferencia'),
+                _buildPaymentMethodChip('TRANSFERENCIA', '📱 Transf.', isDark),
                 const SizedBox(width: 8),
-                _buildPaymentMethodChip('FIADO', '📝 Fiado'),
+                _buildPaymentMethodChip('FIADO', '📝 Fiado', isDark),
               ],
             ),
 
@@ -358,7 +359,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
     );
   }
 
-  Widget _buildPaymentMethodChip(String method, String label) {
+  Widget _buildPaymentMethodChip(String method, String label, bool isDark) {
     final isSelected = _paymentMethod == method;
     return Expanded(
       child: InkWell(
@@ -368,10 +369,14 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
           padding: const EdgeInsets.symmetric(vertical: 10),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF059669) : const Color(0xFFF1F5F9),
+            color: isSelected
+                ? const Color(0xFF059669)
+                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? const Color(0xFF059669) : const Color(0xFFCBD5E1),
+              color: isSelected
+                  ? const Color(0xFF059669)
+                  : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
             ),
           ),
           child: Text(
@@ -379,7 +384,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isSelected ? Colors.white : const Color(0xFF334155),
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
             ),
           ),
         ),

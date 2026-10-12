@@ -21,6 +21,7 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasPhoto = product.photoPath != null &&
         product.photoPath!.isNotEmpty &&
         File(product.photoPath!).existsSync();
@@ -28,13 +29,13 @@ class ProductCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       elevation: 0,
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: product.isOutOfStock
-              ? Colors.red.shade200
-              : const Color(0xFFE2E8F0),
+              ? Colors.red.shade400
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           width: product.isOutOfStock ? 1.5 : 1,
         ),
       ),
@@ -56,9 +57,9 @@ class ProductCard extends StatelessWidget {
                       ? Image.file(
                           File(product.photoPath!),
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                          errorBuilder: (_, __, ___) => _buildPlaceholder(isDark),
                         )
-                      : _buildPlaceholder(),
+                      : _buildPlaceholder(isDark),
                 ),
               ),
               const SizedBox(width: 14),
@@ -74,15 +75,15 @@ class ProductCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             product.category,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B),
+                              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
                             ),
                           ),
                         ),
@@ -107,10 +108,10 @@ class ProductCard extends StatelessWidget {
                       product.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -189,9 +190,9 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaceholder() {
+  Widget _buildPlaceholder(bool isDark) {
     return Container(
-      color: const Color(0xFFF1F5F9),
+      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
       child: const Center(
         child: Icon(Icons.image_outlined, color: Color(0xFF94A3B8), size: 30),
       ),

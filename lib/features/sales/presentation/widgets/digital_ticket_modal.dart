@@ -86,6 +86,13 @@ class DigitalTicketModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final ticketBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     final activeBiz = BusinessRepository.instance.currentActiveBusiness;
     final storeName = businessName ?? activeBiz?.name ?? 'Mi Negocio';
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
@@ -93,9 +100,9 @@ class DigitalTicketModal extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(top: 40),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
         child: SingleChildScrollView(
@@ -108,7 +115,7 @@ class DigitalTicketModal extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -118,12 +125,12 @@ class DigitalTicketModal extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Ticket Digital de Venta',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B)),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textMain),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                    icon: Icon(Icons.close, color: textMuted),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -134,9 +141,9 @@ class DigitalTicketModal extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: ticketBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: borderColor),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.03),
@@ -154,26 +161,26 @@ class DigitalTicketModal extends StatelessWidget {
                         children: [
                           Container(
                             padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFECFDF5),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.receipt_long, color: Color(0xFF059669), size: 28),
+                            child: Icon(Icons.receipt_long, color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669), size: 28),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             storeName,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B)),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textMain),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             dateFormat.format(sale.date),
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            style: TextStyle(fontSize: 12, color: textMuted),
                           ),
                           Text(
                             'Ticket #$shortId',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                            style: TextStyle(fontSize: 11, color: textMuted, fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
@@ -181,11 +188,11 @@ class DigitalTicketModal extends StatelessWidget {
                     const Divider(height: 24, thickness: 1),
 
                     // Detalle de ítems
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Cant. / Descripción', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                        Text('Importe', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        Text('Cant. / Descripción', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textMuted)),
+                        Text('Importe', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textMuted)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -198,18 +205,18 @@ class DigitalTicketModal extends StatelessWidget {
                             children: [
                               Text(
                                 '${sale.quantity}x ${sale.productName}',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textMain),
                               ),
                               Text(
                                 '${CurrencyFormatter.formatCOP(sale.unitPrice)} c/u',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                style: TextStyle(fontSize: 12, color: textMuted),
                               ),
                             ],
                           ),
                         ),
                         Text(
                           CurrencyFormatter.formatCOP(sale.totalAmount),
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textMain),
                         ),
                       ],
                     ),
@@ -219,7 +226,7 @@ class DigitalTicketModal extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('TOTAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                        Text('TOTAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain)),
                         Text(
                           CurrencyFormatter.formatCOP(sale.totalAmount),
                           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
@@ -231,11 +238,13 @@ class DigitalTicketModal extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Método de Pago:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        Text('Método de Pago:', style: TextStyle(fontSize: 12, color: textMuted)),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: sale.paymentMethod == 'FIADO' ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
+                            color: sale.paymentMethod == 'FIADO'
+                                ? (isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7))
+                                : (isDark ? const Color(0xFF064E3B).withOpacity(0.5) : const Color(0xFFECFDF5)),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -243,7 +252,9 @@ class DigitalTicketModal extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: sale.paymentMethod == 'FIADO' ? const Color(0xFFD97706) : const Color(0xFF059669),
+                              color: sale.paymentMethod == 'FIADO'
+                                  ? (isDark ? const Color(0xFFFCD34D) : const Color(0xFFD97706))
+                                  : (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)),
                             ),
                           ),
                         ),
@@ -255,17 +266,17 @@ class DigitalTicketModal extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Cliente:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                          Text(sale.customerName!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+                          Text('Cliente:', style: TextStyle(fontSize: 12, color: textMuted)),
+                          Text(sale.customerName!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textMain)),
                         ],
                       ),
                     ],
 
                     const SizedBox(height: 16),
-                    const Center(
+                    Center(
                       child: Text(
                         '¡Gracias por preferirnos! 🌱 Comprobante ecológico',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                        style: TextStyle(fontSize: 11, color: textMuted),
                       ),
                     ),
                   ],
@@ -299,8 +310,8 @@ class DigitalTicketModal extends StatelessWidget {
                       icon: const Icon(Icons.copy, size: 18),
                       label: const Text('Copiar Texto'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF475569),
-                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        foregroundColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                        side: BorderSide(color: borderColor),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -309,7 +320,7 @@ class DigitalTicketModal extends StatelessWidget {
                   Expanded(
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Listo', style: TextStyle(color: Color(0xFF64748B))),
+                      child: Text('Listo', style: TextStyle(color: textMuted)),
                     ),
                   ),
                 ],

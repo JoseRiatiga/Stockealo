@@ -165,6 +165,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasPhoto = _product.photoPath != null &&
         _product.photoPath!.isNotEmpty &&
         File(_product.photoPath!).existsSync();
@@ -215,21 +216,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Container(
             height: 250,
             width: double.infinity,
-            color: const Color(0xFFF1F5F9),
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
             child: hasPhoto
                 ? Image.file(
                     File(_product.photoPath!),
                     fit: BoxFit.cover,
                   )
-                : const Center(
+                : Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inventory_2_outlined, size: 64, color: Color(0xFF94A3B8)),
-                        SizedBox(height: 8),
+                        const Icon(Icons.inventory_2_outlined, size: 64, color: Color(0xFF94A3B8)),
+                        const SizedBox(height: 8),
                         Text(
                           'Sin foto asignada',
-                          style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -248,14 +252,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
+                        color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                        border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
                       ),
                       child: Text(
                         _product.category,
-                        style: const TextStyle(
-                          color: Color(0xFF059669),
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF059669),
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -265,12 +269,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       onTap: () => BarcodeModal.show(context, _product),
                       child: Row(
                         children: [
-                          const Icon(Icons.qr_code, size: 16, color: Color(0xFF64748B)),
+                          Icon(Icons.qr_code, size: 16, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                           const SizedBox(width: 4),
                           Text(
                             _product.code,
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
+                            style: TextStyle(
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
@@ -285,10 +289,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 // Nombre
                 Text(
                   _product.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -297,9 +301,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -307,19 +311,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Inventario Disponible',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                           ),
                           const SizedBox(height: 4),
                           Row(
                             children: [
                               Text(
                                 '${_product.stock} unid.',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E293B),
+                                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -359,8 +363,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               label: const Text('Ajustar'),
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                foregroundColor: const Color(0xFF475569),
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                foregroundColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                               ),
                             ),
                           ],
@@ -375,16 +379,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                   ),
                   child: Column(
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Precio de Venta al Público', style: TextStyle(color: Color(0xFF64748B))),
+                          Text('Precio de Venta al Público', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
                           Text(
                             CurrencyFormatter.format(_product.salePrice),
                             style: const TextStyle(
@@ -396,14 +400,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ],
                       ),
                       if (canViewCosts) ...[
-                        const Divider(height: 20),
+                        Divider(height: 20, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Costo de Compra', style: TextStyle(color: Color(0xFF64748B))),
+                            Text('Costo de Compra', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
                             Text(
                               CurrencyFormatter.format(_product.purchasePrice),
-                              style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                              ),
                             ),
                           ],
                         ),
@@ -411,7 +418,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Ganancia por unidad', style: TextStyle(color: Color(0xFF64748B))),
+                            Text('Ganancia por unidad', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
                             Text(
                               '${CurrencyFormatter.format(_product.profit)} (+${_product.profitMargin.toStringAsFixed(1)}%)',
                               style: TextStyle(
@@ -432,16 +439,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Valorización de Existencias Actuales',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF334155),
+                          ),
                         ),
                         const SizedBox(height: 10),
                         Row(

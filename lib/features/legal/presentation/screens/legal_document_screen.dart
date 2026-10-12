@@ -195,47 +195,67 @@ Widget _buildHeader({
   required String title,
   required String subtitle,
 }) {
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: const Color(0xFFECFDF5),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: const Color(0xFFA7F3D0)),
-    ),
-    child: Row(
-      children: [
-        CircleAvatar(
-          radius: 26,
-          backgroundColor: const Color(0xFF059669),
-          child: Icon(icon, color: Colors.white, size: 28),
+  return _LegalHeader(icon: icon, title: title, subtitle: subtitle);
+}
+
+class _LegalHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _LegalHeader({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF065F46),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF047857),
-                ),
-              ),
-            ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 26,
+            backgroundColor: const Color(0xFF059669),
+            child: Icon(icon, color: Colors.white, size: 28),
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Widget _buildSection({
@@ -243,55 +263,75 @@ Widget _buildSection({
   required String title,
   required String content,
 }) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 18),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-          ),
-          child: Text(
-            number,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: Color(0xFF334155),
+  return _LegalSection(number: number, title: title, content: content);
+}
+
+class _LegalSection extends StatelessWidget {
+  final String number;
+  final String title;
+  final String content;
+
+  const _LegalSection({
+    required this.number,
+    required this.title,
+    required this.content,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+              ),
+            ),
+            child: Text(
+              number,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF334155),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                content,
-                style: const TextStyle(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: Color(0xFF475569),
+                const SizedBox(height: 6),
+                Text(
+                  content,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

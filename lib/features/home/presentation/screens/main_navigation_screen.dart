@@ -29,6 +29,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final screens = [
       DashboardScreen(
         userId: widget.userId,
@@ -56,9 +57,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: _navigateToTab,
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 3,
-        indicatorColor: const Color(0xFFECFDF5),
+        indicatorColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),

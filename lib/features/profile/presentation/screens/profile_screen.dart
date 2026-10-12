@@ -374,12 +374,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Text('Purgar datos de la Nube', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
           ],
         ),
-        content: const Text(
+        content: Text(
           '¿Deseas eliminar únicamente tus copias en la nube?\n\n'
           '• Se borrarán tus registros de Supabase.\n'
           '• Tus datos en este teléfono seguirán 100% INTACTOS.\n'
           '• La app volverá al Modo Local Privado.',
-          style: TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF475569)),
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: Theme.of(ctx).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
@@ -435,11 +439,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Esta acción es IRREVERSIBLE y permanente.\n\n'
                   'Se borrarán por completo tus empresas, catálogo de productos, registro de ventas, clientes e historial contable tanto de este teléfono móvil como de la nube.\n\n'
                   'Para confirmar, escribe la palabra "ELIMINAR" a continuación:',
-                  style: TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF334155)),
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -821,30 +829,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildCard(
             title: 'Zona de Privacidad y Borrado',
             icon: Icons.delete_forever_outlined,
-            titleColor: const Color(0xFFDC2626),
-            borderColor: const Color(0xFFFECACA),
-            backgroundColor: const Color(0xFFFEF2F2),
+            titleColor: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+            borderColor: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
+            backgroundColor: isDark ? const Color(0xFF450A0A).withOpacity(0.3) : const Color(0xFFFEF2F2),
             child: Column(
               children: [
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFFFEDD5),
-                    child: Icon(Icons.cloud_off_outlined, color: Colors.orange),
+                  leading: CircleAvatar(
+                    backgroundColor: isDark ? const Color(0xFF7C2D12) : const Color(0xFFFFEDD5),
+                    child: Icon(Icons.cloud_off_outlined, color: isDark ? const Color(0xFFFDBA74) : Colors.orange),
                   ),
-                  title: const Text('Purgar datos de la Nube', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF9A3412))),
-                  subtitle: const Text('Borra registros en Supabase y conserva datos en este celular', style: TextStyle(fontSize: 11, color: Color(0xFF7C2D12))),
+                  title: Text(
+                    'Purgar datos de la Nube',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF9A3412)),
+                  ),
+                  subtitle: Text(
+                    'Borra registros en Supabase y conserva datos en este celular',
+                    style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFED7AA) : const Color(0xFF7C2D12)),
+                  ),
                   onTap: _showPurgeCloudDialog,
                 ),
-                const Divider(height: 10, color: Color(0xFFFED7AA)),
+                Divider(height: 10, color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFED7AA)),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFFEE2E2),
-                    child: Icon(Icons.delete_forever, color: Colors.red),
+                  leading: CircleAvatar(
+                    backgroundColor: isDark ? const Color(0xFF991B1B) : const Color(0xFFFEE2E2),
+                    child: Icon(Icons.delete_forever, color: isDark ? const Color(0xFFFCA5A5) : Colors.red),
                   ),
-                  title: const Text('Eliminar cuenta y datos definitivamente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.red)),
-                  subtitle: const Text('Borra todo de forma permanente (Nube y Teléfono)', style: TextStyle(fontSize: 11, color: Color(0xFF991B1B))),
+                  title: Text(
+                    'Eliminar cuenta y datos definitivamente',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? const Color(0xFFF87171) : Colors.red),
+                  ),
+                  subtitle: Text(
+                    'Borra todo de forma permanente (Nube y Teléfono)',
+                    style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFECACA) : const Color(0xFF991B1B)),
+                  ),
                   onTap: _showDeleteAccountDialog,
                 ),
               ],

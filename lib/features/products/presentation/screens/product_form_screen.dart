@@ -330,9 +330,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             width: 130,
                             height: 130,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+                              border: Border.all(
+                                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                                width: 1.5,
+                              ),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.04),
@@ -349,17 +352,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                       fit: BoxFit.cover,
                                     ),
                                   )
-                                : const Column(
+                                : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.add_a_photo_outlined, size: 40, color: Color(0xFF059669)),
-                                      SizedBox(height: 6),
+                                      const Icon(Icons.add_a_photo_outlined, size: 40, color: Color(0xFF059669)),
+                                      const SizedBox(height: 6),
                                       Text(
                                         'Agregar Foto',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF64748B),
+                                          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                         ),
                                       ),
                                     ],
@@ -444,8 +447,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             icon: const Icon(Icons.add),
                             tooltip: 'Crear Categoría',
                             style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFFECFDF5),
-                              foregroundColor: const Color(0xFF059669),
+                              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFF064E3B)
+                                  : const Color(0xFFECFDF5),
+                              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFF34D399)
+                                  : const Color(0xFF059669),
                               padding: const EdgeInsets.all(14),
                             ),
                           ),
@@ -455,8 +462,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             icon: const Icon(Icons.tune, size: 20),
                             tooltip: 'Gestionar categorías',
                             style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFFF1F5F9),
-                              foregroundColor: const Color(0xFF475569),
+                              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFF1F5F9),
+                              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFFCBD5E1)
+                                  : const Color(0xFF475569),
                               padding: const EdgeInsets.all(14),
                             ),
                           ),
@@ -527,10 +538,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
-                        color: margin >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEE2E2),
+                        color: margin >= 0
+                            ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                            : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEE2E2)),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: margin >= 0 ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+                          color: margin >= 0
+                              ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
+                              : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFFEF4444) : const Color(0xFFFECACA)),
                         ),
                       ),
                       child: Row(
@@ -541,7 +556,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                               Icon(
                                 margin >= 0 ? Icons.trending_up : Icons.trending_down,
                                 size: 18,
-                                color: margin >= 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                                color: margin >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                               ),
                               const SizedBox(width: 8),
                               Text(
@@ -549,7 +564,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: margin >= 0 ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                                  color: margin >= 0
+                                      ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46))
+                                      : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
                                 ),
                               ),
                             ],
@@ -559,7 +576,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: margin >= 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                              color: margin >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                             ),
                           ),
                         ],

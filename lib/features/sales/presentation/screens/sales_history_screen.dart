@@ -34,7 +34,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   Future<void> _loadSales() async {
     setState(() => _isLoading = true);
-    final bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+    var bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+    if (bizId == null) {
+      final user = AuthRepository.instance.currentUser;
+      if (user != null) {
+        final biz = await _businessRepo.getActiveBusiness(user.id, user.email);
+        bizId = biz?.id;
+      }
+    }
     if (bizId == null) {
       if (mounted) setState(() => _isLoading = false);
       return;
@@ -169,12 +176,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           IconButton(
             icon: const Icon(Icons.people_alt_outlined),
             tooltip: 'Clientes y Fiados',
-            onPressed: () {
-              final bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
-              if (bizId != null) {
+            onPressed: () async {
+              var bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+              if (bizId == null) {
+                final user = AuthRepository.instance.currentUser;
+                if (user != null) {
+                  final biz = await _businessRepo.getActiveBusiness(user.id, user.email);
+                  bizId = biz?.id;
+                }
+              }
+              if (bizId != null && context.mounted) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => CustomersScreen(businessId: bizId),
+                    builder: (_) => CustomersScreen(businessId: bizId!),
                   ),
                 ).then((_) => _loadSales());
               }
@@ -204,17 +218,24 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Registro de Transacciones',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFFF8FAFC)
+                            : const Color(0xFF1E293B),
                       ),
                     ),
                     Text(
                       '${_sales.length} ventas',
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                      ),
                     ),
                   ],
                 ),
@@ -236,8 +257,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       children: [
                         Container(
                           padding: const EdgeInsets.all(20),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFECFDF5),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xFF064E3B)
+                                : const Color(0xFFECFDF5),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -247,19 +270,26 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'Aún no hay ventas registradas',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xFFF8FAFC)
+                                : const Color(0xFF1E293B),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
+                        Text(
                           'Cuando descuentes productos de stock por venta, aparecerán detallados aquí.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
                         ),
                       ],
                     ),
@@ -287,6 +317,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Widget _buildSummaryCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final total = _summary['totalAmount'] ?? 0.0;
     final profit = _summary['netProfit'] ?? 0.0;
     final efectivo = _summary['byEfectivo'] ?? 0.0;
@@ -297,9 +328,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -317,14 +348,17 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Ventas de Hoy', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                  Text(
+                    'Ventas de Hoy',
+                    style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     CurrencyFormatter.format(total),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                     ),
                   ),
                 ],
@@ -332,14 +366,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
+                  color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                  border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text('Ganancia Real', style: TextStyle(fontSize: 11, color: Color(0xFF065F46))),
+                    Text(
+                      'Ganancia Real',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                      ),
+                    ),
                     Text(
                       CurrencyFormatter.format(profit),
                       style: const TextStyle(
@@ -353,7 +394,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               ),
             ],
           ),
-          const Divider(height: 24),
+          Divider(height: 24, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
 
           // Desglose por Método de Pago
           Row(
@@ -399,6 +440,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Widget _buildSaleCard(Sale sale) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final timeStr = DateFormat('hh:mm a').format(sale.date);
     final dateStr = DateFormat('dd/MM/yyyy').format(sale.date);
 
@@ -422,10 +464,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       elevation: 0,
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -436,19 +478,26 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
               child: Column(
                 children: [
                   Text(
                     timeStr,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                    ),
                   ),
                   Text(
                     dateStr,
-                    style: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8)),
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                    ),
                   ),
                 ],
               ),
@@ -464,10 +513,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     sale.productName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -491,7 +540,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       const SizedBox(width: 6),
                       Text(
                         'x${sale.quantity} unid.',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
                       ),
                     ],
                   ),
@@ -505,10 +557,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               children: [
                 Text(
                   CurrencyFormatter.format(sale.totalAmount),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                   ),
                 ),
                 Text(

@@ -147,20 +147,31 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
           children: [
             Text(
               'Se descontaron ${CurrencyFormatter.formatCOP(result.payment.amount)} de la cuenta de ${result.customer.name}.',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              ),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Nuevo saldo deudor:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  Text(
+                    'Nuevo saldo deudor:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
                   Text(
                     CurrencyFormatter.formatCOP(result.remainingDebt),
                     style: TextStyle(
@@ -200,6 +211,10 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
   @override
   Widget build(BuildContext context) {
     final customer = widget.customer;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Container(
       padding: EdgeInsets.only(
@@ -208,9 +223,9 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
         left: 20,
         right: 20,
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
         child: SingleChildScrollView(
@@ -225,18 +240,18 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Registrar Abono a Fiado',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain),
                       ),
                       Text(
                         'Cliente: ${customer.name}',
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                        style: TextStyle(fontSize: 13, color: textMuted, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                    icon: Icon(Icons.close, color: textMuted),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -247,23 +262,35 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
+                  color: isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF92400E) : const Color(0xFFFDE68A),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Deuda Pendiente Actual', style: TextStyle(fontSize: 12, color: Color(0xFF92400E))),
-                        Text('Saldo por cobrar', style: TextStyle(fontSize: 10, color: Color(0xFFB45309))),
+                        Text(
+                          'Deuda Pendiente Actual',
+                          style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E)),
+                        ),
+                        Text(
+                          'Saldo por cobrar',
+                          style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309)),
+                        ),
                       ],
                     ),
                     Text(
                       CurrencyFormatter.formatCOP(customer.debtBalance),
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
+                      ),
                     ),
                   ],
                 ),
@@ -275,13 +302,15 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                   padding: const EdgeInsets.all(10),
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFEF2F2),
+                    color: isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEF2F2),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFFECACA)),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFFB91C1C) : const Color(0xFFFECACA),
+                    ),
                   ),
                   child: Text(
                     _errorMessage!,
-                    style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
+                    style: TextStyle(color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626), fontSize: 12),
                   ),
                 ),
               ],
@@ -329,7 +358,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
               const SizedBox(height: 16),
 
               // Medio de Pago
-              const Text('Medio de Pago:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+              Text('Medio de Pago:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textMain)),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -337,10 +366,10 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                     child: ChoiceChip(
                       label: const Center(child: Text('💵 Efectivo')),
                       selected: _paymentMethod == 'EFECTIVO',
-                      selectedColor: const Color(0xFFECFDF5),
+                      selectedColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: _paymentMethod == 'EFECTIVO' ? const Color(0xFF059669) : const Color(0xFF64748B),
+                        color: _paymentMethod == 'EFECTIVO' ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)) : textMuted,
                       ),
                       onSelected: (val) {
                         if (val) setState(() => _paymentMethod = 'EFECTIVO');
@@ -352,10 +381,10 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                     child: ChoiceChip(
                       label: const Center(child: Text('📱 Transferencia')),
                       selected: _paymentMethod == 'TRANSFERENCIA',
-                      selectedColor: const Color(0xFFEFF6FF),
+                      selectedColor: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: _paymentMethod == 'TRANSFERENCIA' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                        color: _paymentMethod == 'TRANSFERENCIA' ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)) : textMuted,
                       ),
                       onSelected: (val) {
                         if (val) setState(() => _paymentMethod = 'TRANSFERENCIA');

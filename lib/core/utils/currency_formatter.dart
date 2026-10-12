@@ -14,6 +14,9 @@ class CurrencyFormatter {
     return formatter.format(amount);
   }
 
+  /// Alias de formato
+  static String formatCOP(num amount) => format(amount);
+
   /// Convierte texto de input numérico a valor limpio
   static double parse(String text) {
     if (text.isEmpty) return 0.0;

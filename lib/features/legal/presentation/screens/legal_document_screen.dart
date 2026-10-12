@@ -74,34 +74,46 @@ class _TermsOfServiceView extends StatelessWidget {
           number: '2',
           title: 'Naturaleza del Servicio',
           content:
-              'Stockealo es una herramienta de productividad y gestión comercial diseñada para registrar inventarios, catalogar productos por códigos de barras o SKU, registrar ventas y administrar deudas de clientes ("fiado"). La app opera bajo una arquitectura Local-First, guardando tus datos en una base de datos segura en tu dispositivo.',
+              'Stockealo es una herramienta de productividad y gestión comercial diseñada para registrar inventarios, catalogar productos por códigos de barras o SKU, registrar ventas y administrar deudas de clientes ("fiado"). La app opera bajo una arquitectura Local-First, guardando tus datos en una base de datos segura en tu dispositivo de forma predeterminada.',
         ),
         _buildSection(
           number: '3',
+          title: 'Exclusión de Facturación Tributaria Oficial',
+          content:
+              'Stockealo es una herramienta tecnológica de control interno, inventario y soporte operativo para comerciantes. No constituye ni reemplaza un sistema de facturación electrónica fiscal avalado por entidades tributarias oficiales (como DIAN, SAT u otros organismos gubernamentales). El usuario es el único responsable del cumplimiento de sus obligaciones contables, tributarias y fiscales.',
+        ),
+        _buildSection(
+          number: '4',
           title: 'Cuentas y Múltiples Negocios',
           content:
               'Cada usuario es responsable de mantener la confidencialidad de sus credenciales. Stockealo permite la gestión de múltiples empresas o tiendas bajo una misma cuenta, garantizando que el inventario, ventas y clientes de cada empresa se encuentren 100% aislados e independientes.',
         ),
         _buildSection(
-          number: '4',
+          number: '5',
           title: 'Control de Inventario y Ventas',
           content:
-              'El usuario es el único responsable de la exactitud de los precios, costos y cantidades ingresadas. El sistema incluye validaciones estrictas para impedir la venta de artículos sin existencias, pero no reemplaza la auditoría física que el comerciante deba realizar periódicamente.',
-        ),
-        _buildSection(
-          number: '5',
-          title: 'Créditos Comerciales ("Fiados")',
-          content:
-              'La función de venta a crédito o "fiado" es exclusivamente una herramienta contable y de registro. Stockealo no actúa como entidad financiera, cobrador ni garante entre el comerciante y sus clientes finales.',
+              'El usuario es el único responsable de la exactitud de los precios, costos y cantidades ingresadas. El sistema incluye validaciones para registrar existencias y generar órdenes de reabastecimiento, pero no reemplaza la auditoría física que el comerciante deba realizar periódicamente.',
         ),
         _buildSection(
           number: '6',
+          title: 'Créditos Comerciales ("Fiados") y Datos de Clientes',
+          content:
+              'La función de venta a crédito o "fiado" es exclusivamente una herramienta contable de registro interno. Stockealo no actúa como entidad financiera, cobrador ni garante. El comerciante declara contar con la debida autorización de sus clientes para registrar sus números telefónicos con fines del envío voluntario de comprobantes y recibos por WhatsApp.',
+        ),
+        _buildSection(
+          number: '7',
+          title: 'Uso por Mayores de Edad',
+          content:
+              'La plataforma está dirigida a personas mayores de 18 años con plena capacidad legal para el ejercicio de actividades comerciales.',
+        ),
+        _buildSection(
+          number: '8',
           title: 'Propiedad Intelectual',
           content:
               'Todos los derechos de software, diseño, logotipos y código fuente de Stockealo están protegidos por leyes de propiedad intelectual. Los datos de tus productos e imágenes registradas son y seguirán siendo de tu propiedad exclusiva.',
         ),
         _buildSection(
-          number: '7',
+          number: '9',
           title: 'Modificaciones',
           content:
               'Nos reservamos el derecho de actualizar estos términos en cualquier momento. Te notificaremos dentro de la aplicación ante cualquier cambio sustancial.',
@@ -123,49 +135,54 @@ class _PrivacyPolicyView extends StatelessWidget {
         _buildHeader(
           icon: Icons.shield_rounded,
           title: 'Política de Privacidad y Tratamiento de Datos',
-          subtitle: 'Compromiso de protección de tus datos comerciales',
+          subtitle: 'Compromiso de protección de tus datos comerciales y privacidad',
         ),
         const SizedBox(height: 20),
         _buildSection(
           number: '1',
-          title: 'Principio Local-First y Privacidad Absoluta',
+          title: 'Principio Local-First y Privacidad por Defecto',
           content:
-              'En Stockealo creemos que los datos de tu negocio te pertenecen exclusivamente a ti. Tus productos, costos, márgenes de ganancia, clientes y ventas se almacenan de manera local y encriptada en tu dispositivo. No vendemos ni compartimos tu información comercial con terceros.',
+              'En Stockealo creemos que los datos de tu negocio te pertenecen exclusivamente a ti. De manera predeterminada:\n\n'
+              '• Todos tus productos, costos, ventas, clientes y ganancias se guardan EXCLUSIVAMENTE en la memoria local de tu dispositivo.\n'
+              '• La aplicación NO transmite tu actividad comercial a ningún servidor externo a menos que actives voluntariamente la sincronización en la nube.',
         ),
         _buildSection(
           number: '2',
-          title: 'Información que Recopilamos',
+          title: 'Sincronización en la Nube Opcional (Multidispositivo y Respaldo)',
           content:
-              '• Cuenta: Dirección de correo electrónico y contraseña cifrada para autenticación y gestión de acceso.\n'
-              '• Negocios y Catálogo: Nombres de tiendas, códigos SKU/barras, descripciones, precios y stock.\n'
-              '• Clientes y Transacciones: Nombres de clientes y saldos de deuda registrados exclusivamente para tu control comercial.',
+              'Para los comerciantes que requieran gestionar su inventario desde varios dispositivos a la vez, invitar a miembros de su equipo o mantener una copia de seguridad en la nube, Stockealo ofrece una opción de sincronización.\n\n'
+              'Esta opción está DESACTIVADA por defecto. Si decides activarla, tus datos se transmitirán mediante protocolos encriptados (TLS/HTTPS) hacia nuestra infraestructura en la nube. Puedes desactivar la sincronización en cualquier momento desde los Ajustes de la aplicación.',
         ),
         _buildSection(
           number: '3',
-          title: 'Permisos del Dispositivo y su Uso Estricto',
+          title: 'Información que Recopilamos',
           content:
-              'Para su correcto funcionamiento, Stockealo solicita los siguientes permisos en Android/iOS:\n\n'
-              '📷 Cámara: Se utiliza con el único fin de escanear códigos de barras / QR y capturar fotografías de tus productos para el catálogo.\n\n'
-              '🖼️ Galería y Almacenamiento: Se utiliza para permitirte seleccionar imágenes de tus productos y almacenar copias locales optimizadas en el almacenamiento privado de la app.\n\n'
-              'No accedemos a tus fotos personales ni a tus contactos.',
+              '• Cuenta: Correo electrónico y contraseña cifrada con algoritmos criptográficos unidireccionales (SHA-256 + Salting).\n'
+              '• Catálogo e Inventario: Nombres de tiendas, códigos SKU/barras, costos, precios de venta y existencias.\n'
+              '• Clientes y Transacciones: Nombres y teléfonos registrados por el comerciante para control de ventas y abonos de fiados.',
         ),
         _buildSection(
           number: '4',
-          title: 'Almacenamiento de Fotos',
+          title: 'Permisos del Dispositivo y su Uso Estricto',
           content:
-              'Las fotos tomadas o seleccionadas para tus productos se comprimen a resolución óptima (800x800 px) y se guardan en el directorio privado de la aplicación para no consumir espacio innecesario en tu teléfono.',
+              '📷 Cámara: Se utiliza únicamente para escanear códigos de barras/QR y tomar fotografías para tus productos.\n\n'
+              '🖼️ Galería y Archivos: Se utiliza para seleccionar fotos de productos y para guardar o importar reportes de inventario en Excel (.xlsx).\n\n'
+              '🌐 Conexión de Red: Utilizada para validar credenciales de cuenta, sincronizar con la nube (si el usuario la activa) y abrir WhatsApp para compartir tickets de venta o pedidos.',
         ),
         _buildSection(
           number: '5',
-          title: 'Tus Derechos',
+          title: 'Mecanismos de Supresión de Datos y Derecho al Olvido',
           content:
-              'En cualquier momento puedes exportar tus registros, editar tu catálogo o eliminar tu cuenta junto con toda la base de datos asociada desde la configuración de la aplicación.',
+              'De acuerdo con las normativas de protección de datos personales y las políticas de Google Play y App Store, tienes derecho a eliminar tu información en cualquier momento a través de dos opciones en Ajustes:\n\n'
+              '• Purgar solo la Nube: Elimina de forma inmediata e irreversible todos tus datos en los servidores remotos, regresando la app a modo 100% local sin perder tus datos en el teléfono.\n\n'
+              '• Eliminación Total de Cuenta: Borra definitivamente toda tu información tanto en la nube como en la base de datos de tu teléfono móvil.',
         ),
         _buildSection(
           number: '6',
-          title: 'Contacto y Soporte',
+          title: 'Canal Oficial de Contacto y Soporte',
           content:
-              'Si tienes dudas sobre el tratamiento de tus datos o los términos de la aplicación, puedes comunicarte con nuestro equipo de soporte a través de los canales oficiales de Stockealo.',
+              'Para cualquier solicitud de privacidad, consulta sobre el tratamiento de tus datos o soporte técnico, puedes comunicarte directamente con nosotros a través del correo oficial:\n\n'
+              '📧 byjosealbert@gmail.com',
         ),
         const SizedBox(height: 30),
       ],

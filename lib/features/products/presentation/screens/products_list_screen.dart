@@ -16,6 +16,7 @@ import '../../../business/models/business.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../reports/data/excel_export_service.dart';
+import '../widgets/restock_order_modal.dart';
 
 class ProductsListScreen extends StatefulWidget {
   final String userId;
@@ -269,6 +270,16 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     }
   }
 
+  void _openRestockOrderModal() {
+    if (_activeBusiness == null) return;
+    final user = AuthRepository.instance.currentUser;
+    RestockOrderModal.show(
+      context,
+      business: _activeBusiness!,
+      userName: user?.displayName,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -333,9 +344,21 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                 _exportToExcel();
               } else if (val == 'categories') {
                 _openManageCategories();
+              } else if (val == 'restock') {
+                _openRestockOrderModal();
               }
             },
             itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'restock',
+                child: Row(
+                  children: [
+                    Icon(Icons.local_shipping_outlined, color: Color(0xFFD97706), size: 20),
+                    SizedBox(width: 8),
+                    Text('Pedido a proveedor'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'categories',
                 child: Row(
@@ -546,6 +569,34 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                   ),
                 ),
               ],
+            ),
+          ],
+          if (lowStock > 0 || outOfStock > 0) ...[
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: _openRestockOrderModal,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.local_shipping_outlined, size: 18, color: Color(0xFFD97706)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${lowStock + outOfStock} productos para reponer • Generar pedido',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF92400E)),
+                  ],
+                ),
+              ),
             ),
           ],
         ],

@@ -1,0 +1,323 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../business/data/business_repository.dart';
+import '../../models/sale.dart';
+
+class DigitalTicketModal extends StatelessWidget {
+  final Sale sale;
+  final String? businessName;
+
+  const DigitalTicketModal({
+    super.key,
+    required this.sale,
+    this.businessName,
+  });
+
+  static Future<void> show(
+    BuildContext context, {
+    required Sale sale,
+    String? businessName,
+  }) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DigitalTicketModal(
+        sale: sale,
+        businessName: businessName,
+      ),
+    );
+  }
+
+  String _generateTicketText(String storeName) {
+    final dateFormat = DateFormat('dd/MM/yyyy hh:mm a');
+    final formattedDate = dateFormat.format(sale.date);
+    final shortId = sale.id.length >= 8 ? sale.id.substring(0, 8).toUpperCase() : sale.id.toUpperCase();
+
+    final buffer = StringBuffer();
+    buffer.writeln('🧾 *COMPROBANTE DE VENTA*');
+    buffer.writeln('🏪 *$storeName*');
+    buffer.writeln('📅 Fecha: $formattedDate');
+    buffer.writeln('🔢 N° Ticket: #$shortId');
+    buffer.writeln('--------------------------------');
+    buffer.writeln('🛒 *Detalle:*');
+    buffer.writeln('• ${sale.quantity}x ${sale.productName}');
+    buffer.writeln('  Precio: ${CurrencyFormatter.formatCOP(sale.unitPrice)} c/u');
+    buffer.writeln('  Subtotal: ${CurrencyFormatter.formatCOP(sale.totalAmount)}');
+    buffer.writeln('--------------------------------');
+    buffer.writeln('💰 *TOTAL A PAGAR:* ${CurrencyFormatter.formatCOP(sale.totalAmount)}');
+    buffer.writeln('💳 *Método de pago:* ${sale.paymentMethod}');
+    if (sale.customerName?.isNotEmpty == true) {
+      buffer.writeln('👤 *Cliente:* ${sale.customerName}');
+    }
+    if (sale.paymentMethod == 'FIADO') {
+      buffer.writeln('⚠️ *Estado:* Venta a Crédito (Fiado)');
+    }
+    buffer.writeln('--------------------------------');
+    buffer.writeln('¡Muchas gracias por tu compra!');
+    buffer.writeln('Comprobante digital emitido con Stockealo 📦');
+
+    return buffer.toString();
+  }
+
+  void _shareViaWhatsApp(BuildContext context, String storeName) async {
+    final text = _generateTicketText(storeName);
+    await Share.share(
+      text,
+      subject: 'Comprobante de compra - $storeName',
+    );
+  }
+
+  void _copyToClipboard(BuildContext context, String storeName) {
+    final text = _generateTicketText(storeName);
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('📋 Ticket copiado al portapapeles.'),
+        backgroundColor: Color(0xFF059669),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeBiz = BusinessRepository.instance.currentActiveBusiness;
+    final storeName = businessName ?? activeBiz?.name ?? 'Mi Negocio';
+    final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
+    final shortId = sale.id.length >= 8 ? sale.id.substring(0, 8).toUpperCase() : sale.id.toUpperCase();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 40),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Indicador de arrastre
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Cabecera Modal
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Ticket Digital de Venta',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Recibo estilo ticket térmico
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Encabezado del negocio
+                    Center(
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFECFDF5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.receipt_long, color: Color(0xFF059669), size: 28),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            storeName,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B)),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            dateFormat.format(sale.date),
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                          Text(
+                            'Ticket #$shortId',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 24, thickness: 1),
+
+                    // Detalle de ítems
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Cant. / Descripción', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        Text('Importe', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${sale.quantity}x ${sale.productName}',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                              ),
+                              Text(
+                                '${CurrencyFormatter.formatCOP(sale.unitPrice)} c/u',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          CurrencyFormatter.formatCOP(sale.totalAmount),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24, thickness: 1),
+
+                    // Total y Pago
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('TOTAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                        Text(
+                          CurrencyFormatter.formatCOP(sale.totalAmount),
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Método de Pago:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: sale.paymentMethod == 'FIADO' ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            sale.paymentMethod,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: sale.paymentMethod == 'FIADO' ? const Color(0xFFD97706) : const Color(0xFF059669),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (sale.customerName?.isNotEmpty == true) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Cliente:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          Text(sale.customerName!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+                        ],
+                      ),
+                    ],
+
+                    const SizedBox(height: 16),
+                    const Center(
+                      child: Text(
+                        '¡Gracias por preferirnos! 🌱 Comprobante ecológico',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Botones de acción
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () => _shareViaWhatsApp(context, storeName),
+                  icon: const Icon(Icons.share, size: 20),
+                  label: const Text('Enviar Comprobante por WhatsApp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _copyToClipboard(context, storeName),
+                      icon: const Icon(Icons.copy, size: 18),
+                      label: const Text('Copiar Texto'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF475569),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Listo', style: TextStyle(color: Color(0xFF64748B))),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

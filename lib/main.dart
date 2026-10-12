@@ -9,10 +9,12 @@ import 'features/business/presentation/screens/create_initial_business_screen.da
 import 'features/home/presentation/screens/main_navigation_screen.dart';
 
 import 'core/services/supabase_service.dart';
+import 'core/theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.instance.initialize();
+  await ThemeController.instance.initialize();
   // Sincronización automática silenciosa en segundo plano al arrancar la app
   SupabaseService.instance.syncToCloud();
   runApp(const StockealoApp());
@@ -23,11 +25,18 @@ class StockealoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Stockealo',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: const AuthWrapper(),
+    return AnimatedBuilder(
+      animation: ThemeController.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Stockealo',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeController.instance.themeMode,
+          home: const AuthWrapper(),
+        );
+      },
     );
   }
 }

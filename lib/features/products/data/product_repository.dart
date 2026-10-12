@@ -330,4 +330,10 @@ class ProductRepository {
       'estimatedProfit': totalInventorySaleValue - totalInventoryCost,
     };
   }
+
+  /// Obtiene los productos con stock bajo o agotado para reposición
+  Future<List<Product>> getRestockProducts(String businessId) async {
+    final products = await getAllProducts(businessId);
+    return products.where((p) => p.isLowStock || p.isOutOfStock).toList();
+  }
 }

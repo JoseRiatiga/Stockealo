@@ -76,9 +76,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             label: 'Ventas',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person, color: Color(0xFF059669)),
-            label: 'Perfil',
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings, color: Color(0xFF059669)),
+            label: 'Ajustes',
           ),
         ],
       ),

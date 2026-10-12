@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../products/models/product.dart';
 import '../../data/sales_repository.dart';
+import 'digital_ticket_modal.dart';
 
 class QuickSaleDialog extends StatefulWidget {
   final Product product;
@@ -72,7 +73,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
     setState(() => _isLoading = true);
 
     try {
-      await _salesRepo.recordSale(
+      final sale = await _salesRepo.recordSale(
         product: widget.product,
         quantity: _quantity,
         paymentMethod: _paymentMethod,
@@ -81,15 +82,21 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
 
       if (mounted) {
         final remainingStock = widget.product.stock - _quantity;
-        ScaffoldMessenger.of(context).showSnackBar(
+        final nav = Navigator.of(context);
+        nav.pop(true);
+
+        ScaffoldMessenger.of(nav.context).showSnackBar(
           SnackBar(
             content: Text(
               '✅ Venta registrada: $_quantity unid. descontadas (Quedan: $remainingStock)',
             ),
             backgroundColor: const Color(0xFF059669),
+            duration: const Duration(seconds: 2),
           ),
         );
-        Navigator.pop(context, true);
+
+        // Abrir el comprobante digital listo para WhatsApp
+        DigitalTicketModal.show(nav.context, sale: sale);
       }
     } catch (e) {
       if (mounted) {

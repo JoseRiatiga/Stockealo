@@ -4,8 +4,10 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../data/sales_repository.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../auth/data/auth_repository.dart';
-import '../../../reports/data/excel_export_service.dart';
 import '../../models/sale.dart';
+import '../widgets/digital_ticket_modal.dart';
+import '../../../customers/presentation/screens/customers_screen.dart';
+import '../../../reports/data/excel_export_service.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -164,6 +166,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       appBar: AppBar(
         title: const Text('Historial de Ventas'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.people_alt_outlined),
+            tooltip: 'Clientes y Fiados',
+            onPressed: () {
+              final bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+              if (bizId != null) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CustomersScreen(businessId: bizId),
+                  ),
+                ).then((_) => _loadSales());
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.table_chart_outlined),
             tooltip: 'Exportar a Excel (.xlsx)',
@@ -504,6 +520,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ),
                 ),
               ],
+            ),
+
+            // Botón de ticket digital y compartir
+            IconButton(
+              icon: const Icon(Icons.receipt_long, size: 20, color: Color(0xFF059669)),
+              tooltip: 'Ver / Compartir Ticket',
+              onPressed: () => DigitalTicketModal.show(context, sale: sale),
             ),
 
             // Botón para anular en caso de equivocación

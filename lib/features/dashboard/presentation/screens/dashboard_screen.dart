@@ -10,6 +10,8 @@ import '../../../products/presentation/screens/product_form_screen.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
+import '../../../customers/presentation/screens/customers_screen.dart';
+import '../../../products/presentation/widgets/restock_order_modal.dart';
 import '../../data/dashboard_repository.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -285,7 +287,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           icon: Icons.receipt_long_outlined,
           color: const Color(0xFFD97706),
           bg: const Color(0xFFFEF3C7),
-          onTap: widget.onNavigateToSales,
+          onTap: () {
+            if (_activeBusiness != null) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => CustomersScreen(businessId: _activeBusiness!.id),
+                ),
+              ).then((_) => _loadData());
+            }
+          },
         ),
       ],
     );
@@ -413,7 +423,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icons.warning_amber_rounded,
             color: alertTotal > 0 ? const Color(0xFFDC2626) : const Color(0xFF64748B),
             badge: alertTotal > 0 ? '$alertTotal' : null,
-            onTap: widget.onNavigateToInventory,
+            onTap: () {
+              if (_activeBusiness != null && alertTotal > 0) {
+                final user = _authRepo.currentUser;
+                RestockOrderModal.show(
+                  context,
+                  business: _activeBusiness!,
+                  userName: user?.displayName,
+                );
+              } else {
+                widget.onNavigateToInventory();
+              }
+            },
           ),
         ),
         const SizedBox(width: 8),

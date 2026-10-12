@@ -277,6 +277,64 @@ class SupabaseService {
     }
   }
 
+  /// Actualiza el stock de un producto en Supabase en tiempo real
+  Future<void> updateProductStockInCloud(String productId, int newStock) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('products').update({'current_stock': newStock}).eq('id', productId);
+    } catch (e) {
+      debugPrint('Error al actualizar stock en Supabase: \$e');
+    }
+  }
+
+  /// Guarda o actualiza una empresa en Supabase en tiempo real
+  Future<void> upsertBusinessToCloud(Map<String, dynamic> b) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('businesses').upsert({
+        'id': b['id'],
+        'name': b['name'],
+        'type': (b['type'] ?? 'Comercio General').toString(),
+        'currency': b['currency'] ?? 'COP',
+        'is_deleted': (b['is_deleted'] as int?) ?? 0,
+        'created_at': b['created_at'],
+      }, onConflict: 'id');
+    } catch (e) {
+      debugPrint('Error al guardar empresa en Supabase: \$e');
+    }
+  }
+
+  /// Actualiza el estado de eliminación de una empresa en Supabase
+  Future<void> updateBusinessDeletedStatus(String businessId, bool isDeleted) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('businesses').update({
+        'is_deleted': isDeleted ? 1 : 0,
+        'deleted_at': isDeleted ? DateTime.now().toIso8601String() : null,
+      }).eq('id', businessId);
+    } catch (e) {
+      debugPrint('Error al actualizar estado de empresa en Supabase: \$e');
+    }
+  }
+
+  /// Guarda o actualiza un cliente en Supabase en tiempo real
+  Future<void> upsertCustomerToCloud(Map<String, dynamic> c) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('customers').upsert({
+        'id': c['id'],
+        'business_id': c['business_id'],
+        'name': c['name'],
+        'phone': c['phone'],
+        'address': c['address'],
+        'debt_balance': (c['debt_balance'] as num?)?.toDouble() ?? 0.0,
+        'created_at': c['created_at'],
+      }, onConflict: 'id');
+    } catch (e) {
+      debugPrint('Error al guardar cliente en Supabase: \$e');
+    }
+  }
+
   /// Script SQL listo para crear las tablas
   static const String sqlSetupScript = '''
 -- 1. Tabla de Empresas

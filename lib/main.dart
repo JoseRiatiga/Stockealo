@@ -13,6 +13,8 @@ import 'core/services/supabase_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.instance.initialize();
+  // Sincronización automática silenciosa en segundo plano al arrancar la app
+  SupabaseService.instance.syncToCloud();
   runApp(const StockealoApp());
 }
 

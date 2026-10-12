@@ -1,5 +1,6 @@
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/supabase_service.dart';
 import '../models/business.dart';
 
 class BusinessRepository {
@@ -89,6 +90,10 @@ class BusinessRepository {
 
     await db.insert('businesses', business.toMap());
     _activeBusiness = business;
+
+    // Sincronizar en tiempo real a Supabase
+    SupabaseService.instance.upsertBusinessToCloud(business.toMap());
+
     return business;
   }
 
@@ -115,6 +120,16 @@ class BusinessRepository {
         currency: currency,
       );
     }
+
+    // Sincronizar actualización en tiempo real a Supabase
+    SupabaseService.instance.upsertBusinessToCloud({
+      'id': id,
+      'name': name.trim(),
+      'currency': currency,
+      'type': 'Comercio General',
+      'is_deleted': 0,
+      'created_at': DateTime.now().toIso8601String(),
+    });
   }
 
   /// Mueve una empresa a la papelera (conservando datos durante 7 días)
@@ -133,6 +148,9 @@ class BusinessRepository {
     if (_activeBusiness?.id == id) {
       _activeBusiness = null;
     }
+
+    // Actualizar estado en Supabase en tiempo real
+    await SupabaseService.instance.updateBusinessDeletedStatus(id, true);
   }
 
   /// Restaura una empresa que estaba en la papelera
@@ -147,5 +165,8 @@ class BusinessRepository {
       where: 'id = ?',
       whereArgs: [id],
     );
+
+    // Restaurar estado en Supabase en tiempo real
+    await SupabaseService.instance.updateBusinessDeletedStatus(id, false);
   }
 }

@@ -173,6 +173,9 @@ class ProductRepository {
         'date': DateTime.now().toIso8601String(),
       });
     });
+
+    // Actualizar stock en Supabase en tiempo real
+    SupabaseService.instance.updateProductStockInCloud(productId, newStock);
   }
 
   /// Obtener categorías de la empresa

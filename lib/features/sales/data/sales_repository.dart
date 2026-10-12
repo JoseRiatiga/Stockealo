@@ -1,5 +1,6 @@
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/supabase_service.dart';
 import '../../products/models/product.dart';
 import '../models/sale.dart';
 
@@ -115,7 +116,7 @@ class SalesRepository {
       });
     });
 
-    return Sale(
+    final sale = Sale(
       id: saleId,
       businessId: businessId,
       productId: product.id,
@@ -130,6 +131,12 @@ class SalesRepository {
       customerName: customerName,
       date: now,
     );
+
+    // Sincronizar venta y stock actualizado en tiempo real a Supabase
+    SupabaseService.instance.insertSaleToCloud(sale.toMap());
+    SupabaseService.instance.updateProductStockInCloud(product.id, newStock);
+
+    return sale;
   }
 
   /// Obtener ventas filtradas exclusivamente por la empresa

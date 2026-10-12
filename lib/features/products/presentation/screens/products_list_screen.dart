@@ -4,6 +4,7 @@ import '../../data/product_repository.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../widgets/category_filter_bar.dart';
+import '../widgets/manage_categories_modal.dart';
 import '../widgets/product_card.dart';
 import 'barcode_scanner_screen.dart';
 import 'product_detail_screen.dart';
@@ -260,6 +261,14 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     }
   }
 
+  Future<void> _openManageCategories() async {
+    if (_activeBusiness == null) return;
+    final changed = await ManageCategoriesModal.show(context, _activeBusiness!.id);
+    if (changed == true || mounted) {
+      _loadData();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -322,9 +331,21 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             onSelected: (val) {
               if (val == 'excel') {
                 _exportToExcel();
+              } else if (val == 'categories') {
+                _openManageCategories();
               }
             },
             itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'categories',
+                child: Row(
+                  children: [
+                    Icon(Icons.tune, color: Color(0xFF2563EB), size: 20),
+                    SizedBox(width: 8),
+                    Text('Gestionar categorías'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'excel',
                 child: Row(
@@ -382,19 +403,33 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
               ),
             ),
 
-            // Filtro por categorías
+            // Filtro por categorías con botón de gestión
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: CategoryFilterBar(
-                  categories: _categories,
-                  selectedCategory: _selectedCategory,
-                  onCategorySelected: (cat) {
-                    setState(() {
-                      _selectedCategory = cat;
-                    });
-                    _loadData();
-                  },
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CategoryFilterBar(
+                        categories: _categories,
+                        selectedCategory: _selectedCategory,
+                        onCategorySelected: (cat) {
+                          setState(() {
+                            _selectedCategory = cat;
+                          });
+                          _loadData();
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: IconButton(
+                        icon: const Icon(Icons.tune, size: 20, color: Color(0xFF64748B)),
+                        tooltip: 'Gestionar categorías',
+                        onPressed: _openManageCategories,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

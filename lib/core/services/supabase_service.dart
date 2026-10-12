@@ -110,6 +110,29 @@ class SupabaseService {
 
       final db = await AppDatabase.instance.database;
 
+      // 0. Sincronizar Usuarios (Cuentas)
+      try {
+        final localUsers = await db.query('users');
+        if (localUsers.isNotEmpty) {
+          final formattedUsers = localUsers.map((u) => {
+            'id': u['id'],
+            'email': u['email'],
+            'password': u['password'],
+            'name': u['name'],
+            'phone': u['phone'],
+            'avatar_path': u['avatar_path'],
+            'created_at': u['created_at'],
+          }).toList();
+
+          await client!.from('users').upsert(
+            formattedUsers,
+            onConflict: 'id',
+          );
+        }
+      } catch (e) {
+        debugPrint('Nota: error o tabla users no configurada en Supabase: $e');
+      }
+
       // 1. Sincronizar Businesses
       final localBusinesses = await db.query(
         'businesses',
@@ -129,6 +152,26 @@ class SupabaseService {
           formattedBusinesses,
           onConflict: 'id',
         );
+      }
+
+      // 1.1 Sincronizar Categories
+      try {
+        final localCategories = await db.query('categories');
+        if (localCategories.isNotEmpty) {
+          final formattedCategories = localCategories.map((c) => {
+            'id': c['id'],
+            'business_id': c['business_id'],
+            'name': c['name'],
+            'color_hex': c['color_hex'] ?? '0xFF059669',
+          }).toList();
+
+          await client!.from('categories').upsert(
+            formattedCategories,
+            onConflict: 'id',
+          );
+        }
+      } catch (e) {
+        debugPrint('Nota: error o tabla categories no configurada en Supabase: $e');
       }
 
       // 2. Sincronizar Products
@@ -335,16 +378,80 @@ class SupabaseService {
     }
   }
 
+  /// Guarda o actualiza un usuario/cuenta en Supabase en tiempo real
+  Future<void> upsertUserToCloud(Map<String, dynamic> u) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('users').upsert({
+        'id': u['id'],
+        'email': u['email'],
+        'password': u['password'],
+        'name': u['name'],
+        'phone': u['phone'],
+        'avatar_path': u['avatar_path'],
+        'created_at': u['created_at'],
+      }, onConflict: 'id');
+      debugPrint('Usuario ${u["email"]} sincronizado en Supabase.');
+    } catch (e) {
+      debugPrint('Error al guardar usuario en Supabase: $e');
+    }
+  }
+
+  /// Guarda o actualiza una categoría en Supabase en tiempo real
+  Future<void> upsertCategoryToCloud(Map<String, dynamic> c) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('categories').upsert({
+        'id': c['id'],
+        'business_id': c['business_id'],
+        'name': c['name'],
+        'color_hex': c['color_hex'] ?? '0xFF059669',
+      }, onConflict: 'id');
+    } catch (e) {
+      debugPrint('Error al guardar categoría en Supabase: \$e');
+    }
+  }
+
+  /// Elimina una categoría de Supabase en tiempo real
+  Future<void> deleteCategoryFromCloud(String categoryId) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('categories').delete().eq('id', categoryId);
+    } catch (e) {
+      debugPrint('Error al eliminar categoría en Supabase: \$e');
+    }
+  }
+
   /// Script SQL listo para crear las tablas
   static const String sqlSetupScript = '''
+-- 0. Tabla de Usuarios / Cuentas
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    name TEXT,
+    phone TEXT,
+    avatar_path TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 1. Tabla de Empresas
 CREATE TABLE IF NOT EXISTS businesses (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    type TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'Comercio General',
     currency TEXT NOT NULL DEFAULT 'COP',
     is_deleted INTEGER NOT NULL DEFAULT 0,
     deleted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 1.1 Tabla de Categorías
+CREATE TABLE IF NOT EXISTS categories (
+    id TEXT PRIMARY KEY,
+    business_id TEXT REFERENCES businesses(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    color_hex TEXT DEFAULT '0xFF059669',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -400,7 +507,9 @@ CREATE TABLE IF NOT EXISTS sales (
 );
 
 -- Desactivar RLS temporalmente para acceso directo de prueba
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE businesses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE categories DISABLE ROW LEVEL SECURITY;
 ALTER TABLE business_members DISABLE ROW LEVEL SECURITY;
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
 ALTER TABLE customers DISABLE ROW LEVEL SECURITY;

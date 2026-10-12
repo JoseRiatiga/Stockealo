@@ -204,7 +204,101 @@ class ProductRepository {
       category.toMap(),
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
+
+    // Sincronizar en tiempo real a Supabase
+    SupabaseService.instance.upsertCategoryToCloud(category.toMap());
+
     return category;
+  }
+
+  /// Actualizar / renombrar categoría existente (actualiza también los productos asociados)
+  Future<void> updateCategory({
+    required String id,
+    required String businessId,
+    required String oldName,
+    required String newName,
+  }) async {
+    final db = await _dbProvider.database;
+    final cleanNewName = newName.trim();
+
+    await db.transaction((txn) async {
+      // 1. Actualizar la tabla categories
+      await txn.update(
+        'categories',
+        {'name': cleanNewName},
+        where: 'id = ? AND business_id = ?',
+        whereArgs: [id, businessId],
+      );
+
+      // 2. Actualizar todos los productos que tenían la categoría anterior
+      await txn.update(
+        'products',
+        {'category': cleanNewName},
+        where: 'business_id = ? AND category = ?',
+        whereArgs: [businessId, oldName],
+      );
+    });
+
+    // 3. Sincronizar a Supabase
+    SupabaseService.instance.upsertCategoryToCloud({
+      'id': id,
+      'business_id': businessId,
+      'name': cleanNewName,
+      'color_hex': '0xFF059669',
+    });
+    try {
+      await SupabaseService.instance.client
+          ?.from('products')
+          .update({'category': cleanNewName})
+          .eq('business_id', businessId)
+          .eq('category', oldName);
+    } catch (_) {}
+  }
+
+  /// Eliminar categoría y reasignar productos a 'General'
+  Future<void> deleteCategory({
+    required String id,
+    required String businessId,
+    required String categoryName,
+  }) async {
+    final db = await _dbProvider.database;
+
+    await db.transaction((txn) async {
+      // 1. Eliminar de la tabla categories
+      await txn.delete(
+        'categories',
+        where: 'id = ? AND business_id = ?',
+        whereArgs: [id, businessId],
+      );
+
+      // 2. Reasignar productos de esta categoría a 'General'
+      await txn.update(
+        'products',
+        {'category': 'General'},
+        where: 'business_id = ? AND category = ?',
+        whereArgs: [businessId, categoryName],
+      );
+    });
+
+    // 3. Eliminar de Supabase
+    await SupabaseService.instance.deleteCategoryFromCloud(id);
+    try {
+      await SupabaseService.instance.client
+          ?.from('products')
+          .update({'category': 'General'})
+          .eq('business_id', businessId)
+          .eq('category', categoryName);
+    } catch (_) {}
+  }
+
+  /// Contar cuántos productos pertenecen a una categoría
+  Future<int> countProductsInCategory(String categoryName, String businessId) async {
+    final db = await _dbProvider.database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM products WHERE business_id = ? AND category = ? AND is_active = 1',
+      [businessId, categoryName],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   /// Resumen estadístico del inventario de la empresa

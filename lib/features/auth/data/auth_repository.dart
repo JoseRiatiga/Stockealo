@@ -1,5 +1,6 @@
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/hash_helper.dart';
 import '../models/app_user.dart';
 
@@ -56,13 +57,19 @@ class AuthRepository {
       createdAt: DateTime.now(),
     );
 
-    await db.insert('users', {
+    final userMap = {
       ...user.toMap(),
       'password': hashedPassword,
-    });
+    };
+
+    await db.insert('users', userMap);
 
     _currentUser = user;
     await _dbProvider.setSetting('active_user_id', user.id);
+
+    // Sincronizar usuario a Supabase en tiempo real
+    SupabaseService.instance.upsertUserToCloud(userMap);
+
     return user;
   }
 
@@ -151,6 +158,13 @@ class AuthRepository {
         avatarPath: avatarPath ?? _currentUser!.avatarPath,
       );
     }
+
+    // Sincronizar perfil actualizado a Supabase en tiempo real
+    final updatedUserMap = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
+    if (updatedUserMap.isNotEmpty) {
+      SupabaseService.instance.upsertUserToCloud(updatedUserMap.first);
+    }
+
     return _currentUser!;
   }
 
@@ -189,6 +203,12 @@ class AuthRepository {
       where: 'id = ?',
       whereArgs: [userId],
     );
+
+    // Sincronizar contraseña actualizada a Supabase
+    final updatedUserMap = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
+    if (updatedUserMap.isNotEmpty) {
+      SupabaseService.instance.upsertUserToCloud(updatedUserMap.first);
+    }
   }
 
   /// Recarga el usuario desde la base de datos

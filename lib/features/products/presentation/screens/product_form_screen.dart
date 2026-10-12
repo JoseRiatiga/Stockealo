@@ -9,6 +9,7 @@ import '../../data/product_repository.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
 import 'barcode_scanner_screen.dart';
+import '../widgets/manage_categories_modal.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -207,6 +208,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       await _loadCategories();
       setState(() {
         _selectedCategory = result;
+      });
+    }
+  }
+
+  Future<void> _openManageCategoriesModal() async {
+    final changed = await ManageCategoriesModal.show(context, widget.businessId);
+    if (changed == true || mounted) {
+      await _loadCategories();
+      setState(() {
+        if (!_categories.any((c) => c.name == _selectedCategory)) {
+          _selectedCategory = _categories.isNotEmpty ? _categories.first.name : null;
+        }
       });
     }
   }
@@ -433,6 +446,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             style: IconButton.styleFrom(
                               backgroundColor: const Color(0xFFECFDF5),
                               foregroundColor: const Color(0xFF059669),
+                              padding: const EdgeInsets.all(14),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            onPressed: _openManageCategoriesModal,
+                            icon: const Icon(Icons.tune, size: 20),
+                            tooltip: 'Gestionar categorías',
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              foregroundColor: const Color(0xFF475569),
                               padding: const EdgeInsets.all(14),
                             ),
                           ),

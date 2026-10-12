@@ -787,7 +787,14 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
               Icons.shield_outlined,
               color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
             ),
-            title: const Text('Términos y Privacidad', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            title: Text(
+              'Términos y Privacidad',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+              ),
+            ),
             trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFF94A3B8)),
             onTap: () {
               Navigator.pop(context);

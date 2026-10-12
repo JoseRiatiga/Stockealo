@@ -132,7 +132,15 @@ class SupabaseService {
       }
 
       // 2. Sincronizar Products
-      final localProducts = await db.query('products');
+      // Primero eliminar de Supabase los productos que fueron eliminados localmente (is_active = 0)
+      final inactiveProducts = await db.query('products', where: 'is_active = 0');
+      if (inactiveProducts.isNotEmpty) {
+        final inactiveIds = inactiveProducts.map((p) => p['id'] as String).toList();
+        await client!.from('products').delete().inFilter('id', inactiveIds);
+      }
+
+      // Luego sincronizar únicamente los productos activos (is_active = 1)
+      final localProducts = await db.query('products', where: 'is_active = 1');
       if (localProducts.isNotEmpty) {
         final formattedProducts = localProducts.map((p) => {
           'id': p['id'],
@@ -212,6 +220,60 @@ class SupabaseService {
         success: false,
         errorMessage: 'Error al sincronizar: $e',
       );
+    }
+  }
+
+  /// Elimina un producto de Supabase inmediatamente
+  Future<void> deleteProductFromCloud(String productId) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('products').delete().eq('id', productId);
+      debugPrint('Producto \$productId eliminado de Supabase con éxito.');
+    } catch (e) {
+      debugPrint('Error al eliminar producto en Supabase: \$e');
+    }
+  }
+
+  /// Crea o actualiza un producto en Supabase inmediatamente
+  Future<void> upsertProductToCloud(Map<String, dynamic> p) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('products').upsert({
+        'id': p['id'],
+        'business_id': p['business_id'],
+        'name': p['name'],
+        'sku': p['code'] ?? '',
+        'category': p['category'] ?? 'General',
+        'cost_price': (p['purchase_price'] as num?)?.toDouble() ?? 0.0,
+        'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
+        'current_stock': (p['stock'] as num?)?.toInt() ?? 0,
+        'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
+        'image_url': p['photo_path'],
+        'created_at': p['created_at'],
+      }, onConflict: 'id');
+    } catch (e) {
+      debugPrint('Error al guardar producto en Supabase: \$e');
+    }
+  }
+
+  /// Registra una venta en Supabase inmediatamente
+  Future<void> insertSaleToCloud(Map<String, dynamic> s) async {
+    try {
+      if (!_isInitialized) await initialize();
+      await client?.from('sales').insert({
+        'id': s['id'],
+        'business_id': s['business_id'],
+        'product_id': s['product_id'],
+        'quantity': (s['quantity'] as num?)?.toInt() ?? 1,
+        'unit_price': (s['unit_price'] as num?)?.toDouble() ?? 0.0,
+        'unit_cost': (s['unit_cost'] as num?)?.toDouble() ?? 0.0,
+        'total_amount': (s['total_amount'] as num?)?.toDouble() ?? 0.0,
+        'payment_method': s['payment_method'] ?? 'Efectivo',
+        'customer_id': null,
+        'sale_date': s['date'] ?? DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Error al insertar venta en Supabase: \$e');
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/utils/image_helper.dart';
+import '../../../core/services/supabase_service.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 
@@ -99,6 +100,9 @@ class ProductRepository {
         });
       }
     });
+
+    // Sincronizar en tiempo real a Supabase
+    SupabaseService.instance.upsertProductToCloud(product.toMap());
   }
 
   /// Actualizar producto
@@ -110,6 +114,9 @@ class ProductRepository {
       where: 'id = ? AND business_id = ?',
       whereArgs: [product.id, product.businessId],
     );
+
+    // Sincronizar actualización en tiempo real a Supabase
+    SupabaseService.instance.upsertProductToCloud(product.toMap());
   }
 
   /// Eliminar producto
@@ -129,6 +136,9 @@ class ProductRepository {
         where: 'id = ? AND business_id = ?',
         whereArgs: [id, businessId],
       );
+
+      // Eliminar también de Supabase en tiempo real
+      await SupabaseService.instance.deleteProductFromCloud(id);
     }
   }
 

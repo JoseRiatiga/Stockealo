@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/app_database.dart';
+import 'package:sqflite/sqflite.dart';
 
 class SyncResult {
   final bool success;
@@ -262,6 +263,199 @@ class SupabaseService {
       return SyncResult(
         success: false,
         errorMessage: 'Error al sincronizar: $e',
+      );
+    }
+  }
+
+  /// Descarga todos los datos desde Supabase hacia la base de datos local SQLite
+  Future<SyncResult> syncFromCloud(String userId, [String? userEmail]) async {
+    try {
+      if (!_isInitialized) {
+        final ok = await initialize();
+        if (!ok) {
+          return const SyncResult(
+            success: false,
+            errorMessage: 'Supabase no está inicializado.',
+          );
+        }
+      }
+
+      final db = await AppDatabase.instance.database;
+      int businessesCount = 0;
+      int productsCount = 0;
+      int customersCount = 0;
+      int salesCount = 0;
+
+      // 1. Descargar Empresas
+      try {
+        final List<dynamic> cloudBusinesses = await client!
+            .from('businesses')
+            .select()
+            .eq('is_deleted', 0);
+
+        for (final b in cloudBusinesses) {
+          await db.insert(
+            'businesses',
+            {
+              'id': b['id'],
+              'user_id': b['user_id'] ?? userId,
+              'name': b['name'],
+              'currency': b['currency'] ?? 'COP',
+              'is_deleted': (b['is_deleted'] as int?) ?? 0,
+              'deleted_at': b['deleted_at'],
+              'created_at': b['created_at'] ?? DateTime.now().toIso8601String(),
+              'is_synced': 1,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          businessesCount++;
+        }
+      } catch (e) {
+        debugPrint('Error descargando empresas de Supabase: $e');
+      }
+
+      // 1.1 Descargar Categorías
+      try {
+        final List<dynamic> cloudCategories = await client!.from('categories').select();
+        for (final c in cloudCategories) {
+          await db.insert(
+            'categories',
+            {
+              'id': c['id'],
+              'business_id': c['business_id'],
+              'name': c['name'],
+              'color_hex': c['color_hex'] ?? '0xFF059669',
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      } catch (e) {
+        debugPrint('Error descargando categorías de Supabase: $e');
+      }
+
+      // 1.2 Descargar Miembros de equipo
+      try {
+        final List<dynamic> cloudMembers = await client!.from('business_members').select();
+        for (final m in cloudMembers) {
+          await db.insert(
+            'business_members',
+            {
+              'id': m['id'],
+              'business_id': m['business_id'],
+              'user_id': m['user_id'],
+              'email': m['user_email'] ?? m['email'] ?? '',
+              'role': m['role'] ?? 'CASHIER',
+              'status': m['status'] ?? 'ACTIVE',
+              'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      } catch (e) {
+        debugPrint('Error descargando miembros de Supabase: $e');
+      }
+
+      // 2. Descargar Productos
+      try {
+        final List<dynamic> cloudProducts = await client!.from('products').select();
+        for (final p in cloudProducts) {
+          await db.insert(
+            'products',
+            {
+              'id': p['id'],
+              'business_id': p['business_id'],
+              'code': p['sku'] ?? '',
+              'name': p['name'],
+              'description': p['description'],
+              'category': p['category'] ?? 'General',
+              'purchase_price': (p['cost_price'] as num?)?.toDouble() ?? 0.0,
+              'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
+              'stock': (p['current_stock'] as num?)?.toInt() ?? 0,
+              'min_stock': (p['min_stock_alert'] as num?)?.toInt() ?? 5,
+              'photo_path': p['image_url'],
+              'is_active': 1,
+              'created_at': p['created_at'] ?? DateTime.now().toIso8601String(),
+              'updated_at': p['created_at'] ?? DateTime.now().toIso8601String(),
+              'is_synced': 1,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          productsCount++;
+        }
+      } catch (e) {
+        debugPrint('Error descargando productos de Supabase: $e');
+      }
+
+      // 3. Descargar Clientes
+      try {
+        final List<dynamic> cloudCustomers = await client!.from('customers').select();
+        for (final c in cloudCustomers) {
+          await db.insert(
+            'customers',
+            {
+              'id': c['id'],
+              'business_id': c['business_id'],
+              'name': c['name'],
+              'phone': c['phone'],
+              'address': c['address'],
+              'debt_balance': (c['debt_balance'] as num?)?.toDouble() ?? 0.0,
+              'created_at': c['created_at'] ?? DateTime.now().toIso8601String(),
+              'is_synced': 1,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          customersCount++;
+        }
+      } catch (e) {
+        debugPrint('Error descargando clientes de Supabase: $e');
+      }
+
+      // 4. Descargar Ventas
+      try {
+        final List<dynamic> cloudSales = await client!.from('sales').select();
+        for (final s in cloudSales) {
+          final unitCost = (s['unit_cost'] as num?)?.toDouble() ?? 0.0;
+          final qty = (s['quantity'] as num?)?.toInt() ?? 1;
+          final totalAmount = (s['total_amount'] as num?)?.toDouble() ?? 0.0;
+          await db.insert(
+            'sales',
+            {
+              'id': s['id'],
+              'business_id': s['business_id'],
+              'product_id': s['product_id'],
+              'product_name': s['product_name'] ?? 'Producto',
+              'quantity': qty,
+              'customer_id': s['customer_id'],
+              'customer_name': s['customer_name'],
+              'date': s['sale_date'] ?? DateTime.now().toIso8601String(),
+              'total': totalAmount,
+              'total_cost': unitCost * qty,
+              'net_profit': totalAmount - (unitCost * qty),
+              'payment_method': s['payment_method'] ?? 'Efectivo',
+              'payment_status': 'PAGADO',
+              'notes': s['notes'],
+              'created_at': s['sale_date'] ?? DateTime.now().toIso8601String(),
+              'is_synced': 1,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          salesCount++;
+        }
+      } catch (e) {
+        debugPrint('Error descargando ventas de Supabase: $e');
+      }
+
+      return SyncResult(
+        success: true,
+        businessesCount: businessesCount,
+        productsCount: productsCount,
+        customersCount: customersCount,
+        salesCount: salesCount,
+      );
+    } catch (e) {
+      return SyncResult(
+        success: false,
+        errorMessage: 'Error al descargar datos: $e',
       );
     }
   }

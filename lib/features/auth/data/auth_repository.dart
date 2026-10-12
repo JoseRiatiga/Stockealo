@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
@@ -34,7 +36,7 @@ class AuthRepository {
 
     final db = await _dbProvider.database;
 
-    // Verificar si el correo ya existe
+    // 1. Verificar si el correo ya existe localmente
     final existing = await db.query(
       'users',
       where: 'email = ?',
@@ -44,6 +46,27 @@ class AuthRepository {
 
     if (existing.isNotEmpty) {
       throw Exception('Ya existe una cuenta con este correo.');
+    }
+
+    // 2. Verificar si ya existe en Supabase
+    if (!SupabaseService.instance.isInitialized) {
+      await SupabaseService.instance.initialize();
+    }
+    final client = SupabaseService.instance.client;
+    if (client != null) {
+      try {
+        final cloudCheck = await client
+            .from('users')
+            .select('id')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+        if (cloudCheck != null) {
+          throw Exception('Ya existe una cuenta con este correo en la nube. Inicia sesión con tus credenciales.');
+        }
+      } catch (e) {
+        if (e is Exception && e.toString().contains('Ya existe')) rethrow;
+        debugPrint('Nota: no se pudo verificar duplicado en Supabase: $e');
+      }
     }
 
     // Hasheo seguro unidireccional con SHA-256 y Salting
@@ -73,11 +96,12 @@ class AuthRepository {
     return user;
   }
 
-  /// Inicia sesión verificando el hash de la contraseña
+  /// Inicia sesión verificando credenciales localmente o consultando Supabase Cloud
   Future<AppUser> login(String email, String password) async {
     final cleanEmail = email.trim().toLowerCase();
     final db = await _dbProvider.database;
 
+    // 1. Intentar autenticación con base de datos local SQLite
     final maps = await db.query(
       'users',
       where: 'email = ?',
@@ -85,32 +109,95 @@ class AuthRepository {
       limit: 1,
     );
 
-    if (maps.isEmpty) {
-      throw Exception('Correo o contraseña incorrectos.');
+    if (maps.isNotEmpty) {
+      final userRow = maps.first;
+      final storedPassword = userRow['password'] as String;
+
+      if (HashHelper.verifyPassword(password, storedPassword)) {
+        // Auto-migración si el usuario tenía contraseña previa en texto plano
+        final secureHash = HashHelper.hashPassword(password);
+        if (storedPassword != secureHash) {
+          await db.update(
+            'users',
+            {'password': secureHash},
+            where: 'id = ?',
+            whereArgs: [userRow['id']],
+          );
+        }
+
+        final user = AppUser.fromMap(userRow);
+        _currentUser = user;
+        await _dbProvider.setSetting('active_user_id', user.id);
+
+        // Descargar datos actualizados de la nube en segundo plano
+        SupabaseService.instance.syncFromCloud(user.id, user.email);
+
+        return user;
+      }
     }
 
-    final userRow = maps.first;
-    final storedPassword = userRow['password'] as String;
-
-    if (!HashHelper.verifyPassword(password, storedPassword)) {
-      throw Exception('Correo o contraseña incorrectos.');
+    // 2. Si no se encontró en SQLite o la contraseña local no coincidió,
+    // validar directamente contra Supabase Cloud
+    if (!SupabaseService.instance.isInitialized) {
+      await SupabaseService.instance.initialize();
     }
 
-    // Auto-migración si el usuario tenía contraseña previa en texto plano
-    final secureHash = HashHelper.hashPassword(password);
-    if (storedPassword != secureHash) {
-      await db.update(
-        'users',
-        {'password': secureHash},
-        where: 'id = ?',
-        whereArgs: [userRow['id']],
-      );
+    final client = SupabaseService.instance.client;
+    if (client != null) {
+      try {
+        final cloudUser = await client
+            .from('users')
+            .select()
+            .eq('email', cleanEmail)
+            .maybeSingle();
+
+        if (cloudUser != null) {
+          final storedCloudPassword = cloudUser['password'] as String?;
+          final isMatch = storedCloudPassword != null &&
+              (HashHelper.verifyPassword(password, storedCloudPassword) ||
+               storedCloudPassword == password ||
+               storedCloudPassword == HashHelper.hashPassword(password));
+
+          if (isMatch) {
+            final user = AppUser(
+              id: cloudUser['id'] as String,
+              email: cloudUser['email'] as String,
+              name: cloudUser['name'] as String?,
+              phone: cloudUser['phone'] as String?,
+              avatarPath: cloudUser['avatar_path'] as String?,
+              createdAt: cloudUser['created_at'] != null
+                  ? DateTime.tryParse(cloudUser['created_at']) ?? DateTime.now()
+                  : DateTime.now(),
+            );
+
+            final secureHash = HashHelper.hashPassword(password);
+            final userMap = {
+              ...user.toMap(),
+              'password': secureHash,
+            };
+
+            // Guardar usuario en SQLite local para futuros inicios de sesión offline
+            await db.insert(
+              'users',
+              userMap,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+
+            _currentUser = user;
+            await _dbProvider.setSetting('active_user_id', user.id);
+
+            // Descargar todas las empresas, productos, categorías y datos asociados desde la nube
+            await SupabaseService.instance.syncFromCloud(user.id, user.email);
+
+            return user;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error al verificar usuario en Supabase: $e');
+      }
     }
 
-    final user = AppUser.fromMap(userRow);
-    _currentUser = user;
-    await _dbProvider.setSetting('active_user_id', user.id);
-    return user;
+    throw Exception('Correo o contraseña incorrectos.');
   }
 
   /// Restaura la sesión guardada si existe

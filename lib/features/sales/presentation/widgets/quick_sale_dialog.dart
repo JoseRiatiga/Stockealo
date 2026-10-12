@@ -1,0 +1,382 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../products/models/product.dart';
+import '../../data/sales_repository.dart';
+
+class QuickSaleDialog extends StatefulWidget {
+  final Product product;
+
+  const QuickSaleDialog({super.key, required this.product});
+
+  static Future<bool?> show(BuildContext context, Product product) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => QuickSaleDialog(product: product),
+    );
+  }
+
+  @override
+  State<QuickSaleDialog> createState() => _QuickSaleDialogState();
+}
+
+class _QuickSaleDialogState extends State<QuickSaleDialog> {
+  final _salesRepo = SalesRepository();
+  final _customerController = TextEditingController();
+
+  int _quantity = 1;
+  String _paymentMethod = 'EFECTIVO'; // 'EFECTIVO' | 'TRANSFERENCIA' | 'FIADO'
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.product.stock <= 0) {
+      _quantity = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _customerController.dispose();
+    super.dispose();
+  }
+
+  void _increment() {
+    if (_quantity < widget.product.stock) {
+      setState(() => _quantity++);
+    }
+  }
+
+  void _decrement() {
+    if (_quantity > 1) {
+      setState(() => _quantity--);
+    }
+  }
+
+  Future<void> _submitSale() async {
+    if (_quantity <= 0 || _quantity > widget.product.stock) return;
+
+    if (_paymentMethod == 'FIADO' && _customerController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor escribe el nombre del cliente para el fiado.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _salesRepo.recordSale(
+        product: widget.product,
+        quantity: _quantity,
+        paymentMethod: _paymentMethod,
+        customerName: _paymentMethod == 'FIADO' ? _customerController.text.trim() : null,
+      );
+
+      if (mounted) {
+        final remainingStock = widget.product.stock - _quantity;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '✅ Venta registrada: $_quantity unid. descontadas (Quedan: $remainingStock)',
+            ),
+            backgroundColor: const Color(0xFF059669),
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.product;
+    final isOutOfStock = p.isOutOfStock;
+    final totalAmount = p.salePrice * _quantity;
+    final netProfit = (p.salePrice - p.purchasePrice) * _quantity;
+
+    final hasPhoto = p.photoPath != null &&
+        p.photoPath!.isNotEmpty &&
+        File(p.photoPath!).existsSync();
+
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        top: 20,
+        left: 20,
+        right: 20,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Barra superior de agarre
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Encabezado del producto
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: hasPhoto
+                      ? Image.file(File(p.photoPath!), fit: BoxFit.cover)
+                      : Container(
+                          color: const Color(0xFFF1F5F9),
+                          child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF94A3B8)),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${p.code} • ${CurrencyFormatter.format(p.salePrice)} / unid.',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isOutOfStock
+                            ? const Color(0xFFFEE2E2)
+                            : const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isOutOfStock ? 'Agotado (0)' : 'Stock disponible: ${p.stock}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isOutOfStock
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFF059669),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Si está agotado, bloquear
+          if (isOutOfStock) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.block, color: Color(0xFFDC2626)),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'No es posible registrar ventas porque el stock físico es 0. Repón inventario primero.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF991B1B)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ] else ...[
+            // Selector de Cantidad a Descontar
+            const Text(
+              'Cantidad a descontar por venta:',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 10),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton.filledTonal(
+                  onPressed: _decrement,
+                  icon: const Icon(Icons.remove),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    foregroundColor: const Color(0xFF1E293B),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+                Container(
+                  width: 80,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    '$_quantity',
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                ),
+                IconButton.filledTonal(
+                  onPressed: _increment,
+                  icon: const Icon(Icons.add),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFECFDF5),
+                    foregroundColor: const Color(0xFF059669),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Resumen financiero de la venta en segundo plano
+            Center(
+              child: Text(
+                'Total: ${CurrencyFormatter.format(totalAmount)}  •  Ganancia: ${CurrencyFormatter.format(netProfit)}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF059669),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Selector de Método de Pago
+            const Text(
+              'Método de pago utilizado:',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 10),
+
+            Row(
+              children: [
+                _buildPaymentMethodChip('EFECTIVO', '💵 Efectivo'),
+                const SizedBox(width: 8),
+                _buildPaymentMethodChip('TRANSFERENCIA', '📱 Transferencia'),
+                const SizedBox(width: 8),
+                _buildPaymentMethodChip('FIADO', '📝 Fiado'),
+              ],
+            ),
+
+            // Input para nombre de cliente si es FIADO
+            if (_paymentMethod == 'FIADO') ...[
+              const SizedBox(height: 14),
+              TextField(
+                controller: _customerController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre del Cliente para el Fiado *',
+                  hintText: 'Ej. Don Carlos, Sra. María...',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+
+            // Botón de Confirmación
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _submitSale,
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_circle_outline),
+                label: Text(
+                  _isLoading ? 'Guardando...' : 'Registrar Venta ($_quantity unid.)',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodChip(String method, String label) {
+    final isSelected = _paymentMethod == method;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _paymentMethod = method),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF059669) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF059669) : const Color(0xFFCBD5E1),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? Colors.white : const Color(0xFF334155),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

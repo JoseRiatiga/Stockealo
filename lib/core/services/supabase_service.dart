@@ -119,9 +119,9 @@ class SupabaseService {
         final formattedBusinesses = localBusinesses.map((b) => {
           'id': b['id'],
           'name': b['name'],
-          'type': b['type'],
-          'currency': b['currency'],
-          'is_deleted': b['is_deleted'],
+          'type': (b['type'] ?? 'Comercio General').toString(),
+          'currency': b['currency'] ?? 'COP',
+          'is_deleted': (b['is_deleted'] as int?) ?? 0,
           'created_at': b['created_at'],
         }).toList();
 
@@ -138,13 +138,13 @@ class SupabaseService {
           'id': p['id'],
           'business_id': p['business_id'],
           'name': p['name'],
-          'sku': p['sku'],
-          'category': p['category'],
-          'cost_price': p['cost_price'],
-          'sale_price': p['sale_price'],
-          'current_stock': p['current_stock'],
-          'min_stock_alert': p['min_stock_alert'],
-          'image_url': p['image_url'],
+          'sku': p['code'] ?? '',
+          'category': p['category'] ?? 'General',
+          'cost_price': (p['purchase_price'] as num?)?.toDouble() ?? 0.0,
+          'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
+          'current_stock': (p['stock'] as num?)?.toInt() ?? 0,
+          'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
+          'image_url': p['photo_path'],
           'created_at': p['created_at'],
         }).toList();
 
@@ -163,7 +163,7 @@ class SupabaseService {
           'name': c['name'],
           'phone': c['phone'],
           'address': c['address'],
-          'debt_balance': c['debt_balance'],
+          'debt_balance': (c['debt_balance'] as num?)?.toDouble() ?? 0.0,
           'created_at': c['created_at'],
         }).toList();
 
@@ -180,13 +180,13 @@ class SupabaseService {
           'id': s['id'],
           'business_id': s['business_id'],
           'product_id': s['product_id'],
-          'quantity': s['quantity'],
-          'unit_price': s['unit_price'],
-          'unit_cost': s['unit_cost'],
-          'total_amount': s['total_amount'],
-          'payment_method': s['payment_method'],
-          'customer_id': s['customer_id'],
-          'sale_date': s['sale_date'],
+          'quantity': (s['quantity'] as num?)?.toInt() ?? 1,
+          'unit_price': (s['unit_price'] as num?)?.toDouble() ?? 0.0,
+          'unit_cost': (s['unit_cost'] as num?)?.toDouble() ?? 0.0,
+          'total_amount': (s['total_amount'] as num?)?.toDouble() ?? 0.0,
+          'payment_method': s['payment_method'] ?? 'Efectivo',
+          'customer_id': null,
+          'sale_date': s['date'] ?? DateTime.now().toIso8601String(),
         }).toList();
 
         await client!.from('sales').upsert(

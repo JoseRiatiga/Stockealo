@@ -48,6 +48,7 @@ dependencies:
   crypto: ^3.0.6
   excel: ^4.0.6
   supabase_flutter: ^2.15.4
+  app_links: ^6.4.1
 
 dev_dependencies:
   flutter_test:

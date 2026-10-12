@@ -29,7 +29,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
     _loadSales();
+  }
+
+  void _onBusinessChanged() {
+    if (mounted) {
+      _loadSales();
+    }
+  }
+
+  @override
+  void dispose() {
+    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
+    super.dispose();
   }
 
   Future<void> _loadSales() async {
@@ -245,10 +258,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             // Lista de ventas
             if (_isLoading)
               const SliverFillRemaining(
+                hasScrollBody: false,
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (_sales.isEmpty)
               SliverFillRemaining(
+                hasScrollBody: false,
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
@@ -441,8 +456,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   Widget _buildSaleCard(Sale sale) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final timeStr = DateFormat('hh:mm a').format(sale.date);
-    final dateStr = DateFormat('dd/MM/yyyy').format(sale.date);
+    final isToday = sale.date.year == DateTime.now().year &&
+        sale.date.month == DateTime.now().month &&
+        sale.date.day == DateTime.now().day;
+    final timeStr = isToday
+        ? DateFormat('hh:mm a').format(sale.date)
+        : DateFormat('dd/MM hh:mm a').format(sale.date);
 
     Color methodColor;
     String methodLabel;
@@ -470,46 +489,32 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icono / Hora
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  Text(
+            // Fila 1: Hora/Fecha, Nombre de producto y Total
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Text(
                     timeStr,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                     ),
                   ),
-                  Text(
-                    dateStr,
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Nombre de producto y método
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
                     sale.productName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -519,42 +524,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: methodColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          methodLabel,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: methodColor,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'x${sale.quantity} unid.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Monto e ingreso
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
+                ),
+                const SizedBox(width: 8),
                 Text(
                   CurrencyFormatter.format(sale.totalAmount),
                   style: TextStyle(
@@ -563,29 +534,74 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                   ),
                 ),
-                Text(
-                  '+${CurrencyFormatter.format(sale.netProfit)}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF059669),
-                  ),
-                ),
               ],
             ),
-
-            // Botón de ticket digital y compartir
-            IconButton(
-              icon: const Icon(Icons.receipt_long, size: 20, color: Color(0xFF059669)),
-              tooltip: 'Ver / Compartir Ticket',
-              onPressed: () => DigitalTicketModal.show(context, sale: sale),
-            ),
-
-            // Botón para anular en caso de equivocación
-            IconButton(
-              icon: const Icon(Icons.undo, size: 18, color: Color(0xFF94A3B8)),
-              tooltip: 'Anular Venta',
-              onPressed: () => _cancelSale(sale),
+            const SizedBox(height: 8),
+            // Fila 2: Método de pago, Cantidad, Ganancia y Acciones
+            Row(
+              children: [
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: methodColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      methodLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: methodColor,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'x${sale.quantity} unid.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF059669).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '+${CurrencyFormatter.format(sale.netProfit)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF059669),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: const Icon(Icons.receipt_long, size: 20, color: Color(0xFF059669)),
+                  tooltip: 'Ver / Compartir Ticket',
+                  onPressed: () => DigitalTicketModal.show(context, sale: sale),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: const Icon(Icons.undo, size: 18, color: Color(0xFF94A3B8)),
+                  tooltip: 'Anular Venta',
+                  onPressed: () => _cancelSale(sale),
+                ),
+              ],
             ),
           ],
         ),

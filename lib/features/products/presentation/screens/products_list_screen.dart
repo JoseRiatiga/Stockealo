@@ -47,11 +47,19 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   @override
   void initState() {
     super.initState();
+    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
     _loadData();
+  }
+
+  void _onBusinessChanged() {
+    if (mounted) {
+      _loadData();
+    }
   }
 
   @override
   void dispose() {
+    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
     _searchController.dispose();
     super.dispose();
   }

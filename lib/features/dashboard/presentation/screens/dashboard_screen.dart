@@ -48,6 +48,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
+  }
+
+  void _onBusinessChanged() {
+    if (mounted) {
+      _loadData();
+    }
+  }
+
+  @override
+  void dispose() {
+    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
+    super.dispose();
   }
 
   Future<void> _loadData() async {

@@ -1,14 +1,18 @@
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
 import '../models/business.dart';
 
-class BusinessRepository {
+class BusinessRepository extends ChangeNotifier {
   static final BusinessRepository instance = BusinessRepository._internal();
   BusinessRepository._internal();
 
   final AppDatabase _dbProvider = AppDatabase.instance;
   static Business? _activeBusiness;
+
+  /// Notificador reactivo del negocio activo actual
+  final ValueNotifier<Business?> activeBusinessNotifier = ValueNotifier<Business?>(null);
 
   /// Negocio activo actual en memoria
   Business? get currentActiveBusiness => _activeBusiness;
@@ -16,22 +20,31 @@ class BusinessRepository {
   /// Obtiene el negocio activo para un usuario (null si no tiene empresas aún)
   Future<Business?> getActiveBusiness(String userId, [String? userEmail]) async {
     if (_activeBusiness != null) {
+      if (activeBusinessNotifier.value?.id != _activeBusiness!.id) {
+        activeBusinessNotifier.value = _activeBusiness;
+      }
       return _activeBusiness!;
     }
 
     final list = await getAllBusinesses(userId, userEmail);
     if (list.isNotEmpty) {
       _activeBusiness = list.first;
+      activeBusinessNotifier.value = _activeBusiness;
+      notifyListeners();
       return _activeBusiness;
     }
 
     _activeBusiness = null;
+    activeBusinessNotifier.value = null;
+    notifyListeners();
     return null;
   }
 
-  /// Cambia la empresa activa en el contexto de trabajo
+  /// Cambia la empresa activa en el contexto de trabajo y notifica inmediatamente a todos los módulos
   void setActiveBusiness(Business? business) {
     _activeBusiness = business;
+    activeBusinessNotifier.value = business;
+    notifyListeners();
   }
 
   /// Purga definitivamente empresas en papelera que superaron los 7 días
@@ -90,6 +103,8 @@ class BusinessRepository {
 
     await db.insert('businesses', business.toMap());
     _activeBusiness = business;
+    activeBusinessNotifier.value = business;
+    notifyListeners();
 
     // Sincronizar en tiempo real a Supabase
     SupabaseService.instance.upsertBusinessToCloud(business.toMap());
@@ -119,6 +134,8 @@ class BusinessRepository {
         name: name.trim(),
         currency: currency,
       );
+      activeBusinessNotifier.value = _activeBusiness;
+      notifyListeners();
     }
 
     // Sincronizar actualización en tiempo real a Supabase
@@ -147,6 +164,8 @@ class BusinessRepository {
 
     if (_activeBusiness?.id == id) {
       _activeBusiness = null;
+      activeBusinessNotifier.value = null;
+      notifyListeners();
     }
 
     // Actualizar estado en Supabase en tiempo real

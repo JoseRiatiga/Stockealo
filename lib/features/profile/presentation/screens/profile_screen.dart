@@ -7,6 +7,8 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../auth/models/app_user.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
+import '../../../business/presentation/widgets/business_selector_modal.dart';
+import '../../../../core/utils/currency_options.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../../../reports/presentation/widgets/excel_import_modal.dart';
@@ -45,6 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
     _user = _authRepo.currentUser;
     _nameController = TextEditingController(text: _user?.name ?? '');
     _phoneController = TextEditingController(text: _user?.phone ?? '');
@@ -52,6 +55,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadActiveBusiness();
     _loadCloudSyncStatus();
     _loadAppVersion();
+  }
+
+  void _onBusinessChanged() {
+    if (mounted) {
+      _loadActiveBusiness();
+    }
   }
 
   Future<void> _loadAppVersion() async {
@@ -190,7 +199,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadActiveBusiness() async {
-    if (_user != null) {
+    final current = _businessRepo.currentActiveBusiness;
+    if (current != null) {
+      if (mounted) {
+        setState(() => _activeBusiness = current);
+      }
+    } else if (_user != null) {
       final biz = await _businessRepo.getActiveBusiness(_user!.id, _user!.email);
       if (mounted) {
         setState(() => _activeBusiness = biz);
@@ -198,8 +212,107 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _openBusinessSelector() async {
+    if (_user == null) return;
+    final changed = await BusinessSelectorModal.show(
+      context,
+      userId: _user!.id,
+      onLogout: widget.onLogout,
+    );
+    if (changed == true) {
+      _loadActiveBusiness();
+    }
+  }
+
+  Future<void> _editActiveBusiness() async {
+    if (_activeBusiness == null) return;
+    final nameController = TextEditingController(text: _activeBusiness!.name);
+    String selectedCurrency = _activeBusiness!.currency;
+
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) => AlertDialog(
+            title: const Text('Editar Empresa Activa'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre de la Empresa',
+                      prefixIcon: Icon(Icons.storefront_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: selectedCurrency,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Moneda Principal',
+                      prefixIcon: Icon(Icons.monetization_on_outlined),
+                    ),
+                    items: kAvailableCurrencies.map((c) {
+                      return DropdownMenuItem(
+                        value: c.code,
+                        child: Text(c.label),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedCurrency = val);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (nameController.text.trim().isNotEmpty) {
+                    Navigator.pop(ctx, {
+                      'name': nameController.text.trim(),
+                      'currency': selectedCurrency,
+                    });
+                  }
+                },
+                child: const Text('Guardar'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (result != null && result['name']!.isNotEmpty) {
+      await _businessRepo.updateBusiness(
+        id: _activeBusiness!.id,
+        name: result['name']!,
+        currency: result['currency'] ?? 'COP',
+      );
+      _loadActiveBusiness();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Empresa actualizada correctamente'),
+            backgroundColor: Color(0xFF059669),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
     _nameController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -765,6 +878,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     title: Text(_activeBusiness!.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     subtitle: Text('Moneda: ${_activeBusiness!.currency} • Comercio Activo', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF059669)),
+                          tooltip: 'Editar nombre o moneda',
+                          onPressed: _editActiveBusiness,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.swap_horiz, size: 22, color: Color(0xFF2563EB)),
+                          tooltip: 'Cambiar de empresa',
+                          onPressed: _openBusinessSelector,
+                        ),
+                      ],
+                    ),
                   ),
                   const Divider(height: 12),
                   ListTile(
@@ -784,6 +912,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       );
                     },
+                  ),
+                ] else ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFFF1F5F9),
+                      child: Icon(Icons.storefront_outlined, color: Color(0xFF64748B)),
+                    ),
+                    title: const Text('Sin empresa activa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: const Text('Selecciona o crea una empresa para comenzar', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    trailing: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF059669),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: _openBusinessSelector,
+                      child: const Text('Seleccionar', style: TextStyle(fontSize: 12)),
+                    ),
                   ),
                 ],
               ],

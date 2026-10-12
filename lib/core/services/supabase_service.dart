@@ -664,12 +664,6 @@ class SupabaseService {
         try { await client!.from('businesses').delete().eq('id', bizId); } catch (_) {}
       }
 
-      // Eliminar el registro del usuario en la nube
-      try { await client!.from('users').delete().eq('id', userId); } catch (_) {}
-      if (userEmail != null && userEmail.isNotEmpty) {
-        try { await client!.from('users').delete().eq('email', userEmail.toLowerCase().trim()); } catch (_) {}
-      }
-
       // Desactivar el flag de sincronización en la nube (volver a Modo Local Privado)
       await setCloudSyncEnabled(false);
       return true;
@@ -684,10 +678,16 @@ class SupabaseService {
     required String userId,
     String? userEmail,
   }) async {
-    // 1. Purgar en la nube primero
+    // 1. Purgar datos de negocio en la nube primero
     await purgeCloudDataForUser(userId, userEmail);
 
-    // 2. Limpiar todas las tablas locales en SQLite
+    // 2. Eliminar el registro de usuario / cuenta en la nube
+    try { await client?.from('users').delete().eq('id', userId); } catch (_) {}
+    if (userEmail != null && userEmail.isNotEmpty) {
+      try { await client?.from('users').delete().eq('email', userEmail.toLowerCase().trim()); } catch (_) {}
+    }
+
+    // 3. Limpiar todas las tablas locales en SQLite
     final db = await AppDatabase.instance.database;
     await db.delete('stock_movements');
     await db.delete('customer_payments');

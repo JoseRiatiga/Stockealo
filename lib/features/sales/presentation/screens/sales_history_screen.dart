@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../data/sales_repository.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../auth/data/auth_repository.dart';
@@ -128,22 +129,38 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       await _salesRepo.cancelSale(sale);
       _loadSales();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Venta anulada y stock devuelto al catálogo'),
-            backgroundColor: Colors.red,
-          ),
+        AppToast.showSuccess(
+          context,
+          'Venta anulada y ${sale.quantity} unid. devueltas al inventario.',
+          title: 'Venta Anulada',
         );
       }
+    }
+  }
+
+  Future<void> _navigateToCustomers() async {
+    var bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+    if (bizId == null) {
+      final user = AuthRepository.instance.currentUser;
+      if (user != null) {
+        final biz = await _businessRepo.getActiveBusiness(user.id, user.email);
+        bizId = biz?.id;
+      }
+    }
+    if (bizId != null && mounted) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CustomersScreen(businessId: bizId!),
+        ),
+      );
+      _loadSales();
     }
   }
 
   Future<void> _exportToExcel() async {
     final biz = _businessRepo.currentActiveBusiness;
     if (biz == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay una empresa activa seleccionada.'), backgroundColor: Colors.orange),
-      );
+      AppToast.showWarning(context, 'No hay una empresa activa seleccionada.');
       return;
     }
 
@@ -196,17 +213,18 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         onGenerated: closeDialog,
       );
       closeDialog();
+      if (mounted) {
+        AppToast.showSuccess(
+          context,
+          'El archivo Excel (.xlsx) ha sido generado y compartido.',
+          title: 'Exportación Exitosa',
+        );
+      }
     } catch (e) {
       closeDialog();
       if (mounted) {
         final errorMsg = e.toString().replaceAll('Exception: ', '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        AppToast.showError(context, errorMsg);
       }
     }
   }
@@ -220,23 +238,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           IconButton(
             icon: const Icon(Icons.people_alt_outlined),
             tooltip: 'Clientes y Fiados',
-            onPressed: () async {
-              var bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
-              if (bizId == null) {
-                final user = AuthRepository.instance.currentUser;
-                if (user != null) {
-                  final biz = await _businessRepo.getActiveBusiness(user.id, user.email);
-                  bizId = biz?.id;
-                }
-              }
-              if (bizId != null && context.mounted) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CustomersScreen(businessId: bizId!),
-                  ),
-                ).then((_) => _loadSales());
-              }
-            },
+            onPressed: _navigateToCustomers,
           ),
           IconButton(
             icon: const Icon(Icons.table_chart_outlined),
@@ -253,6 +255,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             // Resumen de Métricas de Ventas de Hoy
             SliverToBoxAdapter(
               child: _buildSummaryCard(),
+            ),
+
+            // Accesos Rápidos Destacados: Clientes / Fiados y Exportación Excel
+            SliverToBoxAdapter(
+              child: _buildQuickModulesBar(),
             ),
 
             // Encabezado de la lista
@@ -358,6 +365,132 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuickModulesBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Row(
+        children: [
+          // Tarjeta Clientes y Fiados
+          Expanded(
+            child: InkWell(
+              onTap: _navigateToCustomers,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.5) : const Color(0xFFDBEAFE),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2563EB).withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.people_alt_rounded, size: 20, color: Color(0xFF2563EB)),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Clientes',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          ),
+                          SizedBox(height: 1),
+                          Text(
+                            'Fiados y abonos',
+                            style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, size: 18, color: Color(0xFF2563EB)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // Tarjeta Exportar Excel
+          Expanded(
+            child: InkWell(
+              onTap: _exportToExcel,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF065F46).withOpacity(0.5) : const Color(0xFFA7F3D0),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF059669).withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF064E3B).withOpacity(0.4) : const Color(0xFFECFDF5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.table_chart_rounded, size: 20, color: Color(0xFF059669)),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Excel',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          ),
+                          SizedBox(height: 1),
+                          Text(
+                            'Exportar .xlsx',
+                            style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.download_rounded, size: 18, color: Color(0xFF059669)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

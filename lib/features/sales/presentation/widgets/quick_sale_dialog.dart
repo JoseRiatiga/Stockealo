@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/app_toast.dart';
+import '../../../customers/data/customer_repository.dart';
+import '../../../customers/models/customer.dart';
 import '../../../products/models/product.dart';
 import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../data/sales_repository.dart';
@@ -30,6 +33,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   int _quantity = 1;
   String _paymentMethod = 'EFECTIVO'; // 'EFECTIVO' | 'TRANSFERENCIA' | 'FIADO'
   bool _isLoading = false;
+  List<Customer> _existingCustomers = [];
 
   @override
   void initState() {
@@ -37,6 +41,16 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
     if (widget.product.stock <= 0) {
       _quantity = 0;
     }
+    _loadCustomers();
+  }
+
+  Future<void> _loadCustomers() async {
+    try {
+      final list = await CustomerRepository.instance.getCustomers(widget.product.businessId);
+      if (mounted) {
+        setState(() => _existingCustomers = list);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -61,11 +75,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
     if (_quantity <= 0 || _quantity > widget.product.stock) return;
 
     if (_paymentMethod == 'FIADO' && _customerController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor escribe el nombre del cliente para el fiado.'),
-          backgroundColor: Colors.orange,
-        ),
+      AppToast.showWarning(
+        context,
+        'Por favor escribe o selecciona el nombre del cliente para el fiado.',
       );
       return;
     }
@@ -85,14 +97,10 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
         final nav = Navigator.of(context);
         nav.pop(true);
 
-        ScaffoldMessenger.of(nav.context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '✅ Venta registrada: $_quantity unid. descontadas (Quedan: $remainingStock)',
-            ),
-            backgroundColor: const Color(0xFF059669),
-            duration: const Duration(seconds: 2),
-          ),
+        AppToast.showSuccess(
+          nav.context,
+          'Descontadas $_quantity unid. del inventario (Quedan: $remainingStock)',
+          title: 'Venta Registrada',
         );
 
         // Abrir el comprobante digital listo para WhatsApp
@@ -100,11 +108,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+        AppToast.showError(
+          context,
+          e.toString().replaceAll('Exception: ', ''),
         );
       }
     } finally {
@@ -306,14 +312,172 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
             // Input para nombre de cliente si es FIADO
             if (_paymentMethod == 'FIADO') ...[
               const SizedBox(height: 14),
-              TextField(
-                controller: _customerController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del Cliente para el Fiado *',
-                  hintText: 'Ej. Don Carlos, Sra. María...',
-                  prefixIcon: Icon(Icons.person_outline),
+              // Chips de clientes rápidos si hay registrados
+              if (_existingCustomers.isNotEmpty) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Clientes registrados:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    Text(
+                      '${_existingCustomers.length} disponibles',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 36,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _existingCustomers.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (ctx, i) {
+                      final c = _existingCustomers[i];
+                      final isSelected = _customerController.text.trim().toLowerCase() == c.name.toLowerCase();
+                      return ActionChip(
+                        avatar: CircleAvatar(
+                          backgroundColor: isSelected ? Colors.white : const Color(0xFF2563EB).withOpacity(0.2),
+                          child: Text(
+                            c.name.isNotEmpty ? c.name[0].toUpperCase() : 'C',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF2563EB),
+                            ),
+                          ),
+                        ),
+                        label: Text(
+                          c.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? Colors.white : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
+                          ),
+                        ),
+                        backgroundColor: isSelected
+                            ? const Color(0xFF2563EB)
+                            : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                        side: BorderSide(
+                          color: isSelected
+                              ? const Color(0xFF2563EB)
+                              : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _customerController.text = c.name;
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+
+              RawAutocomplete<Customer>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) {
+                    return _existingCustomers.take(5);
+                  }
+                  return _existingCustomers.where((Customer option) {
+                    return option.name.toLowerCase().contains(textEditingValue.text.toLowerCase()) ||
+                        (option.phone != null && option.phone!.contains(textEditingValue.text));
+                  });
+                },
+                displayStringForOption: (Customer option) => option.name,
+                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                  if (_customerController.text.isNotEmpty && controller.text.isEmpty) {
+                    controller.text = _customerController.text;
+                  }
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Nombre del Cliente para el Fiado *',
+                      hintText: 'Escribe o busca cliente...',
+                      prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF059669)),
+                      suffixIcon: controller.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                controller.clear();
+                                _customerController.clear();
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (val) {
+                      _customerController.text = val;
+                      setState(() {});
+                    },
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 6,
+                      borderRadius: BorderRadius.circular(14),
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      child: Container(
+                        width: MediaQuery.of(context).size.width - 48,
+                        constraints: const BoxConstraints(maxHeight: 180),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                          ),
+                          itemBuilder: (context, index) {
+                            final Customer option = options.elementAt(index);
+                            return ListTile(
+                              dense: true,
+                              leading: const CircleAvatar(
+                                radius: 14,
+                                backgroundColor: Color(0xFFEFF6FF),
+                                child: Icon(Icons.person, size: 16, color: Color(0xFF2563EB)),
+                              ),
+                              title: Text(
+                                option.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              subtitle: option.debtBalance > 0
+                                  ? Text(
+                                      'Deuda pendiente: ${CurrencyFormatter.format(option.debtBalance)}',
+                                      style: const TextStyle(fontSize: 11, color: Colors.orange),
+                                    )
+                                  : (option.phone != null
+                                      ? Text(option.phone!, style: const TextStyle(fontSize: 11))
+                                      : null),
+                              onTap: () {
+                                onSelected(option);
+                                _customerController.text = option.name;
+                                setState(() {});
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
             const SizedBox(height: 24),

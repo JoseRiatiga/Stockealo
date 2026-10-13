@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/currency_options.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../../../products/presentation/screens/barcode_scanner_screen.dart';
@@ -395,11 +396,9 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
     final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
     if (role == 'CASHIER') {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Solo el dueño o administradores pueden cambiar los datos de la empresa.'),
-            backgroundColor: Colors.redAccent,
-          ),
+        AppToast.showPermission(
+          context,
+          'Solo el dueño o administradores pueden cambiar los datos de la empresa.',
         );
       }
       return;

@@ -16,6 +16,7 @@ import '../../../team/data/team_repository.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/services/update_service.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/update_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -237,11 +238,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _editActiveBusiness() async {
     if (_activeBusiness == null) return;
     if (_currentBusinessRole == 'CASHIER') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Solo el dueño o administradores pueden cambiar los datos de la empresa.'),
-          backgroundColor: Colors.redAccent,
-        ),
+      AppToast.showPermission(
+        context,
+        'Solo el dueño o administradores pueden cambiar los datos de la empresa.',
       );
       return;
     }

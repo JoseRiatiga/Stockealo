@@ -4,6 +4,7 @@ import 'package:barcode_widget/barcode_widget.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
 import '../../data/team_repository.dart';
@@ -186,9 +187,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   if (ctx.mounted) Navigator.pop(ctx, true);
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                    );
+                    AppToast.showError(context, e.toString().replaceAll('Exception: ', ''));
                   }
                 }
               },
@@ -202,11 +201,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     if (updated == true) {
       _loadData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Rol de ${member.displayName} actualizado correctamente'),
-            backgroundColor: const Color(0xFF059669),
-          ),
+        AppToast.showSuccess(
+          context,
+          'Rol de ${member.displayName} actualizado correctamente',
+          title: 'Equipo Actualizado',
         );
       }
     }
@@ -232,16 +230,21 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     if (confirm == true) {
       await _teamRepo.removeMember(member.id);
       _loadData();
+      if (mounted) {
+        AppToast.showSuccess(
+          context,
+          '${member.displayName} ha sido desvinculado del equipo.',
+          title: 'Empleado Desvinculado',
+        );
+      }
     }
   }
 
   Future<void> _checkAndShowInviteModal() async {
     if (!canInvite) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Solo el dueño o administradores pueden generar códigos de invitación.'),
-          backgroundColor: Colors.redAccent,
-        ),
+      AppToast.showPermission(
+        context,
+        'Solo el dueño o administradores pueden generar códigos de invitación.',
       );
       return;
     }
@@ -417,11 +420,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
   void _showInviteQrModal() {
     if (!canInvite) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Solo el dueño o administradores pueden generar códigos de invitación.'),
-          backgroundColor: Colors.redAccent,
-        ),
+      AppToast.showPermission(
+        context,
+        'Solo el dueño o administradores pueden generar códigos de invitación.',
       );
       return;
     }
@@ -538,12 +539,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                     tooltip: 'Copiar código',
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: inviteCode));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('¡Código de invitación copiado!'),
-                          backgroundColor: Color(0xFF059669),
-                          duration: Duration(seconds: 2),
-                        ),
+                      AppToast.showSuccess(
+                        context,
+                        'Código de invitación $inviteCode copiado al portapapeles.',
+                        title: 'Código Copiado',
                       );
                     },
                   ),

@@ -101,6 +101,7 @@ class SalesRepository {
         'business_id': businessId,
         'product_id': product.id,
         'product_name': product.name,
+        'product_photo_path': product.photoPath,
         'quantity': quantity,
         'customer_id': customerId,
         'customer_name': customerName?.trim().isNotEmpty == true ? customerName!.trim() : null,
@@ -139,33 +140,36 @@ class SalesRepository {
     return sale;
   }
 
-  /// Obtener ventas filtradas exclusivamente por la empresa
+  /// Obtener ventas filtradas exclusivamente por la empresa con resolución de foto de producto
   Future<List<Sale>> getSales({
     required String businessId,
     String? dateFilter,
   }) async {
     final db = await _dbProvider.database;
-    String whereClause = 'business_id = ?';
-    List<dynamic> whereArgs = [businessId];
+    String sql = '''
+      SELECT s.*, COALESCE(s.product_photo_path, p.photo_path) AS resolved_photo
+      FROM sales s
+      LEFT JOIN products p ON s.product_id = p.id
+      WHERE s.business_id = ?
+    ''';
+    final List<dynamic> args = [businessId];
 
     if (dateFilter != null && dateFilter.isNotEmpty) {
-      whereClause += ' AND date LIKE ?';
-      whereArgs.add('$dateFilter%');
+      sql += ' AND s.date LIKE ?';
+      args.add('$dateFilter%');
     }
+    sql += ' ORDER BY s.date DESC';
 
-    final List<Map<String, dynamic>> maps = await db.query(
-      'sales',
-      where: whereClause,
-      whereArgs: whereArgs,
-      orderBy: 'date DESC',
-    );
+    final List<Map<String, dynamic>> maps = await db.rawQuery(sql, args);
 
     return maps.map((map) {
+      final photoPath = map['resolved_photo'] as String? ?? map['product_photo_path'] as String?;
       return Sale(
         id: map['id'] as String,
         businessId: map['business_id'] as String? ?? businessId,
         productId: map['product_id'] as String? ?? '',
         productName: map['product_name'] as String,
+        productPhotoPath: photoPath,
         quantity: (map['quantity'] as num).toInt(),
         unitPrice: (map['quantity'] as num).toInt() > 0
             ? ((map['total'] as num).toDouble()) / ((map['quantity'] as num).toInt())

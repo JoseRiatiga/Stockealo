@@ -10,6 +10,7 @@ import '../widgets/digital_ticket_modal.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../products/presentation/widgets/product_image_view.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -624,152 +625,302 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         sale.date.month == DateTime.now().month &&
         sale.date.day == DateTime.now().day;
     final timeStr = isToday
-        ? DateFormat('hh:mm a').format(sale.date)
-        : DateFormat('dd/MM hh:mm a').format(sale.date);
+        ? 'Hoy, ${DateFormat('hh:mm a').format(sale.date)}'
+        : DateFormat('dd/MM/yyyy • hh:mm a').format(sale.date);
 
     Color methodColor;
     String methodLabel;
+    IconData methodIcon;
 
     switch (sale.paymentMethod) {
       case 'TRANSFERENCIA':
         methodColor = const Color(0xFF2563EB);
-        methodLabel = '📱 Transferencia';
+        methodLabel = 'Transferencia';
+        methodIcon = Icons.account_balance_outlined;
         break;
       case 'FIADO':
         methodColor = const Color(0xFFD97706);
-        methodLabel = '📝 Fiado${sale.customerName != null ? ' (${sale.customerName})' : ''}';
+        methodLabel = 'Venta a Fiado';
+        methodIcon = Icons.assignment_late_outlined;
         break;
       default:
         methodColor = const Color(0xFF059669);
-        methodLabel = '💵 Efectivo';
+        methodLabel = 'Efectivo';
+        methodIcon = Icons.payments_outlined;
     }
 
+    final unitPrice = sale.quantity > 0 ? sale.totalAmount / sale.quantity : sale.totalAmount;
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       elevation: 0,
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Fila 1: Hora/Fecha, Nombre de producto y Total
+            // 1. Cabecera: Fecha/Hora y Badge de Método de Pago
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.schedule_rounded,
+                      size: 14,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      timeStr,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    color: methodColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: methodColor.withOpacity(0.25)),
                   ),
-                  child: Text(
-                    timeStr,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    sale.productName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  CurrencyFormatter.format(sale.totalAmount),
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(methodIcon, size: 13, color: methodColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        methodLabel,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: methodColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            // Fila 2: Método de pago, Cantidad, Ganancia y Acciones
+            const SizedBox(height: 12),
+
+            // 2. Bloque del Producto: Foto + Nombre Multilínea + Cliente si es fiado
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Foto del producto
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: ProductImageView(
+                      imagePath: sale.productPhotoPath,
+                      width: 56,
+                      height: 56,
+                      iconSize: 26,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Información textual completa del producto
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        sale.productName,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                          height: 1.25,
+                        ),
+                        softWrap: true,
+                      ),
+                      if (sale.paymentMethod == 'FIADO' || (sale.customerName != null && sale.customerName!.trim().isNotEmpty)) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFD97706).withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.person_rounded, size: 13, color: Color(0xFFD97706)),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'Cliente: ${sale.customerName ?? "Sin registrar"}',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFD97706),
+                                  ),
+                                  softWrap: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // 3. Ficha de Métricas Comerciales (Bloque en grilla / celdas)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155).withOpacity(0.6) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
+                children: [
+                  _buildMetricCell(
+                    label: 'Cantidad',
+                    value: 'x${sale.quantity} und.',
+                    isDark: isDark,
+                  ),
+                  _buildMetricDivider(isDark),
+                  _buildMetricCell(
+                    label: 'Unitario',
+                    value: CurrencyFormatter.format(unitPrice),
+                    isDark: isDark,
+                  ),
+                  _buildMetricDivider(isDark),
+                  _buildMetricCell(
+                    label: 'Ganancia',
+                    value: '+${CurrencyFormatter.format(sale.netProfit)}',
+                    isDark: isDark,
+                    valueColor: const Color(0xFF059669),
+                  ),
+                  _buildMetricDivider(isDark),
+                  _buildMetricCell(
+                    label: 'Total',
+                    value: CurrencyFormatter.format(sale.totalAmount),
+                    isDark: isDark,
+                    isBold: true,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // 4. Barra Inferior de Acciones Directas
             Row(
               children: [
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: methodColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => DigitalTicketModal.show(context, sale: sale),
+                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                    label: const Text(
+                      'Comprobante',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
                     ),
-                    child: Text(
-                      methodLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: methodColor,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF059669),
+                      side: BorderSide(
+                        color: isDark ? const Color(0xFF065F46) : const Color(0xFFA7F3D0),
                       ),
+                      backgroundColor: isDark
+                          ? const Color(0xFF064E3B).withOpacity(0.2)
+                          : const Color(0xFFECFDF5),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'x${sale.quantity} unid.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF059669).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '+${CurrencyFormatter.format(sale.netProfit)}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF059669),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  icon: const Icon(Icons.receipt_long, size: 20, color: Color(0xFF059669)),
-                  tooltip: 'Ver / Compartir Ticket',
-                  onPressed: () => DigitalTicketModal.show(context, sale: sale),
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  icon: const Icon(Icons.undo, size: 18, color: Color(0xFF94A3B8)),
-                  tooltip: 'Anular Venta',
+                TextButton.icon(
                   onPressed: () => _cancelSale(sale),
+                  icon: const Icon(Icons.undo_rounded, size: 15),
+                  label: const Text(
+                    'Anular',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMetricCell({
+    required String label,
+    required String value,
+    required bool isDark,
+    Color? valueColor,
+    bool isBold = false,
+  }) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+                color: valueColor ??
+                    (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricDivider(bool isDark) {
+    return Container(
+      height: 24,
+      width: 1,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
     );
   }
 }

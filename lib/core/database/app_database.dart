@@ -48,6 +48,9 @@ class AppDatabase {
         try {
           await db.execute('ALTER TABLE business_members ADD COLUMN name TEXT');
         } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE sales ADD COLUMN product_photo_path TEXT');
+        } catch (_) {}
       },
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
@@ -185,6 +188,7 @@ class AppDatabase {
         business_id TEXT NOT NULL,
         product_id TEXT,
         product_name TEXT NOT NULL,
+        product_photo_path TEXT,
         quantity INTEGER NOT NULL DEFAULT 1,
         customer_id TEXT,
         customer_name TEXT,

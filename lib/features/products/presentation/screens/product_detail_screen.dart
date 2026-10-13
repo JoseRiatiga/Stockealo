@@ -1,9 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/product_repository.dart';
 import '../../models/product.dart';
 import '../widgets/barcode_modal.dart';
+import '../widgets/product_image_view.dart';
 import '../widgets/stock_status_badge.dart';
 import 'product_form_screen.dart';
 import '../../../auth/data/auth_repository.dart';
@@ -166,10 +166,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hasPhoto = _product.photoPath != null &&
-        _product.photoPath!.isNotEmpty &&
-        File(_product.photoPath!).existsSync();
-
     final totalCostInventory = _product.purchasePrice * _product.stock;
     final totalSaleInventory = _product.salePrice * _product.stock;
     final totalPotentialProfit = totalSaleInventory - totalCostInventory;
@@ -213,31 +209,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       body: ListView(
         children: [
           // Imagen Principal
-          Container(
-            height: 250,
+          ProductImageView(
+            imagePath: _product.photoPath,
             width: double.infinity,
-            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-            child: hasPhoto
-                ? Image.file(
-                    File(_product.photoPath!),
-                    fit: BoxFit.cover,
-                  )
-                : Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.inventory_2_outlined, size: 64, color: Color(0xFF94A3B8)),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Sin foto asignada',
-                          style: TextStyle(
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+            height: 250,
+            iconSize: 64,
+            placeholderText: 'Sin foto asignada',
           ),
 
           Padding(

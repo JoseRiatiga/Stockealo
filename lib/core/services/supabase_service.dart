@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/app_database.dart';
@@ -236,19 +237,40 @@ class SupabaseService {
       // Luego sincronizar únicamente los productos activos (is_active = 1)
       final localProducts = await db.query('products', where: 'is_active = 1');
       if (localProducts.isNotEmpty) {
-        final formattedProducts = localProducts.map((p) => {
-          'id': p['id'],
-          'business_id': p['business_id'],
-          'name': p['name'],
-          'sku': p['code'] ?? '',
-          'category': p['category'] ?? 'General',
-          'cost_price': (p['purchase_price'] as num?)?.toDouble() ?? 0.0,
-          'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
-          'current_stock': (p['stock'] as num?)?.toInt() ?? 0,
-          'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
-          'image_url': p['photo_path'],
-          'created_at': p['created_at'],
-        }).toList();
+        final List<Map<String, dynamic>> formattedProducts = [];
+        for (final p in localProducts) {
+          String? imageUrl = p['photo_path'] as String?;
+          if (imageUrl != null && imageUrl.isNotEmpty && !imageUrl.startsWith('http')) {
+            final uploadedUrl = await uploadProductImage(
+              businessId: p['business_id'] as String,
+              productId: p['id'] as String,
+              localFilePath: imageUrl,
+            );
+            if (uploadedUrl != null) {
+              imageUrl = uploadedUrl;
+              await db.update(
+                'products',
+                {'photo_path': uploadedUrl},
+                where: 'id = ?',
+                whereArgs: [p['id']],
+              );
+            }
+          }
+
+          formattedProducts.add({
+            'id': p['id'],
+            'business_id': p['business_id'],
+            'name': p['name'],
+            'sku': p['code'] ?? '',
+            'category': p['category'] ?? 'General',
+            'cost_price': (p['purchase_price'] as num?)?.toDouble() ?? 0.0,
+            'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
+            'current_stock': (p['stock'] as num?)?.toInt() ?? 0,
+            'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
+            'image_url': imageUrl,
+            'created_at': p['created_at'],
+          });
+        }
 
         await client!.from('products').upsert(
           formattedProducts,
@@ -532,11 +554,67 @@ class SupabaseService {
     }
   }
 
+  /// Sube la imagen del producto a Supabase Storage (bucket: product-images) y retorna la URL pública
+  Future<String?> uploadProductImage({
+    required String businessId,
+    required String productId,
+    required String localFilePath,
+  }) async {
+    try {
+      if (!_isInitialized) await initialize();
+      if (client == null) return null;
+
+      final file = File(localFilePath);
+      if (!await file.exists()) return null;
+
+      final extension = localFilePath.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+      final storagePath = '$businessId/$productId.$extension';
+
+      await client!.storage.from('product-images').upload(
+        storagePath,
+        file,
+        fileOptions: FileOptions(
+          upsert: true,
+          contentType: extension == 'png' ? 'image/png' : 'image/jpeg',
+        ),
+      );
+
+      final publicUrl = client!.storage.from('product-images').getPublicUrl(storagePath);
+      final urlWithTimestamp = '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      return urlWithTimestamp;
+    } catch (e) {
+      debugPrint('Error al subir imagen a Supabase Storage: $e');
+      return null;
+    }
+  }
+
   /// Crea o actualiza un producto en Supabase inmediatamente
   Future<void> upsertProductToCloud(Map<String, dynamic> p) async {
     try {
       if (!(await isCloudSyncEnabled())) return;
       if (!_isInitialized) await initialize();
+
+      String? imageUrl = p['photo_path'] as String?;
+
+      // Si tiene una imagen local almacenada en el dispositivo, subirla a Supabase Storage
+      if (imageUrl != null && imageUrl.isNotEmpty && !imageUrl.startsWith('http')) {
+        final uploadedUrl = await uploadProductImage(
+          businessId: p['business_id'] as String,
+          productId: p['id'] as String,
+          localFilePath: imageUrl,
+        );
+        if (uploadedUrl != null) {
+          imageUrl = uploadedUrl;
+          final db = await AppDatabase.instance.database;
+          await db.update(
+            'products',
+            {'photo_path': uploadedUrl},
+            where: 'id = ?',
+            whereArgs: [p['id']],
+          );
+        }
+      }
+
       await client?.from('products').upsert({
         'id': p['id'],
         'business_id': p['business_id'],
@@ -547,7 +625,7 @@ class SupabaseService {
         'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
         'current_stock': (p['stock'] as num?)?.toInt() ?? 0,
         'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
-        'image_url': p['photo_path'],
+        'image_url': imageUrl,
         'created_at': p['created_at'],
       }, onConflict: 'id');
     } catch (e) {

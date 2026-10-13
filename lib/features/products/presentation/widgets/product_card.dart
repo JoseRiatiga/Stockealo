@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../models/product.dart';
 import 'barcode_modal.dart';
+import 'product_image_view.dart';
 import 'stock_status_badge.dart';
 
 class ProductCard extends StatelessWidget {
@@ -22,9 +22,6 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hasPhoto = product.photoPath != null &&
-        product.photoPath!.isNotEmpty &&
-        File(product.photoPath!).existsSync();
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -48,19 +45,11 @@ class ProductCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Foto del producto o icono placeholder
-              ClipRRect(
+              ProductImageView(
+                imagePath: product.photoPath,
+                width: 72,
+                height: 72,
                 borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: hasPhoto
-                      ? Image.file(
-                          File(product.photoPath!),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildPlaceholder(isDark),
-                        )
-                      : _buildPlaceholder(isDark),
-                ),
               ),
               const SizedBox(width: 14),
 
@@ -186,15 +175,6 @@ class ProductCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder(bool isDark) {
-    return Container(
-      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-      child: const Center(
-        child: Icon(Icons.image_outlined, color: Color(0xFF94A3B8), size: 30),
       ),
     );
   }

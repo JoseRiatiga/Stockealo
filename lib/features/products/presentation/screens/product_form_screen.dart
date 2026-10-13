@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -10,6 +9,7 @@ import '../../models/category.dart';
 import '../../models/product.dart';
 import 'barcode_scanner_screen.dart';
 import '../widgets/manage_categories_modal.dart';
+import '../widgets/product_image_view.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -140,7 +140,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 title: const Text('Elegir de la galería'),
                 onTap: () => _pickImage(ImageSource.gallery),
               ),
-              if (_photoPath != null)
+              if (_photoPath != null && _photoPath!.trim().isNotEmpty)
                 ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: Color(0xFFFEE2E2),
@@ -344,13 +344,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                 ),
                               ],
                             ),
-                            child: _photoPath != null && File(_photoPath!).existsSync()
-                                ? ClipRRect(
+                            child: (_photoPath != null && _photoPath!.trim().isNotEmpty)
+                                ? ProductImageView(
+                                    imagePath: _photoPath,
+                                    width: 130,
+                                    height: 130,
                                     borderRadius: BorderRadius.circular(19),
-                                    child: Image.file(
-                                      File(_photoPath!),
-                                      fit: BoxFit.cover,
-                                    ),
+                                    iconSize: 40,
                                   )
                                 : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -375,7 +375,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                               radius: 18,
                               backgroundColor: const Color(0xFF059669),
                               child: Icon(
-                                _photoPath != null ? Icons.edit : Icons.camera_alt,
+                                (_photoPath != null && _photoPath!.trim().isNotEmpty) ? Icons.edit : Icons.camera_alt,
                                 size: 18,
                                 color: Colors.white,
                               ),

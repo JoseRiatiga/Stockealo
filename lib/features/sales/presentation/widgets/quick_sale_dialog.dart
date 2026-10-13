@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../products/models/product.dart';
+import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../data/sales_repository.dart';
 import 'digital_ticket_modal.dart';
 
@@ -122,10 +122,6 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
     final totalAmount = p.salePrice * _quantity;
     final netProfit = (p.salePrice - p.purchasePrice) * _quantity;
 
-    final hasPhoto = p.photoPath != null &&
-        p.photoPath!.isNotEmpty &&
-        File(p.photoPath!).existsSync();
-
     return Container(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
@@ -157,18 +153,11 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
           // Encabezado del producto
           Row(
             children: [
-              ClipRRect(
+              ProductImageView(
+                imagePath: p.photoPath,
+                width: 60,
+                height: 60,
                 borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: hasPhoto
-                      ? Image.file(File(p.photoPath!), fit: BoxFit.cover)
-                      : Container(
-                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                          child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF94A3B8)),
-                        ),
-                ),
               ),
               const SizedBox(width: 14),
               Expanded(

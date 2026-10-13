@@ -4,14 +4,12 @@ class CurrencyFormatter {
   static String currencySymbol = r'$';
   static String currencyCode = 'COP';
 
-  /// Formatea un valor numérico a moneda (por defecto pesos colombianos sin decimales: $ 50.000)
+  /// Formatea un valor numérico a moneda con el símbolo al inicio (ej. $2.000)
   static String format(num amount, {bool includeSymbol = true, int decimalDigits = 0}) {
-    final formatter = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: includeSymbol ? '$currencySymbol ' : '',
-      decimalDigits: decimalDigits,
-    );
-    return formatter.format(amount);
+    final pattern = decimalDigits > 0 ? '#,##0.${'0' * decimalDigits}' : '#,##0';
+    final numberFormatter = NumberFormat(pattern, 'es_CO');
+    final formattedNumber = numberFormatter.format(amount);
+    return includeSymbol ? '$currencySymbol$formattedNumber' : formattedNumber;
   }
 
   /// Alias de formato

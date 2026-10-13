@@ -392,6 +392,19 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
   }
 
   Future<void> _showEditBusinessDialog(Business biz) async {
+    final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
+    if (role == 'CASHIER') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Solo el dueño o administradores pueden cambiar los datos de la empresa.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return;
+    }
+
     final nameController = TextEditingController(text: biz.name);
     String selectedCurrency = biz.currency;
 
@@ -1475,8 +1488,10 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                           itemBuilder: (ctx) {
                             final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
                             final isOwner = role == 'OWNER';
+                            final isAdmin = role == 'ADMIN';
+                            final canManage = isOwner || isAdmin;
                             return [
-                              if (isOwner) ...[
+                              if (canManage)
                                 PopupMenuItem(
                                   value: 'edit',
                                   child: Row(
@@ -1491,6 +1506,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                     ],
                                   ),
                                 ),
+                              if (isOwner)
                                 const PopupMenuItem(
                                   value: 'delete',
                                   child: Row(
@@ -1501,7 +1517,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                     ],
                                   ),
                                 ),
-                              ] else ...[
+                              if (!isOwner)
                                 const PopupMenuItem(
                                   value: 'leave',
                                   child: Row(
@@ -1512,7 +1528,6 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                     ],
                                   ),
                                 ),
-                              ],
                             ];
                           },
                         ),

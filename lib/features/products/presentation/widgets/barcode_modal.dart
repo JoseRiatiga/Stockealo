@@ -1,6 +1,7 @@
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../models/product.dart';
 
 class BarcodeModal extends StatefulWidget {
@@ -135,7 +136,7 @@ class _BarcodeModalState extends State<BarcodeModal> {
             child: ElevatedButton.icon(
               onPressed: () {
                 Share.share(
-                  'Producto: ${widget.product.name}\nCódigo: ${widget.product.code}\nPrecio: \$ ${widget.product.salePrice.toStringAsFixed(0)}',
+                  'Producto: ${widget.product.name}\nCódigo: ${widget.product.code}\nPrecio: ${CurrencyFormatter.format(widget.product.salePrice)}',
                 );
               },
               icon: const Icon(Icons.share_outlined),

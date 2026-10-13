@@ -42,6 +42,9 @@ class AppDatabase {
         try {
           await db.execute('ALTER TABLE businesses ADD COLUMN deleted_at TEXT');
         } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE business_members ADD COLUMN name TEXT');
+        } catch (_) {}
       },
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
@@ -67,6 +70,7 @@ class AppDatabase {
           business_id TEXT NOT NULL,
           user_id TEXT,
           email TEXT NOT NULL,
+          name TEXT,
           role TEXT NOT NULL DEFAULT 'CASHIER',
           status TEXT NOT NULL DEFAULT 'ACTIVE',
           created_at TEXT NOT NULL,
@@ -114,6 +118,7 @@ class AppDatabase {
         business_id TEXT NOT NULL,
         user_id TEXT,
         email TEXT NOT NULL,
+        name TEXT,
         role TEXT NOT NULL DEFAULT 'CASHIER',
         status TEXT NOT NULL DEFAULT 'ACTIVE',
         created_at TEXT NOT NULL,

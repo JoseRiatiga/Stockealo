@@ -13,16 +13,24 @@ class TeamRepository {
 
   final AppDatabase _dbProvider = AppDatabase.instance;
 
-  /// Obtiene los miembros y empleados de una empresa
+  /// Obtiene los miembros y empleados de una empresa con sus nombres resueltos
   Future<List<BusinessMember>> getMembers(String businessId) async {
     final db = await _dbProvider.database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'business_members',
-      where: 'business_id = ?',
-      whereArgs: [businessId],
-      orderBy: 'created_at ASC',
-    );
-    return maps.map((m) => BusinessMember.fromMap(m)).toList();
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT bm.*, COALESCE(bm.name, u.name) as resolved_name
+      FROM business_members bm
+      LEFT JOIN users u ON (bm.user_id = u.id OR LOWER(bm.email) = LOWER(u.email))
+      WHERE bm.business_id = ?
+      ORDER BY bm.created_at ASC
+    ''', [businessId]);
+
+    return maps.map((m) {
+      final data = Map<String, dynamic>.from(m);
+      if (data['name'] == null || (data['name'] as String).trim().isEmpty) {
+        data['name'] = data['resolved_name'];
+      }
+      return BusinessMember.fromMap(data);
+    }).toList();
   }
 
   /// Añade un empleado por su correo electrónico con un rol asignado
@@ -78,11 +86,13 @@ class TeamRepository {
       } catch (_) {}
     }
 
+    final memberName = linkedUserName ?? cleanEmail.split('@').first;
     final member = BusinessMember(
       id: const Uuid().v4(),
       businessId: businessId,
       userId: linkedUserId,
       email: cleanEmail,
+      name: memberName,
       role: role,
       status: 'ACTIVE',
       createdAt: DateTime.now(),
@@ -91,11 +101,7 @@ class TeamRepository {
     await db.insert('business_members', member.toMap());
 
     // 3. Sincronizar en tiempo real a Supabase Cloud
-    final memberCloudData = {
-      ...member.toMap(),
-      'name': linkedUserName ?? cleanEmail.split('@').first,
-    };
-    SupabaseService.instance.upsertBusinessMemberToCloud(memberCloudData);
+    SupabaseService.instance.upsertBusinessMemberToCloud(member.toMap());
 
     return member;
   }
@@ -282,12 +288,14 @@ class TeamRepository {
       limit: 1,
     );
 
+    final resolvedUserName = userName ?? cleanEmail.split('@').first;
     if (existingMember.isEmpty) {
       final member = BusinessMember(
         id: const Uuid().v4(),
         businessId: bizId,
         userId: userId,
         email: cleanEmail,
+        name: resolvedUserName,
         role: 'CASHIER',
         status: 'ACTIVE',
         createdAt: DateTime.now(),
@@ -295,14 +303,15 @@ class TeamRepository {
       await db.insert('business_members', member.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
 
       // Sincronizar membresía a Supabase Cloud
-      await SupabaseService.instance.upsertBusinessMemberToCloud({
-        ...member.toMap(),
-        'name': userName ?? cleanEmail.split('@').first,
-      });
+      await SupabaseService.instance.upsertBusinessMemberToCloud(member.toMap());
     } else {
       await db.update(
         'business_members',
-        {'user_id': userId, 'status': 'ACTIVE'},
+        {
+          'user_id': userId,
+          'status': 'ACTIVE',
+          if (userName != null) 'name': userName,
+        },
         where: 'id = ?',
         whereArgs: [existingMember.first['id']],
       );
@@ -310,6 +319,7 @@ class TeamRepository {
         ...existingMember.first,
         'user_id': userId,
         'status': 'ACTIVE',
+        if (userName != null) 'name': userName,
       };
       await SupabaseService.instance.upsertBusinessMemberToCloud(updatedMap);
     }

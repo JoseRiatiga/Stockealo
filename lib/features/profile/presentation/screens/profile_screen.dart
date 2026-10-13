@@ -12,6 +12,7 @@ import '../../../../core/utils/currency_options.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../../../reports/presentation/widgets/excel_import_modal.dart';
+import '../../../team/data/team_repository.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/services/update_service.dart';
@@ -36,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   AppUser? _user;
   Business? _activeBusiness;
+  String _currentBusinessRole = 'OWNER';
   String? _avatarPath;
   bool _isLoading = false;
   bool _isEditingProfile = false;
@@ -200,15 +202,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadActiveBusiness() async {
     final current = _businessRepo.currentActiveBusiness;
-    if (current != null) {
-      if (mounted) {
-        setState(() => _activeBusiness = current);
-      }
-    } else if (_user != null) {
-      final biz = await _businessRepo.getActiveBusiness(_user!.id, _user!.email);
-      if (mounted) {
-        setState(() => _activeBusiness = biz);
-      }
+    Business? biz = current;
+    if (biz == null && _user != null) {
+      biz = await _businessRepo.getActiveBusiness(_user!.id, _user!.email);
+    }
+    String role = 'OWNER';
+    if (biz != null && _user != null) {
+      role = await TeamRepository.instance.getUserRoleInBusiness(
+        businessId: biz.id,
+        userId: _user!.id,
+        userEmail: _user!.email,
+      );
+    }
+    if (mounted) {
+      setState(() {
+        _activeBusiness = biz;
+        _currentBusinessRole = role;
+      });
     }
   }
 
@@ -226,6 +236,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _editActiveBusiness() async {
     if (_activeBusiness == null) return;
+    if (_currentBusinessRole == 'CASHIER') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solo el dueño o administradores pueden cambiar los datos de la empresa.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
     final nameController = TextEditingController(text: _activeBusiness!.name);
     String selectedCurrency = _activeBusiness!.currency;
 
@@ -881,11 +900,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF059669)),
-                          tooltip: 'Editar nombre o moneda',
-                          onPressed: _editActiveBusiness,
-                        ),
+                        if (_currentBusinessRole != 'CASHIER')
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF059669)),
+                            tooltip: 'Editar nombre o moneda',
+                            onPressed: _editActiveBusiness,
+                          ),
                         IconButton(
                           icon: const Icon(Icons.swap_horiz, size: 22, color: Color(0xFF2563EB)),
                           tooltip: 'Cambiar de empresa',

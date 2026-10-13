@@ -3,6 +3,7 @@ class BusinessMember {
   final String businessId;
   final String? userId;
   final String email;
+  final String? name;
   final String role; // 'OWNER' | 'ADMIN' | 'CASHIER'
   final String status; // 'ACTIVE' | 'PENDING'
   final DateTime createdAt;
@@ -12,6 +13,7 @@ class BusinessMember {
     required this.businessId,
     this.userId,
     required this.email,
+    this.name,
     required this.role,
     this.status = 'ACTIVE',
     required this.createdAt,
@@ -26,6 +28,13 @@ class BusinessMember {
   bool get canEditProducts => role == 'OWNER' || role == 'ADMIN';
   bool get canManageTeam => role == 'OWNER';
   bool get canAdjustStockDirectly => role == 'OWNER' || role == 'ADMIN';
+
+  String get displayName {
+    if (name != null && name!.trim().isNotEmpty) {
+      return name!.trim();
+    }
+    return email.split('@').first;
+  }
 
   String get roleDisplayName {
     switch (role) {
@@ -59,6 +68,7 @@ class BusinessMember {
       'business_id': businessId,
       'user_id': userId,
       'email': email,
+      'name': name,
       'role': role,
       'status': status,
       'created_at': createdAt.toIso8601String(),
@@ -71,9 +81,32 @@ class BusinessMember {
       businessId: map['business_id'] as String,
       userId: map['user_id'] as String?,
       email: map['email'] as String,
+      name: (map['name'] as String?) ?? (map['user_name'] as String?),
       role: map['role'] as String,
       status: map['status'] as String? ?? 'ACTIVE',
       createdAt: DateTime.parse(map['created_at'] as String),
+    );
+  }
+
+  BusinessMember copyWith({
+    String? id,
+    String? businessId,
+    String? userId,
+    String? email,
+    String? name,
+    String? role,
+    String? status,
+    DateTime? createdAt,
+  }) {
+    return BusinessMember(
+      id: id ?? this.id,
+      businessId: businessId ?? this.businessId,
+      userId: userId ?? this.userId,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      role: role ?? this.role,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

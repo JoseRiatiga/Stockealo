@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/currency_options.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../products/presentation/screens/barcode_scanner_screen.dart';
@@ -130,46 +129,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
     }
   }
 
-  /// Comprueba en Supabase si ya existía una invitación por correo previa
-  Future<void> _checkPendingEmailInvites() async {
-    setState(() => _isLoading = true);
-    try {
-      final email = widget.userEmail ?? AuthRepository.instance.currentUser?.email;
-      await SupabaseService.instance.syncFromCloud(widget.userId, email);
-      final list = await _businessRepo.getAllBusinesses(widget.userId, email);
-      if (list.isNotEmpty) {
-        _businessRepo.setActiveBusiness(list.first);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('¡Te has unido a ${list.first.name}!'),
-              backgroundColor: const Color(0xFF059669),
-            ),
-          );
-          widget.onBusinessCreated();
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Aún no tienes invitaciones registradas con tu correo.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -498,21 +458,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
 
-                      // 3. Comprobar invitaciones por correo
-                      TextButton.icon(
-                        onPressed: _isLoading ? null : _checkPendingEmailInvites,
-                        icon: const Icon(Icons.sync, size: 16, color: Color(0xFF059669)),
-                        label: const Text(
-                          '¿Ya te invitaron por correo? Comprobar invitaciones',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF059669),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ],

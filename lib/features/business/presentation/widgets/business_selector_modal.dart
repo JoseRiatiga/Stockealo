@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../auth/data/auth_repository.dart';
+import '../../../../core/database/app_database.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/currency_options.dart';
+import '../../../auth/data/auth_repository.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
+import '../../../products/presentation/screens/barcode_scanner_screen.dart';
+import '../../../team/data/team_repository.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
 
@@ -139,6 +143,236 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
       _businessRepo.setActiveBusiness(newBiz);
       if (mounted) {
         Navigator.pop(context, true);
+      }
+    }
+  }
+
+  Future<void> _showJoinBusinessDialog() async {
+    final codeController = TextEditingController();
+    bool isSubmitting = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.group_add_outlined, color: Color(0xFF059669)),
+              SizedBox(width: 10),
+              Text('Unirse a Empresa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Ingresa como colaborador escaneando el código QR o escribiendo el código de invitación.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 18),
+
+                // Botón Cámara QR
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF059669),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.qr_code_scanner, size: 20),
+                    label: const Text('Escanear Código QR', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final scanned = await Navigator.push<String>(
+                              context,
+                              MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+                            );
+                            if (scanned != null && scanned.trim().isNotEmpty) {
+                              codeController.text = scanned.trim();
+                              setDialogState(() {});
+                            }
+                          },
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(
+                        'O escribe el código',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Campo Código de Invitación
+                TextField(
+                  controller: codeController,
+                  textCapitalization: TextCapitalization.characters,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2.0,
+                    color: Color(0xFF059669),
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Código de Invitación',
+                    hintText: 'Ej. 6CC1-4831',
+                    prefixIcon: const Icon(Icons.pin, color: Color(0xFF64748B)),
+                    suffixIcon: codeController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              codeController.clear();
+                              setDialogState(() {});
+                            },
+                          )
+                        : null,
+                  ),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: isSubmitting || codeController.text.trim().isEmpty
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      try {
+                        final user = AuthRepository.instance.currentUser;
+                        final userEmail = user?.email ?? '';
+                        final userName = user?.name;
+
+                        final joinedBiz = await TeamRepository.instance.joinBusinessByCode(
+                          codeOrId: codeController.text.trim(),
+                          userId: widget.userId,
+                          userEmail: userEmail,
+                          userName: userName,
+                        );
+
+                        if (dialogCtx.mounted) {
+                          Navigator.pop(dialogCtx);
+                        }
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('¡Te has unido exitosamente a "${joinedBiz.name}"!'),
+                            backgroundColor: const Color(0xFF059669),
+                          ),
+                        );
+                        Navigator.pop(context, true);
+                      } catch (e) {
+                        setDialogState(() => isSubmitting = false);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(e.toString().replaceAll('Exception: ', '')),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Unirme'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmLeaveBusiness(Business biz) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Salir de este equipo?'),
+        content: Text('Ya no tendrás acceso a los productos ni ventas de "${biz.name}". Puedes volver a unirte con el código de invitación.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Salir del equipo'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final user = AuthRepository.instance.currentUser;
+      final userEmail = user?.email ?? '';
+      final db = await AppDatabase.instance.database;
+
+      // Eliminar membresía local
+      await db.delete(
+        'business_members',
+        where: 'business_id = ? AND (user_id = ? OR LOWER(email) = ?)',
+        whereArgs: [biz.id, widget.userId, userEmail.toLowerCase()],
+      );
+
+      // Eliminar de Supabase
+      try {
+        final client = SupabaseService.instance.client;
+        if (client != null) {
+          await client
+              .from('business_members')
+              .delete()
+              .eq('business_id', biz.id)
+              .or('user_id.eq.${widget.userId},email.ilike.$userEmail');
+        }
+      } catch (_) {}
+
+      // Si era la empresa activa, cambiar a otra
+      if (_currentBusiness?.id == biz.id) {
+        final otherBusinesses = _businesses.where((b) => b.id != biz.id).toList();
+        if (otherBusinesses.isNotEmpty) {
+          _businessRepo.setActiveBusiness(otherBusinesses.first);
+        } else {
+          _businessRepo.setActiveBusiness(null);
+        }
+      }
+
+      await _loadBusinesses();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Has salido del equipo de "${biz.name}"')),
+        );
       }
     }
   }
@@ -545,14 +779,28 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                   color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                 ),
               ),
-              TextButton.icon(
-                onPressed: _showCreateBusinessDialog,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Nueva'),
-                style: TextButton.styleFrom(
-                  foregroundColor: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                  textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton.icon(
+                    onPressed: _showJoinBusinessDialog,
+                    icon: const Icon(Icons.group_add_outlined, size: 16),
+                    label: const Text('Unirse'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF2563EB),
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _showCreateBusinessDialog,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Nueva'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -590,10 +838,23 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: _showCreateBusinessDialog,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Crear Empresa'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _showJoinBusinessDialog,
+                          icon: const Icon(Icons.group_add_outlined, size: 18),
+                          label: const Text('Unirme con Código/QR'),
+                          style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF2563EB)),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: _showCreateBusinessDialog,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Crear Empresa'),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -680,6 +941,32 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                                   ),
                                                 ),
                                               ),
+                                            Container(
+                                              margin: const EdgeInsets.only(left: 6),
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: biz.userId == widget.userId
+                                                    ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                                                    : (isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF)),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: biz.userId == widget.userId
+                                                      ? const Color(0xFF059669)
+                                                      : const Color(0xFF2563EB),
+                                                  width: 0.8,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                biz.userId == widget.userId ? '👑 Dueño' : '👥 Equipo',
+                                                style: TextStyle(
+                                                  color: biz.userId == widget.userId
+                                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                                      : (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)),
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
                                           ],
                                         ),
                                         const SizedBox(height: 2),
@@ -706,33 +993,48 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                               _showEditBusinessDialog(biz);
                             } else if (action == 'delete') {
                               _confirmDeleteBusiness(biz);
+                            } else if (action == 'leave') {
+                              _confirmLeaveBusiness(biz);
                             }
                           },
                           itemBuilder: (ctx) => [
-                            PopupMenuItem(
-                              value: 'edit',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.edit_outlined,
-                                    size: 18,
-                                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text('Editar negocio'),
-                                ],
+                            if (biz.userId == widget.userId) ...[
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.edit_outlined,
+                                      size: 18,
+                                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text('Editar negocio'),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                                  SizedBox(width: 8),
-                                  Text('Mover a papelera', style: TextStyle(color: Colors.red)),
-                                ],
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text('Mover a papelera', style: TextStyle(color: Colors.red)),
+                                  ],
+                                ),
                               ),
-                            ),
+                            ] else ...[
+                              const PopupMenuItem(
+                                value: 'leave',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.exit_to_app, size: 18, color: Colors.orange),
+                                    SizedBox(width: 8),
+                                    Text('Salir del equipo', style: TextStyle(color: Colors.orange)),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         const SizedBox(width: 4),

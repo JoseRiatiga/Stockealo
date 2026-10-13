@@ -54,78 +54,70 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
   bool get isOwner => _currentUserRole == 'OWNER';
 
-  Future<void> _showAddEmployeeDialog() async {
-    final emailController = TextEditingController();
-    String selectedRole = 'CASHIER';
+  Future<void> _showEditRoleDialog(BusinessMember member) async {
+    String selectedRole = member.role;
 
-    final added = await showDialog<bool>(
+    final updated = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.person_add_alt_1, color: Color(0xFF059669)),
-              SizedBox(width: 10),
-              Text('Añadir Empleado', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Icon(Icons.manage_accounts_outlined, color: Color(0xFF059669)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Ajustar Rol: ${member.email.split('@').first}',
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Ingresa el correo electrónico del colaborador para vincularlo a tu empresa.',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Correo Electrónico *',
-                    hintText: 'empleado@gmail.com',
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Rol y Privilegios:',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                ),
-                const SizedBox(height: 8),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Correo: ${member.email}',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Selecciona el nivel de acceso:',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
 
-                // Selector Cajero
-                RadioListTile<String>(
-                  value: 'CASHIER',
-                  groupValue: selectedRole,
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: const Color(0xFF059669),
-                  title: const Text('Cajero / Vendedor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text(
-                    'Recomendado. Solo registra ventas. Precios de compra y costos protegidos.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                  ),
-                  onChanged: (val) => setDialogState(() => selectedRole = val!),
+              // Opción Cajero
+              RadioListTile<String>(
+                value: 'CASHIER',
+                groupValue: selectedRole,
+                contentPadding: EdgeInsets.zero,
+                activeColor: const Color(0xFF059669),
+                title: const Text('Cajero / Vendedor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text(
+                  'Solo registra ventas. Precios de compra y costos protegidos.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                 ),
+                onChanged: (val) => setDialogState(() => selectedRole = val!),
+              ),
 
-                // Selector Administrador
-                RadioListTile<String>(
-                  value: 'ADMIN',
-                  groupValue: selectedRole,
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: const Color(0xFF059669),
-                  title: const Text('Administrador', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text(
-                    'Puede ingresar inventario, modificar precios y ver márgenes de ganancia.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                  ),
-                  onChanged: (val) => setDialogState(() => selectedRole = val!),
+              // Opción Administrador
+              RadioListTile<String>(
+                value: 'ADMIN',
+                groupValue: selectedRole,
+                contentPadding: EdgeInsets.zero,
+                activeColor: const Color(0xFF059669),
+                title: const Text('Administrador', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text(
+                  'Puede ingresar inventario, modificar precios y ver márgenes.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                 ),
-              ],
-            ),
+                onChanged: (val) => setDialogState(() => selectedRole = val!),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -133,43 +125,36 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+              ),
               onPressed: () async {
-                final email = emailController.text.trim();
-                if (email.isEmpty || !email.contains('@')) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ingresa un correo válido')),
-                  );
-                  return;
-                }
                 try {
-                  await _teamRepo.addMember(
-                    businessId: widget.business.id,
-                    email: email,
-                    role: selectedRole,
-                  );
+                  await _teamRepo.updateRole(member.id, selectedRole);
                   if (ctx.mounted) Navigator.pop(ctx, true);
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red),
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
                     );
                   }
                 }
               },
-              child: const Text('Vincular'),
+              child: const Text('Guardar Rol'),
             ),
           ],
         ),
       ),
     );
 
-    if (added == true) {
+    if (updated == true) {
       _loadData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Empleado vinculado exitosamente'),
-            backgroundColor: Color(0xFF059669),
+          SnackBar(
+            content: Text('Rol de ${member.email} actualizado correctamente'),
+            backgroundColor: const Color(0xFF059669),
           ),
         );
       }
@@ -484,9 +469,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                     ),
                     if (isOwner)
                       TextButton.icon(
-                        onPressed: _showAddEmployeeDialog,
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Añadir'),
+                        onPressed: _showInviteQrModal,
+                        icon: const Icon(Icons.qr_code, size: 18),
+                        label: const Text('Invitar'),
                         style: TextButton.styleFrom(
                           foregroundColor: const Color(0xFF059669),
                           textStyle: const TextStyle(fontWeight: FontWeight.bold),
@@ -560,6 +545,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        onTap: isOwner ? () => _showEditRoleDialog(member) : null,
                         leading: CircleAvatar(
                           backgroundColor: roleBg,
                           child: Icon(
@@ -575,16 +561,29 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: roleBg,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: roleColor.withOpacity(0.5)),
-                              ),
-                              child: Text(
-                                member.roleDisplayName,
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: roleColor),
+                            InkWell(
+                              onTap: isOwner ? () => _showEditRoleDialog(member) : null,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: roleBg,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: roleColor.withOpacity(0.5)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      member.roleDisplayName,
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: roleColor),
+                                    ),
+                                    if (isOwner) ...[
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.edit, size: 12, color: roleColor),
+                                    ],
+                                  ],
+                                ),
                               ),
                             ),
                             if (isOwner)

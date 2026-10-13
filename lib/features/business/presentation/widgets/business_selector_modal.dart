@@ -768,42 +768,15 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Tus Empresas / Negocios',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextButton.icon(
-                    onPressed: _showJoinBusinessDialog,
-                    icon: const Icon(Icons.group_add_outlined, size: 16),
-                    label: const Text('Unirse'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF2563EB),
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _showCreateBusinessDialog,
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Nueva'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          Text(
+            'Tus Empresas / Negocios',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+            ),
           ),
+          const SizedBox(height: 4),
           Text(
             'Los productos y ventas de cada empresa están 100% aislados.',
             style: TextStyle(
@@ -811,7 +784,48 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
               color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          // Botones de acción principales (Unirse y Crear Empresa)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _showJoinBusinessDialog,
+                  icon: const Icon(Icons.group_add_outlined, size: 18),
+                  label: const Text('Unirme'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF2563EB),
+                    side: BorderSide(
+                      color: isDark ? const Color(0xFF3B82F6) : const Color(0xFF93C5FD),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _showCreateBusinessDialog,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Crear Empresa'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
           if (_isLoading)
             const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
@@ -837,24 +851,14 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                         color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _showJoinBusinessDialog,
-                          icon: const Icon(Icons.group_add_outlined, size: 18),
-                          label: const Text('Unirme con Código/QR'),
-                          style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF2563EB)),
-                        ),
-                        const SizedBox(width: 10),
-                        ElevatedButton.icon(
-                          onPressed: _showCreateBusinessDialog,
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Crear Empresa'),
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
-                        ),
-                      ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Usa los botones de arriba para unirte a un equipo o crear tu negocio.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
                     ),
                   ],
                 ),

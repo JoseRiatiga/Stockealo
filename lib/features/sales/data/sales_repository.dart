@@ -167,8 +167,12 @@ class SalesRepository {
         productId: map['product_id'] as String? ?? '',
         productName: map['product_name'] as String,
         quantity: (map['quantity'] as num).toInt(),
-        unitPrice: ((map['total'] as num).toDouble()) / ((map['quantity'] as num).toInt()),
-        unitCost: ((map['total_cost'] as num).toDouble()) / ((map['quantity'] as num).toInt()),
+        unitPrice: (map['quantity'] as num).toInt() > 0
+            ? ((map['total'] as num).toDouble()) / ((map['quantity'] as num).toInt())
+            : 0.0,
+        unitCost: (map['quantity'] as num).toInt() > 0
+            ? ((map['total_cost'] as num).toDouble()) / ((map['quantity'] as num).toInt())
+            : 0.0,
         totalAmount: (map['total'] as num).toDouble(),
         netProfit: (map['net_profit'] as num).toDouble(),
         paymentMethod: map['payment_method'] as String,

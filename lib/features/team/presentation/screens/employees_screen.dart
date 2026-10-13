@@ -532,6 +532,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   )
                 else
                   ..._members.map((member) {
+                    final currentUser = _authRepo.currentUser;
+                    final isSelf = (member.userId != null && member.userId == currentUser?.id) ||
+                        member.email.toLowerCase() == currentUser?.email.toLowerCase();
                     final isCashier = member.isCashier;
                     final roleColor = isCashier
                         ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB))
@@ -545,7 +548,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                        onTap: isOwner ? () => _showEditRoleDialog(member) : null,
+                        onTap: (isOwner && !isSelf) ? () => _showEditRoleDialog(member) : null,
                         leading: CircleAvatar(
                           backgroundColor: roleBg,
                           child: Icon(
@@ -553,7 +556,35 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                             color: roleColor,
                           ),
                         ),
-                        title: Text(member.email, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                member.email,
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isSelf) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Tú',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                         subtitle: Text(
                           member.roleDescription,
                           style: TextStyle(fontSize: 11, color: secondaryTextColor),
@@ -562,7 +593,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             InkWell(
-                              onTap: isOwner ? () => _showEditRoleDialog(member) : null,
+                              onTap: (isOwner && !isSelf) ? () => _showEditRoleDialog(member) : null,
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -578,7 +609,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                       member.roleDisplayName,
                                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: roleColor),
                                     ),
-                                    if (isOwner) ...[
+                                    if (isOwner && !isSelf) ...[
                                       const SizedBox(width: 4),
                                       Icon(Icons.edit, size: 12, color: roleColor),
                                     ],
@@ -586,7 +617,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                 ),
                               ),
                             ),
-                            if (isOwner)
+                            if (isOwner && !isSelf)
                               IconButton(
                                 icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
                                 tooltip: 'Desvincular',

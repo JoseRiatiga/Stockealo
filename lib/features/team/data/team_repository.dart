@@ -142,8 +142,21 @@ class TeamRepository {
     required String userEmail,
   }) async {
     final db = await _dbProvider.database;
+    final cleanEmail = userEmail.trim().toLowerCase();
 
-    // 1. ¿Es el dueño fundador de la empresa?
+    // 1. Consultar primero en la tabla de miembros (fuente de verdad del equipo)
+    final memberQuery = await db.query(
+      'business_members',
+      where: 'business_id = ? AND (user_id = ? OR LOWER(email) = ?)',
+      whereArgs: [businessId, userId, cleanEmail],
+      limit: 1,
+    );
+
+    if (memberQuery.isNotEmpty) {
+      return memberQuery.first['role'] as String;
+    }
+
+    // 2. Si no tiene registro explícito de miembro, verificar si es el dueño fundador original
     final bizQuery = await db.query(
       'businesses',
       where: 'id = ? AND user_id = ?',
@@ -155,19 +168,7 @@ class TeamRepository {
       return 'OWNER';
     }
 
-    // 2. ¿Está en la lista de miembros de la empresa?
-    final memberQuery = await db.query(
-      'business_members',
-      where: 'business_id = ? AND (user_id = ? OR LOWER(email) = ?)',
-      whereArgs: [businessId, userId, userEmail.trim().toLowerCase()],
-      limit: 1,
-    );
-
-    if (memberQuery.isNotEmpty) {
-      return memberQuery.first['role'] as String;
-    }
-
-    // Por defecto, si tiene acceso pero no rol definido
+    // Por defecto, rol restringido
     return 'CASHIER';
   }
 
@@ -255,9 +256,15 @@ class TeamRepository {
     final db = await _dbProvider.database;
 
     // 2. Guardar o actualizar la empresa en la base local SQLite
+    // Al unirse a una empresa existente, el creador NO es el usuario que se une
+    final existingBiz = await db.query('businesses', where: 'id = ?', whereArgs: [bizId], limit: 1);
+    final ownerUserId = (cloudBiz['user_id'] as String?) ??
+        (existingBiz.isNotEmpty ? existingBiz.first['user_id'] as String? : null) ??
+        'remote_owner';
+
     final business = Business(
       id: bizId,
-      userId: (cloudBiz['user_id'] as String?) ?? userId,
+      userId: ownerUserId,
       name: bizName,
       currency: bizCurrency,
       createdAt: cloudBiz['created_at'] != null

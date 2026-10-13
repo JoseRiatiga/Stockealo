@@ -344,4 +344,20 @@ class AuthRepository {
     }
     return null;
   }
+
+  /// Verifica si la contraseña proporcionada coincide con la del usuario en sesión
+  Future<bool> verifyCurrentPassword(String password) async {
+    final user = _currentUser;
+    if (user == null) return false;
+    final db = await _dbProvider.database;
+    final maps = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [user.id],
+      limit: 1,
+    );
+    if (maps.isEmpty) return false;
+    final storedPassword = maps.first['password'] as String;
+    return HashHelper.verifyPassword(password, storedPassword);
+  }
 }

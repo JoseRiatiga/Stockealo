@@ -13,6 +13,7 @@ import '../../../team/presentation/screens/employees_screen.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../products/presentation/widgets/restock_order_modal.dart';
 import '../../data/dashboard_repository.dart';
+import '../../../../core/services/supabase_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String userId;
@@ -49,12 +50,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _loadData();
     _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
+    _syncSilently();
   }
 
   void _onBusinessChanged() {
     if (mounted) {
       _loadData();
+      _syncSilently();
     }
+  }
+
+  Future<void> _syncSilently() async {
+    try {
+      if (await SupabaseService.instance.isCloudSyncEnabled()) {
+        final currentUser = _authRepo.currentUser;
+        if (currentUser != null) {
+          await SupabaseService.instance.syncFromCloud(widget.userId, currentUser.email);
+          if (mounted) {
+            _loadData();
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleRefresh() async {
+    try {
+      if (await SupabaseService.instance.isCloudSyncEnabled()) {
+        final currentUser = _authRepo.currentUser;
+        if (currentUser != null) {
+          await SupabaseService.instance.syncFromCloud(widget.userId, currentUser.email);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error sincronizando dashboard: $e');
+    }
+    await _loadData();
   }
 
   @override
@@ -170,7 +201,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: _handleRefresh,
         color: const Color(0xFF059669),
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))

@@ -43,6 +43,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
   final _businessRepo = BusinessRepository.instance;
   List<Business> _businesses = [];
   List<Business> _deletedBusinesses = [];
+  Map<String, String> _rolesByBusinessId = {};
   Business? _currentBusiness;
   bool _isLoading = true;
 
@@ -53,14 +54,27 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
   }
 
   Future<void> _loadBusinesses() async {
-    final list = await _businessRepo.getAllBusinesses(widget.userId);
-    final active = await _businessRepo.getActiveBusiness(widget.userId);
+    final user = AuthRepository.instance.currentUser;
+    final userEmail = user?.email ?? '';
+    final list = await _businessRepo.getAllBusinesses(widget.userId, userEmail);
+    final active = await _businessRepo.getActiveBusiness(widget.userId, userEmail);
     final deleted = await _businessRepo.getDeletedBusinesses(widget.userId);
+
+    final Map<String, String> roles = {};
+    for (final biz in list) {
+      roles[biz.id] = await TeamRepository.instance.getUserRoleInBusiness(
+        businessId: biz.id,
+        userId: widget.userId,
+        userEmail: userEmail,
+      );
+    }
+
     if (mounted) {
       setState(() {
         _businesses = list;
         _currentBusiness = active;
         _deletedBusinesses = deleted;
+        _rolesByBusinessId = roles;
         _isLoading = false;
       });
     }
@@ -581,6 +595,406 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
     }
   }
 
+  Future<void> _showPermanentDeleteDialog(
+    BuildContext trashCtx,
+    Business biz,
+    StateSetter setTrashState,
+    List<Business> deleted,
+  ) async {
+    final nameController = TextEditingController();
+    final passwordController = TextEditingController();
+    bool obscurePassword = true;
+    String? errorMessage;
+    bool isDeleting = false;
+
+    await showDialog<void>(
+      context: trashCtx,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final isNameMatch = nameController.text.trim() == biz.name.trim();
+          final canSubmit = isNameMatch && passwordController.text.length >= 6 && !isDeleting;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Eliminar definitivamente',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF450A0A).withOpacity(0.5) : const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA)),
+                    ),
+                    child: Text(
+                      'Esta acción es IRREVERSIBLE. Se destruirán para siempre los productos, ventas, inventario, clientes y miembros de "${biz.name}" en el teléfono y en la nube.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '1. Escribe el nombre exacto de la empresa:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
+                    ),
+                    child: SelectableText(
+                      biz.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      hintText: biz.name,
+                      prefixIcon: const Icon(Icons.storefront_outlined),
+                      errorText: nameController.text.isNotEmpty && !isNameMatch ? 'El nombre no coincide' : null,
+                    ),
+                    onChanged: (_) => setDialogState(() => errorMessage = null),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '2. Ingresa tu contraseña de Dueño:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+                    decoration: InputDecoration(
+                      hintText: 'Contraseña de tu cuenta',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                      ),
+                    ),
+                    onChanged: (_) => setDialogState(() => errorMessage = null),
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              errorMessage!,
+                              style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isDeleting ? null : () => Navigator.pop(dialogCtx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+                onPressed: canSubmit
+                    ? () async {
+                        final messenger = ScaffoldMessenger.of(trashCtx);
+                        setDialogState(() {
+                          isDeleting = true;
+                          errorMessage = null;
+                        });
+
+                        final isPasswordValid = await AuthRepository.instance.verifyCurrentPassword(
+                          passwordController.text,
+                        );
+
+                        if (!isPasswordValid) {
+                          if (dialogCtx.mounted) {
+                            setDialogState(() {
+                              isDeleting = false;
+                              errorMessage = 'Contraseña incorrecta. No se puede eliminar.';
+                            });
+                          }
+                          return;
+                        }
+
+                        await _businessRepo.deleteBusinessPermanently(biz.id);
+                        if (trashCtx.mounted) {
+                          setTrashState(() {
+                            deleted.removeWhere((b) => b.id == biz.id);
+                          });
+                        }
+                        await _loadBusinesses();
+
+                        if (dialogCtx.mounted) {
+                          Navigator.pop(dialogCtx);
+                        }
+
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Empresa "${biz.name}" eliminada definitivamente.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    : null,
+                icon: isDeleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.delete_forever, size: 18),
+                label: const Text('Destruir Definitivamente'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showEmptyTrashDialog(
+    BuildContext trashCtx,
+    StateSetter setTrashState,
+    List<Business> deleted,
+  ) async {
+    final wordController = TextEditingController();
+    final passwordController = TextEditingController();
+    bool obscurePassword = true;
+    String? errorMessage;
+    bool isDeleting = false;
+
+    await showDialog<void>(
+      context: trashCtx,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final isWordMatch = wordController.text.trim().toUpperCase() == 'VACIAR';
+          final canSubmit = isWordMatch && passwordController.text.length >= 6 && !isDeleting;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.delete_sweep, color: Colors.red, size: 28),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '¿Vaciar toda la papelera?',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF450A0A).withOpacity(0.5) : const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA)),
+                    ),
+                    child: Text(
+                      'Se destruirán definitivamente todas las empresas en la papelera (${deleted.length} ${deleted.length == 1 ? "empresa" : "empresas"}) y todos sus datos en el teléfono y en la nube. Esta acción NO se puede deshacer.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '1. Escribe la palabra VACIAR para confirmar:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: wordController,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      hintText: 'VACIAR',
+                      prefixIcon: const Icon(Icons.delete_sweep_outlined),
+                      errorText: wordController.text.isNotEmpty && !isWordMatch ? 'Escribe exactamente VACIAR' : null,
+                    ),
+                    onChanged: (_) => setDialogState(() => errorMessage = null),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '2. Ingresa tu contraseña de Dueño:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+                    decoration: InputDecoration(
+                      hintText: 'Contraseña de tu cuenta',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                      ),
+                    ),
+                    onChanged: (_) => setDialogState(() => errorMessage = null),
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              errorMessage!,
+                              style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isDeleting ? null : () => Navigator.pop(dialogCtx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+                onPressed: canSubmit
+                    ? () async {
+                        final messenger = ScaffoldMessenger.of(trashCtx);
+                        setDialogState(() {
+                          isDeleting = true;
+                          errorMessage = null;
+                        });
+
+                        final isPasswordValid = await AuthRepository.instance.verifyCurrentPassword(
+                          passwordController.text,
+                        );
+
+                        if (!isPasswordValid) {
+                          if (dialogCtx.mounted) {
+                            setDialogState(() {
+                              isDeleting = false;
+                              errorMessage = 'Contraseña incorrecta. No se puede vaciar.';
+                            });
+                          }
+                          return;
+                        }
+
+                        await _businessRepo.emptyTrash(widget.userId);
+                        if (trashCtx.mounted) {
+                          setTrashState(() {
+                            deleted.clear();
+                          });
+                        }
+                        await _loadBusinesses();
+
+                        if (dialogCtx.mounted) {
+                          Navigator.pop(dialogCtx);
+                        }
+
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Papelera vaciada por completo.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    : null,
+                icon: isDeleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.delete_sweep, size: 18),
+                label: const Text('Vaciar Todo'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _showTrashModal() async {
     final deleted = await _businessRepo.getDeletedBusinesses(widget.userId);
     if (!mounted) return;
@@ -616,17 +1030,35 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                   ),
                   const SizedBox(height: 16),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Papelera de Empresas',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                        ),
+                      Row(
+                        children: [
+                          const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Papelera de Empresas',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                            ),
+                          ),
+                        ],
                       ),
+                      if (deleted.isNotEmpty)
+                        TextButton.icon(
+                          onPressed: () => _showEmptyTrashDialog(trashCtx, setTrashState, deleted),
+                          icon: const Icon(Icons.delete_sweep, size: 16, color: Colors.red),
+                          label: const Text(
+                            'Vaciar',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -697,27 +1129,41 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                     ],
                                   ),
                                 ),
-                                TextButton.icon(
-                                  onPressed: () async {
-                                    final messenger = ScaffoldMessenger.of(trashCtx);
-                                    await _businessRepo.restoreBusiness(biz.id);
-                                    setTrashState(() {
-                                      deleted.removeWhere((b) => b.id == biz.id);
-                                    });
-                                    await _loadBusinesses();
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text('Empresa "${biz.name}" restaurada con éxito'),
-                                        backgroundColor: const Color(0xFF059669),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: () async {
+                                        final messenger = ScaffoldMessenger.of(trashCtx);
+                                        await _businessRepo.restoreBusiness(biz.id);
+                                        setTrashState(() {
+                                          deleted.removeWhere((b) => b.id == biz.id);
+                                        });
+                                        await _loadBusinesses();
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text('Empresa "${biz.name}" restaurada con éxito'),
+                                            backgroundColor: const Color(0xFF059669),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.restore, size: 15),
+                                      label: const Text('Restaurar'),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: const Color(0xFF059669),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
                                       ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.restore, size: 16),
-                                  label: const Text('Restaurar'),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: const Color(0xFF059669),
-                                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                  ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_forever, size: 20, color: Colors.red),
+                                      tooltip: 'Eliminar definitivamente',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _showPermanentDeleteDialog(trashCtx, biz, setTrashState, deleted),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -786,14 +1232,20 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
           ),
           const SizedBox(height: 14),
 
-          // Botones de acción principales (Unirse y Crear Empresa)
+          // Botones de acción principales (Unirse y Crear Negocio)
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _showJoinBusinessDialog,
                   icon: const Icon(Icons.group_add_outlined, size: 18),
-                  label: const Text('Unirme'),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Unirme a Negocio',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF2563EB),
                     side: BorderSide(
@@ -802,16 +1254,22 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 6),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _showCreateBusinessDialog,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Crear Empresa'),
+                  icon: const Icon(Icons.add_business_outlined, size: 18),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Crear Negocio',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF059669),
                     foregroundColor: Colors.white,
@@ -819,7 +1277,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 6),
                   ),
                 ),
               ),
@@ -914,23 +1372,29 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Row(
+                                        // Nombre del negocio en su propia fila completa
+                                        Text(
+                                          biz.name,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                            color: isSelected
+                                                ? (isDark ? const Color(0xFF34D399) : const Color(0xFF065F46))
+                                                : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+
+                                        // Etiquetas de estado, rol y moneda
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
                                           children: [
-                                            Expanded(
-                                              child: Text(
-                                                biz.name,
-                                                style: TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                                  color: isSelected
-                                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF065F46))
-                                                      : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
-                                                ),
-                                              ),
-                                            ),
                                             if (isSelected)
                                               Container(
-                                                margin: const EdgeInsets.only(left: 6),
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
                                                   color: const Color(0xFF059669),
@@ -945,41 +1409,48 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                                   ),
                                                 ),
                                               ),
-                                            Container(
-                                              margin: const EdgeInsets.only(left: 6),
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: biz.userId == widget.userId
-                                                    ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
-                                                    : (isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF)),
-                                                borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(
-                                                  color: biz.userId == widget.userId
-                                                      ? const Color(0xFF059669)
-                                                      : const Color(0xFF2563EB),
-                                                  width: 0.8,
-                                                ),
-                                              ),
-                                              child: Text(
-                                                biz.userId == widget.userId ? '👑 Dueño' : '👥 Equipo',
-                                                style: TextStyle(
-                                                  color: biz.userId == widget.userId
-                                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                                                      : (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)),
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                            Builder(
+                                              builder: (_) {
+                                                final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
+                                                final isOwner = role == 'OWNER';
+                                                final roleText = isOwner
+                                                    ? '👑 Dueño'
+                                                    : (role == 'ADMIN' ? '🛡️ Admin' : '👤 Cajero');
+                                                return Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: isOwner
+                                                        ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                                                        : (isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF)),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(
+                                                      color: isOwner
+                                                          ? const Color(0xFF059669)
+                                                          : const Color(0xFF2563EB),
+                                                      width: 0.8,
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    roleText,
+                                                    style: TextStyle(
+                                                      color: isOwner
+                                                          ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                                          : (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)),
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                            Text(
+                                              '• ${getCurrencyLabel(biz.currency)}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                               ),
                                             ),
                                           ],
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Moneda: ${getCurrencyLabel(biz.currency)}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                          ),
                                         ),
                                       ],
                                     ),
@@ -1001,45 +1472,49 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                               _confirmLeaveBusiness(biz);
                             }
                           },
-                          itemBuilder: (ctx) => [
-                            if (biz.userId == widget.userId) ...[
-                              PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.edit_outlined,
-                                      size: 18,
-                                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text('Editar negocio'),
-                                  ],
+                          itemBuilder: (ctx) {
+                            final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
+                            final isOwner = role == 'OWNER';
+                            return [
+                              if (isOwner) ...[
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.edit_outlined,
+                                        size: 18,
+                                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text('Editar negocio'),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                                    SizedBox(width: 8),
-                                    Text('Mover a papelera', style: TextStyle(color: Colors.red)),
-                                  ],
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('Mover a papelera', style: TextStyle(color: Colors.red)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ] else ...[
-                              const PopupMenuItem(
-                                value: 'leave',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.exit_to_app, size: 18, color: Colors.orange),
-                                    SizedBox(width: 8),
-                                    Text('Salir del equipo', style: TextStyle(color: Colors.orange)),
-                                  ],
+                              ] else ...[
+                                const PopupMenuItem(
+                                  value: 'leave',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.exit_to_app, size: 18, color: Colors.orange),
+                                      SizedBox(width: 8),
+                                      Text('Salir del equipo', style: TextStyle(color: Colors.orange)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ],
+                              ],
+                            ];
+                          },
                         ),
                         const SizedBox(width: 4),
                       ],

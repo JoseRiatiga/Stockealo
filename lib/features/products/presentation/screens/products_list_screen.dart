@@ -17,6 +17,7 @@ import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../widgets/restock_order_modal.dart';
+import '../../../../core/services/supabase_service.dart';
 
 class ProductsListScreen extends StatefulWidget {
   final String userId;
@@ -49,12 +50,38 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     super.initState();
     _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
     _loadData();
+    _syncSilently();
   }
 
   void _onBusinessChanged() {
     if (mounted) {
       _loadData();
+      _syncSilently();
     }
+  }
+
+  Future<void> _syncSilently() async {
+    try {
+      if (await SupabaseService.instance.isCloudSyncEnabled()) {
+        final currentUser = AuthRepository.instance.currentUser;
+        await SupabaseService.instance.syncFromCloud(widget.userId, currentUser?.email);
+        if (mounted) {
+          _loadData();
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleRefresh() async {
+    try {
+      if (await SupabaseService.instance.isCloudSyncEnabled()) {
+        final currentUser = AuthRepository.instance.currentUser;
+        await SupabaseService.instance.syncFromCloud(widget.userId, currentUser?.email);
+      }
+    } catch (e) {
+      debugPrint('Error sincronizando productos: $e');
+    }
+    await _loadData();
   }
 
   @override
@@ -392,7 +419,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: _handleRefresh,
         color: const Color(0xFF059669),
         child: CustomScrollView(
           slivers: [

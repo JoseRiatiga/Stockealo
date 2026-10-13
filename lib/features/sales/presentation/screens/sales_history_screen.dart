@@ -8,6 +8,7 @@ import '../../models/sale.dart';
 import '../widgets/digital_ticket_modal.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../reports/data/excel_export_service.dart';
+import '../../../../core/services/supabase_service.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -31,12 +32,42 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     super.initState();
     _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
     _loadSales();
+    _syncSilently();
   }
 
   void _onBusinessChanged() {
     if (mounted) {
       _loadSales();
+      _syncSilently();
     }
+  }
+
+  Future<void> _syncSilently() async {
+    try {
+      if (await SupabaseService.instance.isCloudSyncEnabled()) {
+        final user = AuthRepository.instance.currentUser;
+        if (user != null) {
+          await SupabaseService.instance.syncFromCloud(user.id, user.email);
+          if (mounted) {
+            _loadSales();
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleRefresh() async {
+    try {
+      if (await SupabaseService.instance.isCloudSyncEnabled()) {
+        final user = AuthRepository.instance.currentUser;
+        if (user != null) {
+          await SupabaseService.instance.syncFromCloud(user.id, user.email);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error sincronizando historial de ventas: $e');
+    }
+    await _loadSales();
   }
 
   @override
@@ -215,7 +246,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadSales,
+        onRefresh: _handleRefresh,
         color: const Color(0xFF059669),
         child: CustomScrollView(
           slivers: [

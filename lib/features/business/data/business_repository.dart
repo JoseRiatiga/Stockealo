@@ -188,4 +188,44 @@ class BusinessRepository extends ChangeNotifier {
     // Restaurar estado en Supabase en tiempo real
     await SupabaseService.instance.updateBusinessDeletedStatus(id, false);
   }
+
+  /// Elimina definitivamente una empresa y todos sus datos en SQLite y Supabase
+  Future<void> deleteBusinessPermanently(String id) async {
+    final db = await _dbProvider.database;
+
+    await db.transaction((txn) async {
+      await txn.delete('stock_movements', where: 'business_id = ?', whereArgs: [id]);
+      await txn.delete('sales', where: 'business_id = ?', whereArgs: [id]);
+      await txn.delete('customers', where: 'business_id = ?', whereArgs: [id]);
+      await txn.delete('products', where: 'business_id = ?', whereArgs: [id]);
+      await txn.delete('categories', where: 'business_id = ?', whereArgs: [id]);
+      await txn.delete('business_members', where: 'business_id = ?', whereArgs: [id]);
+      await txn.delete('businesses', where: 'id = ?', whereArgs: [id]);
+    });
+
+    if (_activeBusiness?.id == id) {
+      _activeBusiness = null;
+      activeBusinessNotifier.value = null;
+      notifyListeners();
+    }
+
+    // Eliminar también en Supabase Cloud
+    await SupabaseService.instance.deleteBusinessPermanently(id);
+  }
+
+  /// Vacía toda la papelera del usuario eliminando definitivamente todas sus empresas archivadas
+  Future<void> emptyTrash(String userId) async {
+    final db = await _dbProvider.database;
+    final trashed = await db.query(
+      'businesses',
+      columns: ['id'],
+      where: 'user_id = ? AND is_deleted = 1',
+      whereArgs: [userId],
+    );
+
+    for (final row in trashed) {
+      final bizId = row['id'] as String;
+      await deleteBusinessPermanently(bizId);
+    }
+  }
 }

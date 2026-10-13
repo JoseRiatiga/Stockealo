@@ -300,23 +300,52 @@ class SupabaseService {
       // 4. Sincronizar Sales
       final localSales = await db.query('sales');
       if (localSales.isNotEmpty) {
-        final formattedSales = localSales.map((s) => {
-          'id': s['id'],
-          'business_id': s['business_id'],
-          'product_id': s['product_id'],
-          'quantity': (s['quantity'] as num?)?.toInt() ?? 1,
-          'unit_price': (s['unit_price'] as num?)?.toDouble() ?? 0.0,
-          'unit_cost': (s['unit_cost'] as num?)?.toDouble() ?? 0.0,
-          'total_amount': (s['total_amount'] as num?)?.toDouble() ?? 0.0,
-          'payment_method': s['payment_method'] ?? 'Efectivo',
-          'customer_id': null,
-          'sale_date': s['date'] ?? DateTime.now().toIso8601String(),
+        final formattedSales = localSales.map((s) {
+          final qty = (s['quantity'] as num?)?.toInt() ?? 1;
+          final totalAmount = (s['total'] as num?)?.toDouble() ?? (s['total_amount'] as num?)?.toDouble() ?? 0.0;
+          final totalCost = (s['total_cost'] as num?)?.toDouble() ?? 0.0;
+          final unitPrice = qty > 0 ? (totalAmount / qty) : 0.0;
+          final unitCost = qty > 0 ? (totalCost / qty) : 0.0;
+
+          return {
+            'id': s['id'],
+            'business_id': s['business_id'],
+            'product_id': s['product_id'],
+            'product_name': s['product_name'],
+            'quantity': qty,
+            'unit_price': unitPrice,
+            'unit_cost': unitCost,
+            'total_amount': totalAmount,
+            'payment_method': s['payment_method'] ?? 'Efectivo',
+            'customer_id': s['customer_id'],
+            'customer_name': s['customer_name'],
+            'sale_date': s['date'] ?? s['created_at'] ?? DateTime.now().toIso8601String(),
+          };
         }).toList();
 
-        await client!.from('sales').upsert(
-          formattedSales,
-          onConflict: 'id',
-        );
+        try {
+          await client!.from('sales').upsert(
+            formattedSales,
+            onConflict: 'id',
+          );
+        } catch (e) {
+          if (e.toString().contains('product_name') ||
+              e.toString().contains('customer_name') ||
+              e.toString().contains('42703')) {
+            final fallbackSales = formattedSales.map((m) {
+              final copy = Map<String, dynamic>.from(m);
+              copy.remove('product_name');
+              copy.remove('customer_name');
+              return copy;
+            }).toList();
+            await client!.from('sales').upsert(
+              fallbackSales,
+              onConflict: 'id',
+            );
+          } else {
+            rethrow;
+          }
+        }
       }
 
       return SyncResult(
@@ -367,11 +396,14 @@ class SupabaseService {
             .eq('is_deleted', 0);
 
         for (final b in cloudBusinesses) {
+          final existing = await db.query('businesses', where: 'id = ?', whereArgs: [b['id']], limit: 1);
+          final existingUserId = existing.isNotEmpty ? existing.first['user_id'] as String? : null;
+
           await db.insert(
             'businesses',
             {
               'id': b['id'],
-              'user_id': b['user_id'] ?? userId,
+              'user_id': b['user_id'] ?? existingUserId ?? 'remote_owner',
               'name': b['name'],
               'currency': b['currency'] ?? 'COP',
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
@@ -495,23 +527,70 @@ class SupabaseService {
       try {
         final List<dynamic> cloudSales = await client!.from('sales').select();
         for (final s in cloudSales) {
-          final unitCost = (s['unit_cost'] as num?)?.toDouble() ?? 0.0;
           final qty = (s['quantity'] as num?)?.toInt() ?? 1;
-          final totalAmount = (s['total_amount'] as num?)?.toDouble() ?? 0.0;
+          final unitCost = (s['unit_cost'] as num?)?.toDouble() ?? 0.0;
+          final unitPrice = (s['unit_price'] as num?)?.toDouble() ?? 0.0;
+          var totalAmount = (s['total_amount'] as num?)?.toDouble() ?? (s['total'] as num?)?.toDouble() ?? 0.0;
+          if (totalAmount <= 0.0 && unitPrice > 0.0) {
+            totalAmount = unitPrice * qty;
+          }
+
+          // Resolver nombre del producto y precios de respaldo desde SQLite si faltan
+          String prodName = (s['product_name'] as String?)?.trim() ?? '';
+          final prodId = s['product_id'] as String?;
+          var calcTotalCost = unitCost * qty;
+
+          if (prodId != null) {
+            final prodRows = await db.query(
+              'products',
+              columns: ['name', 'sale_price', 'purchase_price'],
+              where: 'id = ?',
+              whereArgs: [prodId],
+              limit: 1,
+            );
+            if (prodRows.isNotEmpty) {
+              if (prodName.isEmpty || prodName.toLowerCase() == 'producto') {
+                final foundName = prodRows.first['name'] as String?;
+                if (foundName != null && foundName.trim().isNotEmpty) {
+                  prodName = foundName.trim();
+                }
+              }
+              if (totalAmount <= 0.0) {
+                final fallbackSalePrice = (prodRows.first['sale_price'] as num?)?.toDouble() ?? 0.0;
+                totalAmount = fallbackSalePrice * qty;
+              }
+              if (calcTotalCost <= 0.0) {
+                final fallbackCostPrice = (prodRows.first['purchase_price'] as num?)?.toDouble() ?? 0.0;
+                calcTotalCost = fallbackCostPrice * qty;
+              }
+            }
+          }
+          if (prodName.isEmpty) prodName = 'Producto';
+
+          // Resolver nombre del cliente si está referenciado
+          String? custName = (s['customer_name'] as String?)?.trim();
+          final custId = s['customer_id'] as String?;
+          if ((custName == null || custName.isEmpty) && custId != null) {
+            final custRows = await db.query('customers', columns: ['name'], where: 'id = ?', whereArgs: [custId], limit: 1);
+            if (custRows.isNotEmpty) {
+              custName = custRows.first['name'] as String?;
+            }
+          }
+
           await db.insert(
             'sales',
             {
               'id': s['id'],
               'business_id': s['business_id'],
-              'product_id': s['product_id'],
-              'product_name': s['product_name'] ?? 'Producto',
+              'product_id': prodId,
+              'product_name': prodName,
               'quantity': qty,
-              'customer_id': s['customer_id'],
-              'customer_name': s['customer_name'],
+              'customer_id': custId,
+              'customer_name': custName,
               'date': s['sale_date'] ?? DateTime.now().toIso8601String(),
               'total': totalAmount,
-              'total_cost': unitCost * qty,
-              'net_profit': totalAmount - (unitCost * qty),
+              'total_cost': calcTotalCost,
+              'net_profit': totalAmount - calcTotalCost,
               'payment_method': s['payment_method'] ?? 'Efectivo',
               'payment_status': 'PAGADO',
               'notes': s['notes'],
@@ -638,18 +717,45 @@ class SupabaseService {
     try {
       if (!(await isCloudSyncEnabled())) return;
       if (!_isInitialized) await initialize();
-      await client?.from('sales').insert({
+
+      final total = (s['total_amount'] as num?)?.toDouble() ??
+          (s['total'] as num?)?.toDouble() ??
+          0.0;
+      final qty = (s['quantity'] as num?)?.toInt() ?? 1;
+      final unitPrice = (s['unit_price'] as num?)?.toDouble() ??
+          (qty > 0 ? total / qty : 0.0);
+      final totalCost = (s['total_cost'] as num?)?.toDouble() ?? 0.0;
+      final unitCost = (s['unit_cost'] as num?)?.toDouble() ??
+          (qty > 0 ? totalCost / qty : 0.0);
+
+      final payload = {
         'id': s['id'],
         'business_id': s['business_id'],
         'product_id': s['product_id'],
-        'quantity': (s['quantity'] as num?)?.toInt() ?? 1,
-        'unit_price': (s['unit_price'] as num?)?.toDouble() ?? 0.0,
-        'unit_cost': (s['unit_cost'] as num?)?.toDouble() ?? 0.0,
-        'total_amount': (s['total_amount'] as num?)?.toDouble() ?? 0.0,
+        'product_name': s['product_name'],
+        'quantity': qty,
+        'unit_price': unitPrice,
+        'unit_cost': unitCost,
+        'total_amount': total,
         'payment_method': s['payment_method'] ?? 'Efectivo',
-        'customer_id': null,
-        'sale_date': s['date'] ?? DateTime.now().toIso8601String(),
-      });
+        'customer_id': s['customer_id'],
+        'customer_name': s['customer_name'],
+        'sale_date': s['date'] ?? s['created_at'] ?? DateTime.now().toIso8601String(),
+      };
+
+      try {
+        await client?.from('sales').insert(payload);
+      } catch (e) {
+        if (e.toString().contains('product_name') ||
+            e.toString().contains('customer_name') ||
+            e.toString().contains('42703')) {
+          payload.remove('product_name');
+          payload.remove('customer_name');
+          await client?.from('sales').insert(payload);
+        } else {
+          rethrow;
+        }
+      }
     } catch (e) {
       debugPrint('Error al insertar venta en Supabase: $e');
     }
@@ -695,6 +801,49 @@ class SupabaseService {
       }).eq('id', businessId);
     } catch (e) {
       debugPrint('Error al actualizar estado de empresa en Supabase: $e');
+    }
+  }
+
+  /// Elimina una empresa permanentemente de Supabase y todos sus datos relacionados
+  Future<void> deleteBusinessPermanently(String businessId) async {
+    try {
+      if (!(await isCloudSyncEnabled())) return;
+      if (!_isInitialized) await initialize();
+      if (client == null) return;
+
+      // 1. Eliminar datos hijos en la nube
+      try {
+        await client!.from('sales').delete().eq('business_id', businessId);
+      } catch (_) {}
+      try {
+        await client!.from('customers').delete().eq('business_id', businessId);
+      } catch (_) {}
+      try {
+        await client!.from('products').delete().eq('business_id', businessId);
+      } catch (_) {}
+      try {
+        await client!.from('categories').delete().eq('business_id', businessId);
+      } catch (_) {}
+      try {
+        await client!.from('business_members').delete().eq('business_id', businessId);
+      } catch (_) {}
+
+      // 2. Eliminar la empresa
+      await client!.from('businesses').delete().eq('id', businessId);
+
+      // 3. Eliminar fotos del Storage correspondientes a este negocio
+      try {
+        final files = await client!.storage.from('product-images').list(path: businessId);
+        if (files.isNotEmpty) {
+          final filePaths = files.map((f) => '$businessId/${f.name}').toList();
+          await client!.storage.from('product-images').remove(filePaths);
+        }
+      } catch (storageErr) {
+        debugPrint('Nota al eliminar fotos de Storage en Supabase: $storageErr');
+      }
+      debugPrint('Empresa $businessId destruida permanentemente de Supabase.');
+    } catch (e) {
+      debugPrint('Error al eliminar negocio permanentemente en Supabase: $e');
     }
   }
 
@@ -931,14 +1080,20 @@ CREATE TABLE IF NOT EXISTS sales (
     id TEXT PRIMARY KEY,
     business_id TEXT REFERENCES businesses(id) ON DELETE CASCADE,
     product_id TEXT REFERENCES products(id) ON DELETE SET NULL,
+    product_name TEXT,
     quantity INTEGER NOT NULL,
     unit_price NUMERIC(12, 2) NOT NULL,
     unit_cost NUMERIC(12, 2) NOT NULL DEFAULT 0,
     total_amount NUMERIC(12, 2) NOT NULL,
     payment_method TEXT NOT NULL DEFAULT 'Efectivo',
     customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
+    customer_name TEXT,
     sale_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Asegurar columnas nuevas en caso de que la tabla ya existiera previamente
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS product_name TEXT;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS customer_name TEXT;
 
 -- Desactivar RLS temporalmente para acceso directo de prueba
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;

@@ -112,19 +112,25 @@ class BusinessRepository extends ChangeNotifier {
     return business;
   }
 
-  /// Actualiza los datos de una empresa (nombre y moneda)
+  /// Actualiza los datos de una empresa (nombre, moneda y descripción opcional)
   Future<void> updateBusiness({
     required String id,
     required String name,
     required String currency,
+    String? description,
   }) async {
     final db = await _dbProvider.database;
+    final Map<String, dynamic> updateData = {
+      'name': name.trim(),
+      'currency': currency,
+    };
+    if (description != null) {
+      updateData['description'] = description.trim();
+    }
+
     await db.update(
       'businesses',
-      {
-        'name': name.trim(),
-        'currency': currency,
-      },
+      updateData,
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -133,6 +139,7 @@ class BusinessRepository extends ChangeNotifier {
       _activeBusiness = _activeBusiness!.copyWith(
         name: name.trim(),
         currency: currency,
+        description: description != null ? description.trim() : _activeBusiness!.description,
       );
       activeBusinessNotifier.value = _activeBusiness;
       notifyListeners();
@@ -143,6 +150,7 @@ class BusinessRepository extends ChangeNotifier {
       'id': id,
       'name': name.trim(),
       'currency': currency,
+      'description': description?.trim() ?? _activeBusiness?.description,
       'type': 'Comercio General',
       'is_deleted': 0,
       'created_at': DateTime.now().toIso8601String(),

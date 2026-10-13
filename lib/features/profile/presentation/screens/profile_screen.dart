@@ -7,16 +7,14 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../auth/models/app_user.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
+import '../../../business/presentation/screens/business_info_screen.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
-import '../../../../core/utils/currency_options.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../../../reports/presentation/widgets/excel_import_modal.dart';
 import '../../../team/data/team_repository.dart';
-import '../../../team/presentation/screens/employees_screen.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/services/update_service.dart';
-import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/update_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -232,99 +230,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (changed == true) {
       _loadActiveBusiness();
-    }
-  }
-
-  Future<void> _editActiveBusiness() async {
-    if (_activeBusiness == null) return;
-    if (_currentBusinessRole == 'CASHIER') {
-      AppToast.showPermission(
-        context,
-        'Solo el dueño o administradores pueden cambiar los datos de la empresa.',
-      );
-      return;
-    }
-    final nameController = TextEditingController(text: _activeBusiness!.name);
-    String selectedCurrency = _activeBusiness!.currency;
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) => AlertDialog(
-            title: const Text('Editar Empresa Activa'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre de la Empresa',
-                      prefixIcon: Icon(Icons.storefront_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: selectedCurrency,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Moneda Principal',
-                      prefixIcon: Icon(Icons.monetization_on_outlined),
-                    ),
-                    items: kAvailableCurrencies.map((c) {
-                      return DropdownMenuItem(
-                        value: c.code,
-                        child: Text(c.label),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedCurrency = val);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (nameController.text.trim().isNotEmpty) {
-                    Navigator.pop(ctx, {
-                      'name': nameController.text.trim(),
-                      'currency': selectedCurrency,
-                    });
-                  }
-                },
-                child: const Text('Guardar'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (result != null && result['name']!.isNotEmpty) {
-      await _businessRepo.updateBusiness(
-        id: _activeBusiness!.id,
-        name: result['name']!,
-        currency: result['currency'] ?? 'COP',
-      );
-      _loadActiveBusiness();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Empresa actualizada correctamente'),
-            backgroundColor: Color(0xFF059669),
-          ),
-        );
-      }
     }
   }
 
@@ -776,9 +681,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         elevation: 0,
+        actions: [
+          _buildCompactThemeToggle(isDark),
+        ],
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         children: [
           // 1. Tarjeta: Perfil Comercial y Cuenta
           _buildCard(
@@ -789,7 +697,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Stack(
                       children: [
                         CircleAvatar(
-                          radius: 34,
+                          radius: 32,
                           backgroundColor: const Color(0xFFECFDF5),
                           backgroundImage: _avatarPath != null && File(_avatarPath!).existsSync()
                               ? FileImage(File(_avatarPath!))
@@ -797,7 +705,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: _avatarPath == null
                               ? Text(
                                   (user?.displayName.isNotEmpty == true ? user!.displayName[0] : 'U').toUpperCase(),
-                                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
                                 )
                               : null,
                         ),
@@ -807,9 +715,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: InkWell(
                             onTap: _showAvatarPickerModal,
                             child: const CircleAvatar(
-                              radius: 12,
+                              radius: 11,
                               backgroundColor: Color(0xFF059669),
-                              child: Icon(Icons.camera_alt, color: Colors.white, size: 13),
+                              child: Icon(Icons.camera_alt, color: Colors.white, size: 12),
                             ),
                           ),
                         ),
@@ -822,7 +730,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           Text(
                             user?.displayName ?? 'Comerciante',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: primaryTextColor),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryTextColor),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -840,14 +748,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(_isEditingProfile ? Icons.close : Icons.edit_outlined, color: const Color(0xFF059669)),
+                      icon: Icon(_isEditingProfile ? Icons.close : Icons.edit_outlined, color: const Color(0xFF059669), size: 22),
                       onPressed: () => setState(() => _isEditingProfile = !_isEditingProfile),
                       tooltip: 'Editar datos personales',
                     ),
                   ],
                 ),
                 if (_isEditingProfile) ...[
-                  const Divider(height: 24),
+                  const Divider(height: 20),
                   TextField(
                     controller: _nameController,
                     decoration: const InputDecoration(
@@ -879,61 +787,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // 2. Tarjeta: Tu Negocio y Equipo
+          // 2. Tarjeta Unificada: Información de tu Negocio
           _buildCard(
-            title: 'Negocio y Equipo',
-            icon: Icons.storefront_outlined,
-            child: Column(
-              children: [
-                if (_activeBusiness != null) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      backgroundColor: Color(0xFFECFDF5),
-                      child: Icon(Icons.store, color: Color(0xFF059669)),
-                    ),
-                    title: Text(_activeBusiness!.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: Text('Moneda: ${_activeBusiness!.currency} • Comercio Activo', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_currentBusinessRole != 'CASHIER')
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF059669)),
-                            tooltip: 'Editar nombre o moneda',
-                            onPressed: _editActiveBusiness,
-                          ),
-                        IconButton(
-                          icon: const Icon(Icons.swap_horiz, size: 22, color: Color(0xFF2563EB)),
-                          tooltip: 'Cambiar de empresa',
-                          onPressed: _openBusinessSelector,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      backgroundColor: Color(0xFFEFF6FF),
-                      child: Icon(Icons.group_outlined, color: Color(0xFF2563EB)),
-                    ),
-                    title: const Text('Equipo de Trabajo y Cajeros', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    subtitle: const Text('Administrar empleados y roles comerciales', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                    trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-                    onTap: () {
-                      Navigator.push(
+            child: _activeBusiness != null
+                ? InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => EmployeesScreen(business: _activeBusiness!),
+                          builder: (_) => BusinessInfoScreen(
+                            business: _activeBusiness!,
+                            onLogout: widget.onLogout,
+                          ),
                         ),
                       );
+                      _loadActiveBusiness();
                     },
-                  ),
-                ] else ...[
-                  ListTile(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF059669).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(0xFF10B981).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                _activeBusiness!.name.isNotEmpty
+                                    ? _activeBusiness!.name[0].toUpperCase()
+                                    : 'B',
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _activeBusiness!.name,
+                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: primaryTextColor),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _buildCompactRoleBadge(_currentBusinessRole),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Información de tu negocio, equipo y auditoría',
+                                  style: TextStyle(fontSize: 12, color: secondaryTextColor),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.chevron_right_rounded, size: 22, color: Color(0xFF94A3B8)),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const CircleAvatar(
                       backgroundColor: Color(0xFFF1F5F9),
@@ -953,38 +882,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: const Text('Seleccionar', style: TextStyle(fontSize: 12)),
                     ),
                   ),
-                ],
-              ],
-            ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // 3. Tarjeta: Datos, Nube y Movilidad
+          // 3. Tarjeta: Datos, Respaldo y Nube
           _buildCard(
             title: 'Datos, Respaldo y Nube',
             icon: Icons.cloud_sync_outlined,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Switch Nube Opcional
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   activeColor: const Color(0xFF059669),
                   value: _isCloudSyncEnabled,
                   onChanged: _toggleCloudSync,
                   title: const Text(
-                    'Sincronización en la Nube y Multidispositivo',
+                    'Sincronización en la Nube',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   subtitle: Text(
                     _isCloudSyncEnabled
-                        ? 'Activo: Tus datos se respaldan de forma segura para usar en varios teléfonos o con empleados.'
-                        : 'Modo Local Privado: Tus datos residen únicamente en la memoria de este teléfono.',
+                        ? 'Activo: Respaldo automático multidispositivo y para equipo.'
+                        : 'Modo Local Privado: Los datos residen solo en este teléfono.',
                     style: TextStyle(fontSize: 12, color: _isCloudSyncEnabled ? const Color(0xFF059669) : const Color(0xFF64748B)),
                   ),
                 ),
                 if (_isCloudSyncEnabled) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -996,11 +921,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF059669),
                         side: const BorderSide(color: Color(0xFF059669)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                     ),
                   ),
                 ],
-                const Divider(height: 20),
+                const Divider(height: 18),
 
                 // Botones Excel (Importar y Exportar)
                 Row(
@@ -1008,12 +934,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _openExcelImport,
-                        icon: const Icon(Icons.file_upload_outlined, size: 18),
-                        label: const Text('Importar Excel'),
+                        icon: const Icon(Icons.file_upload_outlined, size: 17),
+                        label: const Text('Importar Excel', style: TextStyle(fontSize: 12)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: primaryTextColor,
                           side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
@@ -1022,12 +948,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _exportToExcel,
-                        icon: const Icon(Icons.file_download_outlined, size: 18),
-                        label: const Text('Exportar Excel'),
+                        icon: const Icon(Icons.file_download_outlined, size: 17),
+                        label: const Text('Exportar Excel', style: TextStyle(fontSize: 12)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF059669),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
@@ -1037,60 +963,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
-
-          // 4. Tarjeta: Preferencias de Apariencia (Modo Oscuro)
-          _buildCard(
-            title: 'Apariencia de la App',
-            icon: Icons.palette_outlined,
-            child: AnimatedBuilder(
-              animation: ThemeController.instance,
-              builder: (context, _) {
-                final currentMode = ThemeController.instance.themeMode;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Selecciona el tema visual para Stockealo:',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildThemeOption(
-                            label: 'Sistema',
-                            icon: Icons.brightness_auto,
-                            isSelected: currentMode == ThemeMode.system,
-                            onTap: () => ThemeController.instance.setThemeMode(ThemeMode.system),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildThemeOption(
-                            label: 'Claro',
-                            icon: Icons.light_mode_outlined,
-                            isSelected: currentMode == ThemeMode.light,
-                            onTap: () => ThemeController.instance.setThemeMode(ThemeMode.light),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildThemeOption(
-                            label: 'Oscuro',
-                            icon: Icons.dark_mode_outlined,
-                            isSelected: currentMode == ThemeMode.dark,
-                            onTap: () => ThemeController.instance.setThemeMode(ThemeMode.dark),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // 5. Tarjeta: Seguridad de la Cuenta
           _buildCard(
@@ -1250,50 +1123,126 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildThemeOption({
-    required String label,
+  Widget _buildCompactThemeToggle(bool isDark) {
+    return AnimatedBuilder(
+      animation: ThemeController.instance,
+      builder: (context, _) {
+        final mode = ThemeController.instance.themeMode;
+        return Container(
+          margin: const EdgeInsets.only(right: 14),
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildThemeIconItem(
+                icon: Icons.wb_sunny_rounded,
+                tooltip: 'Tema Claro',
+                isSelected: mode == ThemeMode.light,
+                onTap: () => ThemeController.instance.setThemeMode(ThemeMode.light),
+                isDark: isDark,
+              ),
+              _buildThemeIconItem(
+                icon: Icons.nightlight_round,
+                tooltip: 'Tema Oscuro',
+                isSelected: mode == ThemeMode.dark,
+                onTap: () => ThemeController.instance.setThemeMode(ThemeMode.dark),
+                isDark: isDark,
+              ),
+              _buildThemeIconItem(
+                icon: Icons.brightness_auto_rounded,
+                tooltip: 'Automático (Sistema)',
+                isSelected: mode == ThemeMode.system,
+                onTap: () => ThemeController.instance.setThemeMode(ThemeMode.system),
+                isDark: isDark,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildThemeIconItem({
     required IconData icon,
+    required String tooltip,
     required bool isSelected,
     required VoidCallback onTap,
+    required bool isDark,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final unselectedBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
-    final unselectedBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final selectedBg = isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5);
-    final selectedText = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? selectedBg : unselectedBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF059669) : unselectedBorder,
-            width: isSelected ? 2 : 1,
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? (isDark ? const Color(0xFF059669) : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    )
+                  ]
+                : null,
+          ),
+          child: Icon(
+            icon,
+            size: 15,
+            color: isSelected
+                ? (isDark ? Colors.white : const Color(0xFF059669))
+                : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
           ),
         ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected ? const Color(0xFF059669) : const Color(0xFF64748B),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? selectedText : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
-              ),
-            ),
-          ],
-        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactRoleBadge(String role) {
+    Color bg;
+    Color fg;
+    String label;
+
+    switch (role.toUpperCase()) {
+      case 'OWNER':
+        bg = const Color(0xFFFEF3C7);
+        fg = const Color(0xFFB45309);
+        label = 'Dueño';
+        break;
+      case 'ADMIN':
+        bg = const Color(0xFFEFF6FF);
+        fg = const Color(0xFF1D4ED8);
+        label = 'Admin';
+        break;
+      default:
+        bg = const Color(0xFFF1F5F9);
+        fg = const Color(0xFF475569);
+        label = 'Cajero';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
       ),
     );
   }

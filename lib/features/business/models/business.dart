@@ -3,6 +3,7 @@ class Business {
   final String userId;
   final String name;
   final String currency;
+  final String? description;
   final DateTime createdAt;
   final bool isSynced;
   final bool isDeleted;
@@ -13,6 +14,7 @@ class Business {
     required this.userId,
     required this.name,
     this.currency = 'COP',
+    this.description,
     required this.createdAt,
     this.isSynced = false,
     this.isDeleted = false,
@@ -41,6 +43,7 @@ class Business {
     String? userId,
     String? name,
     String? currency,
+    String? description,
     DateTime? createdAt,
     bool? isSynced,
     bool? isDeleted,
@@ -51,6 +54,7 @@ class Business {
       userId: userId ?? this.userId,
       name: name ?? this.name,
       currency: currency ?? this.currency,
+      description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       isSynced: isSynced ?? this.isSynced,
       isDeleted: isDeleted ?? this.isDeleted,
@@ -64,6 +68,7 @@ class Business {
       'user_id': userId,
       'name': name,
       'currency': currency,
+      'description': description,
       'created_at': createdAt.toIso8601String(),
       'is_synced': isSynced ? 1 : 0,
       'is_deleted': isDeleted ? 1 : 0,
@@ -77,6 +82,7 @@ class Business {
       userId: map['user_id'] as String? ?? 'default_user',
       name: map['name'] as String,
       currency: map['currency'] as String? ?? 'COP',
+      description: map['description'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       isSynced: (map['is_synced'] as int?) == 1,
       isDeleted: (map['is_deleted'] as int? ?? 0) == 1,

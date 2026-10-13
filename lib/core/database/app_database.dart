@@ -43,6 +43,9 @@ class AppDatabase {
           await db.execute('ALTER TABLE businesses ADD COLUMN deleted_at TEXT');
         } catch (_) {}
         try {
+          await db.execute('ALTER TABLE businesses ADD COLUMN description TEXT');
+        } catch (_) {}
+        try {
           await db.execute('ALTER TABLE business_members ADD COLUMN name TEXT');
         } catch (_) {}
       },
@@ -103,6 +106,7 @@ class AppDatabase {
         user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         currency TEXT NOT NULL DEFAULT 'COP',
+        description TEXT,
         created_at TEXT NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,
         is_deleted INTEGER NOT NULL DEFAULT 0,

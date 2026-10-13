@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
+import '../../../business/presentation/screens/business_info_screen.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../products/data/product_repository.dart';
 import '../../../products/presentation/screens/barcode_scanner_screen.dart';
 import '../../../products/presentation/screens/product_form_screen.dart';
+import '../../../reports/data/excel_export_service.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
@@ -14,6 +17,88 @@ import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../products/presentation/widgets/restock_order_modal.dart';
 import '../../data/dashboard_repository.dart';
 import '../../../../core/services/supabase_service.dart';
+
+class QuickActionDef {
+  final String id;
+  final String label;
+  final String description;
+  final IconData icon;
+  final Color color;
+
+  const QuickActionDef({
+    required this.id,
+    required this.label,
+    required this.description,
+    required this.icon,
+    required this.color,
+  });
+}
+
+const List<QuickActionDef> kAvailableQuickActions = [
+  QuickActionDef(
+    id: 'sell',
+    label: 'Vender',
+    description: 'Escanear código de barras para venta rápida',
+    icon: Icons.qr_code_scanner,
+    color: Color(0xFF059669),
+  ),
+  QuickActionDef(
+    id: 'add_product',
+    label: 'Producto',
+    description: 'Crear un nuevo producto en catálogo',
+    icon: Icons.add_box_outlined,
+    color: Color(0xFF2563EB),
+  ),
+  QuickActionDef(
+    id: 'customers',
+    label: 'Clientes',
+    description: 'Gestionar clientes y cuentas por cobrar (fiados)',
+    icon: Icons.people_outline_rounded,
+    color: Color(0xFFD97706),
+  ),
+  QuickActionDef(
+    id: 'alerts',
+    label: 'Alertas',
+    description: 'Productos agotados o con bajo inventario',
+    icon: Icons.warning_amber_rounded,
+    color: Color(0xFFDC2626),
+  ),
+  QuickActionDef(
+    id: 'inventory',
+    label: 'Inventario',
+    description: 'Ir directo al catálogo completo de stock',
+    icon: Icons.inventory_2_outlined,
+    color: Color(0xFF0284C7),
+  ),
+  QuickActionDef(
+    id: 'sales_history',
+    label: 'Ventas',
+    description: 'Historial detallado y recibos',
+    icon: Icons.receipt_long_outlined,
+    color: Color(0xFF0D9488),
+  ),
+  QuickActionDef(
+    id: 'excel_export',
+    label: 'Excel',
+    description: 'Exportar catálogo, ventas y clientes en .xlsx',
+    icon: Icons.file_download_outlined,
+    color: Color(0xFF16A34A),
+  ),
+  QuickActionDef(
+    id: 'team',
+    label: 'Equipo',
+    description: 'Administrar colaboradores y roles',
+    icon: Icons.group_outlined,
+    color: Color(0xFF7C3AED),
+  ),
+  QuickActionDef(
+    id: 'biz_info',
+    label: 'Mi Negocio',
+    description: 'Información general y métricas del comercio',
+    icon: Icons.storefront_outlined,
+    color: Color(0xFF475569),
+  ),
+];
 
 class DashboardScreen extends StatefulWidget {
   final String userId;
@@ -42,6 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Business? _activeBusiness;
   Map<String, dynamic> _summary = {};
+  List<String> _quickActionIds = List.from(DashboardRepository.defaultQuickActions);
   String _userRole = 'OWNER';
   bool _isLoading = true;
 
@@ -112,9 +198,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
       final data = await _dashboardRepo.getDashboardSummary(_activeBusiness!.id);
+      final quickActions = await _dashboardRepo.getQuickActions(_activeBusiness!.id);
       if (mounted) {
         setState(() {
           _summary = data;
+          _quickActionIds = quickActions;
           _isLoading = false;
         });
       }
@@ -126,6 +214,314 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   bool get canViewProfits => _userRole == 'OWNER' || _userRole == 'ADMIN';
+
+  Future<void> _exportExcelDirectly() async {
+    if (_activeBusiness == null) return;
+    final user = _authRepo.currentUser;
+    if (user == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: Card(
+          elevation: 6,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: Color(0xFF059669)),
+                SizedBox(height: 18),
+                Text('Generando reporte Excel (.xlsx)...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    bool dialogClosed = false;
+    void closeDialog() {
+      if (!dialogClosed && mounted) {
+        dialogClosed = true;
+        Navigator.pop(context);
+      }
+    }
+
+    try {
+      await ExcelExportService.instance.exportBusinessData(
+        business: _activeBusiness!,
+        userId: user.id,
+        userEmail: user.email,
+        onGenerated: closeDialog,
+      );
+      closeDialog();
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: 'Reporte Excel generado y compartido con éxito',
+          type: ToastType.success,
+        );
+      }
+    } catch (e) {
+      closeDialog();
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: 'Error al exportar: $e',
+          type: ToastType.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _executeQuickAction(String actionId) async {
+    final int lowStock = _summary['lowStock'] ?? 0;
+    final int outOfStock = _summary['outOfStock'] ?? 0;
+    final int alertTotal = lowStock + outOfStock;
+
+    switch (actionId) {
+      case 'sell':
+        _scanToSell();
+        break;
+      case 'add_product':
+        if (_activeBusiness == null) return;
+        final created = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
+          ),
+        );
+        if (created == true) _loadData();
+        break;
+      case 'customers':
+        if (_activeBusiness == null) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CustomersScreen(businessId: _activeBusiness!.id),
+          ),
+        );
+        _loadData();
+        break;
+      case 'alerts':
+        if (_activeBusiness != null && alertTotal > 0) {
+          final user = _authRepo.currentUser;
+          RestockOrderModal.show(
+            context,
+            business: _activeBusiness!,
+            userName: user?.displayName,
+          );
+        } else {
+          widget.onNavigateToInventory();
+        }
+        break;
+      case 'inventory':
+        widget.onNavigateToInventory();
+        break;
+      case 'sales_history':
+        widget.onNavigateToSales();
+        break;
+      case 'excel_export':
+        _exportExcelDirectly();
+        break;
+      case 'team':
+        if (_activeBusiness == null) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EmployeesScreen(business: _activeBusiness!),
+          ),
+        );
+        _loadData();
+        break;
+      case 'biz_info':
+        if (_activeBusiness == null) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BusinessInfoScreen(
+              business: _activeBusiness!,
+              onLogout: widget.onLogout,
+            ),
+          ),
+        );
+        _loadData();
+        break;
+    }
+  }
+
+  Future<void> _openCustomizeQuickActionsModal() async {
+    if (_activeBusiness == null) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectedIds = List<String>.from(_quickActionIds);
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.72,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Personalizar Acciones',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Elige entre 2 y 5 accesos favoritos para tu inicio',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: selectedIds.length >= 2 && selectedIds.length <= 5
+                              ? const Color(0xFFECFDF5)
+                              : const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selectedIds.length >= 2 && selectedIds.length <= 5
+                                ? const Color(0xFF10B981)
+                                : Colors.red,
+                          ),
+                        ),
+                        child: Text(
+                          '${selectedIds.length} / 5',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: selectedIds.length >= 2 && selectedIds.length <= 5
+                                ? const Color(0xFF059669)
+                                : Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: kAvailableQuickActions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, index) {
+                        final action = kAvailableQuickActions[index];
+                        final isSelected = selectedIds.contains(action.id);
+
+                        return CheckboxListTile(
+                          value: isSelected,
+                          activeColor: const Color(0xFF059669),
+                          secondary: CircleAvatar(
+                            backgroundColor: action.color.withOpacity(0.12),
+                            child: Icon(action.icon, color: action.color, size: 20),
+                          ),
+                          title: Text(
+                            action.label,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          subtitle: Text(
+                            action.description,
+                            style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          ),
+                          onChanged: (val) {
+                            setModalState(() {
+                              if (val == true) {
+                                if (selectedIds.length < 5) {
+                                  selectedIds.add(action.id);
+                                } else {
+                                  AppToast.show(
+                                    ctx,
+                                    message: 'Máximo 5 acciones para mantener la pantalla ordenada',
+                                    type: ToastType.warning,
+                                  );
+                                }
+                              } else {
+                                if (selectedIds.length > 2) {
+                                  selectedIds.remove(action.id);
+                                } else {
+                                  AppToast.show(
+                                    ctx,
+                                    message: 'Debes mantener al menos 2 accesos activos',
+                                    type: ToastType.warning,
+                                  );
+                                }
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF059669),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx, true);
+                      },
+                      child: const Text('Guardar Accesos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (saved == true && _activeBusiness != null) {
+      await _dashboardRepo.saveQuickActions(_activeBusiness!.id, selectedIds);
+      setState(() {
+        _quickActionIds = selectedIds;
+      });
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: 'Acciones rápidas guardadas con éxito',
+          type: ToastType.success,
+        );
+      }
+    }
+  }
 
   Future<void> _scanToSell() async {
     if (_activeBusiness == null) return;
@@ -254,18 +650,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
 
-                  // Tarjetas de Métricas de Hoy (2x2 Grid)
+                  // Banner de Tendencia y Comparativa vs Ayer
+                  _buildFinancialTrendBanner(),
+                  const SizedBox(height: 14),
+
+                  // Tarjetas de Métricas de Hoy (2x2 Grid Enriquecido)
                   _buildMetricsGrid(),
                   const SizedBox(height: 20),
 
-                  // Acciones Rápidas (Estilo POS)
-                  Text(
-                    'Acciones Rápidas',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+                  // Acciones Rápidas Personalizables
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Acciones Rápidas',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+                      ),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: _openCustomizeQuickActionsModal,
+                        icon: const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF059669)),
+                        label: const Text(
+                          'Personalizar',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   _buildQuickActions(),
                   const SizedBox(height: 24),
 
@@ -273,7 +690,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildWeeklySalesChart(),
                   const SizedBox(height: 24),
 
-                  // Top Productos Más Vendidos
+                  // Top 5 Productos Más Vendidos
                   _buildTopProductsSection(),
                   const SizedBox(height: 20),
                 ],
@@ -282,11 +699,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildFinancialTrendBanner() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final double todayTotal = _summary['todayTotal'] ?? 0.0;
+    final double yesterdayTotal = _summary['yesterdayTotal'] ?? 0.0;
+
+    String trendText;
+    Color trendColor;
+    IconData trendIcon;
+
+    if (yesterdayTotal > 0) {
+      final double diffPercent = ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100;
+      if (diffPercent >= 0) {
+        trendText = '+${diffPercent.toStringAsFixed(1)}% de ventas vs ayer';
+        trendColor = const Color(0xFF059669);
+        trendIcon = Icons.trending_up_rounded;
+      } else {
+        trendText = '${diffPercent.toStringAsFixed(1)}% respecto al día anterior';
+        trendColor = const Color(0xFFD97706);
+        trendIcon = Icons.trending_down_rounded;
+      }
+    } else if (todayTotal > 0) {
+      trendText = 'Actividad comercial iniciada hoy';
+      trendColor = const Color(0xFF059669);
+      trendIcon = Icons.local_fire_department_rounded;
+    } else {
+      trendText = 'A la espera de las ventas del día';
+      trendColor = const Color(0xFF64748B);
+      trendIcon = Icons.storefront_outlined;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(trendIcon, size: 18, color: trendColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              trendText,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: trendColor,
+              ),
+            ),
+          ),
+          if (yesterdayTotal > 0)
+            Text(
+              'Ayer: ${CurrencyFormatter.format(yesterdayTotal)}',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMetricsGrid() {
     final double todayTotal = _summary['todayTotal'] ?? 0.0;
     final double todayProfit = _summary['todayProfit'] ?? 0.0;
-    final int todayUnits = _summary['todayUnits'] ?? 0;
+    final double profitMargin = _summary['profitMargin'] ?? 0.0;
+    final double averageTicket = _summary['averageTicket'] ?? 0.0;
     final double totalDebt = _summary['totalDebt'] ?? 0.0;
+    final int todayCount = _summary['todayCount'] ?? 0;
 
     return GridView.count(
       crossAxisCount: 2,
@@ -294,43 +779,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
       mainAxisSpacing: 12,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.35,
+      childAspectRatio: 1.32,
       children: [
-        // Ventas de hoy
+        // 1. Ventas de hoy
         _buildMetricCard(
           title: 'Ventas de Hoy',
           value: CurrencyFormatter.format(todayTotal),
-          subtitle: '${_summary['todayCount'] ?? 0} ventas registradas',
+          subtitle: '$todayCount ${todayCount == 1 ? "venta" : "ventas"} registradas',
           icon: Icons.payments_outlined,
           color: const Color(0xFF059669),
           bg: const Color(0xFFECFDF5),
         ),
 
-        // Ganancia Neta de hoy (oculta para Cajeros)
+        // 2. Ganancia Neta de hoy (oculta para Cajeros)
         _buildMetricCard(
-          title: 'Ganancia Neta Hoy',
+          title: 'Ganancia Neta',
           value: canViewProfits ? CurrencyFormatter.format(todayProfit) : '••••••',
-          subtitle: canViewProfits ? 'Margen de utilidad neto' : 'Restringido para cajeros',
+          subtitle: canViewProfits
+              ? (todayTotal > 0 ? 'Margen: ${profitMargin.toStringAsFixed(1)}%' : 'Margen neto estimado')
+              : 'Restringido para cajeros',
           icon: Icons.trending_up,
           color: const Color(0xFF0D9488),
           bg: const Color(0xFFF0FDFA),
         ),
 
-        // Unidades vendidas
+        // 3. Ticket Promedio del Día
         _buildMetricCard(
-          title: 'Unidades Vendidas',
-          value: '$todayUnits unid.',
-          subtitle: 'Despachadas hoy',
-          icon: Icons.inventory_2_outlined,
+          title: 'Ticket Promedio',
+          value: CurrencyFormatter.format(averageTicket),
+          subtitle: 'Promedio por compra',
+          icon: Icons.receipt_outlined,
           color: const Color(0xFF2563EB),
           bg: const Color(0xFFEFF6FF),
         ),
 
-        // Cuentas por Cobrar (Fiados)
+        // 4. Cuentas por Cobrar (Fiados)
         _buildMetricCard(
           title: 'Por Cobrar (Fiado)',
           value: CurrencyFormatter.format(totalDebt),
-          subtitle: 'Deudas pendientes',
+          subtitle: totalDebt > 0 ? 'Toca para cobrar' : 'Al día, sin saldo deudor',
           icon: Icons.receipt_long_outlined,
           color: const Color(0xFFD97706),
           bg: const Color(0xFFFEF3C7),
@@ -438,81 +925,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final int outOfStock = _summary['outOfStock'] ?? 0;
     final int alertTotal = lowStock + outOfStock;
 
+    // Filtra las definiciones que el usuario eligió y están activas en _quickActionIds
+    final List<QuickActionDef> activeDefs = [];
+    for (final id in _quickActionIds) {
+      final found = kAvailableQuickActions.firstWhere(
+        (a) => a.id == id,
+        orElse: () => kAvailableQuickActions.first,
+      );
+      if (!activeDefs.any((a) => a.id == found.id)) {
+        activeDefs.add(found);
+      }
+    }
+
+    if (activeDefs.isEmpty) {
+      activeDefs.addAll(kAvailableQuickActions.take(4));
+    }
+
     return Row(
-      children: [
-        // Botón Venta Rápida
-        Expanded(
-          child: _buildActionBtn(
-            label: 'Vender',
-            icon: Icons.qr_code_scanner,
-            color: const Color(0xFF059669),
-            onTap: _scanToSell,
-          ),
-        ),
-        const SizedBox(width: 8),
+      children: activeDefs.map((action) {
+        String? badge;
+        if (action.id == 'alerts' && alertTotal > 0) {
+          badge = '$alertTotal';
+        }
 
-        // Botón Nuevo Producto
-        Expanded(
-          child: _buildActionBtn(
-            label: 'Producto',
-            icon: Icons.add_box_outlined,
-            color: const Color(0xFF2563EB),
-            onTap: () async {
-              if (_activeBusiness == null) return;
-              final created = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
-                ),
-              );
-              if (created == true) _loadData();
-            },
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: _buildActionBtn(
+              label: action.label,
+              icon: action.icon,
+              color: action.color,
+              badge: badge,
+              onTap: () => _executeQuickAction(action.id),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-
-        // Alertas de Stock
-        Expanded(
-          child: _buildActionBtn(
-            label: 'Alertas',
-            icon: Icons.warning_amber_rounded,
-            color: alertTotal > 0 ? const Color(0xFFDC2626) : const Color(0xFF64748B),
-            badge: alertTotal > 0 ? '$alertTotal' : null,
-            onTap: () {
-              if (_activeBusiness != null && alertTotal > 0) {
-                final user = _authRepo.currentUser;
-                RestockOrderModal.show(
-                  context,
-                  business: _activeBusiness!,
-                  userName: user?.displayName,
-                );
-              } else {
-                widget.onNavigateToInventory();
-              }
-            },
-          ),
-        ),
-        const SizedBox(width: 8),
-
-        // Equipo
-        Expanded(
-          child: _buildActionBtn(
-            label: 'Equipo',
-            icon: Icons.group_outlined,
-            color: const Color(0xFF7C3AED),
-            onTap: () async {
-              if (_activeBusiness == null) return;
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => EmployeesScreen(business: _activeBusiness!),
-                ),
-              );
-              _loadData();
-            },
-          ),
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
 
@@ -566,6 +1014,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 fontWeight: FontWeight.w600,
                 color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF334155),
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -684,7 +1134,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    final medalIcons = ['🥇', '🥈', '🥉'];
+    final medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -696,39 +1146,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Productos Más Vendidos',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Top 5 Productos Más Vendidos',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                ),
+              ),
+              Text(
+                'Ventas & Ingresos',
+                style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ...topProducts.asMap().entries.map((entry) {
             final idx = entry.key;
             final item = entry.value;
-            final medal = idx < medalIcons.length ? medalIcons[idx] : '•';
+            final medal = idx < medals.length ? medals[idx] : '•';
+            final share = (item['share'] as num?)?.toDouble() ?? 0.0;
+            final revenue = (item['revenue'] as num?)?.toDouble() ?? 0.0;
 
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(medal, style: const TextStyle(fontSize: 18)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      item['name'] as String,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                  Row(
+                    children: [
+                      Text(medal, style: const TextStyle(fontSize: 16)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item['name'] as String,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${item['qty']} un.',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '(${CurrencyFormatter.format(revenue)})',
+                        style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${item['qty']} vendidos',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF059669)),
+                  const SizedBox(height: 5),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: share.clamp(0.05, 1.0),
+                      minHeight: 5,
+                      backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF059669)),
+                    ),
                   ),
                 ],
               ),

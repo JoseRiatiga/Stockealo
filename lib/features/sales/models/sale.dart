@@ -11,6 +11,7 @@ class Sale {
   final double netProfit;
   final String paymentMethod; // 'EFECTIVO' | 'TRANSFERENCIA' | 'FIADO'
   final String? customerName;
+  final String? sellerName;
   final DateTime date;
   final bool isSynced;
 
@@ -27,6 +28,7 @@ class Sale {
     required this.netProfit,
     required this.paymentMethod,
     this.customerName,
+    this.sellerName,
     required this.date,
     this.isSynced = false,
   });
@@ -45,6 +47,7 @@ class Sale {
       'net_profit': netProfit,
       'payment_method': paymentMethod,
       'customer_name': customerName,
+      'seller_name': sellerName,
       'date': date.toIso8601String(),
       'is_synced': isSynced ? 1 : 0,
     };
@@ -64,6 +67,7 @@ class Sale {
       netProfit: (map['net_profit'] as num).toDouble(),
       paymentMethod: map['payment_method'] as String,
       customerName: map['customer_name'] as String?,
+      sellerName: map['seller_name'] as String?,
       date: DateTime.parse(map['date'] as String),
       isSynced: (map['is_synced'] as int?) == 1,
     );

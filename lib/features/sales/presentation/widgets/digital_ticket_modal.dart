@@ -25,6 +25,7 @@ class DigitalTicketModal extends StatelessWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DigitalTicketModal(
         sale: sale,
@@ -54,11 +55,14 @@ class DigitalTicketModal extends StatelessWidget {
     if (sale.customerName?.isNotEmpty == true) {
       buffer.writeln('👤 *Cliente:* ${sale.customerName}');
     }
+    if (sale.sellerName?.isNotEmpty == true) {
+      buffer.writeln('👤 *Atendido por:* ${sale.sellerName}');
+    }
     if (sale.paymentMethod == 'FIADO') {
       buffer.writeln('⚠️ *Estado:* Venta a Crédito (Fiado)');
     }
     buffer.writeln('--------------------------------');
-    buffer.writeln('¡Muchas gracias por tu compra!');
+    buffer.writeln('¡Muchas gracias por su compra!');
     buffer.writeln('Comprobante digital emitido con Stockealo 📦');
 
     return buffer.toString();
@@ -106,7 +110,12 @@ class DigitalTicketModal extends StatelessWidget {
       ),
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(
+            24,
+            20,
+            24,
+            MediaQuery.of(context).padding.bottom + 24,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -272,11 +281,22 @@ class DigitalTicketModal extends StatelessWidget {
                       ),
                     ],
 
+                    if (sale.sellerName?.isNotEmpty == true) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Atendido por:', style: TextStyle(fontSize: 12, color: textMuted)),
+                          Text(sale.sellerName!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textMain)),
+                        ],
+                      ),
+                    ],
+
                     const SizedBox(height: 16),
                     Center(
                       child: Text(
-                        '¡Gracias por preferirnos! 🌱 Comprobante ecológico',
-                        style: TextStyle(fontSize: 11, color: textMuted),
+                        '¡Muchas gracias por su compra!',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textMuted),
                       ),
                     ),
                   ],
@@ -313,14 +333,25 @@ class DigitalTicketModal extends StatelessWidget {
                         foregroundColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                         side: BorderSide(color: borderColor),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: TextButton(
+                    child: ElevatedButton(
                       onPressed: () => Navigator.pop(context),
-                      child: Text('Listo', style: TextStyle(color: textMuted)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                        elevation: 0,
+                        side: BorderSide(
+                          color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Listo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     ),
                   ),
                 ],

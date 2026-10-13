@@ -9,7 +9,6 @@ import '../widgets/product_card.dart';
 import 'barcode_scanner_screen.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
-import '../../../sales/presentation/screens/sales_history_screen.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
@@ -42,6 +41,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   List<Product> _products = [];
   List<Category> _categories = [];
   String _selectedCategory = 'Todos';
+  String _sortOption = 'default';
+  String _stockFilterOption = 'all';
   Map<String, dynamic> _stats = {};
   bool _isLoading = true;
 
@@ -114,16 +115,51 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       _selectedCategory = 'Todos';
     }
 
-    final products = await _repository.searchProducts(
+    final rawProducts = await _repository.searchProducts(
       _searchController.text.trim(),
       category: _selectedCategory,
       businessId: businessId,
     );
     final stats = await _repository.getInventoryStats(businessId);
 
+    var filteredProducts = List<Product>.from(rawProducts);
+
+    // Filtro por estado de stock
+    if (_stockFilterOption == 'low_stock') {
+      filteredProducts = filteredProducts.where((p) => p.isLowStock && !p.isOutOfStock).toList();
+    } else if (_stockFilterOption == 'out_of_stock') {
+      filteredProducts = filteredProducts.where((p) => p.isOutOfStock).toList();
+    }
+
+    // Criterio de ordenamiento
+    switch (_sortOption) {
+      case 'stock_desc':
+        filteredProducts.sort((a, b) => b.stock.compareTo(a.stock));
+        break;
+      case 'stock_asc':
+        filteredProducts.sort((a, b) => a.stock.compareTo(b.stock));
+        break;
+      case 'price_desc':
+        filteredProducts.sort((a, b) => b.salePrice.compareTo(a.salePrice));
+        break;
+      case 'price_asc':
+        filteredProducts.sort((a, b) => a.salePrice.compareTo(b.salePrice));
+        break;
+      case 'margin_desc':
+        filteredProducts.sort((a, b) =>
+            (b.salePrice - b.purchasePrice).compareTo(a.salePrice - a.purchasePrice));
+        break;
+      case 'name_asc':
+        filteredProducts.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case 'name_desc':
+        filteredProducts.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        break;
+    }
+
     if (mounted) {
       setState(() {
-        _products = products;
+        _products = filteredProducts;
         _categories = categories;
         _stats = stats;
         _isLoading = false;
@@ -197,30 +233,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         'Ajuste rápido desde catálogo',
       );
       _loadData();
-    }
-  }
-
-  Future<void> _scanToSell() async {
-    if (_activeBusiness == null) return;
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
-    );
-    if (code != null && code.isNotEmpty) {
-      final product = await _repository.getProductByCode(code, _activeBusiness!.id);
-      if (product != null && mounted) {
-        final sold = await QuickSaleDialog.show(context, product);
-        if (sold == true) {
-          _loadData();
-        }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No se encontró ningún producto con el código "$code" en ${_activeBusiness?.name}'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
     }
   }
 
@@ -315,6 +327,207 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     );
   }
 
+  Future<void> _openSortFilterModal() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    String tempSort = _sortOption;
+    String tempStockFilter = _stockFilterOption;
+
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+            final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+            final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+            final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
+            Widget buildSortItem(String value, String label, IconData icon) {
+              final isSelected = tempSort == value;
+              return InkWell(
+                onTap: () => setModalState(() => tempSort = value),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (const Color(0xFF059669).withOpacity(0.12))
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFF059669) : borderColor,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        icon,
+                        size: 18,
+                        color: isSelected ? const Color(0xFF059669) : textMuted,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: isSelected ? const Color(0xFF059669) : textMain,
+                          ),
+                        ),
+                      ),
+                      if (isSelected)
+                        const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF059669)),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            Widget buildStockFilterChip(String value, String label, Color color) {
+              final isSelected = tempStockFilter == value;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => setModalState(() => tempStockFilter = value),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected ? color.withOpacity(0.15) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? color : borderColor,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected ? color : textMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return Container(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                MediaQuery.of(ctx).padding.bottom + 20,
+              ),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Filtros y Ordenamiento',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: textMain,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setModalState(() {
+                              tempSort = 'default';
+                              tempStockFilter = 'all';
+                            });
+                          },
+                          child: const Text('Restablecer', style: TextStyle(fontSize: 12.5)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'ESTADO DEL STOCK',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textMuted),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        buildStockFilterChip('all', 'Todos', const Color(0xFF059669)),
+                        const SizedBox(width: 8),
+                        buildStockFilterChip('low_stock', 'Bajo Stock', const Color(0xFFD97706)),
+                        const SizedBox(width: 8),
+                        buildStockFilterChip('out_of_stock', 'Agotados', const Color(0xFFDC2626)),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'ORDENAR POR',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textMuted),
+                    ),
+                    const SizedBox(height: 8),
+                    buildSortItem('default', 'Predeterminado (Más recientes)', Icons.schedule_rounded),
+                    buildSortItem('stock_desc', 'Mayor stock disponible', Icons.inventory_2_rounded),
+                    buildSortItem('stock_asc', 'Menor stock (Por agotarse)', Icons.production_quantity_limits_rounded),
+                    buildSortItem('price_desc', 'Mayor precio de venta', Icons.arrow_upward_rounded),
+                    buildSortItem('price_asc', 'Menor precio de venta', Icons.arrow_downward_rounded),
+                    buildSortItem('margin_desc', 'Mayor margen de ganancia', Icons.trending_up_rounded),
+                    buildSortItem('name_asc', 'Alfabético (A - Z)', Icons.sort_by_alpha_rounded),
+                    buildSortItem('name_desc', 'Alfabético (Z - A)', Icons.sort_by_alpha_rounded),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF059669),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Aplicar Filtros', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (applied == true) {
+      setState(() {
+        _sortOption = tempSort;
+        _stockFilterOption = tempStockFilter;
+      });
+      _loadData();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -351,26 +564,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            tooltip: 'Escanear para Vender',
-            onPressed: _scanToSell,
-          ),
-          IconButton(
-            icon: const Icon(Icons.receipt_long_outlined),
-            tooltip: 'Historial de Ventas',
-            onPressed: () async {
-              if (_activeBusiness != null) {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SalesHistoryScreen(businessId: _activeBusiness!.id),
-                  ),
-                );
-                _loadData();
-              }
-            },
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             tooltip: 'Más opciones',
@@ -428,35 +621,89 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
               child: _buildStatsHeader(),
             ),
 
-            // Barra de búsqueda con lector de código
+            // Barra de búsqueda con lector de código y botón de filtros
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => _loadData(),
-                  decoration: InputDecoration(
-                    hintText: 'Buscar por nombre o código...',
-                    prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_searchController.text.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              _loadData();
-                            },
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (_) => _loadData(),
+                        decoration: InputDecoration(
+                          hintText: 'Buscar por nombre o código...',
+                          prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_searchController.text.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _loadData();
+                                  },
+                                ),
+                              IconButton(
+                                icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF059669)),
+                                tooltip: 'Escanear para buscar',
+                                onPressed: _scanToSearch,
+                              ),
+                            ],
                           ),
-                        IconButton(
-                          icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF059669)),
-                          tooltip: 'Escanear para buscar',
-                          onPressed: _scanToSearch,
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: _openSortFilterModal,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: (_sortOption != 'default' || _stockFilterOption != 'all')
+                              ? const Color(0xFF059669).withOpacity(0.15)
+                              : (Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFF1E293B)
+                                  : Colors.white),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: (_sortOption != 'default' || _stockFilterOption != 'all')
+                                ? const Color(0xFF059669)
+                                : (Theme.of(context).brightness == Brightness.dark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.tune_rounded,
+                              size: 22,
+                              color: (_sortOption != 'default' || _stockFilterOption != 'all')
+                                  ? const Color(0xFF059669)
+                                  : const Color(0xFF64748B),
+                            ),
+                            if (_sortOption != 'default' || _stockFilterOption != 'all')
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF059669),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -530,27 +777,34 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                 ),
               ),
 
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 80), // Margen para el FAB
+            SliverToBoxAdapter(
+              child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80), // Margen dinámico para Android safe area y el FAB
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          if (_activeBusiness == null) return;
-          final created = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
-            ),
-          );
-          if (created == true) {
-            _loadData();
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Nuevo Producto', style: TextStyle(fontWeight: FontWeight.bold)),
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        child: FloatingActionButton(
+          onPressed: () async {
+            if (_activeBusiness == null) return;
+            final created = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
+              ),
+            );
+            if (created == true) {
+              _loadData();
+            }
+          },
+          backgroundColor: const Color(0xFF059669),
+          foregroundColor: Colors.white,
+          elevation: 4,
+          shape: const CircleBorder(),
+          tooltip: 'Nuevo Producto',
+          child: const Icon(Icons.add, size: 28),
+        ),
       ),
     );
   }

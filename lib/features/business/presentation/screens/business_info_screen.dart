@@ -50,51 +50,60 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
 
   Future<void> _loadAllInfo() async {
     setState(() => _isLoadingMetrics = true);
-    final user = AuthRepository.instance.currentUser;
-    if (user != null) {
-      final role = await _teamRepo.getUserRoleInBusiness(
-        businessId: _business.id,
-        userId: user.id,
-        userEmail: user.email,
+    try {
+      final user = AuthRepository.instance.currentUser;
+      if (user != null) {
+        final role = await _teamRepo.getUserRoleInBusiness(
+          businessId: _business.id,
+          userId: user.id,
+          userEmail: user.email,
+        );
+        _userRole = role;
+      }
+
+      final isCloud = await SupabaseService.instance.isCloudSyncEnabled();
+      final members = await _teamRepo.getMembers(_business.id);
+
+      // Auditoría y métricas desde SQLite local
+      final db = await AppDatabase.instance.database;
+
+      final prodRes = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM products WHERE business_id = ? AND is_active = 1',
+        [_business.id],
       );
-      _userRole = role;
-    }
+      final productsCount = (prodRes.first['count'] as num?)?.toInt() ?? 0;
 
-    final isCloud = await SupabaseService.instance.isCloudSyncEnabled();
-    final members = await _teamRepo.getMembers(_business.id);
+      final salesRes = await db.rawQuery(
+        'SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total_sum FROM sales WHERE business_id = ?',
+        [_business.id],
+      );
+      final salesCount = (salesRes.first['count'] as num?)?.toInt() ?? 0;
+      final salesTotal = (salesRes.first['total_sum'] as num?)?.toDouble() ?? 0.0;
 
-    // Auditoría y métricas desde SQLite local
-    final db = await AppDatabase.instance.database;
+      final custRes = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM customers WHERE business_id = ?',
+        [_business.id],
+      );
+      final customersCount = (custRes.first['count'] as num?)?.toInt() ?? 0;
 
-    final prodRes = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM products WHERE business_id = ? AND is_deleted = 0',
-      [_business.id],
-    );
-    final productsCount = (prodRes.first['count'] as num?)?.toInt() ?? 0;
-
-    final salesRes = await db.rawQuery(
-      'SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total_sum FROM sales WHERE business_id = ?',
-      [_business.id],
-    );
-    final salesCount = (salesRes.first['count'] as num?)?.toInt() ?? 0;
-    final salesTotal = (salesRes.first['total_sum'] as num?)?.toDouble() ?? 0.0;
-
-    final custRes = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM customers WHERE business_id = ?',
-      [_business.id],
-    );
-    final customersCount = (custRes.first['count'] as num?)?.toInt() ?? 0;
-
-    if (mounted) {
-      setState(() {
-        _isCloudSync = isCloud;
-        _members = members;
-        _productsCount = productsCount;
-        _salesCount = salesCount;
-        _salesTotalAmount = salesTotal;
-        _customersCount = customersCount;
-        _isLoadingMetrics = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCloudSync = isCloud;
+          _members = members;
+          _productsCount = productsCount;
+          _salesCount = salesCount;
+          _salesTotalAmount = salesTotal;
+          _customersCount = customersCount;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error cargando información del negocio: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMetrics = false;
+        });
+      }
     }
   }
 
@@ -387,7 +396,12 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
       body: _isLoadingMetrics
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
           : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                14,
+                16,
+                MediaQuery.of(context).padding.bottom + 24,
+              ),
               children: [
                 // 1. Tarjeta Principal: Identidad del Negocio
                 Container(

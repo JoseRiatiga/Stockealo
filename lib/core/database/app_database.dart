@@ -51,6 +51,9 @@ class AppDatabase {
         try {
           await db.execute('ALTER TABLE sales ADD COLUMN product_photo_path TEXT');
         } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE sales ADD COLUMN seller_name TEXT');
+        } catch (_) {}
       },
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
@@ -198,6 +201,7 @@ class AppDatabase {
         net_profit REAL NOT NULL,
         payment_method TEXT NOT NULL, -- EFECTIVO | TRANSFERENCIA | FIADO
         payment_status TEXT NOT NULL DEFAULT 'PAGADO',
+        seller_name TEXT,
         notes TEXT,
         created_at TEXT NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,

@@ -433,9 +433,15 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: EdgeInsets.fromLTRB(
+          24,
+          20,
+          24,
+          MediaQuery.of(ctx).padding.bottom + 20,
+        ),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -600,7 +606,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.of(context).padding.bottom + 28,
+              ),
               children: [
                 // Banner Informativo
                 Container(

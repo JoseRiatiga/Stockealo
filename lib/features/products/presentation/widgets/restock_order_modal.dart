@@ -37,6 +37,7 @@ class RestockOrderModal extends StatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => RestockOrderModal(
         business: business,
@@ -604,7 +605,12 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
 
           // Bottom Bar (Summary & WhatsApp Order Button)
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              14,
+              20,
+              MediaQuery.of(context).padding.bottom + 16,
+            ),
             decoration: BoxDecoration(
               color: cardBg,
               border: Border(top: BorderSide(color: borderColor)),

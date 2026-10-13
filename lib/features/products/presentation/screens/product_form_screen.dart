@@ -696,7 +696,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
                 ],
               ),
             ),

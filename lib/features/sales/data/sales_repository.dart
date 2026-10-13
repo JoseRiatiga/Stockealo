@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../products/models/product.dart';
 import '../models/sale.dart';
 
@@ -35,6 +36,11 @@ class SalesRepository {
     final now = DateTime.now();
     final saleId = const Uuid().v4();
     final businessId = product.businessId;
+
+    final currentUser = AuthRepository.instance.currentUser;
+    final seller = (currentUser?.name != null && currentUser!.name!.trim().isNotEmpty)
+        ? currentUser.name!
+        : (currentUser?.email.split('@').first ?? 'Vendedor');
 
     await db.transaction((txn) async {
       // 2. Descontar stock del producto dentro de la empresa
@@ -105,6 +111,7 @@ class SalesRepository {
         'quantity': quantity,
         'customer_id': customerId,
         'customer_name': customerName?.trim().isNotEmpty == true ? customerName!.trim() : null,
+        'seller_name': seller,
         'date': now.toIso8601String(),
         'total': total,
         'total_cost': totalCost,
@@ -130,6 +137,7 @@ class SalesRepository {
       netProfit: netProfit,
       paymentMethod: paymentMethod,
       customerName: customerName,
+      sellerName: seller,
       date: now,
     );
 
@@ -181,6 +189,7 @@ class SalesRepository {
         netProfit: (map['net_profit'] as num).toDouble(),
         paymentMethod: map['payment_method'] as String,
         customerName: map['customer_name'] as String?,
+        sellerName: map['seller_name'] as String?,
         date: DateTime.parse(map['date'] as String),
         isSynced: (map['is_synced'] as int?) == 1,
       );

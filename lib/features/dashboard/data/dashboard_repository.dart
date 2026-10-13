@@ -7,35 +7,107 @@ class DashboardRepository {
 
   final AppDatabase _dbProvider = AppDatabase.instance;
 
-  Future<Map<String, dynamic>> getDashboardSummary(String businessId) async {
+  Future<Map<String, dynamic>> getDashboardSummary(
+    String businessId, {
+    String period = 'today',
+  }) async {
     final db = await _dbProvider.database;
     final now = DateTime.now();
+
+    // 1. Configuración de filtros según el periodo seleccionado
+    String periodWhereSql = '';
+    final List<dynamic> periodArgs = [businessId];
+    String compareWhereSql = '';
+    final List<dynamic> compareArgs = [businessId];
+    String trendLabel = 'vs ayer';
+
     final todayPrefix = "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}%";
-
-    // 1. Ventas y ganancias de hoy
-    final todaySalesRes = await db.rawQuery('''
-      SELECT 
-        COUNT(*) as count,
-        COALESCE(SUM(total), 0.0) as total_amount,
-        COALESCE(SUM(net_profit), 0.0) as net_profit,
-        COALESCE(SUM(quantity), 0) as units_sold
-      FROM sales 
-      WHERE business_id = ? AND date LIKE ?
-    ''', [businessId, todayPrefix]);
-
-    final todaySales = todaySalesRes.isNotEmpty ? todaySalesRes.first : {};
-    final double todayTotal = (todaySales['total_amount'] as num?)?.toDouble() ?? 0.0;
-    final double todayProfit = (todaySales['net_profit'] as num?)?.toDouble() ?? 0.0;
-    final int todayUnits = (todaySales['units_sold'] as num?)?.toInt() ?? 0;
-    final int todayCount = (todaySales['count'] as num?)?.toInt() ?? 0;
-
-    // Ticket promedio y margen porcentual
-    final double averageTicket = todayCount > 0 ? (todayTotal / todayCount) : 0.0;
-    final double profitMargin = todayTotal > 0 ? (todayProfit / todayTotal) * 100 : 0.0;
-
-    // Ventas de ayer para cálculo de tendencia
     final yesterday = now.subtract(const Duration(days: 1));
     final yesterdayPrefix = "${yesterday.year.toString().padLeft(4, '0')}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}%";
+
+    if (period == 'today') {
+      periodWhereSql = 'AND s.date LIKE ?';
+      periodArgs.add(todayPrefix);
+
+      compareWhereSql = 'AND date LIKE ?';
+      compareArgs.add(yesterdayPrefix);
+      trendLabel = 'vs ayer';
+    } else if (period == 'week') {
+      final sevenDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+      final sevenDaysIso = "${sevenDaysAgo.year.toString().padLeft(4, '0')}-${sevenDaysAgo.month.toString().padLeft(2, '0')}-${sevenDaysAgo.day.toString().padLeft(2, '0')}T00:00:00";
+      final fourteenDaysAgo = sevenDaysAgo.subtract(const Duration(days: 7));
+      final fourteenDaysIso = "${fourteenDaysAgo.year.toString().padLeft(4, '0')}-${fourteenDaysAgo.month.toString().padLeft(2, '0')}-${fourteenDaysAgo.day.toString().padLeft(2, '0')}T00:00:00";
+
+      periodWhereSql = 'AND s.date >= ?';
+      periodArgs.add(sevenDaysIso);
+
+      compareWhereSql = 'AND date >= ? AND date < ?';
+      compareArgs.addAll([fourteenDaysIso, sevenDaysIso]);
+      trendLabel = 'vs 7 días previos';
+    } else if (period == 'month') {
+      final monthPrefix = "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}%";
+      periodWhereSql = 'AND s.date LIKE ?';
+      periodArgs.add(monthPrefix);
+
+      final prevMonthYear = now.month == 1 ? now.year - 1 : now.year;
+      final prevMonthNum = now.month == 1 ? 12 : now.month - 1;
+      final prevMonthPrefix = "${prevMonthYear.toString().padLeft(4, '0')}-${prevMonthNum.toString().padLeft(2, '0')}%";
+
+      compareWhereSql = 'AND date LIKE ?';
+      compareArgs.add(prevMonthPrefix);
+      trendLabel = 'vs mes anterior';
+    } else {
+      // 'all' -> Sin filtro de fecha
+      periodWhereSql = '';
+      compareWhereSql = '';
+      trendLabel = 'total histórico';
+    }
+
+    // 2. Ventas y ganancias del periodo
+    final salesRes = await db.rawQuery('''
+      SELECT 
+        COUNT(*) as count,
+        COALESCE(SUM(s.total), 0.0) as total_amount,
+        COALESCE(SUM(s.net_profit), 0.0) as net_profit,
+        COALESCE(SUM(s.quantity), 0) as units_sold
+      FROM sales s
+      WHERE s.business_id = ? $periodWhereSql
+    ''', periodArgs);
+
+    final periodSales = salesRes.isNotEmpty ? salesRes.first : {};
+    final double periodTotal = (periodSales['total_amount'] as num?)?.toDouble() ?? 0.0;
+    final double periodProfit = (periodSales['net_profit'] as num?)?.toDouble() ?? 0.0;
+    final int periodUnits = (periodSales['units_sold'] as num?)?.toInt() ?? 0;
+    final int periodCount = (periodSales['count'] as num?)?.toInt() ?? 0;
+
+    final double averageTicket = periodCount > 0 ? (periodTotal / periodCount) : 0.0;
+    final double profitMargin = periodTotal > 0 ? (periodProfit / periodTotal) * 100 : 0.0;
+
+    // Ventas del periodo anterior para comparativa
+    double compareTotal = 0.0;
+    if (compareWhereSql.isNotEmpty) {
+      final compRes = await db.rawQuery('''
+        SELECT COALESCE(SUM(total), 0.0) as total_amount 
+        FROM sales 
+        WHERE business_id = ? $compareWhereSql
+      ''', compareArgs);
+      if (compRes.isNotEmpty) {
+        compareTotal = (compRes.first['total_amount'] as num?)?.toDouble() ?? 0.0;
+      }
+    }
+
+    double? trendPercent;
+    bool trendIsPositive = true;
+    if (compareTotal > 0) {
+      final diff = ((periodTotal - compareTotal) / compareTotal) * 100;
+      trendPercent = diff;
+      trendIsPositive = diff >= 0;
+    } else if (periodTotal > 0 && compareWhereSql.isNotEmpty) {
+      trendPercent = 100.0;
+      trendIsPositive = true;
+    }
+
+    // Consulta específica de ventas de ayer para retrocompatibilidad
     final yesterdayRes = await db.rawQuery('''
       SELECT COALESCE(SUM(total), 0.0) as total_amount 
       FROM sales 
@@ -43,7 +115,7 @@ class DashboardRepository {
     ''', [businessId, yesterdayPrefix]);
     final double yesterdayTotal = (yesterdayRes.first['total_amount'] as num?)?.toDouble() ?? 0.0;
 
-    // 2. Deuda total pendiente por cobrar (Fiados)
+    // 3. Deuda total pendiente por cobrar (Fiados)
     final debtRes = await db.rawQuery('''
       SELECT COALESCE(SUM(debt_balance), 0.0) as total_debt 
       FROM customers 
@@ -51,7 +123,7 @@ class DashboardRepository {
     ''', [businessId]);
     final double totalDebt = (debtRes.first['total_debt'] as num?)?.toDouble() ?? 0.0;
 
-    // 3. Estado del stock y alertas
+    // 4. Estado del stock y alertas
     final stockRes = await db.rawQuery('''
       SELECT 
         COUNT(*) as total,
@@ -66,7 +138,7 @@ class DashboardRepository {
     final int lowStock = (stockRow['low_stock'] as num?)?.toInt() ?? 0;
     final int totalProducts = (stockRow['total'] as num?)?.toInt() ?? 0;
 
-    // 4. Ventas de los últimos 7 días para gráfico de barras
+    // 5. Ventas de los últimos 7 días para gráfico de barras
     final List<Map<String, dynamic>> weeklySales = [];
     final dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -88,18 +160,47 @@ class DashboardRepository {
       });
     }
 
-    // 5. Top 5 productos más vendidos con porcentaje
+    // 6. Distribución de ventas por Categoría (Para Gráfico de Pastel / Donut)
+    final categorySalesRes = await db.rawQuery('''
+      SELECT 
+        COALESCE(p.category, 'General') as category_name,
+        COALESCE(SUM(s.total), 0.0) as total_amount,
+        COALESCE(SUM(s.quantity), 0) as units_sold
+      FROM sales s
+      LEFT JOIN products p ON s.product_id = p.id
+      WHERE s.business_id = ? $periodWhereSql
+      GROUP BY category_name
+      ORDER BY total_amount DESC
+    ''', periodArgs);
+
+    final List<Map<String, dynamic>> categorySales = [];
+    for (final row in categorySalesRes) {
+      final double catTotal = (row['total_amount'] as num?)?.toDouble() ?? 0.0;
+      final int catUnits = (row['units_sold'] as num?)?.toInt() ?? 0;
+      String catName = (row['category_name'] as String?)?.trim() ?? 'General';
+      if (catName.isEmpty) catName = 'General';
+      final double pct = periodTotal > 0 ? (catTotal / periodTotal) * 100 : 0.0;
+
+      categorySales.add({
+        'name': catName,
+        'total': catTotal,
+        'units': catUnits,
+        'percentage': pct,
+      });
+    }
+
+    // 7. Top 5 productos más vendidos en el periodo
     final topProductsRes = await db.rawQuery('''
       SELECT 
-        product_name, 
-        SUM(quantity) as qty, 
-        SUM(total) as revenue 
-      FROM sales 
-      WHERE business_id = ? 
-      GROUP BY product_name 
+        s.product_name, 
+        SUM(s.quantity) as qty, 
+        SUM(s.total) as revenue 
+      FROM sales s
+      WHERE s.business_id = ? $periodWhereSql
+      GROUP BY s.product_name 
       ORDER BY qty DESC 
       LIMIT 5
-    ''', [businessId]);
+    ''', periodArgs);
 
     double topMaxRevenue = 1.0;
     for (final r in topProductsRes) {
@@ -118,18 +219,28 @@ class DashboardRepository {
     }).toList();
 
     return {
-      'todayTotal': todayTotal,
-      'todayProfit': todayProfit,
-      'todayUnits': todayUnits,
-      'todayCount': todayCount,
+      'period': period,
+      'periodTotal': periodTotal,
+      'periodProfit': periodProfit,
+      'periodUnits': periodUnits,
+      'periodCount': periodCount,
+      'todayTotal': periodTotal,
+      'todayProfit': periodProfit,
+      'todayUnits': periodUnits,
+      'todayCount': periodCount,
       'averageTicket': averageTicket,
       'profitMargin': profitMargin,
+      'compareTotal': compareTotal,
+      'trendPercent': trendPercent,
+      'trendIsPositive': trendIsPositive,
+      'trendLabel': trendLabel,
       'yesterdayTotal': yesterdayTotal,
       'totalDebt': totalDebt,
       'outOfStock': outOfStock,
       'lowStock': lowStock,
       'totalProducts': totalProducts,
       'weeklySales': weeklySales,
+      'categorySales': categorySales,
       'topProducts': topProducts,
     };
   }

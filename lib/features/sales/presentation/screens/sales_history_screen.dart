@@ -235,18 +235,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historial de Ventas'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.people_alt_outlined),
-            tooltip: 'Clientes y Fiados',
-            onPressed: _navigateToCustomers,
-          ),
-          IconButton(
-            icon: const Icon(Icons.table_chart_outlined),
-            tooltip: 'Exportar a Excel (.xlsx)',
-            onPressed: _exportToExcel,
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
@@ -361,8 +349,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ),
               ),
 
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 30),
+            SliverToBoxAdapter(
+              child: SizedBox(height: MediaQuery.of(context).padding.bottom + 30),
             ),
           ],
         ),

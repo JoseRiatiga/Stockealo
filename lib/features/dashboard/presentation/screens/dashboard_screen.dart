@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
@@ -130,6 +131,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<String> _quickActionIds = List.from(DashboardRepository.defaultQuickActions);
   String _userRole = 'OWNER';
   bool _isLoading = true;
+  String _selectedPeriod = 'today'; // 'today' | 'week' | 'month' | 'all'
+  String _chartPresentation = 'bars'; // 'bars' | 'categories'
 
   @override
   void initState() {
@@ -197,7 +200,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           userEmail: currentUser.email,
         );
       }
-      final data = await _dashboardRepo.getDashboardSummary(_activeBusiness!.id);
+      final data = await _dashboardRepo.getDashboardSummary(
+        _activeBusiness!.id,
+        period: _selectedPeriod,
+      );
       final quickActions = await _dashboardRepo.getQuickActions(_activeBusiness!.id);
       if (mounted) {
         setState(() {
@@ -361,17 +367,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
+            final availableToAdd = kAvailableQuickActions
+                .where((a) => !selectedIds.contains(a.id))
+                .toList();
+
             return Container(
-              height: MediaQuery.of(ctx).size.height * 0.72,
+              height: MediaQuery.of(ctx).size.height * 0.82,
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                MediaQuery.of(ctx).padding.bottom + 20,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -393,12 +409,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Personalizar Acciones',
+                            'Personalizar y Ordenar',
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'Elige entre 2 y 5 accesos favoritos para tu inicio',
+                            'Arrastra con ☰ para fijar el orden que prefieras',
                             style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                           ),
                         ],
@@ -429,61 +445,173 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: kAvailableQuickActions.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (_, index) {
-                        final action = kAvailableQuickActions[index];
-                        final isSelected = selectedIds.contains(action.id);
-
-                        return CheckboxListTile(
-                          value: isSelected,
-                          activeColor: const Color(0xFF059669),
-                          secondary: CircleAvatar(
-                            backgroundColor: action.color.withOpacity(0.12),
-                            child: Icon(action.icon, color: action.color, size: 20),
-                          ),
-                          title: Text(
-                            action.label,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          subtitle: Text(
-                            action.description,
-                            style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                          ),
-                          onChanged: (val) {
-                            setModalState(() {
-                              if (val == true) {
-                                if (selectedIds.length < 5) {
-                                  selectedIds.add(action.id);
-                                } else {
-                                  AppToast.show(
-                                    ctx,
-                                    message: 'Máximo 5 acciones para mantener la pantalla ordenada',
-                                    type: ToastType.warning,
-                                  );
-                                }
-                              } else {
-                                if (selectedIds.length > 2) {
-                                  selectedIds.remove(action.id);
-                                } else {
-                                  AppToast.show(
-                                    ctx,
-                                    message: 'Debes mantener al menos 2 accesos activos',
-                                    type: ToastType.warning,
-                                  );
-                                }
-                              }
-                            });
-                          },
-                        );
-                      },
+                  const SizedBox(height: 14),
+                  Text(
+                    'ACCIONES ACTIVAS EN TU INICIO (ARRASTRA PARA ORDENAR)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     ),
                   ),
+                  const SizedBox(height: 8),
+
+                  // Lista reordenable
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: selectedIds.length,
+                            onReorder: (oldIndex, newIndex) {
+                              setModalState(() {
+                                if (oldIndex < newIndex) {
+                                  newIndex -= 1;
+                                }
+                                final item = selectedIds.removeAt(oldIndex);
+                                selectedIds.insert(newIndex, item);
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              final actionId = selectedIds[index];
+                              final action = kAvailableQuickActions.firstWhere(
+                                (a) => a.id == actionId,
+                                orElse: () => kAvailableQuickActions.first,
+                              );
+
+                              return Container(
+                                key: ValueKey(action.id),
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF059669).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '#${index + 1}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF059669),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: action.color.withOpacity(0.12),
+                                      child: Icon(action.icon, color: action.color, size: 18),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            action.label,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                          ),
+                                          Text(
+                                            action.description,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                      tooltip: 'Quitar de accesos activos',
+                                      onPressed: () {
+                                        if (selectedIds.length > 2) {
+                                          setModalState(() => selectedIds.removeAt(index));
+                                        } else {
+                                          AppToast.show(
+                                            ctx,
+                                            message: 'Debes mantener al menos 2 accesos activos',
+                                            type: ToastType.warning,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                    ReorderableDragStartListener(
+                                      index: index,
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        child: Icon(Icons.drag_handle_rounded, color: Color(0xFF64748B)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+
+                          if (availableToAdd.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              'DISPONIBLES PARA AGREGAR (+)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: availableToAdd.map((action) {
+                                return ActionChip(
+                                  avatar: Icon(action.icon, size: 16, color: action.color),
+                                  label: Text(
+                                    '+ ${action.label}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                  backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                  side: BorderSide(
+                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                                  ),
+                                  onPressed: () {
+                                    setModalState(() {
+                                      if (selectedIds.length < 5) {
+                                        selectedIds.add(action.id);
+                                      } else {
+                                        AppToast.show(
+                                          ctx,
+                                          message: 'Máximo 5 acciones para mantener la pantalla ordenada',
+                                          type: ToastType.warning,
+                                        );
+                                      }
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -497,7 +625,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onPressed: () {
                         Navigator.pop(ctx, true);
                       },
-                      child: const Text('Guardar Accesos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      child: const Text('Guardar Orden y Accesos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     ),
                   ),
                 ],
@@ -588,13 +716,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            tooltip: 'Escanear para Vender',
-            onPressed: _scanToSell,
-          ),
-        ],
+        actions: const [],
       ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
@@ -602,7 +724,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
             : ListView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(context).padding.bottom + 28,
+                ),
                 children: [
                   // Saludo al comerciante
                   Row(
@@ -621,7 +748,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Resumen operativo de hoy',
+                            'Resumen operativo ${_selectedPeriod == "today" ? "de hoy" : (_selectedPeriod == "week" ? "de 7 días" : (_selectedPeriod == "month" ? "del mes" : "histórico"))}',
                             style: TextStyle(fontSize: 13, color: textSecondary),
                           ),
                         ],
@@ -652,11 +779,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Banner de Tendencia y Comparativa vs Ayer
+                  // Selector horizontal de Periodo (Hoy, 7 Días, Este Mes, Histórico)
+                  _buildPeriodSelector(),
+                  const SizedBox(height: 14),
+
+                  // Banner de Tendencia y Comparativa del Periodo
                   _buildFinancialTrendBanner(),
                   const SizedBox(height: 14),
 
-                  // Tarjetas de Métricas de Hoy (2x2 Grid Enriquecido)
+                  // Tarjetas de Métricas del Periodo (2x2 Grid Enriquecido)
                   _buildMetricsGrid(),
                   const SizedBox(height: 20),
 
@@ -686,11 +817,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildQuickActions(),
                   const SizedBox(height: 24),
 
-                  // Gráfico de Ventas de los últimos 7 días
-                  _buildWeeklySalesChart(),
+                  // Gráfico de Rendimiento (Toggle de Barras o Pastel de Categorías)
+                  _buildSalesPerformanceChart(),
                   const SizedBox(height: 24),
 
-                  // Top 5 Productos Más Vendidos
+                  // Top 5 Productos Más Vendidos en el Periodo
                   _buildTopProductsSection(),
                   const SizedBox(height: 20),
                 ],
@@ -699,32 +830,113 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildPeriodSelector() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final periods = [
+      {'id': 'today', 'label': 'Hoy', 'icon': Icons.wb_sunny_outlined},
+      {'id': 'week', 'label': '7 Días', 'icon': Icons.calendar_view_week_rounded},
+      {'id': 'month', 'label': 'Este Mes', 'icon': Icons.calendar_month_rounded},
+      {'id': 'all', 'label': 'Histórico', 'icon': Icons.all_inclusive_rounded},
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: periods.map((p) {
+          final isSelected = _selectedPeriod == p['id'];
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              onTap: () {
+                if (_selectedPeriod != p['id']) {
+                  setState(() => _selectedPeriod = p['id'] as String);
+                  _loadData();
+                }
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFF059669)
+                      : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF059669)
+                        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF059669).withOpacity(0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      p['icon'] as IconData,
+                      size: 15,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      p['label'] as String,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF334155)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _buildFinancialTrendBanner() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final double todayTotal = _summary['todayTotal'] ?? 0.0;
-    final double yesterdayTotal = _summary['yesterdayTotal'] ?? 0.0;
+    final double periodTotal = _summary['periodTotal'] ?? _summary['todayTotal'] ?? 0.0;
+    final double? trendPercent = _summary['trendPercent'] as double?;
+    final bool trendIsPositive = _summary['trendIsPositive'] == true;
+    final String trendLabel = _summary['trendLabel'] ?? 'vs anterior';
+    final double compareTotal = (_summary['compareTotal'] as num?)?.toDouble() ?? 0.0;
 
     String trendText;
     Color trendColor;
     IconData trendIcon;
 
-    if (yesterdayTotal > 0) {
-      final double diffPercent = ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100;
-      if (diffPercent >= 0) {
-        trendText = '+${diffPercent.toStringAsFixed(1)}% de ventas vs ayer';
+    if (trendPercent != null) {
+      if (trendIsPositive) {
+        trendText = '+${trendPercent.toStringAsFixed(1)}% de ventas $trendLabel';
         trendColor = const Color(0xFF059669);
         trendIcon = Icons.trending_up_rounded;
       } else {
-        trendText = '${diffPercent.toStringAsFixed(1)}% respecto al día anterior';
+        trendText = '${trendPercent.toStringAsFixed(1)}% de ventas $trendLabel';
         trendColor = const Color(0xFFD97706);
         trendIcon = Icons.trending_down_rounded;
       }
-    } else if (todayTotal > 0) {
-      trendText = 'Actividad comercial iniciada hoy';
+    } else if (periodTotal > 0) {
+      trendText = 'Actividad comercial registrada en este periodo';
       trendColor = const Color(0xFF059669);
       trendIcon = Icons.local_fire_department_rounded;
     } else {
-      trendText = 'A la espera de las ventas del día';
+      trendText = 'Sin ventas registradas en el periodo seleccionado';
       trendColor = const Color(0xFF64748B);
       trendIcon = Icons.storefront_outlined;
     }
@@ -752,9 +964,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
-          if (yesterdayTotal > 0)
+          if (compareTotal > 0)
             Text(
-              'Ayer: ${CurrencyFormatter.format(yesterdayTotal)}',
+              'Previo: ${CurrencyFormatter.format(compareTotal)}',
               style: TextStyle(
                 fontSize: 11,
                 color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -766,12 +978,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildMetricsGrid() {
-    final double todayTotal = _summary['todayTotal'] ?? 0.0;
-    final double todayProfit = _summary['todayProfit'] ?? 0.0;
+    final double periodTotal = _summary['periodTotal'] ?? _summary['todayTotal'] ?? 0.0;
+    final double periodProfit = _summary['periodProfit'] ?? _summary['todayProfit'] ?? 0.0;
     final double profitMargin = _summary['profitMargin'] ?? 0.0;
     final double averageTicket = _summary['averageTicket'] ?? 0.0;
     final double totalDebt = _summary['totalDebt'] ?? 0.0;
-    final int todayCount = _summary['todayCount'] ?? 0;
+    final int periodCount = _summary['periodCount'] ?? _summary['todayCount'] ?? 0;
+
+    String salesTitle = 'Ventas de Hoy';
+    String profitTitle = 'Ganancia de Hoy';
+    if (_selectedPeriod == 'week') {
+      salesTitle = 'Ventas (7 Días)';
+      profitTitle = 'Ganancia (7 Días)';
+    } else if (_selectedPeriod == 'month') {
+      salesTitle = 'Ventas del Mes';
+      profitTitle = 'Ganancia del Mes';
+    } else if (_selectedPeriod == 'all') {
+      salesTitle = 'Ventas Totales';
+      profitTitle = 'Ganancia Total';
+    }
 
     return GridView.count(
       crossAxisCount: 2,
@@ -781,29 +1006,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 1.32,
       children: [
-        // 1. Ventas de hoy
+        // 1. Ventas del periodo
         _buildMetricCard(
-          title: 'Ventas de Hoy',
-          value: CurrencyFormatter.format(todayTotal),
-          subtitle: '$todayCount ${todayCount == 1 ? "venta" : "ventas"} registradas',
+          title: salesTitle,
+          value: CurrencyFormatter.format(periodTotal),
+          subtitle: '$periodCount ${periodCount == 1 ? "venta" : "ventas"} en periodo',
           icon: Icons.payments_outlined,
           color: const Color(0xFF059669),
           bg: const Color(0xFFECFDF5),
         ),
 
-        // 2. Ganancia Neta de hoy (oculta para Cajeros)
+        // 2. Ganancia Neta del periodo (oculta para Cajeros)
         _buildMetricCard(
-          title: 'Ganancia Neta',
-          value: canViewProfits ? CurrencyFormatter.format(todayProfit) : '••••••',
+          title: profitTitle,
+          value: canViewProfits ? CurrencyFormatter.format(periodProfit) : '••••••',
           subtitle: canViewProfits
-              ? (todayTotal > 0 ? 'Margen: ${profitMargin.toStringAsFixed(1)}%' : 'Margen neto estimado')
+              ? (periodTotal > 0 ? 'Margen: ${profitMargin.toStringAsFixed(1)}%' : 'Margen neto estimado')
               : 'Restringido para cajeros',
           icon: Icons.trending_up,
           color: const Color(0xFF0D9488),
           bg: const Color(0xFFF0FDFA),
         ),
 
-        // 3. Ticket Promedio del Día
+        // 3. Ticket Promedio del Periodo
         _buildMetricCard(
           title: 'Ticket Promedio',
           value: CurrencyFormatter.format(averageTicket),
@@ -1023,14 +1248,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildWeeklySalesChart() {
+  static const List<Color> _piePalette = [
+    Color(0xFF059669),
+    Color(0xFF2563EB),
+    Color(0xFFD97706),
+    Color(0xFF7C3AED),
+    Color(0xFFDC2626),
+    Color(0xFF0D9488),
+    Color(0xFFE11D48),
+    Color(0xFF475569),
+  ];
+
+  Widget _buildSalesPerformanceChart() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final List<dynamic> weeklySales = _summary['weeklySales'] ?? [];
-    double maxAmount = 1000.0;
-    for (final item in weeklySales) {
-      final total = (item['total'] as num).toDouble();
-      if (total > maxAmount) maxAmount = total;
-    }
+    final List<dynamic> categorySales = _summary['categorySales'] ?? [];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1038,78 +1270,329 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header con Título y Toggle de Presentación [Barras / Categorías]
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Ventas de la Semana (Últimos 7 días)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+              Expanded(
+                child: Text(
+                  _chartPresentation == 'bars'
+                      ? 'Ventas de la Semana (7 días)'
+                      : 'Participación por Categorías',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                  ),
                 ),
               ),
-              InkWell(
-                onTap: widget.onNavigateToSales,
-                child: const Text(
-                  'Ver historial',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+              // Toggle de Presentación (Idea B)
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () => setState(() => _chartPresentation = 'bars'),
+                      borderRadius: BorderRadius.circular(7),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _chartPresentation == 'bars' ? const Color(0xFF059669) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.bar_chart_rounded,
+                              size: 14,
+                              color: _chartPresentation == 'bars' ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Barras',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: _chartPresentation == 'bars' ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => setState(() => _chartPresentation = 'categories'),
+                      borderRadius: BorderRadius.circular(7),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _chartPresentation == 'categories' ? const Color(0xFF059669) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.pie_chart_rounded,
+                              size: 14,
+                              color: _chartPresentation == 'categories' ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Pastel',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: _chartPresentation == 'categories' ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-          // Barras
-          SizedBox(
-            height: 120,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: weeklySales.map((item) {
-                final day = item['day'] as String;
-                final total = (item['total'] as num).toDouble();
-                final heightFactor = (total / maxAmount).clamp(0.08, 1.0);
+          // Contenido del Gráfico según toggle
+          if (_chartPresentation == 'bars')
+            _buildBarsChartContent(weeklySales, isDark)
+          else
+            _buildCategoryPieChartContent(categorySales, isDark),
+        ],
+      ),
+    );
+  }
 
-                return Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (total > 0)
-                      Text(
-                        '${(total / 1000).toStringAsFixed(0)}k',
-                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                      ),
-                    const SizedBox(height: 4),
-                    Container(
-                      width: 22,
-                      height: 70 * heightFactor,
-                      decoration: BoxDecoration(
-                        color: total > 0
-                            ? const Color(0xFF059669)
-                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+  Widget _buildBarsChartContent(List<dynamic> weeklySales, bool isDark) {
+    double maxAmount = 1000.0;
+    for (final item in weeklySales) {
+      final total = (item['total'] as num).toDouble();
+      if (total > maxAmount) maxAmount = total;
+    }
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 120,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: weeklySales.map((item) {
+              final day = item['day'] as String;
+              final total = (item['total'] as num).toDouble();
+              final heightFactor = (total / maxAmount).clamp(0.08, 1.0);
+
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (total > 0)
                     Text(
-                      day,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
+                      '${(total / 1000).toStringAsFixed(0)}k',
+                      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
                     ),
-                  ],
-                );
-              }).toList(),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 22,
+                    height: 70 * heightFactor,
+                    decoration: BoxDecoration(
+                      color: total > 0
+                          ? const Color(0xFF059669)
+                          : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    day,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: InkWell(
+            onTap: widget.onNavigateToSales,
+            child: const Text(
+              'Ver historial de ventas →',
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryPieChartContent(List<dynamic> categorySales, bool isDark) {
+    if (categorySales.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        alignment: Alignment.center,
+        child: Column(
+          children: [
+            Icon(Icons.pie_chart_outline_rounded, size: 40, color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+            const SizedBox(height: 10),
+            Text(
+              'Sin ventas registradas por categorías',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Registra ventas con productos asignados a categorías para ver la distribución.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Donut Chart
+            SizedBox(
+              width: 120,
+              height: 120,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(
+                    size: const Size(120, 120),
+                    painter: _CategoryPiePainter(
+                      categorySales: categorySales,
+                      colors: _piePalette,
+                    ),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${categorySales.length}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                        ),
+                      ),
+                      Text(
+                        categorySales.length == 1 ? 'categoría' : 'categorías',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Leyenda de categorías
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: categorySales.take(4).toList().asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final item = entry.value;
+                  final color = _piePalette[idx % _piePalette.length];
+                  final double pct = (item['percentage'] as num).toDouble();
+                  final double tot = (item['total'] as num).toDouble();
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item['name'] as String,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${pct.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          CurrencyFormatter.format(tot),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+        if (categorySales.length > 4) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '+ ${categorySales.length - 4} categorías adicionales registradas',
+              style: TextStyle(
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
@@ -1221,4 +1704,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+}
+
+class _CategoryPiePainter extends CustomPainter {
+  final List<dynamic> categorySales;
+  final List<Color> colors;
+
+  _CategoryPiePainter({required this.categorySales, required this.colors});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (categorySales.isEmpty) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2;
+    const strokeWidth = 20.0;
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.butt;
+
+    double totalVal = 0.0;
+    for (final c in categorySales) {
+      totalVal += (c['total'] as num).toDouble();
+    }
+    if (totalVal <= 0) return;
+
+    double startAngle = -math.pi / 2;
+    for (int i = 0; i < categorySales.length; i++) {
+      final val = (categorySales[i]['total'] as num).toDouble();
+      if (val <= 0) continue;
+      final sweepAngle = (val / totalVal) * 2 * math.pi;
+      paint.color = colors[i % colors.length];
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius - strokeWidth / 2),
+        startAngle,
+        sweepAngle,
+        false,
+        paint,
+      );
+      startAngle += sweepAngle;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CategoryPiePainter oldDelegate) => true;
 }

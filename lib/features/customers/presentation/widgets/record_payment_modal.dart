@@ -26,6 +26,7 @@ class RecordPaymentModal extends StatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => RecordPaymentModal(
         customer: customer,
@@ -218,7 +219,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
 
     return Container(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 20,
         top: 24,
         left: 20,
         right: 20,

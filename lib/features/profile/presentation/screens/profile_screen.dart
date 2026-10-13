@@ -45,6 +45,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isCheckingUpdate = false;
   String _currentAppVersion = '1.0.0';
 
+  bool _isCloudSectionExpanded = false;
+  bool _isSecuritySectionExpanded = false;
+  bool _isPrivacySectionExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -686,7 +690,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          14,
+          16,
+          MediaQuery.of(context).padding.bottom + 28,
+        ),
         children: [
           // 1. Tarjeta: Perfil Comercial y Cuenta
           _buildCard(
@@ -885,10 +894,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 12),
 
-          // 3. Tarjeta: Datos, Respaldo y Nube
-          _buildCard(
+          // 3. Tarjeta: Datos, Respaldo y Nube (Colapsable)
+          _buildCollapsibleCard(
             title: 'Datos, Respaldo y Nube',
+            subtitle: _isCloudSyncEnabled
+                ? 'Respaldo automático en Nube activo'
+                : 'Modo Local Privado (en este equipo)',
             icon: Icons.cloud_sync_outlined,
+            isExpanded: _isCloudSectionExpanded,
+            onToggle: () => setState(() => _isCloudSectionExpanded = !_isCloudSectionExpanded),
+            trailingBadge: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: _isCloudSyncEnabled
+                    ? const Color(0xFF059669).withOpacity(0.12)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                _isCloudSyncEnabled ? '☁️ Nube' : '🔒 Local',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.bold,
+                  color: _isCloudSyncEnabled
+                      ? const Color(0xFF059669)
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                ),
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -927,8 +960,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
                 const Divider(height: 18),
-
-                // Botones Excel (Importar y Exportar)
                 Row(
                   children: [
                     Expanded(
@@ -963,12 +994,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
 
-          // 5. Tarjeta: Seguridad de la Cuenta
-          _buildCard(
+          // 4. Tarjeta: Seguridad (Colapsable)
+          _buildCollapsibleCard(
             title: 'Seguridad',
+            subtitle: 'Contraseña y términos del servicio',
             icon: Icons.shield_outlined,
+            iconColor: const Color(0xFF2563EB),
+            isExpanded: _isSecuritySectionExpanded,
+            onToggle: () => setState(() => _isSecuritySectionExpanded = !_isSecuritySectionExpanded),
             child: Column(
               children: [
                 ListTile(
@@ -1003,15 +1037,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
 
-          // 5. Tarjeta: Zona de Privacidad y Borrado de Datos (Bajas)
-          _buildCard(
+          // 5. Tarjeta: Zona de Privacidad y Borrado de Datos (Colapsable por defecto)
+          _buildCollapsibleCard(
             title: 'Zona de Privacidad y Borrado',
+            subtitle: 'Purgar datos de nube o eliminar cuenta',
             icon: Icons.delete_forever_outlined,
+            iconColor: const Color(0xFFDC2626),
             titleColor: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
             borderColor: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
             backgroundColor: isDark ? const Color(0xFF450A0A).withOpacity(0.3) : const Color(0xFFFEF2F2),
+            isExpanded: _isPrivacySectionExpanded,
+            onToggle: () => setState(() => _isPrivacySectionExpanded = !_isPrivacySectionExpanded),
             child: Column(
               children: [
                 ListTile(
@@ -1297,6 +1334,125 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Divider(height: 20, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           ],
           child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollapsibleCard({
+    required String title,
+    required IconData icon,
+    required String subtitle,
+    required bool isExpanded,
+    required VoidCallback onToggle,
+    required Widget child,
+    Color? iconColor,
+    Color? titleColor,
+    Color? borderColor,
+    Color? backgroundColor,
+    Widget? trailingBadge,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final defaultBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final defaultBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final defaultTitleColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
+    final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? defaultBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor ?? defaultBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (iconColor ?? const Color(0xFF059669)).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 20, color: iconColor ?? const Color(0xFF059669)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              title,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: titleColor ?? defaultTitleColor,
+                              ),
+                            ),
+                            if (trailingBadge != null) ...[
+                              const SizedBox(width: 8),
+                              trailingBadge,
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: secondaryTextColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                children: [
+                  Divider(
+                    height: 16,
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+                  child,
+                ],
+              ),
+            ),
+            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
         ],
       ),
     );

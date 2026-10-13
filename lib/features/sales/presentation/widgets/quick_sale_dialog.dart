@@ -17,6 +17,7 @@ class QuickSaleDialog extends StatefulWidget {
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => QuickSaleDialog(product: product),
     );
@@ -130,7 +131,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
 
     return Container(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 20,
         top: 20,
         left: 20,
         right: 20,
@@ -139,10 +140,11 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Barra superior de agarre
           Center(
             child: Container(
@@ -508,6 +510,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
             ),
           ],
         ],
+      ),
       ),
     );
   }

@@ -347,7 +347,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          12,
+                          16,
+                          MediaQuery.of(context).padding.bottom + 80,
+                        ),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
                           final c = filtered[index];
@@ -357,12 +362,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreateCustomerDialog,
-        backgroundColor: const Color(0xFF059669),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Nuevo Cliente'),
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        child: FloatingActionButton.extended(
+          onPressed: _openCreateCustomerDialog,
+          backgroundColor: const Color(0xFF059669),
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.person_add),
+          label: const Text('Nuevo Cliente'),
+        ),
       ),
     );
   }

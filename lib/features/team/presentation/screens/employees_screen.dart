@@ -39,56 +39,73 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     setState(() => _isLoading = true);
 
     final currentUser = _authRepo.currentUser;
+    String role = 'CASHIER';
     if (currentUser != null) {
-      _currentUserRole = await _teamRepo.getUserRoleInBusiness(
+      role = await _teamRepo.getUserRoleInBusiness(
         businessId: widget.business.id,
         userId: currentUser.id,
         userEmail: currentUser.email,
       );
     }
 
-    // Cargar información del dueño original
+    final list = await _teamRepo.getMembers(widget.business.id);
+
+    // Si el usuario actual aparece en la lista de miembros, su rol explícito es la verdad absoluta
+    final myMember = list.where((m) =>
+        (m.userId != null && m.userId == currentUser?.id) ||
+        (currentUser?.email != null && m.email.toLowerCase() == currentUser!.email.toLowerCase())).firstOrNull;
+    if (myMember != null) {
+      role = myMember.role;
+    }
+
+    // 1. Identificar al dueño real a través del miembro con rol 'OWNER'
+    final ownerMember = list.where((m) => m.isOwner).firstOrNull;
     String? ownerName;
     String? ownerEmail;
 
-    if (currentUser != null && currentUser.id == widget.business.userId) {
-      ownerName = currentUser.name;
-      ownerEmail = currentUser.email;
-    }
-
-    try {
-      final db = await AppDatabase.instance.database;
-      final ownerRes = await db.query(
-        'users',
-        where: 'id = ?',
-        whereArgs: [widget.business.userId],
-        limit: 1,
-      );
-      if (ownerRes.isNotEmpty) {
-        ownerName ??= ownerRes.first['name'] as String?;
-        ownerEmail ??= ownerRes.first['email'] as String?;
+    if (ownerMember != null) {
+      ownerName = ownerMember.displayName;
+      ownerEmail = ownerMember.email;
+    } else {
+      // 2. Si no hay fila de OWNER en business_members, buscar por userId de la empresa
+      // PERO únicamente si el usuario actual realmente es OWNER (nunca si es cajero)
+      if (currentUser != null && currentUser.id == widget.business.userId && role == 'OWNER') {
+        ownerName = currentUser.name;
+        ownerEmail = currentUser.email;
       }
-    } catch (_) {}
 
-    // Si aún no se tiene (ej. unirse desde otro teléfono), intentar desde Supabase
-    if ((ownerName == null || ownerName.trim().isEmpty) && SupabaseService.instance.client != null) {
       try {
-        final cloudUser = await SupabaseService.instance.client!
-            .from('users')
-            .select('name, email')
-            .eq('id', widget.business.userId)
-            .maybeSingle();
-        if (cloudUser != null) {
-          ownerName ??= cloudUser['name'] as String?;
-          ownerEmail ??= cloudUser['email'] as String?;
+        final db = await AppDatabase.instance.database;
+        final ownerRes = await db.query(
+          'users',
+          where: 'id = ?',
+          whereArgs: [widget.business.userId],
+          limit: 1,
+        );
+        if (ownerRes.isNotEmpty) {
+          ownerName ??= ownerRes.first['name'] as String?;
+          ownerEmail ??= ownerRes.first['email'] as String?;
         }
       } catch (_) {}
-    }
 
-    final list = await _teamRepo.getMembers(widget.business.id);
+      if ((ownerName == null || ownerName.trim().isEmpty) && SupabaseService.instance.client != null) {
+        try {
+          final cloudUser = await SupabaseService.instance.client!
+              .from('users')
+              .select('name, email')
+              .eq('id', widget.business.userId)
+              .maybeSingle();
+          if (cloudUser != null) {
+            ownerName ??= cloudUser['name'] as String?;
+            ownerEmail ??= cloudUser['email'] as String?;
+          }
+        } catch (_) {}
+      }
+    }
 
     if (mounted) {
       setState(() {
+        _currentUserRole = role;
         _members = list;
         _ownerName = ownerName;
         _ownerEmail = ownerEmail;
@@ -588,6 +605,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     final primaryTextColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
     final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
+    final employeesList = _members.where((m) => !m.isOwner).toList();
+    final isOwnerSelf = isOwner &&
+        ((_ownerEmail != null &&
+                _ownerEmail!.toLowerCase() == _authRepo.currentUser?.email.toLowerCase()) ||
+            (widget.business.userId == _authRepo.currentUser?.id));
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -717,7 +740,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Miembros del Equipo (${_members.length + 1})',
+                      'Miembros del Equipo (${employeesList.length + 1})',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryTextColor),
                     ),
                     if (canInvite)
@@ -759,7 +782,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (widget.business.userId == _authRepo.currentUser?.id) ...[
+                        if (isOwnerSelf) ...[
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -828,26 +851,28 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // Lista de Empleados
-                if (_members.isEmpty)
+                // Lista de Colaboradores (excluye al dueño para no duplicarlo)
+                if (employeesList.isEmpty)
                   Container(
                     margin: const EdgeInsets.only(top: 20),
                     padding: const EdgeInsets.all(24),
                     alignment: Alignment.center,
-                    child: const Column(
+                    child: Column(
                       children: [
-                        Icon(Icons.person_outline, size: 48, color: Color(0xFF94A3B8)),
-                        SizedBox(height: 12),
+                        const Icon(Icons.person_outline, size: 48, color: Color(0xFF94A3B8)),
+                        const SizedBox(height: 12),
                         Text(
-                          'Aún no has agregado empleados a este negocio.',
+                          canInvite
+                              ? 'Aún no has agregado colaboradores a este negocio.'
+                              : 'No hay más miembros registrados en este equipo.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
                         ),
                       ],
                     ),
                   )
                 else
-                  ..._members.map((member) {
+                  ...employeesList.map((member) {
                     final currentUser = _authRepo.currentUser;
                     final isSelf = (member.userId != null && member.userId == currentUser?.id) ||
                         member.email.toLowerCase() == currentUser?.email.toLowerCase();

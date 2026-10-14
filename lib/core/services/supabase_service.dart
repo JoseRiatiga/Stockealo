@@ -205,12 +205,15 @@ class SupabaseService {
           final formattedMembers = localMembers.map((m) {
             final email = (m['email'] ?? '').toString();
             final rawUserId = m['user_id'] as String?;
+            final memberName = (m['name'] as String?)?.trim();
             return {
               'id': m['id'],
               'business_id': m['business_id'],
               'user_id': (rawUserId != null && rawUserId.trim().isNotEmpty) ? rawUserId.trim() : '',
               'user_email': email,
-              'user_name': (email.isNotEmpty ? email.split('@').first : 'Colaborador'),
+              'user_name': (memberName != null && memberName.isNotEmpty)
+                  ? memberName
+                  : (email.isNotEmpty ? email.split('@').first : 'Colaborador'),
               'role': m['role'] ?? 'CASHIER',
               'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
             };
@@ -449,6 +452,8 @@ class SupabaseService {
           if (resolvedUserId == null && userEmail != null && memberEmail == userEmail.trim().toLowerCase()) {
             resolvedUserId = userId;
           }
+          final memberRole = (m['role'] ?? 'CASHIER').toString().toUpperCase();
+          final memberName = m['user_name'] ?? m['name'] ?? memberEmail.split('@').first;
           await db.insert(
             'business_members',
             {
@@ -456,12 +461,26 @@ class SupabaseService {
               'business_id': m['business_id'],
               'user_id': resolvedUserId,
               'email': memberEmail,
-              'role': m['role'] ?? 'CASHIER',
+              'name': memberName,
+              'role': memberRole,
               'status': 'ACTIVE',
               'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
+
+          // Si el miembro descargado es OWNER, asegurar que el negocio local reconozca a este dueño auténtico
+          if (memberRole == 'OWNER') {
+            final ownerIdToSet = resolvedUserId ?? rawUserId;
+            if (ownerIdToSet != null && ownerIdToSet.trim().isNotEmpty) {
+              await db.update(
+                'businesses',
+                {'user_id': ownerIdToSet.trim()},
+                where: 'id = ?',
+                whereArgs: [m['business_id']],
+              );
+            }
+          }
           membersCount++;
         }
       } catch (e) {

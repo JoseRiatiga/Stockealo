@@ -162,7 +162,53 @@ class TeamRepository {
       return memberQuery.first['role'] as String;
     }
 
-    // 2. Si no tiene registro explícito de miembro, verificar si es el dueño fundador original
+    // 2. Si no tiene registro explícito localmente, consultar Supabase si está disponible
+    if (SupabaseService.instance.client != null) {
+      try {
+        final cloudMember = await SupabaseService.instance.client!
+            .from('business_members')
+            .select()
+            .eq('business_id', businessId)
+            .or('user_id.eq.$userId,user_email.ilike.$cleanEmail')
+            .maybeSingle();
+        if (cloudMember != null) {
+          final cloudRole = (cloudMember['role'] as String?) ?? 'CASHIER';
+          await db.insert(
+            'business_members',
+            {
+              'id': cloudMember['id'],
+              'business_id': businessId,
+              'user_id': userId,
+              'email': cleanEmail,
+              'name': cloudMember['user_name'] ?? cleanEmail.split('@').first,
+              'role': cloudRole,
+              'status': 'ACTIVE',
+              'created_at': cloudMember['created_at'] ?? DateTime.now().toIso8601String(),
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          return cloudRole;
+        }
+      } catch (_) {}
+    }
+
+    // 3. Verificar si existe algún dueño ya registrado en miembros para evitar usurpación accidental
+    final existingOwnerQuery = await db.query(
+      'business_members',
+      where: 'business_id = ? AND role = "OWNER"',
+      whereArgs: [businessId],
+      limit: 1,
+    );
+    if (existingOwnerQuery.isNotEmpty) {
+      final actualOwnerUserId = existingOwnerQuery.first['user_id'] as String?;
+      final actualOwnerEmail = (existingOwnerQuery.first['email'] as String?)?.toLowerCase();
+      if (actualOwnerUserId != userId && actualOwnerEmail != cleanEmail) {
+        return 'CASHIER';
+      }
+      return 'OWNER';
+    }
+
+    // 4. Si no hay registros de miembros, verificar si coincide con el creador del negocio local
     final bizQuery = await db.query(
       'businesses',
       where: 'id = ? AND user_id = ?',

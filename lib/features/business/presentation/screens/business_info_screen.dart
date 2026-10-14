@@ -235,6 +235,14 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
   }
 
   void _copyInviteCode() {
+    if (!_canEdit) {
+      AppToast.show(
+        context,
+        message: 'Solo el dueño o administrador pueden ver o compartir el código de invitación.',
+        type: ToastType.warning,
+      );
+      return;
+    }
     Clipboard.setData(ClipboardData(text: _business.inviteCode));
     AppToast.show(
       context,
@@ -590,46 +598,51 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      // Código de Invitación
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: cardBorder),
+                      if (_canEdit) ...[
+                        const SizedBox(height: 12),
+                        // Código de Invitación (Exclusivo Dueño / Admin)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: cardBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.qr_code_2_rounded, color: Color(0xFF059669), size: 22),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Código de Empresa', style: TextStyle(fontSize: 10, color: textMuted)),
+                                  Text(
+                                    _business.inviteCode,
+                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                                  ),
+                                ],
+                              ),
+                              const Spacer(),
+                              IconButton(
+                                tooltip: 'Copiar Código',
+                                icon: const Icon(Icons.copy_rounded, size: 20, color: Color(0xFF059669)),
+                                onPressed: _copyInviteCode,
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.qr_code_2_rounded, color: Color(0xFF059669), size: 22),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Código de Empresa', style: TextStyle(fontSize: 10, color: textMuted)),
-                                Text(
-                                  _business.inviteCode,
-                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.2),
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              tooltip: 'Copiar Código',
-                              icon: const Icon(Icons.copy_rounded, size: 20, color: Color(0xFF059669)),
-                              onPressed: _copyInviteCode,
-                            ),
-                          ],
-                        ),
-                      ),
+                      ],
                       const SizedBox(height: 12),
-                      // Botón a Administrar Equipo
+                      // Botón a Administrar / Ver Equipo
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: _openEmployeesScreen,
-                          icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                          label: const Text('Administrar Miembros y Permisos'),
+                          icon: Icon(
+                            _canEdit ? Icons.person_add_alt_1_rounded : Icons.people_outline_rounded,
+                            size: 18,
+                          ),
+                          label: Text(_canEdit ? 'Administrar Miembros y Permisos' : 'Ver Equipo de Trabajo'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),
                             foregroundColor: Colors.white,

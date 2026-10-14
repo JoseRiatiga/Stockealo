@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
@@ -108,6 +109,28 @@ class BusinessRepository extends ChangeNotifier {
 
     // Sincronizar en tiempo real a Supabase
     SupabaseService.instance.upsertBusinessToCloud(business.toMap());
+
+    // Registrar automáticamente al creador como OWNER en business_members
+    try {
+      final userQuery = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
+      final userEmail = userQuery.isNotEmpty ? (userQuery.first['email'] as String?)?.trim() : null;
+      final userName = userQuery.isNotEmpty ? (userQuery.first['name'] as String?)?.trim() : null;
+
+      final ownerMember = {
+        'id': const Uuid().v4(),
+        'business_id': business.id,
+        'user_id': userId,
+        'email': userEmail ?? '',
+        'name': userName ?? 'Dueño',
+        'role': 'OWNER',
+        'status': 'ACTIVE',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      await db.insert('business_members', ownerMember, conflictAlgorithm: ConflictAlgorithm.replace);
+      SupabaseService.instance.upsertBusinessMemberToCloud(ownerMember);
+    } catch (e) {
+      debugPrint('Error registrando creador como OWNER en business_members: $e');
+    }
 
     return business;
   }

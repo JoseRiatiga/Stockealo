@@ -21,8 +21,8 @@ class CatalogPdfService {
     final path = photoPath.trim();
 
     try {
-      // 1. URL Remota (Supabase Storage)
-      if (path.startsWith('http://') || path.startsWith('https://')) {
+      // 1. URL Remota (Supabase Storage) o Blob URL en Web
+      if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('blob:')) {
         final res = await http.get(Uri.parse(path)).timeout(const Duration(seconds: 3));
         if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
           return res.bodyBytes;
@@ -30,11 +30,13 @@ class CatalogPdfService {
         return null;
       }
 
-      // 2. Archivo Local en el teléfono
-      final file = File(path);
-      if (await file.exists()) {
-        final bytes = await file.readAsBytes();
-        if (bytes.isNotEmpty) return bytes;
+      // 2. Archivo Local en el teléfono (solo fuera de web)
+      if (!kIsWeb) {
+        final file = File(path);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          if (bytes.isNotEmpty) return bytes;
+        }
       }
     } catch (e) {
       debugPrint('Error cargando imagen para catálogo: $e');
@@ -162,11 +164,17 @@ class CatalogPdfService {
 
     onProgress?.call(0.9, 'Guardando archivo PDF...');
 
-    // 3. Guardar el archivo en la memoria temporal
+    // 3. Guardar el archivo en la memoria o almacenamiento
     final bytes = await pdf.save();
-    final tempDir = await getTemporaryDirectory();
     final cleanName = business.name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
     final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+
+    if (kIsWeb) {
+      onProgress?.call(1.0, '¡Catálogo listo!');
+      return File('Catalogo_${cleanName}_$dateStr.pdf');
+    }
+
+    final tempDir = await getTemporaryDirectory();
     final file = File('${tempDir.path}/Catalogo_${cleanName}_$dateStr.pdf');
     await file.writeAsBytes(bytes, flush: true);
 
@@ -182,9 +190,14 @@ class CatalogPdfService {
     final cleanName = businessName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
     final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
     final fileName = 'Catalogo_${cleanName}_$dateStr.pdf';
+
+    if (kIsWeb) {
+      return (file: pdfFile, pathLabel: 'Descargas/$fileName', isPublicDownload: true);
+    }
+
     final bytes = await pdfFile.readAsBytes();
 
-    if (Platform.isAndroid) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       // 1. Intentar carpeta estándar y visible para el usuario (/storage/emulated/0/Download)
       try {
         final publicDownloadDir = Directory('/storage/emulated/0/Download');

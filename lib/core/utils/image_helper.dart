@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -28,6 +29,11 @@ class ImageHelper {
 
       if (pickedFile == null) return null;
 
+      // En la Web, las imágenes se manejan mediante Blob URLs sin acceso al sistema de archivos local
+      if (kIsWeb) {
+        return pickedFile.path;
+      }
+
       // Obtener directorio persistente de la app
       final appDir = await getApplicationDocumentsDirectory();
       final photosDir = Directory(p.join(appDir.path, 'product_photos'));
@@ -52,7 +58,7 @@ class ImageHelper {
 
   /// Eliminar foto si el producto es eliminado
   static Future<void> deleteImage(String? path) async {
-    if (path == null || path.isEmpty) return;
+    if (path == null || path.isEmpty || kIsWeb) return;
     try {
       final file = File(path);
       if (await file.exists()) {

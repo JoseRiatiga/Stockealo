@@ -57,6 +57,14 @@ class UpdateService {
   Future<AppUpdateInfo> checkForUpdate() async {
     final currentVer = await getCurrentVersion();
 
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return AppUpdateInfo(
+        currentVersion: currentVer,
+        latestVersion: currentVer,
+        hasUpdate: false,
+      );
+    }
+
     try {
       final response = await http.get(
         Uri.parse(releasesUrl),
@@ -155,6 +163,11 @@ class UpdateService {
     required void Function(double progress, int receivedBytes, int totalBytes) onProgress,
     required void Function(String errorMessage) onError,
   }) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      onError('Las actualizaciones APK solo aplican en dispositivos Android.');
+      return;
+    }
+
     try {
       final client = http.Client();
       final request = http.Request('GET', Uri.parse(downloadUrl));

@@ -68,40 +68,115 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
     ];
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: _navigateToTab,
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        elevation: 3,
-        indicatorColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard, color: Color(0xFF059669)),
-            label: 'Inicio',
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 768;
+
+        if (isWide) {
+          return Scaffold(
+            body: Row(
+              children: [
+                NavigationRail(
+                  selectedIndex: _currentIndex,
+                  onDestinationSelected: _navigateToTab,
+                  labelType: NavigationRailLabelType.all,
+                  backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  indicatorColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                  leading: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF059669),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Stockealo',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  destinations: const [
+                    NavigationRailDestination(
+                      icon: Icon(Icons.dashboard_outlined),
+                      selectedIcon: Icon(Icons.dashboard, color: Color(0xFF059669)),
+                      label: Text('Inicio'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.inventory_2_outlined),
+                      selectedIcon: Icon(Icons.inventory_2, color: Color(0xFF059669)),
+                      label: Text('Inventario'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.point_of_sale_outlined),
+                      selectedIcon: Icon(Icons.point_of_sale, color: Color(0xFF059669)),
+                      label: Text('Ventas'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.settings_outlined),
+                      selectedIcon: Icon(Icons.settings, color: Color(0xFF059669)),
+                      label: Text('Ajustes'),
+                    ),
+                  ],
+                ),
+                const VerticalDivider(thickness: 1, width: 1),
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentIndex,
+                    children: screens,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Scaffold(
+          body: IndexedStack(
+            index: _currentIndex,
+            children: screens,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2, color: Color(0xFF059669)),
-            label: 'Inventario',
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _currentIndex,
+            onDestinationSelected: _navigateToTab,
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            elevation: 3,
+            indicatorColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard, color: Color(0xFF059669)),
+                label: 'Inicio',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.inventory_2_outlined),
+                selectedIcon: Icon(Icons.inventory_2, color: Color(0xFF059669)),
+                label: 'Inventario',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.point_of_sale_outlined),
+                selectedIcon: Icon(Icons.point_of_sale, color: Color(0xFF059669)),
+                label: 'Ventas',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings, color: Color(0xFF059669)),
+                label: 'Ajustes',
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.point_of_sale_outlined),
-            selectedIcon: Icon(Icons.point_of_sale, color: Color(0xFF059669)),
-            label: 'Ventas',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings, color: Color(0xFF059669)),
-            label: 'Ajustes',
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

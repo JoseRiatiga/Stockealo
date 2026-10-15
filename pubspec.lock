@@ -177,6 +177,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.17.0"
+  dev_build:
+    dependency: transitive
+    description:
+      name: dev_build
+      sha256: "6cb4c65446aedd671ffdaacbede599b6fb9c462b17d006f11f7b82fe90706bff"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.1+8"
   ed25519_edwards:
     dependency: transitive
     description:
@@ -672,6 +680,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.9.1"
+  pool:
+    dependency: transitive
+    description:
+      name: pool
+      sha256: "4177f68c237ea2128d1bee66ac17b2ce05ba3dbaafcbdd54c5d40a39d0b6b11c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.5.3"
   postgrest:
     dependency: transitive
     description:
@@ -680,6 +696,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.8.0"
+  process_run:
+    dependency: transitive
+    description:
+      name: process_run
+      sha256: a68fa9727392edad97a2a96a77ce8b0c17d28336ba1b284b1dfac9595a4299ea
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.2+1"
+  pub_semver:
+    dependency: transitive
+    description:
+      name: pub_semver
+      sha256: "261236774e8b1d69cfc6b9eabbc96c40f25e7a2d6b171f3385d4f65d5734fb24"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.1"
   qr:
     dependency: transitive
     description:
@@ -829,6 +861,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.4+4"
+  sqflite_common_ffi_web:
+    dependency: "direct main"
+    description:
+      name: sqflite_common_ffi_web
+      sha256: "61ea702e7aba727f28be7ead00b84c19c745cd4a4934d0c41473303df11ac9ea"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.5+4"
   sqflite_darwin:
     dependency: transitive
     description:

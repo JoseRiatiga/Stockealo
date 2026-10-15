@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 class AppDatabase {
   static final AppDatabase instance = AppDatabase._init();
@@ -16,7 +16,9 @@ class AppDatabase {
   }
 
   Future<Database> _initDB(String filePath) async {
-    if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    if (kIsWeb) {
+      databaseFactory = databaseFactoryFfiWeb;
+    } else if (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.linux) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
     }

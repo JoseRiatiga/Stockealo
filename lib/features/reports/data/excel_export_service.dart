@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:excel/excel.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -202,10 +203,26 @@ class ExcelExportService {
       throw Exception('No se pudo generar el archivo de Excel.');
     }
 
-    final tempDir = await getTemporaryDirectory();
     final sanitizedBizName = business.name.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_');
     final timestamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
     final fileName = 'Reporte_${sanitizedBizName}_$timestamp.xlsx';
+
+    if (kIsWeb) {
+      onGenerated?.call();
+      await Share.shareXFiles(
+        [
+          XFile.fromData(
+            Uint8List.fromList(fileBytes),
+            name: fileName,
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          ),
+        ],
+        subject: 'Reporte Excel Stockealo - ${business.name}',
+      );
+      return fileName;
+    }
+
+    final tempDir = await getTemporaryDirectory();
     final filePath = '${tempDir.path}/$fileName';
 
     final file = File(filePath);

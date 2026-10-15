@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class ProductImageView extends StatelessWidget {
@@ -60,8 +61,8 @@ class ProductImageView extends StatelessWidget {
 
     final path = imagePath!.trim();
 
-    // 1. Imagen desde la Nube (URL Web de Supabase Storage)
-    if (path.startsWith('http://') || path.startsWith('https://')) {
+    // 1. Imagen desde la Nube (URL Web de Supabase Storage) o Blob en Web
+    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('blob:')) {
       return _wrapRadius(
         Image.network(
           path,
@@ -91,18 +92,20 @@ class ProductImageView extends StatelessWidget {
       );
     }
 
-    // 2. Archivo Local en la memoria del teléfono
-    final file = File(path);
-    if (file.existsSync()) {
-      return _wrapRadius(
-        Image.file(
-          file,
-          width: width,
-          height: height,
-          fit: fit,
-          errorBuilder: (_, __, ___) => placeholder,
-        ),
-      );
+    // 2. Archivo Local en la memoria del dispositivo (solo en plataformas con sistema de archivos)
+    if (!kIsWeb) {
+      final file = File(path);
+      if (file.existsSync()) {
+        return _wrapRadius(
+          Image.file(
+            file,
+            width: width,
+            height: height,
+            fit: fit,
+            errorBuilder: (_, __, ___) => placeholder,
+          ),
+        );
+      }
     }
 
     // 3. Fallback si no existe en local ni es URL

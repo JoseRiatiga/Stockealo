@@ -137,15 +137,43 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
     final primaryTextColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
     final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWide = screenWidth >= 600;
+
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : (isWide ? const Color(0xFFF1F5F9) : Colors.white),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+            padding: EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: isWide ? 40 : 20,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Container(
+                  padding: isWide ? const EdgeInsets.all(32) : EdgeInsets.zero,
+                  decoration: isWide
+                      ? BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        )
+                      : null,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                 // Selector / Switcher de Rol (Soy Dueño vs Soy Colaborador)
                 Container(
                   padding: const EdgeInsets.all(4),
@@ -463,10 +491,13 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                   ),
                 ],
               ],
+                ),
+              ),
             ),
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

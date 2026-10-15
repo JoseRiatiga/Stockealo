@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -58,6 +59,12 @@ class CatalogPdfService {
 
     if (targetProducts.isEmpty) {
       throw Exception('No hay productos en stock para generar el catálogo.');
+    }
+
+    try {
+      await initializeDateFormatting('es_CO', null);
+    } catch (e) {
+      debugPrint('No se pudo inicializar locale es_CO: $e');
     }
 
     onProgress?.call(0.1, 'Procesando imágenes de productos...');
@@ -225,7 +232,17 @@ class CatalogPdfService {
     required int totalInStock,
     String? categoryFilter,
   }) {
-    final dateFormatted = DateFormat("d 'de' MMMM, yyyy", 'es_CO').format(DateTime.now());
+    String dateFormatted;
+    try {
+      dateFormatted = DateFormat("d 'de' MMMM, yyyy", 'es_CO').format(DateTime.now());
+    } catch (_) {
+      final now = DateTime.now();
+      const months = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+      ];
+      dateFormatted = '${now.day} de ${months[now.month - 1]}, ${now.year}';
+    }
 
     return pw.Container(
       padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),

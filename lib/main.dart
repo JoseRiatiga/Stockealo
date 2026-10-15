@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/models/app_user.dart';
@@ -13,6 +14,11 @@ import 'core/theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await initializeDateFormatting('es_CO', null);
+  } catch (e) {
+    debugPrint('Error inicializando formato de fecha: $e');
+  }
   await SupabaseService.instance.initialize();
   await ThemeController.instance.initialize();
   // Sincronización automática silenciosa en segundo plano al arrancar la app

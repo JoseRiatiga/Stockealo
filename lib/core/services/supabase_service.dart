@@ -386,6 +386,10 @@ class SupabaseService {
       }
 
       final db = await AppDatabase.instance.database;
+      try {
+        await db.execute('PRAGMA foreign_keys = OFF');
+      } catch (_) {}
+
       int businessesCount = 0;
       int productsCount = 0;
       int customersCount = 0;
@@ -402,11 +406,34 @@ class SupabaseService {
           final existing = await db.query('businesses', where: 'id = ?', whereArgs: [b['id']], limit: 1);
           final existingUserId = existing.isNotEmpty ? existing.first['user_id'] as String? : null;
 
+          final rawBizUserId = b['user_id']?.toString().trim();
+          final targetUserId = (rawBizUserId != null && rawBizUserId.isNotEmpty)
+              ? rawBizUserId
+              : (existingUserId ?? (userId.trim().isNotEmpty ? userId.trim() : 'remote_owner'));
+
+          // Asegurar que el usuario exista en la tabla local 'users' para preservar integridad referencial (FK)
+          final userCheck = await db.query('users', where: 'id = ?', whereArgs: [targetUserId], limit: 1);
+          if (userCheck.isEmpty) {
+            await db.insert(
+              'users',
+              {
+                'id': targetUserId,
+                'email': targetUserId == userId
+                    ? (userEmail ?? '$targetUserId@stockealo.local')
+                    : '$targetUserId@stockealo.remote',
+                'password': 'EXTERNAL_OR_REMOTE_USER',
+                'name': targetUserId == userId ? 'Usuario' : 'Propietario Cloud',
+                'created_at': DateTime.now().toIso8601String(),
+              },
+              conflictAlgorithm: ConflictAlgorithm.ignore,
+            );
+          }
+
           await db.insert(
             'businesses',
             {
               'id': b['id'],
-              'user_id': b['user_id'] ?? existingUserId ?? 'remote_owner',
+              'user_id': targetUserId,
               'name': b['name'],
               'currency': b['currency'] ?? 'COP',
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
@@ -473,6 +500,20 @@ class SupabaseService {
           if (memberRole == 'OWNER') {
             final ownerIdToSet = resolvedUserId ?? rawUserId;
             if (ownerIdToSet != null && ownerIdToSet.trim().isNotEmpty) {
+              final ownerUserCheck = await db.query('users', where: 'id = ?', whereArgs: [ownerIdToSet.trim()], limit: 1);
+              if (ownerUserCheck.isEmpty) {
+                await db.insert(
+                  'users',
+                  {
+                    'id': ownerIdToSet.trim(),
+                    'email': memberEmail.isNotEmpty ? memberEmail : '${ownerIdToSet.trim()}@stockealo.remote',
+                    'password': 'EXTERNAL_OR_REMOTE_USER',
+                    'name': memberName,
+                    'created_at': DateTime.now().toIso8601String(),
+                  },
+                  conflictAlgorithm: ConflictAlgorithm.ignore,
+                );
+              }
               await db.update(
                 'businesses',
                 {'user_id': ownerIdToSet.trim()},
@@ -596,15 +637,27 @@ class SupabaseService {
             }
           }
 
+          // Comprobar existencia de claves foráneas antes de insertar venta
+          String? validProdId = prodId;
+          if (validProdId != null) {
+            final pExists = await db.query('products', columns: ['id'], where: 'id = ?', whereArgs: [validProdId], limit: 1);
+            if (pExists.isEmpty) validProdId = null;
+          }
+          String? validCustId = custId;
+          if (validCustId != null) {
+            final cExists = await db.query('customers', columns: ['id'], where: 'id = ?', whereArgs: [validCustId], limit: 1);
+            if (cExists.isEmpty) validCustId = null;
+          }
+
           await db.insert(
             'sales',
             {
               'id': s['id'],
               'business_id': s['business_id'],
-              'product_id': prodId,
+              'product_id': validProdId,
               'product_name': prodName,
               'quantity': qty,
-              'customer_id': custId,
+              'customer_id': validCustId,
               'customer_name': custName,
               'date': s['sale_date'] ?? DateTime.now().toIso8601String(),
               'total': totalAmount,
@@ -637,6 +690,11 @@ class SupabaseService {
         success: false,
         errorMessage: 'Error al descargar datos: $e',
       );
+    } finally {
+      try {
+        final db = await AppDatabase.instance.database;
+        await db.execute('PRAGMA foreign_keys = ON');
+      } catch (_) {}
     }
   }
 

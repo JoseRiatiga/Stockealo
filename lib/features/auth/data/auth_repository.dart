@@ -100,7 +100,7 @@ class AuthRepository {
     await db.update(
       'business_members',
       {'user_id': user.id},
-      where: 'LOWER(email) = ? AND (user_id IS NULL OR user_id = "")',
+      where: "LOWER(email) = ? AND (user_id IS NULL OR TRIM(user_id) = '')",
       whereArgs: [cleanEmail],
     );
 
@@ -156,7 +156,7 @@ class AuthRepository {
         await db.update(
           'business_members',
           {'user_id': user.id},
-          where: 'LOWER(email) = ? AND (user_id IS NULL OR user_id = "")',
+          where: "LOWER(email) = ? AND (user_id IS NULL OR TRIM(user_id) = '')",
           whereArgs: [cleanEmail],
         );
 
@@ -221,7 +221,7 @@ class AuthRepository {
             await db.update(
               'business_members',
               {'user_id': user.id},
-              where: 'LOWER(email) = ? AND (user_id IS NULL OR user_id = "")',
+              where: "LOWER(email) = ? AND (user_id IS NULL OR TRIM(user_id) = '')",
               whereArgs: [cleanEmail],
             );
 

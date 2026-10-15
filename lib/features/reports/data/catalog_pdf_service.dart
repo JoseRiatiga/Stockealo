@@ -167,6 +167,57 @@ class CatalogPdfService {
     return file;
   }
 
+  /// Guarda una copia del archivo PDF generado en la carpeta de Descargas del dispositivo
+  Future<({File file, String pathLabel, bool isPublicDownload})> saveToDownloads({
+    required File pdfFile,
+    required String businessName,
+  }) async {
+    final cleanName = businessName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+    final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+    final fileName = 'Catalogo_${cleanName}_$dateStr.pdf';
+    final bytes = await pdfFile.readAsBytes();
+
+    if (Platform.isAndroid) {
+      // 1. Intentar carpeta estándar y visible para el usuario (/storage/emulated/0/Download)
+      try {
+        final publicDownloadDir = Directory('/storage/emulated/0/Download');
+        if (await publicDownloadDir.exists()) {
+          final targetFile = File('${publicDownloadDir.path}/$fileName');
+          await targetFile.writeAsBytes(bytes, flush: true);
+          return (file: targetFile, pathLabel: 'Descargas/$fileName', isPublicDownload: true);
+        }
+      } catch (e) {
+        debugPrint('No se pudo guardar en /storage/emulated/0/Download: $e');
+      }
+
+      // 2. Intentar carpeta externa de descargas de la app
+      try {
+        final extDir = await getExternalStorageDirectory();
+        if (extDir != null) {
+          final downloadDir = Directory('${extDir.path}/Download');
+          if (!await downloadDir.exists()) {
+            await downloadDir.create(recursive: true);
+          }
+          final targetFile = File('${downloadDir.path}/$fileName');
+          await targetFile.writeAsBytes(bytes, flush: true);
+          return (file: targetFile, pathLabel: 'Almacenamiento/Download/$fileName', isPublicDownload: false);
+        }
+      } catch (e) {
+        debugPrint('No se pudo guardar en getExternalStorageDirectory: $e');
+      }
+    }
+
+    // 3. Fallback de sistema general
+    try {
+      final downloadsDir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      final targetFile = File('${downloadsDir.path}/$fileName');
+      await targetFile.writeAsBytes(bytes, flush: true);
+      return (file: targetFile, pathLabel: 'Descargas/$fileName', isPublicDownload: false);
+    } catch (e) {
+      return (file: pdfFile, pathLabel: pdfFile.path, isPublicDownload: false);
+    }
+  }
+
   /// Cabecera moderna estilo revista comercial
   pw.Widget _buildHeader({
     required Business business,

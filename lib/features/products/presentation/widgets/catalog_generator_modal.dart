@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/database/app_database.dart';
@@ -47,6 +48,9 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
   String _statusMessage = '';
 
   File? _generatedFile;
+  String? _savedPathLabel;
+  bool _isPublicDownload = false;
+  bool _isSavingToDownloads = false;
 
   @override
   void initState() {
@@ -141,10 +145,18 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
         },
       );
 
+      // Guardar automáticamente en el almacenamiento local / Descargas
+      final savedResult = await _pdfService.saveToDownloads(
+        pdfFile: file,
+        businessName: widget.business.name,
+      );
+
       if (mounted) {
         setState(() {
           _isGenerating = false;
-          _generatedFile = file;
+          _generatedFile = savedResult.file;
+          _savedPathLabel = savedResult.pathLabel;
+          _isPublicDownload = savedResult.isPublicDownload;
         });
       }
     } catch (e) {
@@ -155,22 +167,80 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
     }
   }
 
+  Future<void> _manualSaveToDownloads() async {
+    if (_generatedFile == null) return;
+    setState(() => _isSavingToDownloads = true);
+
+    try {
+      final savedResult = await _pdfService.saveToDownloads(
+        pdfFile: _generatedFile!,
+        businessName: widget.business.name,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isSavingToDownloads = false;
+          _generatedFile = savedResult.file;
+          _savedPathLabel = savedResult.pathLabel;
+          _isPublicDownload = savedResult.isPublicDownload;
+        });
+
+        AppToast.show(
+          context,
+          message: 'Guardado con éxito en: ${savedResult.pathLabel}',
+          type: ToastType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSavingToDownloads = false);
+        AppToast.show(
+          context,
+          message: 'Error al guardar archivo: $e',
+          type: ToastType.error,
+        );
+      }
+    }
+  }
+
   Future<void> _shareFile() async {
     if (_generatedFile == null) return;
-    final phone = _phoneController.text.trim();
-    final text = '🛍️ ¡Hola! Te comparto nuestro catálogo de productos en existencia de *${widget.business.name}*.'
-        '${phone.isNotEmpty ? '\n\n📲 Escríbenos al WhatsApp $phone para tomar tu pedido.' : ''}';
+    final fileName = p.basename(_generatedFile!.path);
 
+    // Compartir explícitamente como archivo PDF con mimeType y nombre
     await Share.shareXFiles(
-      [XFile(_generatedFile!.path)],
-      text: text,
+      [
+        XFile(
+          _generatedFile!.path,
+          mimeType: 'application/pdf',
+          name: fileName,
+        ),
+      ],
       subject: 'Catálogo de Productos - ${widget.business.name}',
     );
   }
 
   Future<void> _openFile() async {
     if (_generatedFile == null) return;
-    await OpenFilex.open(_generatedFile!.path);
+    final res = await OpenFilex.open(_generatedFile!.path);
+    if (res.type != ResultType.done && mounted) {
+      AppToast.show(
+        context,
+        message: 'No se pudo abrir el visor: ${res.message}',
+        type: ToastType.warning,
+      );
+    }
+  }
+
+  String _getFileSize(File file) {
+    try {
+      final bytes = file.lengthSync();
+      if (bytes < 1024) return '$bytes B';
+      if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    } catch (_) {
+      return '';
+    }
   }
 
   @override
@@ -302,44 +372,150 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                   ),
                 )
               else if (_generatedFile != null)
-                // Vista de Éxito y Acciones de Compartir
+                // Vista de Éxito y Acciones de Archivo y Compartir
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF064E3B).withOpacity(0.2) : const Color(0xFFECFDF5),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 46),
-                      const SizedBox(height: 10),
-                      Text(
-                        '¡Catálogo generado con éxito!',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
-                        ),
+                      // Cabecera de éxito
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF059669).withOpacity(0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 28),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '¡Catálogo PDF generado!',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryTextColor,
+                                  ),
+                                ),
+                                Text(
+                                  '${_filteredProducts.length} productos en stock listos',
+                                  style: TextStyle(fontSize: 12, color: secondaryTextColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_filteredProducts.length} productos listos para compartir en alta resolución.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
 
-                      // Botón Compartir
+                      // Tarjeta con información del archivo y ubicación
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: cardBorder),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDC2626).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFDC2626), size: 24),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        p.basename(_generatedFile!.path),
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: primaryTextColor,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Documento PDF • ${_getFileSize(_generatedFile!)}',
+                                        style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Divider(height: 1, color: cardBorder),
+                            ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.folder_rounded, color: Color(0xFF059669), size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Guardado localmente en tu teléfono:',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _savedPathLabel ?? p.basename(_generatedFile!.path),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF059669),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        _isPublicDownload
+                                            ? 'Encuéntralo en tu app de "Archivos" o carpeta "Descargas".'
+                                            : 'Almacenado localmente en el dispositivo.',
+                                        style: TextStyle(fontSize: 10.5, color: secondaryTextColor),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Botón 1: Compartir PDF (WhatsApp / Apps)
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: _shareFile,
                           icon: const Icon(Icons.share_rounded, size: 20),
-                          label: const Text('Compartir por WhatsApp / Enviar', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: const Text(
+                            'Compartir PDF (WhatsApp / Apps)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF059669),
                             foregroundColor: Colors.white,
@@ -351,18 +527,59 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Botón Abrir PDF
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _openFile,
-                          icon: const Icon(Icons.visibility_rounded, size: 18),
-                          label: const Text('Abrir y Ver PDF'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
-                            side: BorderSide(color: isDark ? const Color(0xFF059669) : const Color(0xFF059669)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      // Botones 2 y 3: Guardar copia en Descargas y Abrir y Ver PDF
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _isSavingToDownloads ? null : _manualSaveToDownloads,
+                              icon: _isSavingToDownloads
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF059669)),
+                                    )
+                                  : const Icon(Icons.download_rounded, size: 18),
+                              label: Text(_isSavingToDownloads ? 'Guardando...' : 'Guardar Copia'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: primaryTextColor,
+                                side: BorderSide(color: cardBorder),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _openFile,
+                              icon: const Icon(Icons.visibility_rounded, size: 18),
+                              label: const Text('Abrir y Ver'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF059669),
+                                side: const BorderSide(color: Color(0xFF059669)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Botón para generar otro catálogo con otros filtros
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _generatedFile = null;
+                              _savedPathLabel = null;
+                            });
+                          },
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text('Generar otro catálogo', style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(
+                            foregroundColor: secondaryTextColor,
                           ),
                         ),
                       ),

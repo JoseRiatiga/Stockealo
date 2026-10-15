@@ -16,6 +16,7 @@ import '../../../team/data/team_repository.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../products/presentation/widgets/restock_order_modal.dart';
+import '../../../products/presentation/widgets/catalog_generator_modal.dart';
 import '../../data/dashboard_repository.dart';
 import '../../../../core/services/supabase_service.dart';
 
@@ -84,6 +85,13 @@ const List<QuickActionDef> kAvailableQuickActions = [
     description: 'Exportar catálogo, ventas y clientes en .xlsx',
     icon: Icons.file_download_outlined,
     color: Color(0xFF16A34A),
+  ),
+  QuickActionDef(
+    id: 'catalog_pdf',
+    label: 'Catálogo',
+    description: 'Generar catálogo PDF de productos en stock',
+    icon: Icons.picture_as_pdf_outlined,
+    color: Color(0xFFDC2626),
   ),
   QuickActionDef(
     id: 'team',
@@ -332,6 +340,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         break;
       case 'excel_export':
         _exportExcelDirectly();
+        break;
+      case 'catalog_pdf':
+        if (_activeBusiness != null) {
+          CatalogGeneratorModal.show(
+            context: context,
+            business: _activeBusiness!,
+          );
+        }
         break;
       case 'team':
         if (_activeBusiness == null) return;

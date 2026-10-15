@@ -16,6 +16,7 @@ import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../widgets/restock_order_modal.dart';
+import '../widgets/catalog_generator_modal.dart';
 import '../../../../core/services/supabase_service.dart';
 
 class ProductsListScreen extends StatefulWidget {
@@ -327,6 +328,14 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     );
   }
 
+  void _openCatalogModal() {
+    if (_activeBusiness == null) return;
+    CatalogGeneratorModal.show(
+      context: context,
+      business: _activeBusiness!,
+    );
+  }
+
   Future<void> _openSortFilterModal() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     String tempSort = _sortOption;
@@ -568,7 +577,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             icon: const Icon(Icons.more_vert),
             tooltip: 'Más opciones',
             onSelected: (val) {
-              if (val == 'excel') {
+              if (val == 'catalog') {
+                _openCatalogModal();
+              } else if (val == 'excel') {
                 _exportToExcel();
               } else if (val == 'categories') {
                 _openManageCategories();
@@ -577,6 +588,16 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
               }
             },
             itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'catalog',
+                child: Row(
+                  children: [
+                    Icon(Icons.picture_as_pdf_outlined, color: Color(0xFFDC2626), size: 20),
+                    SizedBox(width: 8),
+                    Text('Catálogo en PDF'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'restock',
                 child: Row(

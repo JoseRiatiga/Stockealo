@@ -32,6 +32,19 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Configure Keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/stockealo-release.jks
+          echo "storePassword=$ANDROID_STORE_PASSWORD" > android/key.properties
+          echo "keyPassword=$ANDROID_KEY_PASSWORD" >> android/key.properties
+          echo "keyAlias=$ANDROID_KEY_ALIAS" >> android/key.properties
+          echo "storeFile=stockealo-release.jks" >> android/key.properties
+
       - name: Build APK Release
         run: flutter build apk --release
 
@@ -46,6 +59,8 @@ jobs:
           name: Stockealo ${{ github.ref_name }}
           body: |
             ## 🚀 Novedades de la versión ${{ github.ref_name }}
+            - 🔑 **Recuperación de Contraseña por Correo (OTP 6 Dígitos)**: Autoservicio para usuarios con código de verificación enviado directamente desde la cuenta oficial de soporte (`soporte.stockealo@gmail.com`) y cifrado seguro SHA-256 + Pepper.
+            - 🔐 **Firma Oficial Permanente (Keystore Unificada)**: Todas las versiones ahora comparten la misma firma criptográfica oficial para permitir actualizaciones fluidas con 1 solo toque sin conflicto de paquetes.
             - 👗 **Variantes de Producto (Tallas, Colores y Modelos)**: Creación opcional de variantes con stock independiente por talla/color (presets rápidos de ropa y calzado, códigos de barras por talla y selector visual en el punto de venta).
             - 🛒 **Terminal POS & Carrito Multi-Producto**: Facturación unificada para múltiples productos en una sola compra, buscador integrado, lector de código de barras y preservación de la venta rápida de 1 producto en 3 segundos.
             - 🏷️ **Motor de Descuentos por Mayor & Blindaje Anti-Pérdidas**: Descuentos en porcentaje (%) o monto fijo ($) con validación matemática en vivo para proteger la rentabilidad y bloquear ventas a pérdida en cajeros.

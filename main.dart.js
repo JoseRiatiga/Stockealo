@@ -132930,7 +132930,7 @@ m=r===0
 if(m){l=q==null?i:q.c
 if(l==null)l="Stockealo Pro"}else if(r===1)l="Cat\xe1logo de Inventario"
 else l=r===2?"Historial de Ventas":"Ajustes y Configuraci\xf3n"
-m=m?"Bento Dashboard Operativo en Tiempo Real":"Gesti\xf3n Comercial Inteligente"
+m=m?"Resumen Operativo en Tiempo Real":"Gesti\xf3n Comercial Inteligente"
 k=t.p
 return A.jA(i,i,A.a9(A.a([new A.GZ(r,s.ga2T(),q,p,o,s.gaw3(),n,i),A.aM(A.al(A.a([new A.UN(l,m,new A.aVu(s),new A.aVv(s),i),A.aM(A.b94(B.cG,j.b,r),1)],k),B.y,B.v,B.u),1)],k),B.y,B.v,B.u,i),i,i)}s=j.a
 r=s.d
@@ -132983,7 +132983,7 @@ s=t.p
 r=A.a([],s)
 if(!l.d){q=A.a3(k,B.ahU,B.z,k,k,new A.a4(k,k,k,A.O(10),A.a([new A.bj(0,B.ao,A.B(89,5,150,105),B.fk,10)],t.V),B.als,B.L),k,36,k,k,k,k,k,36)
 p=A.w("Stockealo",k,k,k,k,A.I(k,k,j?B.a7:B.aM,k,k,k,k,k,k,k,k,16,k,k,B.j8,k,k,!0,k,-0.4,k,k,k,k,k,k),k,k)
-r.push(A.a9(A.a([q,B.cJ,A.al(A.a([p,A.w("Bento Pro Suite",k,k,k,k,A.I(k,k,j?B.bT:B.E,k,k,k,k,k,k,k,k,10,k,k,B.bg,k,k,!0,k,k,k,k,k,k,k,k),k,k)],s),B.Y,B.v,B.u)],s),B.y,B.v,B.u,k))}q=l.d?B.ah6:B.ah7
+r.push(A.a9(A.a([q,B.cJ,A.al(A.a([p,A.w("Control de Inventario",k,k,k,k,A.I(k,k,j?B.bT:B.E,k,k,k,k,k,k,k,k,10,k,k,B.bg,k,k,!0,k,k,k,k,k,k,k,k),k,k)],s),B.Y,B.v,B.u)],s),B.y,B.v,B.u,k))}q=l.d?B.ah6:B.ah7
 r.push(A.cO(k,k,k,A.bA(q,j?B.W:B.R,k,20),k,new A.aLS(l),k,18,k,k,k))
 f=A.a([A.a3(k,A.a9(r,B.y,f,B.u,k),B.z,k,k,k,k,k,k,k,new A.a5(e,20,e,20),k,k,k),B.l4,B.bP],s)
 if(!l.d){e=l.a

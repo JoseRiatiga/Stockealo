@@ -728,19 +728,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryTextColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
     final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final isDesktop = MediaQuery.of(context).size.width >= 850;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Ajustes',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        elevation: 0,
-        actions: [
-          _buildCompactThemeToggle(isDark),
-        ],
-      ),
+      appBar: isDesktop
+          ? null
+          : AppBar(
+              title: const Text(
+                'Ajustes',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              elevation: 0,
+              actions: [
+                _buildCompactThemeToggle(isDark),
+              ],
+            ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final double hPadding = math.max(16.0, (constraints.maxWidth - 820) / 2);
@@ -1370,8 +1373,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required Widget child,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final defaultBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final defaultBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final defaultBg = isDark ? const Color(0xFF131127) : Colors.white;
+    final defaultBorder = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
     final defaultTitleColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
 
     return Container(

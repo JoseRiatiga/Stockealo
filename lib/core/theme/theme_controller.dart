@@ -51,4 +51,8 @@ class ThemeController extends ChangeNotifier {
       );
     } catch (_) {}
   }
+
+  Future<void> toggleTheme() async {
+    await setThemeMode(isDarkMode ? ThemeMode.light : ThemeMode.dark);
+  }
 }

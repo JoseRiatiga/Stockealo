@@ -28,13 +28,13 @@ class ProductCard extends StatelessWidget {
     return Card(
       margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       elevation: 0,
-      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      color: isDark ? const Color(0xFF131127) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: product.isOutOfStock
-              ? Colors.red.shade400
-              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ? const Color(0xFFEF4444)
+              : (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
           width: product.isOutOfStock ? 1.5 : 1,
         ),
       ),
@@ -66,7 +66,7 @@ class ProductCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                            color: isDark ? const Color(0xFF1F1C3B) : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(

@@ -383,8 +383,8 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final cardBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final cardBg = isDark ? const Color(0xFF131127) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
     final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Scaffold(

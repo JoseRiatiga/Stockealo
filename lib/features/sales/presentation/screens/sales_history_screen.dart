@@ -233,16 +233,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width >= 850;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Historial de Ventas'),
-      ),
+      appBar: isDesktop
+          ? null
+          : AppBar(
+              title: const Text('Historial de Ventas'),
+            ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
         color: const Color(0xFF059669),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final double hPadding = math.max(0.0, (constraints.maxWidth - 1100) / 2);
+            final double hPadding = math.max(16.0, (constraints.maxWidth - 1000) / 2);
 
             return CustomScrollView(
               slivers: [
@@ -389,15 +392,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  color: isDark ? const Color(0xFF131127) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.5) : const Color(0xFFDBEAFE),
+                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFDBEAFE),
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF2563EB).withOpacity(0.04),
+                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -408,10 +411,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     Container(
                       padding: const EdgeInsets.all(9),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF),
+                        color: isDark ? const Color(0xFF1F1C3B) : const Color(0xFFEFF6FF),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.people_alt_rounded, size: 20, color: Color(0xFF2563EB)),
+                      child: const Icon(Icons.people_alt_rounded, size: 20, color: Color(0xFF38BDF8)),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -431,7 +434,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right, size: 18, color: Color(0xFF2563EB)),
+                    const Icon(Icons.chevron_right, size: 18, color: Color(0xFF38BDF8)),
                   ],
                 ),
               ),
@@ -447,15 +450,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  color: isDark ? const Color(0xFF131127) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF065F46).withOpacity(0.5) : const Color(0xFFA7F3D0),
+                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFA7F3D0),
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF059669).withOpacity(0.04),
+                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -512,12 +515,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        color: isDark ? const Color(0xFF131127) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -666,11 +669,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       elevation: 0,
-      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      color: isDark ? const Color(0xFF131127) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
           width: 1,
         ),
       ),
@@ -806,10 +809,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                color: isDark ? const Color(0xFF1F1C3B) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155).withOpacity(0.6) : const Color(0xFFE2E8F0),
+                  color: isDark ? const Color(0xFF2D2856) : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Row(

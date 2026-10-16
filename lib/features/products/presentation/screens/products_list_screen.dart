@@ -555,8 +555,11 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width >= 850;
     return Scaffold(
-      appBar: AppBar(
+      appBar: isDesktop
+          ? null
+          : AppBar(
         title: InkWell(
           onTap: () async {
             final changed = await BusinessSelectorModal.show(
@@ -931,12 +934,12 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       margin: const EdgeInsets.fromLTRB(0, 16, 0, 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        color: isDark ? const Color(0xFF131127) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

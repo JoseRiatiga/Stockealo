@@ -29,14 +29,29 @@ class TeamRepository {
       ORDER BY bm.created_at ASC
     ''', [businessId]);
 
-    return maps.map((m) {
+    final seenIds = <String>{};
+    final seenEmails = <String>{};
+    final List<BusinessMember> result = [];
+
+    for (final m in maps) {
       final data = Map<String, dynamic>.from(m);
+      final id = data['id'] as String? ?? '';
+      final email = (data['email'] as String? ?? '').trim().toLowerCase();
+
+      if (id.isNotEmpty && seenIds.contains(id)) continue;
+      if (email.isNotEmpty && seenEmails.contains(email)) continue;
+
+      if (id.isNotEmpty) seenIds.add(id);
+      if (email.isNotEmpty) seenEmails.add(email);
+
       final resolved = data['resolved_name'] as String?;
       if (resolved != null && resolved.trim().isNotEmpty) {
         data['name'] = resolved.trim();
       }
-      return BusinessMember.fromMap(data);
-    }).toList();
+      result.add(BusinessMember.fromMap(data));
+    }
+
+    return result;
   }
 
   /// Añade un empleado por su correo electrónico con un rol asignado

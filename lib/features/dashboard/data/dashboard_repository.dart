@@ -308,6 +308,33 @@ class DashboardRepository {
       };
     }).toList();
 
+    // 8. Últimas 5 transacciones registradas (para Bento feed de actividad)
+    final recentSalesRes = await db.rawQuery('''
+      SELECT 
+        s.id,
+        s.product_name,
+        COALESCE(s.customer_name, 'Consumidor Final') as customer_name,
+        s.quantity,
+        s.total,
+        s.payment_method,
+        s.date
+      FROM sales s
+      WHERE s.business_id = ?
+      ORDER BY s.date DESC
+      LIMIT 5
+    ''', [businessId]);
+
+    final List<Map<String, dynamic>> recentTransactions = recentSalesRes.map((r) {
+      return {
+        'id': r['id'] as String,
+        'title': r['product_name'] as String,
+        'subtitle': "${r['quantity']} un. • ${r['customer_name']}",
+        'amount': (r['total'] as num).toDouble(),
+        'payment_method': r['payment_method'] as String? ?? 'EFECTIVO',
+        'date': r['date'] as String,
+      };
+    }).toList();
+
     return {
       'period': period,
       'periodTotal': periodTotal,
@@ -333,6 +360,7 @@ class DashboardRepository {
       'periodTimelineSales': periodTimelineSales,
       'categorySales': categorySales,
       'topProducts': topProducts,
+      'recentTransactions': recentTransactions,
     };
   }
 

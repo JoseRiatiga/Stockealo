@@ -88,13 +88,13 @@ class AppTheme {
     colorScheme: ColorScheme.fromSeed(
       seedColor: primaryGreen,
       primary: primaryGreen,
-      surface: const Color(0xFF1E293B), // Slate 800
+      surface: const Color(0xFF131126), // Bento Obsidian Violet
       onSurface: const Color(0xFFF8FAFC),
       brightness: Brightness.dark,
     ),
-    scaffoldBackgroundColor: const Color(0xFF0F172A), // Slate 900
+    scaffoldBackgroundColor: const Color(0xFF0D0B18), // Deep Obsidian Canvas
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1E293B),
+      backgroundColor: Color(0xFF131126),
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
@@ -107,31 +107,31 @@ class AppTheme {
     ),
     cardTheme: CardTheme(
       elevation: 0,
-      color: const Color(0xFF1E293B),
+      color: const Color(0xFF131126),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFF334155)),
+        side: const BorderSide(color: Color(0xFF26214A)),
       ),
     ),
     dialogTheme: const DialogTheme(
-      backgroundColor: Color(0xFF1E293B),
+      backgroundColor: Color(0xFF131126),
       surfaceTintColor: Colors.transparent,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF1E293B),
+      fillColor: const Color(0xFF18152F),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF334155)),
+        borderSide: const BorderSide(color: Color(0xFF26214A)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF334155)),
+        borderSide: const BorderSide(color: Color(0xFF26214A)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primaryGreen, width: 2),
+        borderSide: const BorderSide(color: Color(0xFF06B6D4), width: 1.8),
       ),
       labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
       hintStyle: const TextStyle(color: Color(0xFF64748B)),

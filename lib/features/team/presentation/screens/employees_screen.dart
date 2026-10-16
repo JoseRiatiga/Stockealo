@@ -782,7 +782,13 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
                 // Tarjeta Dueño / Fundador
                 Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  color: isDark ? const Color(0xFF131127) : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(
+                      color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     leading: CircleAvatar(
@@ -913,7 +919,13 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      color: isDark ? const Color(0xFF131127) : Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(
+                          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         onTap: (isOwner && !isSelf) ? () => _showEditRoleDialog(member) : null,

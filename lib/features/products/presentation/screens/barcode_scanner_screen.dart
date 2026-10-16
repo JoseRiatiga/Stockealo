@@ -18,6 +18,9 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
 
   @override
   void dispose() {
+    try {
+      _controller.stop();
+    } catch (_) {}
     _controller.dispose();
     super.dispose();
   }

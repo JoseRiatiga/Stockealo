@@ -720,6 +720,10 @@ class SupabaseService {
       if (!_isInitialized) await initialize();
       if (client == null) return null;
 
+      if (kIsWeb) {
+        return localFilePath.startsWith('http') ? localFilePath : null;
+      }
+
       final file = File(localFilePath);
       if (!await file.exists()) return null;
 

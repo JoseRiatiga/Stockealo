@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/services/supabase_service.dart';
@@ -308,6 +309,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     }
+  }
+
+  ImageProvider? _getAvatarImageProvider(String? path) {
+    if (path == null || path.trim().isEmpty) return null;
+    final cleanPath = path.trim();
+    if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://') || cleanPath.startsWith('blob:')) {
+      return NetworkImage(cleanPath);
+    }
+    if (!kIsWeb) {
+      try {
+        final file = File(cleanPath);
+        if (file.existsSync()) {
+          return FileImage(file);
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 
   void _showAvatarPickerModal() {
@@ -708,10 +726,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         CircleAvatar(
                           radius: 32,
                           backgroundColor: const Color(0xFFECFDF5),
-                          backgroundImage: _avatarPath != null && File(_avatarPath!).existsSync()
-                              ? FileImage(File(_avatarPath!))
-                              : null,
-                          child: _avatarPath == null
+                          backgroundImage: _getAvatarImageProvider(_avatarPath),
+                          child: _getAvatarImageProvider(_avatarPath) == null
                               ? Text(
                                   (user?.displayName.isNotEmpty == true ? user!.displayName[0] : 'U').toUpperCase(),
                                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF059669)),

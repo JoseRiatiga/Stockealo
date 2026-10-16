@@ -1,0 +1,56 @@
+name: Build and Release Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK Release
+        run: flutter build apk --release
+
+      - name: Copy & Rename APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk Stockealo.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Stockealo.apk
+          tag_name: ${{ github.ref_name }}
+          name: Stockealo ${{ github.ref_name }}
+          body: |
+            ## 🚀 Novedades de la versión ${{ github.ref_name }}
+            - 🎨 **Nuevo Sistema de Diseño Obsidian Violet Bento**: Interfaces de alta legibilidad, contraste y elegancia visual.
+            - 📊 **Gráficos Interactivos**: Indicadores en tiempo real con mira táctil y valores en vivo.
+            - 🏷️ **Inventario Organizado A-Z**: Orden predeterminado alfabético y barra de herramientas rápida.
+            - 🔍 **Detalle de Producto Bento**: Nueva ficha comercial con métricas y valorización de stock.
+            - 🧾 **Historial de Ventas**: Filtros por fecha (hoy, 7 días, mes, rango), métodos de pago y botón rápido para registrar ventas.
+            - 📸 **Nuevo Selector de Cámara/Galería**: Experiencia visual Bento optimizada.
+          draft: false
+          prerelease: false

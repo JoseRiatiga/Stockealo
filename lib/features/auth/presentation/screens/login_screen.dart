@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/auth_repository.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
+import '../widgets/forgot_password_dialog.dart';
 import '../widgets/stocky_mascot.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -459,6 +460,50 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
 
+                  // Enlace de Recuperación de Contraseña (Solo en Modo Iniciar Sesión)
+                  if (!_isRegisterMode) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                ForgotPasswordDialog.show(
+                                  context,
+                                  initialEmail: _emailController.text.trim(),
+                                  onPasswordResetSuccess: (email) {
+                                    setState(() {
+                                      _emailController.text = email;
+                                      _passwordController.clear();
+                                      _errorMessage = null;
+                                    });
+                                    _passwordFocus.requestFocus();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Contraseña restablecida con éxito. Ya puedes ingresar.'),
+                                        backgroundColor: Color(0xFF059669),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          visualDensity: VisualDensity.compact,
+                          foregroundColor: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                        ),
+                        child: const Text(
+                          '¿Olvidaste tu contraseña?',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
                   // Confirmar contraseña en registro
                   if (_isRegisterMode) ...[
                     const SizedBox(height: 16),
@@ -575,8 +620,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 20),
 
                   // Enlaces Legales al pie
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       InkWell(
                         onTap: () => LegalDocumentScreen.show(context, initialTabIndex: 0),

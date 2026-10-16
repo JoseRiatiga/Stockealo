@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
@@ -31,6 +32,7 @@ class _StockyMascotState extends State<StockyMascot> with TickerProviderStateMix
   late AnimationController _blinkController;
   late AnimationController _handsController;
   late AnimationController _celebrateController;
+  Timer? _blinkTimer;
 
   @override
   void initState() {
@@ -64,17 +66,23 @@ class _StockyMascotState extends State<StockyMascot> with TickerProviderStateMix
     _updateStateAnimations();
   }
 
-  void _scheduleBlink() async {
-    while (mounted) {
-      await Future.delayed(Duration(milliseconds: 2800 + math.Random().nextInt(2500)));
-      if (!mounted) break;
+  void _scheduleBlink() {
+    _blinkTimer?.cancel();
+    if (!mounted) return;
+    _blinkTimer = Timer(Duration(milliseconds: 2800 + math.Random().nextInt(2500)), () async {
+      if (!mounted) return;
       if (widget.state != StockyState.coveringEyes) {
-        await _blinkController.forward();
-        if (mounted) {
-          await _blinkController.reverse();
-        }
+        try {
+          await _blinkController.forward();
+          if (mounted) {
+            await _blinkController.reverse();
+          }
+        } catch (_) {}
       }
-    }
+      if (mounted) {
+        _scheduleBlink();
+      }
+    });
   }
 
   @override
@@ -101,6 +109,7 @@ class _StockyMascotState extends State<StockyMascot> with TickerProviderStateMix
 
   @override
   void dispose() {
+    _blinkTimer?.cancel();
     _idleController.dispose();
     _blinkController.dispose();
     _handsController.dispose();

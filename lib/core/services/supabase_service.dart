@@ -1003,6 +1003,58 @@ class SupabaseService {
     }
   }
 
+  /// Envía un código OTP de 6 dígitos al correo para restablecimiento de contraseña
+  Future<void> sendPasswordResetOtp(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    if (!_isInitialized) await initialize();
+    if (client == null) {
+      throw Exception('No se pudo conectar con el servidor en la nube.');
+    }
+    await client!.auth.signInWithOtp(
+      email: cleanEmail,
+    );
+  }
+
+  /// Verifica si el código OTP de 6 dígitos ingresado es válido
+  Future<bool> verifyOtp({required String email, required String token}) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanToken = token.trim();
+    if (!_isInitialized) await initialize();
+    if (client == null) {
+      throw Exception('No se pudo conectar con el servidor en la nube.');
+    }
+    try {
+      final response = await client!.auth.verifyOTP(
+        email: cleanEmail,
+        token: cleanToken,
+        type: OtpType.email,
+      );
+      return response.user != null || response.session != null;
+    } on AuthException catch (e) {
+      debugPrint('Error AuthException al validar código OTP: ${e.message}');
+      throw Exception('Código incorrecto o expirado.');
+    } catch (e) {
+      debugPrint('Error al validar código OTP: $e');
+      throw Exception('Código incorrecto o expirado.');
+    }
+  }
+
+  /// Actualiza la contraseña en Supabase para un usuario identificado por correo
+  Future<void> updatePasswordByEmail(String email, String hashedPassword) async {
+    final cleanEmail = email.trim().toLowerCase();
+    if (!_isInitialized) await initialize();
+    if (client == null) return;
+    try {
+      await client!.from('users').update({
+        'password': hashedPassword,
+      }).eq('email', cleanEmail);
+      debugPrint('Contraseña actualizada en la nube para $cleanEmail.');
+    } catch (e) {
+      debugPrint('Error al actualizar contraseña en la nube: $e');
+      throw Exception('No se pudo actualizar la contraseña en el servidor: $e');
+    }
+  }
+
   /// Guarda o actualiza una categoría en Supabase en tiempo real
   Future<void> upsertCategoryToCloud(Map<String, dynamic> c) async {
     try {

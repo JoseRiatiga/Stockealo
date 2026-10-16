@@ -382,4 +382,115 @@ class AuthRepository {
     final storedPassword = maps.first['password'] as String;
     return HashHelper.verifyPassword(password, storedPassword);
   }
+
+  /// Verifica si un correo está registrado en Stockealo (en SQLite local o Supabase Cloud)
+  Future<bool> isEmailRegistered(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final db = await _dbProvider.database;
+
+    // 1. Revisar SQLite local
+    final localUsers = await db.query(
+      'users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail],
+      limit: 1,
+    );
+    if (localUsers.isNotEmpty) return true;
+
+    // 2. Revisar Supabase Cloud
+    if (!SupabaseService.instance.isInitialized) {
+      await SupabaseService.instance.initialize();
+    }
+    final client = SupabaseService.instance.client;
+    if (client != null) {
+      try {
+        final cloudUser = await client
+            .from('users')
+            .select('id')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+        if (cloudUser != null) return true;
+      } catch (e) {
+        debugPrint('Error al verificar correo en Supabase: $e');
+      }
+    }
+    return false;
+  }
+
+  /// Solicita el código OTP de 6 dígitos para restablecer contraseña
+  Future<void> requestPasswordResetOtp(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
+      throw Exception('Ingresa un correo electrónico válido.');
+    }
+
+    // 1. Validar si el usuario está registrado en Stockealo
+    final exists = await isEmailRegistered(cleanEmail);
+    if (!exists) {
+      throw Exception('No encontramos ninguna cuenta registrada con este correo en Stockealo.');
+    }
+
+    // 2. Solicitar envío de código OTP
+    await SupabaseService.instance.sendPasswordResetOtp(cleanEmail);
+  }
+
+  /// Verifica el código OTP y actualiza la contraseña del usuario
+  Future<void> resetPasswordWithOtp({
+    required String email,
+    required String otpCode,
+    required String newPassword,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanCode = otpCode.trim();
+
+    if (newPassword.length < 6) {
+      throw Exception('La nueva contraseña debe tener al menos 6 caracteres.');
+    }
+
+    // 1. Verificar el código OTP con Supabase
+    final isValid = await SupabaseService.instance.verifyOtp(
+      email: cleanEmail,
+      token: cleanCode,
+    );
+
+    if (!isValid) {
+      throw Exception('El código de verificación es incorrecto o ha expirado.');
+    }
+
+    // 2. Generar el hash seguro unidireccional con SHA-256 y Pepper
+    final secureHash = HashHelper.hashPassword(newPassword);
+
+    // 3. Actualizar en base de datos local SQLite
+    final db = await _dbProvider.database;
+    final updatedRows = await db.update(
+      'users',
+      {'password': secureHash},
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail],
+    );
+
+    // Si el usuario no estaba en la base de datos local (ej. nuevo dispositivo), traerlo de la nube
+    if (updatedRows == 0) {
+      final client = SupabaseService.instance.client;
+      if (client != null) {
+        try {
+          final cloudUser = await client
+              .from('users')
+              .select()
+              .eq('email', cleanEmail)
+              .maybeSingle();
+          if (cloudUser != null) {
+            final userMap = Map<String, dynamic>.from(cloudUser);
+            userMap['password'] = secureHash;
+            await db.insert('users', userMap, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        } catch (e) {
+          debugPrint('Error al descargar usuario tras reset: $e');
+        }
+      }
+    }
+
+    // 4. Actualizar la contraseña en la nube de Supabase
+    await SupabaseService.instance.updatePasswordByEmail(cleanEmail, secureHash);
+  }
 }

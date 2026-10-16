@@ -147,6 +147,12 @@ class UpdateService {
         currentParts.add(0);
       }
 
+      // Transición especial: Si el usuario tenía una versión legacy 1.x.x
+      // y la versión oficial en GitHub pasó al esquema Beta 0.x.x, considerar como actualización disponible
+      if (currentParts[0] >= 1 && remoteParts[0] == 0) {
+        return true;
+      }
+
       for (int i = 0; i < 3; i++) {
         if (remoteParts[i] > currentParts[i]) return true;
         if (remoteParts[i] < currentParts[i]) return false;

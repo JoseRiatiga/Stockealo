@@ -131,16 +131,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 const VerticalDivider(thickness: 1, width: 1),
                 Expanded(
-                  child: Container(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1280),
-                      child: IndexedStack(
-                        index: _currentIndex,
-                        children: screens,
-                      ),
-                    ),
+                  child: IndexedStack(
+                    index: _currentIndex,
+                    children: screens,
                   ),
                 ),
               ],

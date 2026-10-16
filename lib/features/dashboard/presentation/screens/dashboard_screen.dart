@@ -739,108 +739,118 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: const Color(0xFF059669),
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
-            : ListView(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  16,
-                  16,
-                  MediaQuery.of(context).padding.bottom + 28,
-                ),
-                children: [
-                  // Saludo al comerciante
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth >= 900;
+                  final double hPadding = math.max(16.0, (constraints.maxWidth - 1200) / 2);
+
+                  return ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      hPadding,
+                      16,
+                      hPadding,
+                      MediaQuery.of(context).padding.bottom + 28,
+                    ),
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      // Saludo al comerciante
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '¡Hola, $userName!',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: textPrimary,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '¡Hola, $userName!',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Resumen operativo ${_selectedPeriod == "today" ? "de hoy" : (_selectedPeriod == "week" ? "de 7 días" : (_selectedPeriod == "month" ? "del mes" : "histórico"))}',
+                                style: TextStyle(fontSize: 13, color: textSecondary),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Resumen operativo ${_selectedPeriod == "today" ? "de hoy" : (_selectedPeriod == "week" ? "de 7 días" : (_selectedPeriod == "month" ? "del mes" : "histórico"))}',
-                            style: TextStyle(fontSize: 13, color: textSecondary),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.circle, color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669), size: 8),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _userRole == 'OWNER' ? 'Dueño' : (_userRole == 'ADMIN' ? 'Admin' : 'Cajero'),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.circle, color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669), size: 8),
-                            const SizedBox(width: 6),
-                            Text(
-                              _userRole == 'OWNER' ? 'Dueño' : (_userRole == 'ADMIN' ? 'Admin' : 'Cajero'),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
-                              ),
+                      const SizedBox(height: 14),
+
+                      // Selector horizontal de Periodo (Hoy, 7 Días, Este Mes, Histórico)
+                      _buildPeriodSelector(),
+                      const SizedBox(height: 14),
+
+                      // Banner de Tendencia y Comparativa del Periodo
+                      _buildFinancialTrendBanner(),
+                      const SizedBox(height: 14),
+
+                      // Tarjetas de Métricas del Periodo (2x2 Grid Enriquecido)
+                      _buildMetricsGrid(),
+                      const SizedBox(height: 20),
+
+                      // Acciones Rápidas Personalizables
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Acciones Rápidas',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              visualDensity: VisualDensity.compact,
                             ),
-                          ],
-                        ),
+                            onPressed: _openCustomizeQuickActionsModal,
+                            icon: const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF059669)),
+                            label: const Text(
+                              'Personalizar',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 10),
+                      _buildQuickActions(),
+                      const SizedBox(height: 24),
+
+                      // Gráfico de Rendimiento (Lado a lado en Desktop, Toggle en Móvil)
+                      if (isDesktop)
+                        _buildDesktopCharts(isDark)
+                      else
+                        _buildSalesPerformanceChart(),
+                      const SizedBox(height: 24),
+
+                      // Top 5 Productos Más Vendidos en el Periodo
+                      _buildTopProductsSection(),
+                      const SizedBox(height: 20),
                     ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Selector horizontal de Periodo (Hoy, 7 Días, Este Mes, Histórico)
-                  _buildPeriodSelector(),
-                  const SizedBox(height: 14),
-
-                  // Banner de Tendencia y Comparativa del Periodo
-                  _buildFinancialTrendBanner(),
-                  const SizedBox(height: 14),
-
-                  // Tarjetas de Métricas del Periodo (2x2 Grid Enriquecido)
-                  _buildMetricsGrid(),
-                  const SizedBox(height: 20),
-
-                  // Acciones Rápidas Personalizables
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Acciones Rápidas',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
-                      ),
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        onPressed: _openCustomizeQuickActionsModal,
-                        icon: const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF059669)),
-                        label: const Text(
-                          'Personalizar',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  _buildQuickActions(),
-                  const SizedBox(height: 24),
-
-                  // Gráfico de Rendimiento (Toggle de Barras o Pastel de Categorías)
-                  _buildSalesPerformanceChart(),
-                  const SizedBox(height: 24),
-
-                  // Top 5 Productos Más Vendidos en el Periodo
-                  _buildTopProductsSection(),
-                  const SizedBox(height: 20),
-                ],
+                  );
+                },
               ),
       ),
     );
@@ -1401,6 +1411,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildCategoryPieChartContent(categorySales, isDark),
         ],
       ),
+    );
+  }
+
+  Widget _buildDesktopCharts(bool isDark) {
+    final List<dynamic> weeklySales = _summary['weeklySales'] ?? [];
+    final List<dynamic> categorySales = _summary['categorySales'] ?? [];
+
+    Widget buildCard({required String title, required Widget child}) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 18),
+            child,
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: buildCard(
+            title: 'Ventas de la Semana (7 días)',
+            child: _buildBarsChartContent(weeklySales, isDark),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: buildCard(
+            title: 'Participación por Categorías',
+            child: _buildCategoryPieChartContent(categorySales, isDark),
+          ),
+        ),
+      ],
     );
   }
 

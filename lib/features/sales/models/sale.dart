@@ -14,6 +14,8 @@ class Sale {
   final String? sellerName;
   final DateTime date;
   final bool isSynced;
+  final String? variantId;
+  final String? variantName;
 
   Sale({
     required this.id,
@@ -31,6 +33,8 @@ class Sale {
     this.sellerName,
     required this.date,
     this.isSynced = false,
+    this.variantId,
+    this.variantName,
   });
 
   Map<String, dynamic> toMap() {
@@ -50,6 +54,8 @@ class Sale {
       'seller_name': sellerName,
       'date': date.toIso8601String(),
       'is_synced': isSynced ? 1 : 0,
+      'variant_id': variantId,
+      'variant_name': variantName,
     };
   }
 
@@ -70,6 +76,8 @@ class Sale {
       sellerName: map['seller_name'] as String?,
       date: DateTime.parse(map['date'] as String),
       isSynced: (map['is_synced'] as int?) == 1,
+      variantId: map['variant_id'] as String?,
+      variantName: map['variant_name'] as String?,
     );
   }
 }

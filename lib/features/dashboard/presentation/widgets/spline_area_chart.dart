@@ -71,57 +71,69 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.title,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.2,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  if (hoveredItem != null) ...[
-                    Row(
-                      children: [
-                        Text(
-                          '${hoveredItem['label']}: ',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
-                          ),
-                        ),
-                        Text(
-                          CurrencyFormatter.format((hoveredItem['value'] as num?)?.toDouble() ?? 0.0),
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ] else if (widget.subtitle != null) ...[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      widget.subtitle!,
+                      widget.title,
                       style: TextStyle(
-                        fontSize: 11.5,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.2,
+                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 2),
+                    if (hoveredItem != null) ...[
+                      Row(
+                        children: [
+                          Text(
+                            '${hoveredItem['label']}: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                            ),
+                          ),
+                          Flexible(
+                            child: Text(
+                              CurrencyFormatter.format((hoveredItem['value'] as num?)?.toDouble() ?? 0.0),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (widget.subtitle != null) ...[
+                      Text(
+                        widget.subtitle!,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(

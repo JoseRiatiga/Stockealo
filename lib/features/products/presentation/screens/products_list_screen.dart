@@ -18,15 +18,19 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../widgets/restock_order_modal.dart';
 import '../widgets/catalog_generator_modal.dart';
+import '../../../team/data/team_repository.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/widgets/stocky_empty_state.dart';
 
 class ProductsListScreen extends StatefulWidget {
   final String userId;
+  final String? userRole;
   final VoidCallback? onLogout;
 
   const ProductsListScreen({
     super.key,
     required this.userId,
+    this.userRole,
     this.onLogout,
   });
 
@@ -48,6 +52,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   String _stockFilterOption = 'all';
   Map<String, dynamic> _stats = {};
   bool _isLoading = true;
+  String _effectiveRole = 'OWNER';
+
+  bool get canEditProducts => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
+  bool get canViewCosts => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
 
   int _currentPage = 1;
   static const int _pageSize = 12;
@@ -176,11 +184,23 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         break;
     }
 
+    // Resolver rol efectivo del usuario para control de acceso
+    String role = widget.userRole ?? 'OWNER';
+    final user = AuthRepository.instance.currentUser;
+    if (user != null) {
+      role = await TeamRepository.instance.getUserRoleInBusiness(
+        businessId: businessId,
+        userId: user.id,
+        userEmail: user.email,
+      );
+    }
+
     if (mounted) {
       setState(() {
         _products = filteredProducts;
         _categories = categories;
         _stats = stats;
+        _effectiveRole = role;
         _isLoading = false;
       });
     }
@@ -728,13 +748,15 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                                 onTap: _openCatalogModal,
                                 isDark: isDark,
                               ),
-                              _buildDesktopActionButton(
-                                icon: Icons.local_shipping_outlined,
-                                label: 'Pedido Proveedor',
-                                color: const Color(0xFFD97706),
-                                onTap: _openRestockOrderModal,
-                                isDark: isDark,
-                              ),
+                              if (canEditProducts) ...[
+                                _buildDesktopActionButton(
+                                  icon: Icons.local_shipping_outlined,
+                                  label: 'Pedido Proveedor',
+                                  color: const Color(0xFFD97706),
+                                  onTap: _openRestockOrderModal,
+                                  isDark: isDark,
+                                ),
+                              ],
                               _buildDesktopActionButton(
                                 icon: Icons.table_chart_rounded,
                                 label: 'Exportar Excel',
@@ -742,40 +764,43 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                                 onTap: _exportToExcel,
                                 isDark: isDark,
                               ),
-                              _buildDesktopActionButton(
-                                icon: Icons.tune_rounded,
-                                label: 'Categorías',
-                                color: const Color(0xFF8B5CF6),
-                                onTap: _openManageCategories,
-                                isDark: isDark,
-                              ),
+                              if (canEditProducts) ...[
+                                _buildDesktopActionButton(
+                                  icon: Icons.tune_rounded,
+                                  label: 'Categorías',
+                                  color: const Color(0xFF8B5CF6),
+                                  onTap: _openManageCategories,
+                                  isDark: isDark,
+                                ),
+                              ],
                             ],
                           ),
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              if (_activeBusiness == null) return;
-                              final created = await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
-                                ),
-                              );
-                              if (created == true) {
-                                _loadData();
-                              }
-                            },
-                            icon: const Icon(Icons.add_rounded, size: 18),
-                            label: const Text(
-                              '+ Nuevo Producto',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          if (canEditProducts)
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                if (_activeBusiness == null) return;
+                                final created = await Navigator.push<bool>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
+                                  ),
+                                );
+                                if (created == true) {
+                                  _loadData();
+                                }
+                              },
+                              icon: const Icon(Icons.add_rounded, size: 18),
+                              label: const Text(
+                                '+ Nuevo Producto',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF8B5CF6),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF8B5CF6),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -987,6 +1012,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                                 return ProductCard(
                                   product: product,
                                   margin: EdgeInsets.zero,
+                                  showMargin: canViewCosts,
+                                  canAdjustStock: canEditProducts,
                                   onTap: () async {
                                     await Navigator.push(
                                       context,
@@ -996,7 +1023,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                                     );
                                     _loadData();
                                   },
-                                  onAdjustStock: () => _showQuickStockDialog(product),
+                                  onAdjustStock: canEditProducts ? () => _showQuickStockDialog(product) : null,
                                   onSale: () async {
                                     final sold = await QuickSaleDialog.show(context, product);
                                     if (sold == true) {
@@ -1019,6 +1046,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                               final product = pagedList[index];
                               return ProductCard(
                                 product: product,
+                                showMargin: canViewCosts,
+                                canAdjustStock: canEditProducts,
                                 onTap: () async {
                                   await Navigator.push(
                                     context,
@@ -1028,7 +1057,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                                   );
                                   _loadData();
                                 },
-                                onAdjustStock: () => _showQuickStockDialog(product),
+                                onAdjustStock: canEditProducts ? () => _showQuickStockDialog(product) : null,
                                 onSale: () async {
                                   final sold = await QuickSaleDialog.show(context, product);
                                   if (sold == true) {
@@ -1061,29 +1090,31 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
           },
         ),
       ),
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-        child: FloatingActionButton(
-          onPressed: () async {
-            if (_activeBusiness == null) return;
-            final created = await Navigator.push<bool>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
+      floatingActionButton: canEditProducts
+          ? Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+              child: FloatingActionButton(
+                onPressed: () async {
+                  if (_activeBusiness == null) return;
+                  final created = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
+                    ),
+                  );
+                  if (created == true) {
+                    _loadData();
+                  }
+                },
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                elevation: 4,
+                shape: const CircleBorder(),
+                tooltip: 'Nuevo Producto',
+                child: const Icon(Icons.add, size: 28),
               ),
-            );
-            if (created == true) {
-              _loadData();
-            }
-          },
-          backgroundColor: const Color(0xFF059669),
-          foregroundColor: Colors.white,
-          elevation: 4,
-          shape: const CircleBorder(),
-          tooltip: 'Nuevo Producto',
-          child: const Icon(Icons.add, size: 28),
-        ),
-      ),
+            )
+          : null,
     );
   }
 
@@ -1202,61 +1233,68 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   }
 
   Widget _buildEmptyState() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.inventory_2_outlined,
-                size: 56,
-                color: Color(0xFF059669),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _searchController.text.isNotEmpty
-                  ? 'No se encontraron productos'
-                  : 'Aún no tienes productos registrados',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _searchController.text.isNotEmpty
-                  ? 'Intenta con otro término de búsqueda o limpia el filtro.'
-                  : 'Toca el botón "+ Nuevo Producto" para comenzar a registrar tu catálogo y stock.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              ),
-            ),
-          ],
-        ),
-      ),
+    final hasSearch = _searchController.text.isNotEmpty;
+    final canCreate = widget.userRole != 'CASHIER';
+
+    return StockyEmptyState(
+      title: hasSearch ? 'No se encontraron productos' : 'Catálogo de Inventario Vacío',
+      message: hasSearch
+          ? 'Intenta con otro término de búsqueda o limpia los filtros activos.'
+          : (canCreate
+              ? 'Toca el botón "+ Nuevo Producto" para comenzar a registrar tu catálogo y stock.'
+              : 'Aún no se han registrado productos en este negocio.'),
+      actionLabel: hasSearch
+          ? 'Limpiar Búsqueda'
+          : (canCreate ? '+ Nuevo Producto' : null),
+      onAction: hasSearch
+          ? () {
+              _searchController.clear();
+              _currentPage = 1;
+              _loadData();
+            }
+          : (canCreate
+              ? () async {
+                  if (_activeBusiness == null) return;
+                  final created = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
+                    ),
+                  );
+                  if (created == true) {
+                    _loadData();
+                  }
+                }
+              : null),
     );
   }
 
   Widget _buildPaginationControls(int totalPages) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isMobile = MediaQuery.of(context).size.width < 520;
     final startIndex = (_currentPage - 1) * _pageSize + 1;
     final endIndex = math.min(_currentPage * _pageSize, _products.length);
 
+    void goToPrev() {
+      if (_currentPage > 1) {
+        setState(() => _currentPage--);
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        }
+      }
+    }
+
+    void goToNext() {
+      if (_currentPage < totalPages) {
+        setState(() => _currentPage++);
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        }
+      }
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: isMobile ? 8 : 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF131126) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1272,69 +1310,102 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Mostrando $startIndex-$endIndex de ${_products.length} productos',
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w500,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          Flexible(
+            child: Text(
+              isMobile
+                  ? '$startIndex-$endIndex de ${_products.length}'
+                  : 'Mostrando $startIndex-$endIndex de ${_products.length} productos',
+              style: TextStyle(
+                fontSize: isMobile ? 11.5 : 12.5,
+                fontWeight: FontWeight.w500,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          Row(
-            children: [
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          const SizedBox(width: 8),
+          if (isMobile)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
                   visualDensity: VisualDensity.compact,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: _currentPage > 1 ? goToPrev : null,
+                  icon: const Icon(Icons.chevron_left_rounded, size: 22),
+                  color: const Color(0xFF8B5CF6),
+                  disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
                 ),
-                onPressed: _currentPage > 1
-                    ? () {
-                        setState(() => _currentPage--);
-                        if (_scrollController.hasClients) {
-                          _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-                        }
-                      }
-                    : null,
-                icon: const Icon(Icons.chevron_left_rounded, size: 18),
-                label: const Text('Anterior', style: TextStyle(fontSize: 12)),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF059669).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '$_currentPage / $totalPages',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF059669),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF059669).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$_currentPage / $totalPages',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF059669),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                IconButton(
                   visualDensity: VisualDensity.compact,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: _currentPage < totalPages ? goToNext : null,
+                  icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                  color: const Color(0xFF8B5CF6),
+                  disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
                 ),
-                onPressed: _currentPage < totalPages
-                    ? () {
-                        setState(() => _currentPage++);
-                        if (_scrollController.hasClients) {
-                          _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-                        }
-                      }
-                    : null,
-                icon: const Icon(Icons.chevron_right_rounded, size: 18),
-                label: const Text('Siguiente', style: TextStyle(fontSize: 12)),
-              ),
-            ],
-          ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: _currentPage > 1 ? goToPrev : null,
+                  icon: const Icon(Icons.chevron_left_rounded, size: 18),
+                  label: const Text('Anterior', style: TextStyle(fontSize: 12)),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF059669).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$_currentPage / $totalPages',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF059669),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: _currentPage < totalPages ? goToNext : null,
+                  icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                  label: const Text('Siguiente', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
         ],
       ),
     );

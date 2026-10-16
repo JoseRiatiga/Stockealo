@@ -56,6 +56,78 @@ class AppDatabase {
         try {
           await db.execute('ALTER TABLE sales ADD COLUMN seller_name TEXT');
         } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE sales ADD COLUMN invoice_number TEXT');
+        } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE sales ADD COLUMN discount_amount REAL DEFAULT 0.0');
+        } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE products ADD COLUMN has_variants INTEGER DEFAULT 0');
+        } catch (_) {}
+        try {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS product_variants (
+              id TEXT PRIMARY KEY,
+              business_id TEXT NOT NULL,
+              product_id TEXT NOT NULL,
+              attribute_name TEXT NOT NULL DEFAULT 'Talla',
+              attribute_value TEXT NOT NULL,
+              sku_or_barcode TEXT,
+              stock INTEGER NOT NULL DEFAULT 0,
+              additional_price REAL DEFAULT 0.0,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              is_synced INTEGER DEFAULT 0,
+              FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+            )
+          ''');
+          await db.execute('CREATE INDEX IF NOT EXISTS idx_variants_product ON product_variants(product_id)');
+          await db.execute('CREATE INDEX IF NOT EXISTS idx_variants_barcode ON product_variants(sku_or_barcode)');
+        } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE sales ADD COLUMN variant_id TEXT');
+        } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE sales ADD COLUMN variant_name TEXT');
+        } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE quotation_items ADD COLUMN variant_id TEXT');
+        } catch (_) {}
+        try {
+          await db.execute('ALTER TABLE quotation_items ADD COLUMN variant_name TEXT');
+        } catch (_) {}
+        try {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS quotations (
+              id TEXT PRIMARY KEY,
+              business_id TEXT NOT NULL,
+              quotation_number TEXT NOT NULL,
+              customer_name TEXT,
+              customer_phone TEXT,
+              total_amount REAL NOT NULL,
+              discount_amount REAL NOT NULL DEFAULT 0.0,
+              notes TEXT,
+              status TEXT NOT NULL DEFAULT 'PENDIENTE',
+              valid_until TEXT,
+              created_at TEXT NOT NULL,
+              seller_name TEXT
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS quotation_items (
+              id TEXT PRIMARY KEY,
+              quotation_id TEXT NOT NULL,
+              product_id TEXT NOT NULL,
+              product_name TEXT NOT NULL,
+              quantity INTEGER NOT NULL,
+              unit_price REAL NOT NULL,
+              subtotal REAL NOT NULL,
+              variant_id TEXT,
+              variant_name TEXT
+            )
+          ''');
+        } catch (_) {}
       },
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
@@ -167,9 +239,30 @@ class AppDatabase {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,
+        has_variants INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
       )
     ''');
+
+    // 4.1 Tabla de Variantes de Producto (Tallas / Colores / Presentaciones)
+    await db.execute('''
+      CREATE TABLE product_variants (
+        id TEXT PRIMARY KEY,
+        business_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        attribute_name TEXT NOT NULL DEFAULT 'Talla',
+        attribute_value TEXT NOT NULL,
+        sku_or_barcode TEXT,
+        stock INTEGER NOT NULL DEFAULT 0,
+        additional_price REAL DEFAULT 0.0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 0,
+        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_variants_product ON product_variants(product_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_variants_barcode ON product_variants(sku_or_barcode)');
 
     // 5. Tabla de Clientes (aislados por empresa)
     await db.execute('''
@@ -261,6 +354,38 @@ class AppDatabase {
       )
     ''');
 
+    // 10. Tabla de Cotizaciones / Proformas (aisladas por empresa)
+    await db.execute('''
+      CREATE TABLE quotations (
+        id TEXT PRIMARY KEY,
+        business_id TEXT NOT NULL,
+        quotation_number TEXT NOT NULL,
+        customer_name TEXT,
+        customer_phone TEXT,
+        total_amount REAL NOT NULL,
+        discount_amount REAL NOT NULL DEFAULT 0.0,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'PENDIENTE',
+        valid_until TEXT,
+        created_at TEXT NOT NULL,
+        seller_name TEXT,
+        FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE quotation_items (
+        id TEXT PRIMARY KEY,
+        quotation_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        subtotal REAL NOT NULL,
+        FOREIGN KEY (quotation_id) REFERENCES quotations (id) ON DELETE CASCADE
+      )
+    ''');
+
     // Índices de alto rendimiento
     await db.execute('CREATE INDEX idx_businesses_user ON businesses(user_id)');
     await db.execute('CREATE INDEX idx_products_business ON products(business_id)');
@@ -271,6 +396,7 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_customers_business ON customers(business_id)');
     await db.execute('CREATE INDEX idx_members_biz ON business_members(business_id)');
     await db.execute('CREATE INDEX idx_members_email ON business_members(email)');
+    await db.execute('CREATE INDEX idx_quotations_biz ON quotations(business_id)');
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

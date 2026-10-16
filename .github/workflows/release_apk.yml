@@ -46,11 +46,13 @@ jobs:
           name: Stockealo ${{ github.ref_name }}
           body: |
             ## 🚀 Novedades de la versión ${{ github.ref_name }}
-            - 🎨 **Nuevo Sistema de Diseño Obsidian Violet Bento**: Interfaces de alta legibilidad, contraste y elegancia visual.
-            - 📊 **Gráficos Interactivos**: Indicadores en tiempo real con mira táctil y valores en vivo.
-            - 🏷️ **Inventario Organizado A-Z**: Orden predeterminado alfabético y barra de herramientas rápida.
-            - 🔍 **Detalle de Producto Bento**: Nueva ficha comercial con métricas y valorización de stock.
-            - 🧾 **Historial de Ventas**: Filtros por fecha (hoy, 7 días, mes, rango), métodos de pago y botón rápido para registrar ventas.
-            - 📸 **Nuevo Selector de Cámara/Galería**: Experiencia visual Bento optimizada.
+            - 👗 **Variantes de Producto (Tallas, Colores y Modelos)**: Creación opcional de variantes con stock independiente por talla/color (presets rápidos de ropa y calzado, códigos de barras por talla y selector visual en el punto de venta).
+            - 🛒 **Terminal POS & Carrito Multi-Producto**: Facturación unificada para múltiples productos en una sola compra, buscador integrado, lector de código de barras y preservación de la venta rápida de 1 producto en 3 segundos.
+            - 🏷️ **Motor de Descuentos por Mayor & Blindaje Anti-Pérdidas**: Descuentos en porcentaje (%) o monto fijo ($) con validación matemática en vivo para proteger la rentabilidad y bloquear ventas a pérdida en cajeros.
+            - 📄 **Gestor de Cotizaciones / Proformas**: Creación de presupuestos con validez de 15 días, compartibles por WhatsApp y convertibles a venta final en 1 solo clic con validación automática de inventario.
+            - 🤖 **Stocky Cyber-Bot & Copiloto Comercial**: Nueva anatomía con propulsores de levitación iónica, LED reactivo y asistente inteligente en el Dashboard con diagnósticos proactivos de inventario y fiados.
+            - 📱 **Catálogo para Redes Sociales & Historias**: Exportación dual en PDF y tarjetas PNG 9:16 en Ultra-HD para WhatsApp e Instagram Stories, con selector de densidad (1, 2, 4 o 6 productos) y pedidos directos a WhatsApp.
+            - 🔔 **Notificaciones Push / Realtime en Vivo**: Alertas instantáneas y campanita con badge cuando cajeros registran ventas en tiempo real, sin requerir configuración manual.
+            - 🛡️ **Seguridad y Blindaje de Roles**: Protección total para cajeros (costos de compra y márgenes ocultos; acceso restringido para crear o modificar catálogo).
           draft: false
           prerelease: false

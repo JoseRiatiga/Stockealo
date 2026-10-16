@@ -8,17 +8,21 @@ import 'stock_status_badge.dart';
 class ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback onTap;
-  final VoidCallback onAdjustStock;
+  final VoidCallback? onAdjustStock;
   final VoidCallback? onSale;
   final EdgeInsetsGeometry? margin;
+  final bool showMargin;
+  final bool canAdjustStock;
 
   const ProductCard({
     super.key,
     required this.product,
     required this.onTap,
-    required this.onAdjustStock,
+    this.onAdjustStock,
     this.onSale,
     this.margin,
+    this.showMargin = true,
+    this.canAdjustStock = true,
   });
 
   @override
@@ -78,6 +82,24 @@ class ProductCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (product.hasVariants) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF8B5CF6).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Variantes',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF8B5CF6),
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -97,11 +119,12 @@ class ProductCard extends StatelessWidget {
                     // Nombre del producto
                     Text(
                       product.name,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 14.5,
                         fontWeight: FontWeight.bold,
+                        height: 1.25,
                         color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                       ),
                     ),
@@ -120,8 +143,8 @@ class ProductCard extends StatelessWidget {
                             color: Color(0xFF059669),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        if (product.purchasePrice > 0)
+                        if (showMargin && product.purchasePrice > 0) ...[
+                          const SizedBox(width: 8),
                           Text(
                             '+${product.profitMargin.toStringAsFixed(0)}%',
                             style: TextStyle(
@@ -132,6 +155,7 @@ class ProductCard extends StatelessWidget {
                                   : const Color(0xFFD97706),
                             ),
                           ),
+                        ],
                       ],
                     ),
                   ],
@@ -163,13 +187,14 @@ class ProductCard extends StatelessWidget {
                           tooltip: 'Registrar Venta',
                           onPressed: onSale,
                         ),
-                      // Botón para ajuste rápido de stock
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.edit_note, size: 22, color: Color(0xFF64748B)),
-                        tooltip: 'Ajustar Stock',
-                        onPressed: onAdjustStock,
-                      ),
+                      // Botón para ajuste rápido de stock (solo para Dueño / Admin)
+                      if (canAdjustStock && onAdjustStock != null)
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.edit_note, size: 22, color: Color(0xFF64748B)),
+                          tooltip: 'Ajustar Stock',
+                          onPressed: onAdjustStock,
+                        ),
                     ],
                   ),
                 ],

@@ -8,19 +8,28 @@ import '../../../business/data/business_repository.dart';
 import '../../models/sale.dart';
 
 class DigitalTicketModal extends StatelessWidget {
-  final Sale sale;
+  final Sale? sale;
+  final List<Sale>? salesList;
   final String? businessName;
+  final String? invoiceNumber;
+  final double? discountAmount;
 
   const DigitalTicketModal({
     super.key,
-    required this.sale,
+    this.sale,
+    this.salesList,
     this.businessName,
-  });
+    this.invoiceNumber,
+    this.discountAmount,
+  }) : assert(sale != null || (salesList != null && salesList.length > 0));
 
   static Future<void> show(
     BuildContext context, {
-    required Sale sale,
+    Sale? sale,
+    List<Sale>? salesList,
     String? businessName,
+    String? invoiceNumber,
+    double? discountAmount,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -29,36 +38,54 @@ class DigitalTicketModal extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => DigitalTicketModal(
         sale: sale,
+        salesList: salesList,
         businessName: businessName,
+        invoiceNumber: invoiceNumber,
+        discountAmount: discountAmount,
       ),
     );
   }
 
+  List<Sale> get _items => salesList ?? (sale != null ? [sale!] : <Sale>[]);
+  Sale get _primarySale => _items.first;
+
+  double get _totalAmount => _items.fold(0.0, (sum, s) => sum + s.totalAmount);
+  double get _discount => discountAmount ?? 0.0;
+  double get _subtotal => _totalAmount + _discount;
+
   String _generateTicketText(String storeName) {
     final dateFormat = DateFormat('dd/MM/yyyy hh:mm a');
-    final formattedDate = dateFormat.format(sale.date);
-    final shortId = sale.id.length >= 8 ? sale.id.substring(0, 8).toUpperCase() : sale.id.toUpperCase();
+    final formattedDate = dateFormat.format(_primarySale.date);
+    final ticketNo = invoiceNumber ??
+        (_primarySale.id.length >= 8 ? _primarySale.id.substring(0, 8).toUpperCase() : _primarySale.id.toUpperCase());
 
     final buffer = StringBuffer();
     buffer.writeln('🧾 *COMPROBANTE DE VENTA*');
     buffer.writeln('🏪 *$storeName*');
     buffer.writeln('📅 Fecha: $formattedDate');
-    buffer.writeln('🔢 N° Ticket: #$shortId');
+    buffer.writeln('🔢 N° Factura / Ticket: $ticketNo');
     buffer.writeln('--------------------------------');
-    buffer.writeln('🛒 *Detalle:*');
-    buffer.writeln('• ${sale.quantity}x ${sale.productName}');
-    buffer.writeln('  Precio: ${CurrencyFormatter.formatCOP(sale.unitPrice)} c/u');
-    buffer.writeln('  Subtotal: ${CurrencyFormatter.formatCOP(sale.totalAmount)}');
+    buffer.writeln('🛒 *Detalle de compra:*');
+    for (final item in _items) {
+      buffer.writeln('• ${item.quantity}x ${item.productName}');
+      buffer.writeln('  Precio: ${CurrencyFormatter.formatCOP(item.unitPrice)} c/u | Total: ${CurrencyFormatter.formatCOP(item.totalAmount)}');
+    }
     buffer.writeln('--------------------------------');
-    buffer.writeln('💰 *TOTAL A PAGAR:* ${CurrencyFormatter.formatCOP(sale.totalAmount)}');
-    buffer.writeln('💳 *Método de pago:* ${sale.paymentMethod}');
-    if (sale.customerName?.isNotEmpty == true) {
-      buffer.writeln('👤 *Cliente:* ${sale.customerName}');
+    if (_discount > 0) {
+      buffer.writeln('Subtotal: ${CurrencyFormatter.formatCOP(_subtotal)}');
+      buffer.writeln('🏷️ Descuento: -${CurrencyFormatter.formatCOP(_discount)}');
+      buffer.writeln('🎉 *¡Ahorro total:* ${CurrencyFormatter.formatCOP(_discount)}*');
+      buffer.writeln('--------------------------------');
     }
-    if (sale.sellerName?.isNotEmpty == true) {
-      buffer.writeln('👤 *Atendido por:* ${sale.sellerName}');
+    buffer.writeln('💰 *TOTAL A PAGAR:* ${CurrencyFormatter.formatCOP(_totalAmount)}');
+    buffer.writeln('💳 *Método de pago:* ${_primarySale.paymentMethod}');
+    if (_primarySale.customerName?.isNotEmpty == true) {
+      buffer.writeln('👤 *Cliente:* ${_primarySale.customerName}');
     }
-    if (sale.paymentMethod == 'FIADO') {
+    if (_primarySale.sellerName?.isNotEmpty == true) {
+      buffer.writeln('👤 *Atendido por:* ${_primarySale.sellerName}');
+    }
+    if (_primarySale.paymentMethod == 'FIADO') {
       buffer.writeln('⚠️ *Estado:* Venta a Crédito (Fiado)');
     }
     buffer.writeln('--------------------------------');
@@ -100,7 +127,6 @@ class DigitalTicketModal extends StatelessWidget {
     final activeBiz = BusinessRepository.instance.currentActiveBusiness;
     final storeName = businessName ?? activeBiz?.name ?? 'Mi Negocio';
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
-    final shortId = sale.id.length >= 8 ? sale.id.substring(0, 8).toUpperCase() : sale.id.toUpperCase();
 
     return Container(
       margin: const EdgeInsets.only(top: 40),
@@ -184,11 +210,11 @@ class DigitalTicketModal extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            dateFormat.format(sale.date),
+                            dateFormat.format(_primarySale.date),
                             style: TextStyle(fontSize: 12, color: textMuted),
                           ),
                           Text(
-                            'Ticket #$shortId',
+                            'Ticket #${invoiceNumber ?? (_primarySale.id.length >= 8 ? _primarySale.id.substring(0, 8).toUpperCase() : _primarySale.id.toUpperCase())}',
                             style: TextStyle(fontSize: 11, color: textMuted, fontWeight: FontWeight.w500),
                           ),
                         ],
@@ -205,31 +231,84 @@ class DigitalTicketModal extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${sale.quantity}x ${sale.productName}',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textMain),
+                    ..._items.map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${item.quantity}x ${item.productName}',
+                                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: textMain),
+                                  ),
+                                  Text(
+                                    '${CurrencyFormatter.formatCOP(item.unitPrice)} c/u',
+                                    style: TextStyle(fontSize: 11.5, color: textMuted),
+                                  ),
+                                ],
                               ),
+                            ),
+                            Text(
+                              CurrencyFormatter.formatCOP(item.totalAmount),
+                              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: textMain),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const Divider(height: 18, thickness: 1),
+
+                    // Desglose de Descuentos si aplica
+                    if (_discount > 0) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Subtotal:', style: TextStyle(fontSize: 13, color: textMuted)),
+                          Text(
+                            CurrencyFormatter.formatCOP(_subtotal),
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textMain),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.discount_outlined, size: 14, color: Color(0xFF10B981)),
+                              SizedBox(width: 4),
                               Text(
-                                '${CurrencyFormatter.formatCOP(sale.unitPrice)} c/u',
-                                style: TextStyle(fontSize: 12, color: textMuted),
+                                'Descuento aplicado:',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
                               ),
                             ],
                           ),
+                          Text(
+                            '-${CurrencyFormatter.formatCOP(_discount)}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        Text(
-                          CurrencyFormatter.formatCOP(sale.totalAmount),
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textMain),
+                        child: Text(
+                          '🎉 ¡Ahorro del cliente: ${CurrencyFormatter.formatCOP(_discount)}!',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
                         ),
-                      ],
-                    ),
-                    const Divider(height: 24, thickness: 1),
+                      ),
+                      const Divider(height: 18, thickness: 1),
+                    ],
 
                     // Total y Pago
                     Row(
@@ -237,7 +316,7 @@ class DigitalTicketModal extends StatelessWidget {
                       children: [
                         Text('TOTAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain)),
                         Text(
-                          CurrencyFormatter.formatCOP(sale.totalAmount),
+                          CurrencyFormatter.formatCOP(_totalAmount),
                           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
                         ),
                       ],
@@ -251,17 +330,17 @@ class DigitalTicketModal extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: sale.paymentMethod == 'FIADO'
+                            color: _primarySale.paymentMethod == 'FIADO'
                                 ? (isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7))
                                 : (isDark ? const Color(0xFF064E3B).withOpacity(0.5) : const Color(0xFFECFDF5)),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            sale.paymentMethod,
+                            _primarySale.paymentMethod,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: sale.paymentMethod == 'FIADO'
+                              color: _primarySale.paymentMethod == 'FIADO'
                                   ? (isDark ? const Color(0xFFFCD34D) : const Color(0xFFD97706))
                                   : (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)),
                             ),
@@ -270,24 +349,24 @@ class DigitalTicketModal extends StatelessWidget {
                       ],
                     ),
 
-                    if (sale.customerName?.isNotEmpty == true) ...[
+                    if (_primarySale.customerName?.isNotEmpty == true) ...[
                       const SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Cliente:', style: TextStyle(fontSize: 12, color: textMuted)),
-                          Text(sale.customerName!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textMain)),
+                          Text(_primarySale.customerName!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textMain)),
                         ],
                       ),
                     ],
 
-                    if (sale.sellerName?.isNotEmpty == true) ...[
+                    if (_primarySale.sellerName?.isNotEmpty == true) ...[
                       const SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Atendido por:', style: TextStyle(fontSize: 12, color: textMuted)),
-                          Text(sale.sellerName!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textMain)),
+                          Text(_primarySale.sellerName!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textMain)),
                         ],
                       ),
                     ],

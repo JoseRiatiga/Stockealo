@@ -1,0 +1,411 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/widgets/stocky_empty_state.dart';
+import '../../../products/data/product_repository.dart';
+import '../../../products/models/product_variant.dart';
+import '../../data/sales_repository.dart';
+import '../../models/cart_item.dart';
+import '../../models/quotation.dart';
+import 'digital_ticket_modal.dart';
+
+class QuotationsListModal extends StatefulWidget {
+  final String businessId;
+
+  const QuotationsListModal({super.key, required this.businessId});
+
+  static Future<void> show(BuildContext context, {required String businessId}) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => QuotationsListModal(businessId: businessId),
+    );
+  }
+
+  @override
+  State<QuotationsListModal> createState() => _QuotationsListModalState();
+}
+
+class _QuotationsListModalState extends State<QuotationsListModal> {
+  final _salesRepo = SalesRepository();
+  final _productRepo = ProductRepository();
+  List<Quotation> _quotations = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuotations();
+  }
+
+  Future<void> _loadQuotations() async {
+    setState(() => _isLoading = true);
+    try {
+      final list = await _salesRepo.getQuotations(businessId: widget.businessId);
+      if (mounted) {
+        setState(() {
+          _quotations = list;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _shareQuotationViaWhatsApp(Quotation q) {
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    final buffer = StringBuffer();
+    buffer.writeln('📄 *COTIZACIÓN / PRESUPUESTO COMERCIAL*');
+    buffer.writeln('🔢 N°: ${q.quotationNumber}');
+    buffer.writeln('📅 Fecha: ${dateFormat.format(q.createdAt)}');
+    if (q.validUntil != null) {
+      buffer.writeln('⏳ Validez: hasta el ${dateFormat.format(q.validUntil!)}');
+    }
+    if (q.customerName?.isNotEmpty == true) {
+      buffer.writeln('👤 Para: ${q.customerName}');
+    }
+    buffer.writeln('--------------------------------');
+    buffer.writeln('🛒 *Productos Cotizados:*');
+    for (final item in q.items) {
+      buffer.writeln('• ${item.quantity}x ${item.productName}');
+      buffer.writeln('  Precio: ${CurrencyFormatter.formatCOP(item.unitPrice)} c/u | Subtotal: ${CurrencyFormatter.formatCOP(item.subtotal)}');
+    }
+    buffer.writeln('--------------------------------');
+    if (q.discountAmount > 0) {
+      buffer.writeln('Subtotal: ${CurrencyFormatter.formatCOP(q.totalAmount + q.discountAmount)}');
+      buffer.writeln('🏷️ Descuento especial: -${CurrencyFormatter.formatCOP(q.discountAmount)}');
+      buffer.writeln('--------------------------------');
+    }
+    buffer.writeln('💰 *TOTAL ESTIMADO:* ${CurrencyFormatter.formatCOP(q.totalAmount)}');
+    if (q.notes?.isNotEmpty == true) {
+      buffer.writeln('📝 Notas: ${q.notes}');
+    }
+    buffer.writeln('--------------------------------');
+    buffer.writeln('Para confirmar y preparar tu pedido, responde a este mensaje.');
+    buffer.writeln('Emitido con Stockealo Pro 📦');
+
+    Share.share(buffer.toString(), subject: 'Cotización ${q.quotationNumber}');
+  }
+
+  Future<void> _convertQuotationToSale(Quotation q) async {
+    if (q.status == 'FACTURADA') {
+      AppToast.show(context, message: 'Esta cotización ya fue facturada.', type: ToastType.warning);
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Facturar Cotización?'),
+        content: Text(
+          'Se descontarán las unidades del inventario y se registrará la venta formal por ${CurrencyFormatter.formatCOP(q.totalAmount)}.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar y Facturar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    try {
+      // Reconstruir CartItems con productos frescos de la base de datos
+      final List<CartItem> cartItems = [];
+      for (final qItem in q.items) {
+        final prod = await _productRepo.getProductById(qItem.productId, widget.businessId);
+        if (prod == null) {
+          throw Exception('El producto "${qItem.productName}" ya no existe en el catálogo.');
+        }
+
+        ProductVariant? matchedVariant;
+        if (qItem.variantId != null && prod.hasVariants) {
+          for (final v in prod.variants) {
+            if (v.id == qItem.variantId) {
+              matchedVariant = v;
+              break;
+            }
+          }
+        }
+
+        final available = matchedVariant != null ? matchedVariant.stock : prod.stock;
+        if (available < qItem.quantity) {
+          throw Exception('Stock insuficiente para "${qItem.productName}". Quedan $available y la cotización pide ${qItem.quantity}.');
+        }
+
+        cartItems.add(CartItem(
+          product: prod,
+          variant: matchedVariant,
+          quantity: qItem.quantity,
+          customUnitPrice: qItem.unitPrice,
+        ));
+      }
+
+      final sales = await _salesRepo.recordMultiProductSale(
+        businessId: widget.businessId,
+        items: cartItems,
+        paymentMethod: 'EFECTIVO',
+        customerName: q.customerName,
+        discountAmount: q.discountAmount,
+        notes: 'Facturada desde Cotización ${q.quotationNumber}',
+      );
+
+      await _salesRepo.markQuotationAsBilled(q.id);
+
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: '¡Cotización ${q.quotationNumber} facturada con éxito!',
+          type: ToastType.success,
+        );
+        _loadQuotations();
+        DigitalTicketModal.show(
+          context,
+          salesList: sales,
+          discountAmount: q.discountAmount,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.show(context, message: '$e', type: ToastType.error);
+      }
+    }
+  }
+
+  Future<void> _deleteQuotation(Quotation q) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar Cotización?'),
+        content: Text('Se eliminará ${q.quotationNumber}. Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _salesRepo.deleteQuotation(q.id);
+      _loadQuotations();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF131126) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
+    final cardBg = isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC);
+    final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 20),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        border: Border.all(color: borderColor, width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.description_outlined, color: Color(0xFF8B5CF6), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cotizaciones y Presupuestos',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain),
+                      ),
+                      Text(
+                        '${_quotations.length} registradas (no descuentan stock)',
+                        style: TextStyle(fontSize: 11, color: textMuted),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B5CF6)))
+                : _quotations.isEmpty
+                    ? const StockyEmptyState(
+                        title: 'No hay cotizaciones pendientes',
+                        message: 'Cuando guardes una venta como proforma o cotización, aparecerá aquí lista para enviar o facturar en 1 clic.',
+                        mascotSize: 72,
+                      )
+                    : ListView.separated(
+                        itemCount: _quotations.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, idx) {
+                          final q = _quotations[idx];
+                          final isBilled = q.status == 'FACTURADA';
+
+                          return Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: cardBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isBilled
+                                    ? const Color(0xFF10B981).withOpacity(0.3)
+                                    : borderColor,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          q.quotationNumber,
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: textMain),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isBilled
+                                                ? const Color(0xFF10B981).withOpacity(0.15)
+                                                : const Color(0xFFF59E0B).withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            q.status,
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: isBilled ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      CurrencyFormatter.formatCOP(q.totalAmount),
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+
+                                if (q.customerName?.isNotEmpty == true)
+                                  Text(
+                                    'Cliente: ${q.customerName}',
+                                    style: TextStyle(fontSize: 12, color: textMuted),
+                                  ),
+
+                                const SizedBox(height: 6),
+                                // Resumen de ítems
+                                Text(
+                                  q.items.map((i) => '${i.quantity}x ${i.productName}').join(' • '),
+                                  style: TextStyle(fontSize: 11.5, color: textMain.withOpacity(0.85)),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Botones de acción
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                                      tooltip: 'Eliminar',
+                                      onPressed: () => _deleteQuotation(q),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.share, size: 14),
+                                      label: const Text('WhatsApp', style: TextStyle(fontSize: 11.5)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFF10B981),
+                                        side: const BorderSide(color: Color(0xFF10B981)),
+                                        visualDensity: VisualDensity.compact,
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      ),
+                                      onPressed: () => _shareQuotationViaWhatsApp(q),
+                                    ),
+                                    if (!isBilled) ...[
+                                      const SizedBox(width: 8),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.point_of_sale_rounded, size: 14),
+                                        label: const Text('Facturar', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF8B5CF6),
+                                          foregroundColor: Colors.white,
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        ),
+                                        onPressed: () => _convertQuotationToSale(q),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}

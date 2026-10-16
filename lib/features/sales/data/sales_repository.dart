@@ -4,6 +4,8 @@ import '../../../core/services/supabase_service.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../products/models/product.dart';
 import '../models/sale.dart';
+import '../models/cart_item.dart';
+import '../models/quotation.dart';
 
 class SalesRepository {
   final AppDatabase _dbProvider = AppDatabase.instance;
@@ -146,6 +148,326 @@ class SalesRepository {
     SupabaseService.instance.updateProductStockInCloud(product.id, newStock);
 
     return sale;
+  }
+
+  /// Registra una venta multi-producto (carrito) con descuento mayorista y factura unificada
+  Future<List<Sale>> recordMultiProductSale({
+    required String businessId,
+    required List<CartItem> items,
+    required String paymentMethod, // 'EFECTIVO' | 'TRANSFERENCIA' | 'FIADO'
+    String? customerName,
+    double discountAmount = 0.0,
+    double discountPercent = 0.0,
+    String? notes,
+  }) async {
+    if (items.isEmpty) {
+      throw Exception('El carrito está vacío. Agrega al menos un producto.');
+    }
+
+    final db = await _dbProvider.database;
+
+    // 1. Validar stock de todos los productos y variantes antes de iniciar
+    for (final item in items) {
+      final available = item.availableStock;
+      if (available <= 0) {
+        throw Exception('El producto "${item.displayName}" está agotado.');
+      }
+      if (item.quantity > available) {
+        throw Exception('Stock insuficiente para "${item.displayName}". Quedan $available unidades.');
+      }
+      if (item.quantity <= 0) {
+        throw Exception('La cantidad de "${item.displayName}" debe ser mayor a 0.');
+      }
+    }
+
+    final double totalSubtotal = items.fold(0.0, (sum, i) => sum + i.subtotal);
+    final double finalDiscount = discountAmount > 0
+        ? discountAmount
+        : (discountPercent > 0 ? (totalSubtotal * (discountPercent / 100.0)) : 0.0);
+    final double finalTotal = (totalSubtotal - finalDiscount).clamp(0.0, double.infinity);
+
+    final now = DateTime.now();
+    final invoiceNumber = '#INV-${now.millisecondsSinceEpoch.toString().substring(5)}';
+
+    final currentUser = AuthRepository.instance.currentUser;
+    final seller = (currentUser?.name != null && currentUser!.name!.trim().isNotEmpty)
+        ? currentUser.name!
+        : (currentUser?.email.split('@').first ?? 'Vendedor');
+
+    final List<Sale> createdSales = [];
+
+    await db.transaction((txn) async {
+      String? customerId;
+      // Registrar o actualizar deuda de fiado si corresponde
+      if (paymentMethod == 'FIADO' && customerName != null && customerName.trim().isNotEmpty) {
+        final cleanName = customerName.trim();
+        final List<Map<String, dynamic>> existingCustomer = await txn.query(
+          'customers',
+          where: 'business_id = ? AND LOWER(name) = ?',
+          whereArgs: [businessId, cleanName.toLowerCase()],
+          limit: 1,
+        );
+
+        if (existingCustomer.isNotEmpty) {
+          customerId = existingCustomer.first['id'] as String;
+          final currentDebt = (existingCustomer.first['debt_balance'] as num).toDouble();
+          await txn.update(
+            'customers',
+            {'debt_balance': currentDebt + finalTotal},
+            where: 'id = ? AND business_id = ?',
+            whereArgs: [customerId, businessId],
+          );
+        } else {
+          customerId = const Uuid().v4();
+          await txn.insert('customers', {
+            'id': customerId,
+            'business_id': businessId,
+            'name': cleanName,
+            'debt_balance': finalTotal,
+            'created_at': now.toIso8601String(),
+            'is_synced': 0,
+          });
+        }
+      }
+
+      for (final item in items) {
+        final product = item.product;
+        final newStock = product.stock - item.quantity;
+        final saleId = const Uuid().v4();
+
+        // Proporción del descuento asignado a este ítem
+        final double itemProportion = totalSubtotal > 0 ? (item.subtotal / totalSubtotal) : (1.0 / items.length);
+        final double itemDiscount = finalDiscount * itemProportion;
+        final double itemTotal = (item.subtotal - itemDiscount).clamp(0.0, double.infinity);
+        final double itemProfit = itemTotal - item.totalCost;
+
+        // Descontar stock específico de la variante si aplica
+        if (item.variant != null) {
+          final newVariantStock = item.variant!.stock - item.quantity;
+          await txn.update(
+            'product_variants',
+            {
+              'stock': newVariantStock,
+              'updated_at': now.toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [item.variant!.id],
+          );
+        }
+
+        // Descontar stock general en products
+        await txn.update(
+          'products',
+          {
+            'stock': newStock,
+            'updated_at': now.toIso8601String(),
+          },
+          where: 'id = ? AND business_id = ?',
+          whereArgs: [product.id, businessId],
+        );
+
+        // Movimiento en Kardex
+        await txn.insert('stock_movements', {
+          'id': const Uuid().v4(),
+          'business_id': businessId,
+          'product_id': product.id,
+          'type': 'SALIDA_VENTA',
+          'quantity': item.quantity,
+          'resulting_stock': newStock,
+          'reason': item.variant != null
+              ? 'Venta POS $invoiceNumber - ${item.variant!.attributeValue} ($paymentMethod)'
+              : 'Venta POS $invoiceNumber ($paymentMethod)',
+          'date': now.toIso8601String(),
+        });
+
+        // Insertar en sales
+        await txn.insert('sales', {
+          'id': saleId,
+          'business_id': businessId,
+          'product_id': product.id,
+          'product_name': item.displayName,
+          'product_photo_path': product.photoPath,
+          'quantity': item.quantity,
+          'customer_id': customerId,
+          'customer_name': customerName?.trim().isNotEmpty == true ? customerName!.trim() : null,
+          'seller_name': seller,
+          'date': now.toIso8601String(),
+          'total': itemTotal,
+          'total_cost': item.totalCost,
+          'net_profit': itemProfit,
+          'payment_method': paymentMethod,
+          'payment_status': paymentMethod == 'FIADO' ? 'PENDIENTE' : 'PAGADO',
+          'notes': notes,
+          'invoice_number': invoiceNumber,
+          'discount_amount': itemDiscount,
+          'variant_id': item.variant?.id,
+          'variant_name': item.variant?.attributeValue,
+          'created_at': now.toIso8601String(),
+          'is_synced': 0,
+        });
+
+        // Insertar en sale_items
+        await txn.insert('sale_items', {
+          'id': const Uuid().v4(),
+          'sale_id': saleId,
+          'product_id': product.id,
+          'quantity': item.quantity,
+          'unit_price': item.unitPrice,
+          'unit_cost': item.unitCost,
+          'subtotal': itemTotal,
+        });
+
+        final sale = Sale(
+          id: saleId,
+          businessId: businessId,
+          productId: product.id,
+          productName: item.displayName,
+          productPhotoPath: product.photoPath,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          unitCost: item.unitCost,
+          totalAmount: itemTotal,
+          netProfit: itemProfit,
+          paymentMethod: paymentMethod,
+          customerName: customerName,
+          sellerName: seller,
+          date: now,
+          variantId: item.variant?.id,
+          variantName: item.variant?.attributeValue,
+        );
+
+        createdSales.add(sale);
+
+        // Sincronización a la nube en segundo plano
+        SupabaseService.instance.insertSaleToCloud(sale.toMap());
+        SupabaseService.instance.updateProductStockInCloud(product.id, newStock);
+      }
+    });
+
+    return createdSales;
+  }
+
+  /// Guarda una cotización formal (proforma) sin descontar inventario
+  Future<Quotation> recordQuotation({
+    required String businessId,
+    required List<CartItem> items,
+    String? customerName,
+    String? customerPhone,
+    double discountAmount = 0.0,
+    int validDays = 7,
+    String? notes,
+  }) async {
+    if (items.isEmpty) {
+      throw Exception('Agrega al menos un producto para generar una cotización.');
+    }
+
+    final db = await _dbProvider.database;
+    final now = DateTime.now();
+    final quotationId = const Uuid().v4();
+    final quotationNumber = 'COT-${now.millisecondsSinceEpoch.toString().substring(6)}';
+    final validUntil = now.add(Duration(days: validDays));
+
+    final totalSubtotal = items.fold(0.0, (sum, i) => sum + i.subtotal);
+    final totalAmount = (totalSubtotal - discountAmount).clamp(0.0, double.infinity);
+
+    final currentUser = AuthRepository.instance.currentUser;
+    final seller = (currentUser?.name != null && currentUser!.name!.trim().isNotEmpty)
+        ? currentUser.name!
+        : (currentUser?.email.split('@').first ?? 'Vendedor');
+
+    final List<QuotationItem> quotationItems = [];
+
+    await db.transaction((txn) async {
+      await txn.insert('quotations', {
+        'id': quotationId,
+        'business_id': businessId,
+        'quotation_number': quotationNumber,
+        'customer_name': customerName?.trim().isNotEmpty == true ? customerName!.trim() : null,
+        'customer_phone': customerPhone?.trim().isNotEmpty == true ? customerPhone!.trim() : null,
+        'total_amount': totalAmount,
+        'discount_amount': discountAmount,
+        'notes': notes,
+        'status': 'PENDIENTE',
+        'valid_until': validUntil.toIso8601String(),
+        'created_at': now.toIso8601String(),
+        'seller_name': seller,
+      });
+
+      for (final item in items) {
+        final itemId = const Uuid().v4();
+        final qItem = QuotationItem(
+          id: itemId,
+          quotationId: quotationId,
+          productId: item.product.id,
+          productName: item.displayName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal: item.subtotal,
+          variantId: item.variant?.id,
+          variantName: item.variant?.attributeValue,
+        );
+        quotationItems.add(qItem);
+
+        await txn.insert('quotation_items', qItem.toMap());
+      }
+    });
+
+    return Quotation(
+      id: quotationId,
+      businessId: businessId,
+      quotationNumber: quotationNumber,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      totalAmount: totalAmount,
+      discountAmount: discountAmount,
+      notes: notes,
+      status: 'PENDIENTE',
+      validUntil: validUntil,
+      createdAt: now,
+      sellerName: seller,
+      items: quotationItems,
+    );
+  }
+
+  /// Obtiene cotizaciones de la empresa
+  Future<List<Quotation>> getQuotations({required String businessId}) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query(
+      'quotations',
+      where: 'business_id = ?',
+      whereArgs: [businessId],
+      orderBy: 'created_at DESC',
+    );
+
+    final List<Quotation> list = [];
+    for (final row in rows) {
+      final qId = row['id'] as String;
+      final itemRows = await db.query(
+        'quotation_items',
+        where: 'quotation_id = ?',
+        whereArgs: [qId],
+      );
+      final items = itemRows.map((m) => QuotationItem.fromMap(m)).toList();
+      list.add(Quotation.fromMap(row, items));
+    }
+    return list;
+  }
+
+  /// Elimina una cotización
+  Future<void> deleteQuotation(String quotationId) async {
+    final db = await _dbProvider.database;
+    await db.delete('quotations', where: 'id = ?', whereArgs: [quotationId]);
+  }
+
+  /// Marca una cotización como FACTURADA
+  Future<void> markQuotationAsBilled(String quotationId) async {
+    final db = await _dbProvider.database;
+    await db.update(
+      'quotations',
+      {'status': 'FACTURADA'},
+      where: 'id = ?',
+      whereArgs: [quotationId],
+    );
   }
 
   /// Obtener ventas filtradas exclusivamente por la empresa con resolución de foto de producto

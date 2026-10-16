@@ -13,11 +13,15 @@ import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../products/presentation/widgets/product_image_view.dart';
+import '../../../team/data/team_repository.dart';
+import '../../../../core/widgets/stocky_empty_state.dart';
+import '../widgets/quotations_list_modal.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
+  final String? userRole;
 
-  const SalesHistoryScreen({super.key, this.businessId});
+  const SalesHistoryScreen({super.key, this.businessId, this.userRole});
 
   @override
   State<SalesHistoryScreen> createState() => _SalesHistoryScreenState();
@@ -30,6 +34,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   List<Sale> _sales = [];
   Map<String, dynamic> _summary = {};
   bool _isLoading = true;
+  String? _userRole;
+
+  String get _effectiveRole => widget.userRole ?? _userRole ?? 'OWNER';
+  bool get canViewCosts => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
+  bool get canCancelSale => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
 
   // Filtros y paginación
   String _selectedDateFilter = 'all'; // 'all', 'today', '7days', 'month', 'custom'
@@ -103,6 +112,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
     final sales = await _salesRepo.getSales(businessId: bizId);
     final summary = await _salesRepo.getTodaySummary(bizId);
+
+    if (widget.userRole == null) {
+      final user = AuthRepository.instance.currentUser;
+      if (user != null) {
+        try {
+          _userRole = await TeamRepository.instance.getUserRoleInBusiness(
+            businessId: bizId,
+            userId: user.id,
+            userEmail: user.email,
+          );
+        } catch (_) {}
+      }
+    }
 
     if (mounted) {
       setState(() {
@@ -450,32 +472,80 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Ventas Registradas',
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+                        Row(
+                          children: [
+                            Text(
+                              'Ventas Registradas',
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            '${filtered.length} venta${filtered.length == 1 ? '' : 's'}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Text(
+                                '${filtered.length}',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
+                        if (totalPages > 1)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                onPressed: currentPageClamped > 1
+                                    ? () => setState(() => _currentPage--)
+                                    : null,
+                                icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                                color: const Color(0xFF8B5CF6),
+                                disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8B5CF6).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '$currentPageClamped / $totalPages',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF8B5CF6),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                onPressed: currentPageClamped < totalPages
+                                    ? () => setState(() => _currentPage++)
+                                    : null,
+                                icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                                color: const Color(0xFF8B5CF6),
+                                disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
@@ -490,70 +560,22 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 else if (filtered.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF18152F) : const Color(0xFFF3E8FF),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE9D5FF),
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.receipt_long_outlined,
-                                size: 48,
-                                color: Color(0xFF8B5CF6),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _sales.isEmpty ? 'Aún no hay ventas registradas' : 'Sin ventas con estos filtros',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _sales.isEmpty
-                                  ? 'Cuando descuentes productos de stock por venta, aparecerán detallados aquí.'
-                                  : 'Prueba cambiando el rango de fechas o el método de pago seleccionado.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              ),
-                            ),
-                            if (_sales.isNotEmpty) ...[
-                              const SizedBox(height: 14),
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedDateFilter = 'all';
-                                    _selectedPaymentMethod = 'ALL';
-                                    _customDateRange = null;
-                                    _currentPage = 1;
-                                  });
-                                },
-                                icon: const Icon(Icons.refresh_rounded, size: 16),
-                                label: const Text('Limpiar Filtros'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF8B5CF6),
-                                  side: const BorderSide(color: Color(0xFF8B5CF6)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+                    child: StockyEmptyState(
+                      title: _sales.isEmpty ? 'Aún no hay ventas registradas' : 'Sin ventas con estos filtros',
+                      message: _sales.isEmpty
+                          ? 'Cuando descuentes productos de stock por venta, aparecerán detallados aquí en tiempo real.'
+                          : 'Prueba cambiando el rango de fechas o el método de pago seleccionado.',
+                      actionLabel: _sales.isNotEmpty ? 'Limpiar Filtros' : null,
+                      onAction: _sales.isNotEmpty
+                          ? () {
+                              setState(() {
+                                _selectedDateFilter = 'all';
+                                _selectedPaymentMethod = 'ALL';
+                                _customDateRange = null;
+                                _currentPage = 1;
+                              });
+                            }
+                          : null,
                     ),
                   )
                 else ...[
@@ -597,9 +619,48 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Widget _buildFiltersBar(bool isDark) {
+    final bool hasActiveFilter = _selectedDateFilter != 'all' || _selectedPaymentMethod != 'ALL';
+
+    String dateLabel;
+    switch (_selectedDateFilter) {
+      case 'today':
+        dateLabel = 'Hoy';
+        break;
+      case '7days':
+        dateLabel = '7 Días';
+        break;
+      case 'month':
+        dateLabel = 'Este Mes';
+        break;
+      case 'custom':
+        dateLabel = _customDateRange != null
+            ? '${DateFormat('dd/MM').format(_customDateRange!.start)} - ${DateFormat('dd/MM').format(_customDateRange!.end)}'
+            : 'Rango';
+        break;
+      case 'all':
+      default:
+        dateLabel = 'Todas las fechas';
+    }
+
+    String methodLabel;
+    switch (_selectedPaymentMethod) {
+      case 'EFECTIVO':
+        methodLabel = '💵 Efectivo';
+        break;
+      case 'TRANSFERENCIA':
+        methodLabel = '🏦 Transferencia';
+        break;
+      case 'FIADO':
+        methodLabel = '📝 Fiado';
+        break;
+      case 'ALL':
+      default:
+        methodLabel = 'Todos los métodos';
+    }
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF131126) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -607,166 +668,196 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Filtros de Fecha
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.calendar_today_rounded,
-                  size: 14,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  label: 'Todas las fechas',
-                  isSelected: _selectedDateFilter == 'all',
-                  onTap: () => setState(() {
-                    _selectedDateFilter = 'all';
+          // Filtro de Fecha Popup
+          Expanded(
+            child: PopupMenuButton<String>(
+              tooltip: 'Filtrar por fecha',
+              initialValue: _selectedDateFilter,
+              onSelected: (val) {
+                if (val == 'custom') {
+                  _pickCustomDateRange();
+                } else {
+                  setState(() {
+                    _selectedDateFilter = val;
                     _currentPage = 1;
-                  }),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 6),
-                _buildFilterChip(
-                  label: 'Hoy',
-                  isSelected: _selectedDateFilter == 'today',
-                  onTap: () => setState(() {
-                    _selectedDateFilter = 'today';
-                    _currentPage = 1;
-                  }),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 6),
-                _buildFilterChip(
-                  label: 'Últimos 7 días',
-                  isSelected: _selectedDateFilter == '7days',
-                  onTap: () => setState(() {
-                    _selectedDateFilter = '7days';
-                    _currentPage = 1;
-                  }),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 6),
-                _buildFilterChip(
-                  label: 'Este mes',
-                  isSelected: _selectedDateFilter == 'month',
-                  onTap: () => setState(() {
-                    _selectedDateFilter = 'month';
-                    _currentPage = 1;
-                  }),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 6),
-                _buildFilterChip(
-                  label: _customDateRange != null && _selectedDateFilter == 'custom'
-                      ? '${DateFormat('dd/MM').format(_customDateRange!.start)} - ${DateFormat('dd/MM').format(_customDateRange!.end)}'
-                      : 'Rango 📅',
-                  isSelected: _selectedDateFilter == 'custom',
-                  onTap: _pickCustomDateRange,
-                  isDark: isDark,
-                ),
+                  });
+                }
+              },
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              color: isDark ? const Color(0xFF18152F) : Colors.white,
+              itemBuilder: (ctx) => [
+                _buildPopupItem('all', '📅 Todas las fechas', _selectedDateFilter == 'all', isDark),
+                _buildPopupItem('today', '☀️ Hoy', _selectedDateFilter == 'today', isDark),
+                _buildPopupItem('7days', '⏱️ Últimos 7 días', _selectedDateFilter == '7days', isDark),
+                _buildPopupItem('month', '📆 Este mes', _selectedDateFilter == 'month', isDark),
+                _buildPopupItem('custom', '🗓️ Rango personalizado...', _selectedDateFilter == 'custom', isDark),
               ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _selectedDateFilter != 'all'
+                      ? const Color(0xFF8B5CF6).withOpacity(0.12)
+                      : (isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _selectedDateFilter != 'all'
+                        ? const Color(0xFF8B5CF6)
+                        : (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 14,
+                      color: _selectedDateFilter != 'all'
+                          ? const Color(0xFF8B5CF6)
+                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        dateLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: _selectedDateFilter != 'all' ? FontWeight.bold : FontWeight.w500,
+                          color: _selectedDateFilter != 'all'
+                              ? const Color(0xFF8B5CF6)
+                              : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_drop_down_rounded,
+                      size: 18,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 10),
-          Divider(height: 1, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-          const SizedBox(height: 10),
+          const SizedBox(width: 8),
 
-          // Filtros de Método de Pago
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.filter_list_rounded,
-                  size: 15,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  label: 'Todos los pagos',
-                  isSelected: _selectedPaymentMethod == 'ALL',
-                  onTap: () => setState(() {
-                    _selectedPaymentMethod = 'ALL';
-                    _currentPage = 1;
-                  }),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 6),
-                _buildFilterChip(
-                  label: '💵 Efectivo',
-                  isSelected: _selectedPaymentMethod == 'EFECTIVO',
-                  onTap: () => setState(() {
-                    _selectedPaymentMethod = 'EFECTIVO';
-                    _currentPage = 1;
-                  }),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 6),
-                _buildFilterChip(
-                  label: '🏦 Transferencia',
-                  isSelected: _selectedPaymentMethod == 'TRANSFERENCIA',
-                  onTap: () => setState(() {
-                    _selectedPaymentMethod = 'TRANSFERENCIA';
-                    _currentPage = 1;
-                  }),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 6),
-                _buildFilterChip(
-                  label: '📝 Fiado',
-                  isSelected: _selectedPaymentMethod == 'FIADO',
-                  onTap: () => setState(() {
-                    _selectedPaymentMethod = 'FIADO';
-                    _currentPage = 1;
-                  }),
-                  isDark: isDark,
-                ),
+          // Filtro de Método de Pago Popup
+          Expanded(
+            child: PopupMenuButton<String>(
+              tooltip: 'Filtrar por método',
+              initialValue: _selectedPaymentMethod,
+              onSelected: (val) {
+                setState(() {
+                  _selectedPaymentMethod = val;
+                  _currentPage = 1;
+                });
+              },
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              color: isDark ? const Color(0xFF18152F) : Colors.white,
+              itemBuilder: (ctx) => [
+                _buildPopupItem('ALL', '💳 Todos los métodos', _selectedPaymentMethod == 'ALL', isDark),
+                _buildPopupItem('EFECTIVO', '💵 Efectivo', _selectedPaymentMethod == 'EFECTIVO', isDark),
+                _buildPopupItem('TRANSFERENCIA', '🏦 Transferencia', _selectedPaymentMethod == 'TRANSFERENCIA', isDark),
+                _buildPopupItem('FIADO', '📝 Venta a Fiado', _selectedPaymentMethod == 'FIADO', isDark),
               ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _selectedPaymentMethod != 'ALL'
+                      ? const Color(0xFF059669).withOpacity(0.12)
+                      : (isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _selectedPaymentMethod != 'ALL'
+                        ? const Color(0xFF059669)
+                        : (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.payments_outlined,
+                      size: 14,
+                      color: _selectedPaymentMethod != 'ALL'
+                          ? const Color(0xFF059669)
+                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        methodLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: _selectedPaymentMethod != 'ALL' ? FontWeight.bold : FontWeight.w500,
+                          color: _selectedPaymentMethod != 'ALL'
+                              ? const Color(0xFF059669)
+                              : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_drop_down_rounded,
+                      size: 18,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
+
+          // Botón limpiar filtros si hay alguno activo
+          if (hasActiveFilter) ...[
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedDateFilter = 'all';
+                  _selectedPaymentMethod = 'ALL';
+                  _customDateRange = null;
+                  _currentPage = 1;
+                });
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required bool isDark,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF8B5CF6)
-              : (isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9)),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF8B5CF6)
-                : (isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1)),
+  PopupMenuItem<String> _buildPopupItem(String value, String text, bool isSelected, bool isDark) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected
+                    ? const Color(0xFF8B5CF6)
+                    : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
+              ),
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected
-                ? Colors.white
-                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
-          ),
-        ),
+          if (isSelected)
+            const Icon(Icons.check_rounded, size: 16, color: Color(0xFF8B5CF6)),
+        ],
       ),
     );
   }
@@ -839,7 +930,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               onTap: _navigateToCustomers,
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF131127) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -847,49 +938,106 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     color: isDark ? const Color(0xFF26214A) : const Color(0xFFDBEAFE),
                     width: 1.5,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(9),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1F1C3B) : const Color(0xFFEFF6FF),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.people_alt_rounded, size: 20, color: Color(0xFF38BDF8)),
+                      child: const Icon(Icons.people_alt_rounded, size: 16, color: Color(0xFF38BDF8)),
                     ),
-                    const SizedBox(width: 10),
-                    const Expanded(
+                    const SizedBox(width: 6),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
+                          const Text(
                             'Clientes',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                          ),
-                          SizedBox(height: 1),
-                          Text(
-                            'Fiados y abonos',
-                            style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Fiados',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right, size: 18, color: Color(0xFF38BDF8)),
                   ],
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
+
+          // Tarjeta Cotizaciones / Proformas
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                final bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+                if (bizId != null) {
+                  QuotationsListModal.show(context, businessId: bizId);
+                }
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF131127) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFDDD6FE),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF26214A) : const Color(0xFFF5F3FF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.description_outlined, size: 16, color: Color(0xFF8B5CF6)),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Cotizaciones',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Proformas',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
 
           // Tarjeta Exportar Excel
           Expanded(
@@ -897,7 +1045,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               onTap: _exportToExcel,
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF131127) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -905,43 +1053,40 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     color: isDark ? const Color(0xFF26214A) : const Color(0xFFA7F3D0),
                     width: 1.5,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(9),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF064E3B).withOpacity(0.4) : const Color(0xFFECFDF5),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.table_chart_rounded, size: 20, color: Color(0xFF059669)),
+                      child: const Icon(Icons.table_chart_rounded, size: 16, color: Color(0xFF059669)),
                     ),
-                    const SizedBox(width: 10),
-                    const Expanded(
+                    const SizedBox(width: 6),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
+                          const Text(
                             'Excel',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                          ),
-                          SizedBox(height: 1),
-                          Text(
-                            'Exportar .xlsx',
-                            style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '.xlsx',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.download_rounded, size: 18, color: Color(0xFF059669)),
                   ],
                 ),
               ),
@@ -999,35 +1144,69 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Ganancia Real',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+              if (canViewCosts)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'Ganancia Real',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                        ),
                       ),
-                    ),
-                    Text(
-                      CurrencyFormatter.format(profit),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF059669),
+                      Text(
+                        CurrencyFormatter.format(profit),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF059669),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'Ventas Hoy',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                        ),
+                      ),
+                      Text(
+                        '${_summary['salesCount'] ?? _sales.where((s) {
+                          final n = DateTime.now();
+                          return s.date.year == n.year && s.date.month == n.month && s.date.day == n.day;
+                        }).length} reg.',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
           Divider(height: 24, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
@@ -1277,13 +1456,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     value: CurrencyFormatter.format(unitPrice),
                     isDark: isDark,
                   ),
-                  _buildMetricDivider(isDark),
-                  _buildMetricCell(
-                    label: 'Ganancia',
-                    value: '+${CurrencyFormatter.format(sale.netProfit)}',
-                    isDark: isDark,
-                    valueColor: const Color(0xFF059669),
-                  ),
+                  if (canViewCosts) ...[
+                    _buildMetricDivider(isDark),
+                    _buildMetricCell(
+                      label: 'Ganancia',
+                      value: '+${CurrencyFormatter.format(sale.netProfit)}',
+                      isDark: isDark,
+                      valueColor: const Color(0xFF059669),
+                    ),
+                  ],
                   _buildMetricDivider(isDark),
                   _buildMetricCell(
                     label: 'Total',
@@ -1320,20 +1501,22 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: () => _cancelSale(sale),
-                  icon: const Icon(Icons.undo_rounded, size: 15),
-                  label: const Text(
-                    'Anular',
-                    style: TextStyle(fontSize: 12),
+                if (canCancelSale) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () => _cancelSale(sale),
+                    icon: const Icon(Icons.undo_rounded, size: 15),
+                    label: const Text(
+                      'Anular',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
                   ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
+                ],
               ],
             ),
           ],

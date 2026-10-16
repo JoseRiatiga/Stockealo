@@ -62,8 +62,12 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
         _userRole = role;
       }
 
-      final isCloud = await SupabaseService.instance.isCloudSyncEnabled();
       final members = await _teamRepo.getMembers(_business.id);
+      var isCloud = await SupabaseService.instance.isCloudSyncEnabled();
+      if (members.length > 1 && !isCloud) {
+        await SupabaseService.instance.setCloudSyncEnabled(true);
+        isCloud = true;
+      }
 
       // Auditoría y métricas desde SQLite local
       final db = await AppDatabase.instance.database;
@@ -89,7 +93,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
 
       if (mounted) {
         setState(() {
-          _isCloudSync = isCloud;
+          _isCloudSync = isCloud || members.length > 1;
           _members = members;
           _productsCount = productsCount;
           _salesCount = salesCount;

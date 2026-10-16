@@ -102,7 +102,22 @@ class SupabaseService {
   /// Comprueba si el usuario tiene activada la sincronización en la nube (False por defecto = Local-First)
   Future<bool> isCloudSyncEnabled() async {
     final val = await AppDatabase.instance.getSetting('cloud_sync_enabled');
-    return val == 'true';
+    if (val == 'true') return true;
+
+    // Auto-detección: si la base de datos ya contiene miembros de equipo (>1),
+    // la sincronización en la nube se activa automáticamente para garantizar multi-dispositivo.
+    try {
+      final db = await AppDatabase.instance.database;
+      final count = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT COUNT(*) FROM business_members'),
+      ) ?? 0;
+      if (count > 1) {
+        await setCloudSyncEnabled(true);
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
   }
 
   /// Activa o desactiva la sincronización en la nube

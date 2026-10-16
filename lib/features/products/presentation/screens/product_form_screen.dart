@@ -7,19 +7,50 @@ import '../../../../core/utils/image_helper.dart';
 import '../../data/product_repository.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
+import '../../models/product_variant.dart';
 import 'barcode_scanner_screen.dart';
 import '../widgets/manage_categories_modal.dart';
 import '../widgets/product_image_view.dart';
 import '../../../../core/widgets/image_source_picker_modal.dart';
+import '../../../auth/data/auth_repository.dart';
+import '../../../team/data/team_repository.dart';
+
+class _VariantDraft {
+  String id;
+  String attributeValue;
+  int stock;
+  String? skuOrBarcode;
+  TextEditingController valueController;
+  TextEditingController stockController;
+  TextEditingController barcodeController;
+
+  _VariantDraft({
+    String? id,
+    required this.attributeValue,
+    this.stock = 0,
+    this.skuOrBarcode,
+  })  : id = id ?? const Uuid().v4(),
+        valueController = TextEditingController(text: attributeValue),
+        stockController = TextEditingController(text: stock > 0 ? stock.toString() : '0'),
+        barcodeController = TextEditingController(text: skuOrBarcode ?? '');
+
+  void dispose() {
+    valueController.dispose();
+    stockController.dispose();
+    barcodeController.dispose();
+  }
+}
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
   final String businessId;
+  final String? userRole;
 
   const ProductFormScreen({
     super.key,
     this.productToEdit,
     required this.businessId,
+    this.userRole,
   });
 
   @override
@@ -43,6 +74,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   List<Category> _categories = [];
   bool _isLoading = false;
 
+  // Variantes (Tallas / Colores / Presentaciones)
+  bool _hasVariants = false;
+  String _variantAttributeName = 'Talla';
+  final List<_VariantDraft> _variantDrafts = [];
+
   bool get isEditing => widget.productToEdit != null;
 
   @override
@@ -64,9 +100,128 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _photoPath = p?.photoPath;
     if (p != null) {
       _selectedCategory = p.category;
+      _hasVariants = p.hasVariants;
+      if (p.hasVariants) {
+        if (p.variants.isNotEmpty) {
+          _variantAttributeName = p.variants.first.attributeName;
+          for (final v in p.variants) {
+            final draft = _VariantDraft(
+              id: v.id,
+              attributeValue: v.attributeValue,
+              stock: v.stock,
+              skuOrBarcode: v.skuOrBarcode,
+            );
+            draft.stockController.addListener(_updateTotalStockFromVariants);
+            _variantDrafts.add(draft);
+          }
+        } else {
+          _loadExistingVariants(p.id);
+        }
+      }
     }
 
+    _checkRoleSecurity();
     _loadCategories();
+  }
+
+  Future<void> _loadExistingVariants(String productId) async {
+    final list = await _repository.getVariantsForProduct(productId);
+    if (list.isNotEmpty && mounted) {
+      setState(() {
+        _hasVariants = true;
+        _variantAttributeName = list.first.attributeName;
+        _variantDrafts.clear();
+        for (final v in list) {
+          final draft = _VariantDraft(
+            id: v.id,
+            attributeValue: v.attributeValue,
+            stock: v.stock,
+            skuOrBarcode: v.skuOrBarcode,
+          );
+          draft.stockController.addListener(_updateTotalStockFromVariants);
+          _variantDrafts.add(draft);
+        }
+        _updateTotalStockFromVariants();
+      });
+    }
+  }
+
+  void _updateTotalStockFromVariants() {
+    final total = _variantDrafts.fold(0, (sum, d) {
+      final s = int.tryParse(d.stockController.text.trim()) ?? 0;
+      return sum + s;
+    });
+    _stockController.text = total.toString();
+  }
+
+  void _addVariantDraft([String initialValue = '']) {
+    setState(() {
+      final draft = _VariantDraft(attributeValue: initialValue, stock: 0);
+      draft.stockController.addListener(_updateTotalStockFromVariants);
+      _variantDrafts.add(draft);
+      _updateTotalStockFromVariants();
+    });
+  }
+
+  void _removeVariantDraft(int index) {
+    setState(() {
+      _variantDrafts[index].dispose();
+      _variantDrafts.removeAt(index);
+      _updateTotalStockFromVariants();
+    });
+  }
+
+  void _applyClothingPreset() {
+    setState(() {
+      _variantAttributeName = 'Talla';
+      for (final d in _variantDrafts) {
+        d.dispose();
+      }
+      _variantDrafts.clear();
+      for (final s in ['S', 'M', 'L', 'XL']) {
+        final d = _VariantDraft(attributeValue: s, stock: 0);
+        d.stockController.addListener(_updateTotalStockFromVariants);
+        _variantDrafts.add(d);
+      }
+      _updateTotalStockFromVariants();
+    });
+  }
+
+  void _applyShoePreset() {
+    setState(() {
+      _variantAttributeName = 'Talla';
+      for (final d in _variantDrafts) {
+        d.dispose();
+      }
+      _variantDrafts.clear();
+      for (final s in ['36', '37', '38', '39', '40']) {
+        final d = _VariantDraft(attributeValue: s, stock: 0);
+        d.stockController.addListener(_updateTotalStockFromVariants);
+        _variantDrafts.add(d);
+      }
+      _updateTotalStockFromVariants();
+    });
+  }
+
+  Future<void> _checkRoleSecurity() async {
+    final user = AuthRepository.instance.currentUser;
+    if (user != null) {
+      final role = widget.userRole ??
+          await TeamRepository.instance.getUserRoleInBusiness(
+            businessId: widget.businessId,
+            userId: user.id,
+            userEmail: user.email,
+          );
+      if (role == 'CASHIER' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Acceso restringido: Solo administradores pueden gestionar productos'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+        Navigator.pop(context);
+      }
+    }
   }
 
   @override
@@ -78,6 +233,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _salePriceController.dispose();
     _stockController.dispose();
     _minStockController.dispose();
+    for (final d in _variantDrafts) {
+      d.dispose();
+    }
     super.dispose();
   }
 
@@ -204,13 +362,57 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
     final purchasePrice = double.tryParse(_purchasePriceController.text.trim()) ?? 0.0;
     final salePrice = double.tryParse(_salePriceController.text.trim()) ?? 0.0;
-    final stock = int.tryParse(_stockController.text.trim()) ?? 0;
     final minStock = int.tryParse(_minStockController.text.trim()) ?? 5;
-
+    final productId = widget.productToEdit?.id ?? const Uuid().v4();
     final now = DateTime.now();
 
+    List<ProductVariant> variants = [];
+    if (_hasVariants) {
+      if (_variantDrafts.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor agrega al menos una talla o desactiva la opción de variantes.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      for (final d in _variantDrafts) {
+        final val = d.valueController.text.trim();
+        if (val.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Todas las variantes deben tener un valor o talla (ej: S, M, L).'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+        final s = int.tryParse(d.stockController.text.trim()) ?? 0;
+        final barcode = d.barcodeController.text.trim();
+        variants.add(ProductVariant(
+          id: d.id,
+          businessId: widget.productToEdit?.businessId ?? widget.businessId,
+          productId: productId,
+          attributeName: _variantAttributeName,
+          attributeValue: val,
+          skuOrBarcode: barcode.isNotEmpty ? barcode : null,
+          stock: s,
+          createdAt: now,
+          updatedAt: now,
+        ));
+      }
+    }
+
+    final totalStock = _hasVariants
+        ? variants.fold(0, (sum, v) => sum + v.stock)
+        : (int.tryParse(_stockController.text.trim()) ?? 0);
+
     final product = Product(
-      id: widget.productToEdit?.id ?? const Uuid().v4(),
+      id: productId,
       businessId: widget.productToEdit?.businessId ?? widget.businessId,
       code: _codeController.text.trim(),
       name: _nameController.text.trim(),
@@ -220,11 +422,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       category: _selectedCategory!,
       purchasePrice: purchasePrice,
       salePrice: salePrice,
-      stock: stock,
+      stock: totalStock,
       minStock: minStock,
       photoPath: _photoPath,
       createdAt: widget.productToEdit?.createdAt ?? now,
       updatedAt: now,
+      hasVariants: _hasVariants,
+      variants: variants,
     );
 
     try {
@@ -548,48 +752,247 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     ),
                   const SizedBox(height: 16),
 
-                  // 5. Stock y Stock Mínimo (etiquetas legibles sin truncar)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _stockController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: isEditing ? 'Stock Actual *' : 'Stock Inicial *',
-                            hintText: '0',
-                            prefixIcon: const Icon(Icons.inventory_2_outlined, size: 20, color: Color(0xFF64748B)),
-                            prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                          ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Requerido';
-                            final val = int.tryParse(v.trim());
-                            if (val == null || val < 0) return 'Mínimo 0';
-                            return null;
-                          },
-                        ),
+                  // 5. Stock y Variantes (Tallas / Colores / Presentaciones)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _hasVariants
+                          ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1B4B).withOpacity(0.4) : const Color(0xFFF5F3FF))
+                          : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF131127) : const Color(0xFFF8FAFC)),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _hasVariants ? const Color(0xFF8B5CF6) : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
+                        width: _hasVariants ? 1.5 : 1,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _minStockController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Stock Mínimo',
-                            hintText: '5',
-                            prefixIcon: Icon(Icons.notifications_active_outlined, size: 20, color: Color(0xFF64748B)),
-                            prefixIconConstraints: BoxConstraints(minWidth: 38, minHeight: 38),
+                    ),
+                    child: SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                      title: Row(
+                        children: [
+                          Icon(
+                            Icons.style_outlined,
+                            size: 20,
+                            color: _hasVariants ? const Color(0xFF8B5CF6) : const Color(0xFF64748B),
                           ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Requerido';
-                            final val = int.tryParse(v.trim());
-                            if (val == null || val < 0) return 'Mínimo 0';
-                            return null;
-                          },
-                        ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '¿Tiene variantes? (Tallas, colores...)',
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
-                    ],
+                      subtitle: const Text(
+                        'Actívalo si vendes este producto en varias tallas o modelos con stock independiente.',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                      value: _hasVariants,
+                      activeColor: const Color(0xFF8B5CF6),
+                      onChanged: (val) {
+                        setState(() {
+                          _hasVariants = val;
+                          if (_hasVariants && _variantDrafts.isEmpty) {
+                            _applyClothingPreset();
+                          }
+                        });
+                      },
+                    ),
                   ),
+                  const SizedBox(height: 14),
+
+                  // Si NO tiene variantes: Stock simple tradicional
+                  if (!_hasVariants)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _stockController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: isEditing ? 'Stock Actual *' : 'Stock Inicial *',
+                              hintText: '0',
+                              prefixIcon: const Icon(Icons.inventory_2_outlined, size: 20, color: Color(0xFF64748B)),
+                              prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Requerido';
+                              final val = int.tryParse(v.trim());
+                              if (val == null || val < 0) return 'Mínimo 0';
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _minStockController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Stock Mínimo',
+                              hintText: '5',
+                              prefixIcon: Icon(Icons.notifications_active_outlined, size: 20, color: Color(0xFF64748B)),
+                              prefixIconConstraints: BoxConstraints(minWidth: 38, minHeight: 38),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Requerido';
+                              final val = int.tryParse(v.trim());
+                              if (val == null || val < 0) return 'Mínimo 0';
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    )
+                  else ...[
+                    // Si SÍ tiene variantes: Gestor de Tallas / Colores
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF131127) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF26214A) : const Color(0xFFDDD6FE),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.tune, size: 16, color: Color(0xFF8B5CF6)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Variantes por: $_variantAttributeName',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF8B5CF6)),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  ActionChip(
+                                    visualDensity: VisualDensity.compact,
+                                    label: const Text('Ropa', style: TextStyle(fontSize: 11)),
+                                    onPressed: _applyClothingPreset,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  ActionChip(
+                                    visualDensity: VisualDensity.compact,
+                                    label: const Text('Calzado', style: TextStyle(fontSize: 11)),
+                                    onPressed: _applyShoePreset,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          ..._variantDrafts.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final draft = entry.value;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? const Color(0xFF1A1633)
+                                    : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? const Color(0xFF26214A)
+                                      : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: TextFormField(
+                                      controller: draft.valueController,
+                                      decoration: InputDecoration(
+                                        labelText: _variantAttributeName,
+                                        hintText: 'Ej. S, M, 38...',
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 3,
+                                    child: TextFormField(
+                                      controller: draft.stockController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Stock',
+                                        hintText: '0',
+                                        isDense: true,
+                                      ),
+                                      onChanged: (_) => _updateTotalStockFromVariants(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    icon: const Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFF059669)),
+                                    tooltip: 'Escanear código de barras para esta talla',
+                                    onPressed: () async {
+                                      final code = await Navigator.push<String>(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+                                      );
+                                      if (code != null && code.isNotEmpty) {
+                                        setState(() {
+                                          draft.barcodeController.text = code;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                                    onPressed: () => _removeVariantDraft(idx),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () => _addVariantDraft(''),
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text('Agregar Talla', style: TextStyle(fontSize: 12)),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Total: ${_stockController.text} unids',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF059669)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _minStockController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Alerta de Stock Mínimo Global',
+                        hintText: '5',
+                        prefixIcon: Icon(Icons.notifications_active_outlined, size: 20, color: Color(0xFF64748B)),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   // 6. Código de Barras / SKU (Asignación automática y escáner claro)

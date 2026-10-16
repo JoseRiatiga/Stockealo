@@ -13,17 +13,20 @@ import '../../../business/data/business_repository.dart';
 class GlobalSearchDialog extends StatefulWidget {
   final String? businessId;
   final Function(int tabIndex)? onNavigateToTab;
+  final String? userRole;
 
   const GlobalSearchDialog({
     super.key,
     this.businessId,
     this.onNavigateToTab,
+    this.userRole,
   });
 
   static Future<void> show(
     BuildContext context, {
     String? businessId,
     Function(int tabIndex)? onNavigateToTab,
+    String? userRole,
   }) {
     return showDialog(
       context: context,
@@ -31,6 +34,7 @@ class GlobalSearchDialog extends StatefulWidget {
       builder: (_) => GlobalSearchDialog(
         businessId: businessId,
         onNavigateToTab: onNavigateToTab,
+        userRole: userRole,
       ),
     );
   }
@@ -239,28 +243,33 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
           borderColor: borderColor,
           textMain: textMain,
         ),
-        const SizedBox(height: 8),
-        _buildShortcutTile(
-          icon: Icons.add_circle_outline_rounded,
-          iconColor: const Color(0xFF8B5CF6),
-          title: 'Registrar Nuevo Producto',
-          subtitle: 'Añade un nuevo artículo al catálogo',
-          onTap: () async {
-            final biz = BusinessRepository.instance.currentActiveBusiness;
-            if (biz == null) return;
-            Navigator.pop(context);
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductFormScreen(businessId: biz.id),
-              ),
-            );
-          },
-          isDark: isDark,
-          cardBg: cardBg,
-          borderColor: borderColor,
-          textMain: textMain,
-        ),
+        if (widget.userRole != 'CASHIER') ...[
+          const SizedBox(height: 8),
+          _buildShortcutTile(
+            icon: Icons.add_circle_outline_rounded,
+            iconColor: const Color(0xFF8B5CF6),
+            title: 'Registrar Nuevo Producto',
+            subtitle: 'Añade un nuevo artículo al catálogo',
+            onTap: () async {
+              final biz = BusinessRepository.instance.currentActiveBusiness;
+              if (biz == null) return;
+              Navigator.pop(context);
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProductFormScreen(
+                    businessId: biz.id,
+                    userRole: widget.userRole,
+                  ),
+                ),
+              );
+            },
+            isDark: isDark,
+            cardBg: cardBg,
+            borderColor: borderColor,
+            textMain: textMain,
+          ),
+        ],
         const SizedBox(height: 8),
         _buildShortcutTile(
           icon: Icons.picture_as_pdf_rounded,

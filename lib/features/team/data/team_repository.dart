@@ -391,10 +391,13 @@ class TeamRepository {
       await SupabaseService.instance.upsertBusinessMemberToCloud(updatedMap);
     }
 
-    // 4. Descargar todos los productos y datos de la empresa desde la nube
+    // 4. Activar obligatoriamente la sincronización en la nube para colaboradores
+    await SupabaseService.instance.setCloudSyncEnabled(true);
+
+    // 5. Descargar todos los productos y datos de la empresa desde la nube
     await SupabaseService.instance.syncFromCloud(userId, userEmail);
 
-    // 5. Establecer empresa como activa
+    // 6. Establecer empresa como activa
     BusinessRepository.instance.setActiveBusiness(business);
 
     return business;

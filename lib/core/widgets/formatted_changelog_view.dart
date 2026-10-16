@@ -41,6 +41,13 @@ class FormattedChangelogView extends StatelessWidget {
       color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
     );
 
+    final italicStyle = TextStyle(
+      fontSize: 12.5,
+      height: 1.45,
+      fontStyle: FontStyle.italic,
+      color: baseTextColor,
+    );
+
     final List<Widget> widgets = [];
 
     for (int i = 0; i < lines.length; i++) {
@@ -84,10 +91,51 @@ class FormattedChangelogView extends StatelessWidget {
         continue;
       }
 
-      // 2. Viñetas (- , * , • )
+      // 2. Viñetas numeradas (1. , 2. )
+      final numberMatch = RegExp(r'^(\d+)\.\s+(.*)$').firstMatch(line);
+      if (numberMatch != null) {
+        final numStr = numberMatch.group(1)!;
+        final cleanLine = numberMatch.group(2)!.trim();
+        final spans = _parseInlineSpans(cleanLine, baseStyle, boldStyle, italicStyle, codeStyle);
+
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 2, right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    numStr,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF10B981),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(children: spans),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        continue;
+      }
+
+      // 3. Viñetas (- , * , • )
       if (line.startsWith('- ') || line.startsWith('* ') || line.startsWith('• ')) {
         final cleanLine = line.substring(2).trim();
-        final spans = _parseInlineSpans(cleanLine, baseStyle, boldStyle, codeStyle);
+        final spans = _parseInlineSpans(cleanLine, baseStyle, boldStyle, italicStyle, codeStyle);
 
         widgets.add(
           Padding(
@@ -122,8 +170,8 @@ class FormattedChangelogView extends StatelessWidget {
         continue;
       }
 
-      // 3. Párrafo normal con posibles negritas o código
-      final spans = _parseInlineSpans(line, baseStyle, boldStyle, codeStyle);
+      // 4. Párrafo normal con posibles negritas o código
+      final spans = _parseInlineSpans(line, baseStyle, boldStyle, italicStyle, codeStyle);
       widgets.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),
@@ -149,15 +197,16 @@ class FormattedChangelogView extends StatelessWidget {
     );
   }
 
-  /// Convierte patrones `**negrita**` y `code` en Spans de texto formateados
+  /// Convierte patrones `**negrita**`, `_cursiva_` y `code` en Spans de texto formateados
   List<InlineSpan> _parseInlineSpans(
     String text,
     TextStyle baseStyle,
     TextStyle boldStyle,
+    TextStyle italicStyle,
     TextStyle codeStyle,
   ) {
     final List<InlineSpan> spans = [];
-    final regex = RegExp(r'(\*\*(.*?)\*\*|`(.*?)`)');
+    final regex = RegExp(r'(\*\*(.*?)\*\*|`(.*?)`|_(.*?)_)');
     int lastIndex = 0;
 
     for (final match in regex.allMatches(text)) {
@@ -179,6 +228,12 @@ class FormattedChangelogView extends StatelessWidget {
         spans.add(TextSpan(
           text: ' ${match.group(3)} ',
           style: codeStyle,
+        ));
+      } else if (match.group(4) != null) {
+        // Encontró _cursiva_
+        spans.add(TextSpan(
+          text: match.group(4),
+          style: italicStyle,
         ));
       }
 

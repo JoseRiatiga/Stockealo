@@ -5,6 +5,7 @@ import '../../../core/utils/image_helper.dart';
 import '../../../core/services/supabase_service.dart';
 import '../models/category.dart';
 import '../models/product.dart';
+import '../models/product_variant.dart';
 
 class ProductRepository {
   final AppDatabase _dbProvider = AppDatabase.instance;
@@ -21,7 +22,7 @@ class ProductRepository {
     return maps.map((map) => Product.fromMap(map)).toList();
   }
 
-  /// Búsqueda predictiva aislada por empresa
+  /// Búsqueda predictiva aislada por empresa (con soporte de variantes)
   Future<List<Product>> searchProducts(
     String query, {
     String? category,
@@ -47,10 +48,44 @@ class ProductRepository {
       whereArgs: whereArgs,
       orderBy: 'name ASC',
     );
-    return maps.map((map) => Product.fromMap(map)).toList();
+
+    final List<Product> result = [];
+    for (final map in maps) {
+      final p = Product.fromMap(map);
+      if (p.hasVariants) {
+        final variants = await getVariantsForProduct(p.id);
+        result.add(p.copyWith(variants: variants));
+      } else {
+        result.add(p);
+      }
+    }
+    return result;
   }
 
-  /// Obtener producto por ID dentro de la empresa
+  /// Obtener variantes asociadas a un producto
+  Future<List<ProductVariant>> getVariantsForProduct(String productId) async {
+    final db = await _dbProvider.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'product_variants',
+      where: 'product_id = ?',
+      whereArgs: [productId],
+      orderBy: 'created_at ASC',
+    );
+    return maps.map((m) => ProductVariant.fromMap(m)).toList();
+  }
+
+  /// Guardar o reemplazar lista de variantes de un producto
+  Future<void> saveVariants(String productId, String businessId, List<ProductVariant> variants) async {
+    final db = await _dbProvider.database;
+    await db.transaction((txn) async {
+      await txn.delete('product_variants', where: 'product_id = ?', whereArgs: [productId]);
+      for (final v in variants) {
+        await txn.insert('product_variants', v.toMap());
+      }
+    });
+  }
+
+  /// Obtener producto por ID dentro de la empresa (con variantes cargadas si existen)
   Future<Product?> getProductById(String id, String businessId) async {
     final db = await _dbProvider.database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -60,10 +95,15 @@ class ProductRepository {
       limit: 1,
     );
     if (maps.isEmpty) return null;
-    return Product.fromMap(maps.first);
+    final product = Product.fromMap(maps.first);
+    if (product.hasVariants) {
+      final variants = await getVariantsForProduct(product.id);
+      return product.copyWith(variants: variants);
+    }
+    return product;
   }
 
-  /// Buscar por código de barras / QR dentro de la empresa
+  /// Buscar por código de barras / QR dentro de la empresa (busca en producto y en códigos de variante)
   Future<Product?> getProductByCode(String code, String businessId) async {
     final db = await _dbProvider.database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -72,11 +112,31 @@ class ProductRepository {
       whereArgs: [code, businessId],
       limit: 1,
     );
-    if (maps.isEmpty) return null;
-    return Product.fromMap(maps.first);
+    if (maps.isNotEmpty) {
+      final product = Product.fromMap(maps.first);
+      if (product.hasVariants) {
+        final variants = await getVariantsForProduct(product.id);
+        return product.copyWith(variants: variants);
+      }
+      return product;
+    }
+
+    // Si no coincide con código de producto, buscar en códigos de variantes
+    final List<Map<String, dynamic>> variantMaps = await db.query(
+      'product_variants',
+      where: 'sku_or_barcode = ? AND business_id = ?',
+      whereArgs: [code, businessId],
+      limit: 1,
+    );
+    if (variantMaps.isNotEmpty) {
+      final parentId = variantMaps.first['product_id'] as String;
+      return getProductById(parentId, businessId);
+    }
+
+    return null;
   }
 
-  /// Insertar nuevo producto asignado a su empresa
+  /// Insertar nuevo producto asignado a su empresa (con sus variantes si aplica)
   Future<void> insertProduct(Product product) async {
     final db = await _dbProvider.database;
     await db.transaction((txn) async {
@@ -85,6 +145,12 @@ class ProductRepository {
         product.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+
+      if (product.hasVariants && product.variants.isNotEmpty) {
+        for (final v in product.variants) {
+          await txn.insert('product_variants', v.toMap());
+        }
+      }
 
       // Registrar movimiento inicial de stock en la empresa
       if (product.stock > 0) {
@@ -105,15 +171,24 @@ class ProductRepository {
     SupabaseService.instance.upsertProductToCloud(product.toMap());
   }
 
-  /// Actualizar producto
+  /// Actualizar producto (y sincronizar variantes)
   Future<void> updateProduct(Product product) async {
     final db = await _dbProvider.database;
-    await db.update(
-      'products',
-      product.toMap(),
-      where: 'id = ? AND business_id = ?',
-      whereArgs: [product.id, product.businessId],
-    );
+    await db.transaction((txn) async {
+      await txn.update(
+        'products',
+        product.toMap(),
+        where: 'id = ? AND business_id = ?',
+        whereArgs: [product.id, product.businessId],
+      );
+
+      if (product.hasVariants) {
+        await txn.delete('product_variants', where: 'product_id = ?', whereArgs: [product.id]);
+        for (final v in product.variants) {
+          await txn.insert('product_variants', v.toMap());
+        }
+      }
+    });
 
     // Sincronizar actualización en tiempo real a Supabase
     SupabaseService.instance.upsertProductToCloud(product.toMap());

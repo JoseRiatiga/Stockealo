@@ -10,6 +10,7 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
 import '../../models/product.dart';
 import '../../../reports/data/catalog_pdf_service.dart';
+import 'story_catalog_modal.dart';
 
 class CatalogGeneratorModal extends StatefulWidget {
   final Business business;
@@ -41,6 +42,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
   List<String> _categories = ['Todas'];
   String _selectedCategory = 'Todas';
   bool _showExactStock = false;
+  int _itemsPerPage = 4; // 1, 2, 4, 6
 
   bool _isLoading = true;
   bool _isGenerating = false;
@@ -135,6 +137,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
         contactPhone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
         showExactStock: _showExactStock,
         categoryFilter: _selectedCategory,
+        itemsPerPage: _itemsPerPage,
         onProgress: (p, msg) {
           if (mounted) {
             setState(() {
@@ -706,16 +709,35 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                         onChanged: (val) => setState(() => _showExactStock = val),
                       ),
                     ),
+                    const SizedBox(height: 14),
+
+                    // Selector de Densidad de Productos por Página
+                    Text(
+                      'Productos por Página:',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryTextColor),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _buildDensityOption(1, '1 Prod.', 'Hero', isDark, cardBorder, primaryTextColor),
+                        const SizedBox(width: 6),
+                        _buildDensityOption(2, '2 Prod.', 'Dúo', isDark, cardBorder, primaryTextColor),
+                        const SizedBox(width: 6),
+                        _buildDensityOption(4, '4 Prod.', 'Grilla', isDark, cardBorder, primaryTextColor),
+                        const SizedBox(width: 6),
+                        _buildDensityOption(6, '6 Prod.', 'Lista', isDark, cardBorder, primaryTextColor),
+                      ],
+                    ),
                     const SizedBox(height: 18),
 
-                    // Botón Principal de Generación
+                    // Botón Principal de Generación PDF
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: _generatePdf,
                         icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
                         label: Text(
-                          'Generar Catálogo (${_filteredProducts.length} productos)',
+                          'Descargar Catálogo PDF (${_filteredProducts.length} productos)',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
@@ -727,8 +749,84 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 10),
+
+                    // Botón Especial para Historias de Redes Sociales (PNG 9:16)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          StoryCatalogModal.show(
+                            context: context,
+                            business: widget.business,
+                            products: _filteredProducts,
+                            contactPhone: _phoneController.text.trim().isNotEmpty
+                                ? _phoneController.text.trim()
+                                : null,
+                            itemsPerPage: _itemsPerPage == 6 ? 4 : _itemsPerPage,
+                          );
+                        },
+                        icon: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF8B5CF6), size: 18),
+                        label: const Text(
+                          'Crear Historias para Redes (PNG 9:16)',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6)),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF8B5CF6), width: 1.3),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDensityOption(int count, String label, String sublabel, bool isDark, Color cardBorder, Color primaryTextColor) {
+    final isSelected = _itemsPerPage == count;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _itemsPerPage = count),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF059669).withOpacity(0.15)
+                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF059669) : cardBorder,
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? const Color(0xFF059669) : primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sublabel,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  color: isSelected ? const Color(0xFF059669) : const Color(0xFF94A3B8),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),

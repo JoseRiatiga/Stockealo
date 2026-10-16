@@ -1,3 +1,5 @@
+import 'product_variant.dart';
+
 class Product {
   final String id;
   final String businessId;
@@ -14,6 +16,8 @@ class Product {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isSynced;
+  final bool hasVariants;
+  final List<ProductVariant> variants;
 
   Product({
     required this.id,
@@ -31,6 +35,8 @@ class Product {
     required this.createdAt,
     required this.updatedAt,
     this.isSynced = false,
+    this.hasVariants = false,
+    this.variants = const [],
   });
 
   /// Ganancia neta por unidad
@@ -63,6 +69,8 @@ class Product {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isSynced,
+    bool? hasVariants,
+    List<ProductVariant>? variants,
   }) {
     return Product(
       id: id ?? this.id,
@@ -80,6 +88,8 @@ class Product {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isSynced: isSynced ?? this.isSynced,
+      hasVariants: hasVariants ?? this.hasVariants,
+      variants: variants ?? this.variants,
     );
   }
 
@@ -100,10 +110,11 @@ class Product {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'is_synced': isSynced ? 1 : 0,
+      'has_variants': hasVariants ? 1 : 0,
     };
   }
 
-  factory Product.fromMap(Map<String, dynamic> map) {
+  factory Product.fromMap(Map<String, dynamic> map, {List<ProductVariant> variants = const []}) {
     return Product(
       id: map['id'] as String,
       businessId: map['business_id'] as String? ?? 'default_business',
@@ -120,6 +131,8 @@ class Product {
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
       isSynced: (map['is_synced'] as int?) == 1,
+      hasVariants: (map['has_variants'] as int?) == 1,
+      variants: variants,
     );
   }
 }

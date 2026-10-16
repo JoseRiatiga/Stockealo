@@ -137,6 +137,7 @@ class _StockyMascotState extends State<StockyMascot> with TickerProviderStateMix
                 blinkValue: _blinkController.value,
                 handsValue: _handsController.value,
                 celebrateValue: _celebrateController.value,
+                idleValue: _idleController.value,
                 isDark: isDark,
               ),
             ),
@@ -153,6 +154,7 @@ class _StockyPainter extends CustomPainter {
   final double blinkValue;
   final double handsValue;
   final double celebrateValue;
+  final double idleValue;
   final bool isDark;
 
   _StockyPainter({
@@ -161,6 +163,7 @@ class _StockyPainter extends CustomPainter {
     required this.blinkValue,
     required this.handsValue,
     required this.celebrateValue,
+    required this.idleValue,
     required this.isDark,
   });
 
@@ -170,24 +173,77 @@ class _StockyPainter extends CustomPainter {
     final h = size.height;
     final center = Offset(w / 2, h / 2);
 
-    // Sombra en el suelo
+    // Sombra en el suelo interactiva
     final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(isDark ? 0.35 : 0.08)
+      ..color = Colors.black.withOpacity(isDark ? 0.38 : 0.10)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
     final shadowRect = Rect.fromCenter(
-      center: Offset(center.dx, h - 4),
-      width: w * 0.75,
-      height: 10,
+      center: Offset(center.dx, h - 3),
+      width: w * 0.76,
+      height: 9,
     );
     canvas.drawOval(shadowRect, shadowPaint);
 
     // 1. Cuerpo de Stocky: Caja amigable con esquinas redondeadas
     final boxRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(center.dx, center.dy + 2), width: w * 0.82, height: h * 0.78),
+      Rect.fromCenter(center: Offset(center.dx, center.dy + 2), width: w * 0.82, height: h * 0.74),
       const Radius.circular(20),
     );
 
-    // Gradiente esmeralda premium
+    // Toberas y propulsores de levitación magnética / iones en la base
+    final leftPodX = center.dx - w * 0.22;
+    final rightPodX = center.dx + w * 0.22;
+    final podY = boxRect.bottom - 1;
+
+    final podPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: isDark
+            ? [const Color(0xFF2E2A54), const Color(0xFF131126)]
+            : [const Color(0xFF475569), const Color(0xFF1E293B)],
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+
+    // Toberas metálicas cilíndricas
+    final podLeft = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(leftPodX, podY), width: w * 0.16, height: 6),
+      const Radius.circular(3),
+    );
+    final podRight = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(rightPodX, podY), width: w * 0.16, height: 6),
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(podLeft, podPaint);
+    canvas.drawRRect(podRight, podPaint);
+
+    // Flamas de plasma/ion pulsantes en reposo
+    final ionPulse = 0.75 + 0.25 * math.sin(idleValue * 2 * math.pi);
+    final ionPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF38BDF8).withOpacity(0.85 * ionPulse),
+          const Color(0xFF10B981).withOpacity(0.40 * ionPulse),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromCircle(center: Offset(leftPodX, podY + 3), radius: 8));
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(leftPodX, podY + 4), width: w * 0.12 * ionPulse, height: 6 * ionPulse),
+      ionPaint,
+    );
+    final ionPaintRight = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF38BDF8).withOpacity(0.85 * ionPulse),
+          const Color(0xFF10B981).withOpacity(0.40 * ionPulse),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromCircle(center: Offset(rightPodX, podY + 3), radius: 8));
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(rightPodX, podY + 4), width: w * 0.12 * ionPulse, height: 6 * ionPulse),
+      ionPaintRight,
+    );
+
+    // Gradiente esmeralda premium cyber-bot
     final bodyPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topLeft,
@@ -200,11 +256,29 @@ class _StockyPainter extends CustomPainter {
     // Dibujar cuerpo
     canvas.drawRRect(boxRect, bodyPaint);
 
+    // Arco de Visor de Vidrio Cibernético (Sheen specularity)
+    final visorPath = Path()
+      ..moveTo(boxRect.left + 8, boxRect.top + 7)
+      ..lineTo(boxRect.right - 8, boxRect.top + 7)
+      ..lineTo(boxRect.right - 14, boxRect.top + boxRect.height * 0.32)
+      ..lineTo(boxRect.left + 14, boxRect.top + boxRect.height * 0.32)
+      ..close();
+    final visorPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.white.withOpacity(0.24),
+          Colors.white.withOpacity(0.03),
+        ],
+      ).createShader(boxRect.outerRect);
+    canvas.drawPath(visorPath, visorPaint);
+
     // Borde brillante superior
     final borderPaint = Paint()
-      ..color = Colors.white.withOpacity(0.2)
+      ..color = Colors.white.withOpacity(0.25)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
+      ..strokeWidth = 1.8;
     canvas.drawRRect(boxRect, borderPaint);
 
     // Cinta / Tapa superior de la caja (característica de paquete de stock)
@@ -214,6 +288,32 @@ class _StockyPainter extends CustomPainter {
     );
     final tapePaint = Paint()..color = const Color(0xFF34D399).withOpacity(0.35);
     canvas.drawRRect(tapeRect, tapePaint);
+
+    // Mini Antena Cibernética con LED de estado en la parte superior
+    final antennaBaseY = boxRect.top;
+    final antennaTipY = boxRect.top - 8;
+    final antennaPaint = Paint()
+      ..color = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(center.dx, antennaBaseY), Offset(center.dx, antennaTipY), antennaPaint);
+
+    Color ledColor = const Color(0xFF10B981);
+    if (state == StockyState.error) {
+      ledColor = const Color(0xFFEF4444);
+    } else if (state == StockyState.loading) {
+      ledColor = const Color(0xFFF59E0B);
+    } else if (state == StockyState.success) {
+      ledColor = const Color(0xFF8B5CF6);
+    }
+
+    final ledGlow = Paint()
+      ..color = ledColor.withOpacity(0.5 + 0.35 * math.sin(idleValue * 2 * math.pi))
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(Offset(center.dx, antennaTipY - 1), 4.5, ledGlow);
+
+    canvas.drawCircle(Offset(center.dx, antennaTipY - 1), 2.2, Paint()..color = ledColor);
+    canvas.drawCircle(Offset(center.dx - 0.6, antennaTipY - 1.6), 0.8, Paint()..color = Colors.white);
 
     // Pequeño broche / estrella en el centro de la cinta
     final pinPaint = Paint()..color = const Color(0xFFA7F3D0);
@@ -360,8 +460,16 @@ class _StockyPainter extends CustomPainter {
 
     const handRadius = 11.0;
 
-    // Dibujar manitas
+    // Dibujar manitas con aros magnéticos
     for (final handPos in [curLeftHand, curRightHand]) {
+      // Anillo de campo magnético levitante
+      final magPulse = 1.0 + 0.18 * math.sin(idleValue * 2 * math.pi);
+      final magPaint = Paint()
+        ..color = const Color(0xFF34D399).withOpacity(0.22)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      canvas.drawCircle(handPos, (handRadius + 3) * magPulse, magPaint);
+
       canvas.drawCircle(handPos, handRadius, handPaint);
       canvas.drawCircle(handPos, handRadius, handStroke);
 
@@ -385,6 +493,7 @@ class _StockyPainter extends CustomPainter {
         oldDelegate.blinkValue != blinkValue ||
         oldDelegate.handsValue != handsValue ||
         oldDelegate.celebrateValue != celebrateValue ||
+        oldDelegate.idleValue != idleValue ||
         oldDelegate.isDark != isDark;
   }
 }

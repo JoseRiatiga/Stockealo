@@ -10,10 +10,12 @@ import '../../../business/models/business.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/services/update_service.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../core/widgets/update_dialog.dart';
 import '../widgets/app_sidebar_pro.dart';
 import '../widgets/app_header_bar.dart';
 import '../widgets/global_search_dialog.dart';
+import '../widgets/notifications_modal.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -50,6 +52,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   void dispose() {
+    NotificationService.instance.stopRealtimeSalesListening();
     _businessRepo.activeBusinessNotifier.removeListener(_loadNavigationContext);
     super.dispose();
   }
@@ -65,6 +68,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           businessId: biz.id,
           userId: user.id,
           userEmail: user.email,
+        );
+        // Iniciar escucha de ventas en tiempo real si hay negocio activo
+        NotificationService.instance.startRealtimeSalesListening(
+          businessId: biz.id,
+          currentUserId: user.id,
         );
       }
       if (mounted) {
@@ -117,9 +125,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ProductsListScreen(
         userId: widget.userId,
         onLogout: widget.onLogout,
+        userRole: _userRole,
       ),
-      const SalesHistoryScreen(
+      SalesHistoryScreen(
         businessId: null,
+        userRole: _userRole,
       ),
       ProfileScreen(
         onLogout: widget.onLogout,
@@ -132,6 +142,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           GlobalSearchDialog.show(
             context,
             businessId: _activeBusiness?.id,
+            userRole: _userRole,
             onNavigateToTab: _navigateToTab,
           );
         },
@@ -160,21 +171,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     Expanded(
                       child: Column(
                         children: [
-                          AppHeaderBar(
-                            title: _currentIndex == 0
-                                ? (_activeBusiness?.name ?? 'Stockealo Pro')
-                                : (_currentIndex == 1
-                                    ? 'Catálogo de Inventario'
-                                    : (_currentIndex == 2 ? 'Historial de Ventas' : 'Ajustes y Configuración')),
-                            subtitle: _currentIndex == 0
-                                ? 'Resumen Operativo en Tiempo Real'
-                                : 'Gestión Comercial Inteligente',
-                            onQuickSale: () => QuickSaleDialog.show(context),
-                            onSearchTap: () => GlobalSearchDialog.show(
-                              context,
-                              businessId: _activeBusiness?.id,
-                              onNavigateToTab: _navigateToTab,
-                            ),
+                          AnimatedBuilder(
+                            animation: NotificationService.instance,
+                            builder: (context, _) {
+                              return AppHeaderBar(
+                                title: _currentIndex == 0
+                                    ? (_activeBusiness?.name ?? 'Stockealo Pro')
+                                    : (_currentIndex == 1
+                                        ? 'Catálogo de Inventario'
+                                        : (_currentIndex == 2 ? 'Historial de Ventas' : 'Ajustes y Configuración')),
+                                subtitle: _currentIndex == 0
+                                    ? 'Resumen Operativo en Tiempo Real'
+                                    : 'Gestión Comercial Inteligente',
+                                alertCount: NotificationService.instance.unreadCount,
+                                onNotificationsTap: () => NotificationsModal.show(
+                                  context: context,
+                                  onNavigateToTab: _navigateToTab,
+                                ),
+                                onQuickSale: () => QuickSaleDialog.show(context),
+                                onSearchTap: () => GlobalSearchDialog.show(
+                                  context,
+                                  businessId: _activeBusiness?.id,
+                                  userRole: _userRole,
+                                  onNavigateToTab: _navigateToTab,
+                                ),
+                              );
+                            },
                           ),
                           Expanded(
                             child: IndexedStack(

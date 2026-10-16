@@ -23,6 +23,9 @@ import '../widgets/radial_gauge_card.dart';
 import '../widgets/spline_area_chart.dart';
 import '../widgets/segmented_progress_card.dart';
 import '../widgets/recent_transactions_card.dart';
+import '../../../../core/services/notification_service.dart';
+import '../../../home/presentation/widgets/notifications_modal.dart';
+import '../widgets/stocky_copilot_card.dart';
 
 class QuickActionDef {
   final String id;
@@ -750,7 +753,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ),
-        actions: const [],
+        actions: [
+          AnimatedBuilder(
+            animation: NotificationService.instance,
+            builder: (context, _) {
+              final unread = NotificationService.instance.unreadCount;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                    tooltip: 'Notificaciones',
+                    onPressed: () => NotificationsModal.show(
+                      context: context,
+                      onNavigateToTab: (index) {
+                        if (index == 1) widget.onNavigateToInventory();
+                        if (index == 2) widget.onNavigateToSales();
+                      },
+                    ),
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$unread',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
@@ -820,6 +867,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       // Selector horizontal de Periodo (Hoy, 7 Días, Este Mes, Histórico)
                       _buildPeriodSelector(),
+                      const SizedBox(height: 14),
+
+                      // Tarjeta Inteligente Stocky Copiloto Comercial
+                      StockyCopilotCard(
+                        lowStockCount: _summary['lowStock'] ?? 0,
+                        outOfStockCount: _summary['outOfStock'] ?? 0,
+                        totalSalesToday: (_summary['todayTotal'] as num?)?.toDouble() ?? 0.0,
+                        salesCountToday: (_summary['todayCount'] as num?)?.toInt() ?? 0,
+                        pendingFiados: (_summary['totalDebt'] as num?)?.toDouble() ?? 0.0,
+                        onNavigateToInventory: widget.onNavigateToInventory,
+                        onNavigateToSales: widget.onNavigateToSales,
+                        onRestockOrder: _activeBusiness != null
+                            ? () {
+                                final user = _authRepo.currentUser;
+                                RestockOrderModal.show(
+                                  context,
+                                  business: _activeBusiness!,
+                                  userName: user?.displayName,
+                                );
+                              }
+                            : null,
+                        onOpenCatalog: _activeBusiness != null
+                            ? () => CatalogGeneratorModal.show(
+                                  context: context,
+                                  business: _activeBusiness!,
+                                )
+                            : null,
+                        onQuickSale: _openQuickSale,
+                        onNavigateToCustomers: _activeBusiness != null
+                            ? () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => CustomersScreen(businessId: _activeBusiness!.id),
+                                  ),
+                                ).then((_) => _loadData())
+                            : null,
+                      ),
                       const SizedBox(height: 14),
 
                       // Banner de Tendencia y Comparativa del Periodo

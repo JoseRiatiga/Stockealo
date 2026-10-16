@@ -51,6 +51,7 @@ class CatalogPdfService {
     String? contactPhone,
     bool showExactStock = false,
     String? categoryFilter,
+    int itemsPerPage = 4,
     void Function(double progress, String status)? onProgress,
   }) async {
     // Filtrar productos por categoría si se seleccionó una en específico
@@ -91,22 +92,30 @@ class CatalogPdfService {
       author: 'Stockealo',
     );
 
-    // 2. Distribución en páginas: 6 productos por página (2 columnas x 3 filas)
-    const int itemsPerPage = 6;
-    final int totalPages = (targetProducts.length / itemsPerPage).ceil();
+    // 2. Distribución en páginas según densidad (1, 2, 4 o 6 productos)
+    final int effectiveItemsPerPage = (itemsPerPage == 1 || itemsPerPage == 2 || itemsPerPage == 4 || itemsPerPage == 6)
+        ? itemsPerPage
+        : 4;
+    final int totalPages = (targetProducts.length / effectiveItemsPerPage).ceil();
 
     for (int pIndex = 0; pIndex < totalPages; pIndex++) {
-      final start = pIndex * itemsPerPage;
-      final end = (start + itemsPerPage < targetProducts.length) ? start + itemsPerPage : targetProducts.length;
+      final start = pIndex * effectiveItemsPerPage;
+      final end = (start + effectiveItemsPerPage < targetProducts.length) ? start + effectiveItemsPerPage : targetProducts.length;
       final pageProducts = targetProducts.sublist(start, end);
 
-      // Agrupar en filas de 2 productos
+      // Agrupar productos según formato
       final List<List<Product>> rows = [];
-      for (int r = 0; r < pageProducts.length; r += 2) {
-        if (r + 1 < pageProducts.length) {
-          rows.add([pageProducts[r], pageProducts[r + 1]]);
-        } else {
-          rows.add([pageProducts[r]]);
+      if (effectiveItemsPerPage == 1 || effectiveItemsPerPage == 2) {
+        for (final p in pageProducts) {
+          rows.add([p]);
+        }
+      } else {
+        for (int r = 0; r < pageProducts.length; r += 2) {
+          if (r + 1 < pageProducts.length) {
+            rows.add([pageProducts[r], pageProducts[r + 1]]);
+          } else {
+            rows.add([pageProducts[r]]);
+          }
         }
       }
 
@@ -127,30 +136,40 @@ class CatalogPdfService {
                 ...rows.map((row) {
                   return pw.Padding(
                     padding: const pw.EdgeInsets.only(bottom: 8),
-                    child: pw.Row(
-                      children: [
-                        pw.Expanded(
-                          child: _buildProductCard(
+                    child: (effectiveItemsPerPage == 1 || effectiveItemsPerPage == 2)
+                        ? _buildProductCard(
                             row[0],
                             imageMap[row[0].id],
                             showExactStock,
                             business.currency,
-                          ),
-                        ),
-                        pw.SizedBox(width: 8),
-                        if (row.length > 1)
-                          pw.Expanded(
-                            child: _buildProductCard(
-                              row[1],
-                              imageMap[row[1].id],
-                              showExactStock,
-                              business.currency,
-                            ),
+                            itemsPerPage: effectiveItemsPerPage,
                           )
-                        else
-                          pw.Expanded(child: pw.Container()),
-                      ],
-                    ),
+                        : pw.Row(
+                            children: [
+                              pw.Expanded(
+                                child: _buildProductCard(
+                                  row[0],
+                                  imageMap[row[0].id],
+                                  showExactStock,
+                                  business.currency,
+                                  itemsPerPage: effectiveItemsPerPage,
+                                ),
+                              ),
+                              pw.SizedBox(width: 8),
+                              if (row.length > 1)
+                                pw.Expanded(
+                                  child: _buildProductCard(
+                                    row[1],
+                                    imageMap[row[1].id],
+                                    showExactStock,
+                                    business.currency,
+                                    itemsPerPage: effectiveItemsPerPage,
+                                  ),
+                                )
+                              else
+                                pw.Expanded(child: pw.Container()),
+                            ],
+                          ),
                   );
                 }),
                 pw.Spacer(),
@@ -313,7 +332,7 @@ class CatalogPdfService {
                 pw.SizedBox(height: 3),
               ],
               pw.Text(
-                '$totalInStock referencias disponibles • $dateFormatted',
+                '$totalInStock referencias disponibles   |   $dateFormatted',
                 style: pw.TextStyle(fontSize: 7.5, color: PdfColor.fromHex('#94A3B8')),
               ),
             ],
@@ -323,15 +342,239 @@ class CatalogPdfService {
     );
   }
 
-  /// Tarjeta de cada producto en el catálogo
+  /// Tarjeta adaptativa de cada producto según densidad (1, 2, 4 o 6 por página)
   pw.Widget _buildProductCard(
     Product product,
     Uint8List? imageBytes,
     bool showExactStock,
-    String currency,
-  ) {
+    String currency, {
+    int itemsPerPage = 4,
+  }) {
+    // 1 Producto por página (Modo Destacado / Hero)
+    if (itemsPerPage == 1) {
+      return pw.Container(
+        height: 520,
+        decoration: pw.BoxDecoration(
+          color: PdfColors.white,
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(12)),
+          border: pw.Border.all(color: PdfColor.fromHex('#E2E8F0'), width: 1.2),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Container(
+              height: 290,
+              width: double.infinity,
+              decoration: pw.BoxDecoration(
+                color: PdfColor.fromHex('#F8FAFC'),
+                borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(12)),
+              ),
+              child: imageBytes != null
+                  ? pw.ClipRRect(
+                      horizontalRadius: 12,
+                      verticalRadius: 12,
+                      child: pw.Image(pw.MemoryImage(imageBytes), fit: pw.BoxFit.contain),
+                    )
+                  : pw.Center(
+                      child: pw.Text(
+                        product.name.trim().isNotEmpty ? product.name.trim()[0].toUpperCase() : 'P',
+                        style: pw.TextStyle(fontSize: 48, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#64748B')),
+                      ),
+                    ),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(16),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColor.fromHex('#F3E8FF'),
+                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        ),
+                        child: pw.Text(
+                          product.category.toUpperCase(),
+                          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#8B5CF6')),
+                        ),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColor.fromHex('#ECFDF5'),
+                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        ),
+                        child: pw.Text(
+                          showExactStock ? 'Stock: ${product.stock} disponibles' : 'Disponible en Tienda',
+                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#059669')),
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Text(
+                    product.name,
+                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#0F172A')),
+                  ),
+                  if (product.description != null && product.description!.trim().isNotEmpty) ...[
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      product.description!,
+                      maxLines: 4,
+                      style: pw.TextStyle(fontSize: 9.5, color: PdfColor.fromHex('#475569')),
+                    ),
+                  ],
+                  pw.SizedBox(height: 14),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Precio de Oferta:', style: pw.TextStyle(fontSize: 8.5, color: PdfColor.fromHex('#64748B'))),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            CurrencyFormatter.format(product.salePrice),
+                            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#059669')),
+                          ),
+                        ],
+                      ),
+                      if (product.code.isNotEmpty)
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: pw.BoxDecoration(
+                            color: PdfColor.fromHex('#F1F5F9'),
+                            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                          ),
+                          child: pw.Text('Código: ${product.code}', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromHex('#64748B'))),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 2 Productos por página (Modo Dúo Horizontal)
+    if (itemsPerPage == 2) {
+      return pw.Container(
+        height: 235,
+        decoration: pw.BoxDecoration(
+          color: PdfColors.white,
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+          border: pw.Border.all(color: PdfColor.fromHex('#E2E8F0'), width: 1),
+        ),
+        child: pw.Row(
+          children: [
+            pw.Container(
+              width: 220,
+              height: double.infinity,
+              decoration: pw.BoxDecoration(
+                color: PdfColor.fromHex('#F8FAFC'),
+                borderRadius: const pw.BorderRadius.horizontal(left: pw.Radius.circular(10)),
+              ),
+              child: imageBytes != null
+                  ? pw.ClipRRect(
+                      horizontalRadius: 10,
+                      verticalRadius: 10,
+                      child: pw.Image(pw.MemoryImage(imageBytes), fit: pw.BoxFit.contain),
+                    )
+                  : pw.Center(
+                      child: pw.Text(
+                        product.name.trim().isNotEmpty ? product.name.trim()[0].toUpperCase() : 'P',
+                        style: pw.TextStyle(fontSize: 32, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#64748B')),
+                      ),
+                    ),
+            ),
+            pw.Expanded(
+              child: pw.Padding(
+                padding: const pw.EdgeInsets.all(14),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                              decoration: pw.BoxDecoration(
+                                color: PdfColor.fromHex('#F3E8FF'),
+                                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                              ),
+                              child: pw.Text(
+                                product.category.toUpperCase(),
+                                style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#8B5CF6')),
+                              ),
+                            ),
+                            pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                              decoration: pw.BoxDecoration(
+                                color: PdfColor.fromHex('#ECFDF5'),
+                                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                              ),
+                              child: pw.Text(
+                                showExactStock ? 'Stock: ${product.stock}' : 'Disponible',
+                                style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#059669')),
+                              ),
+                            ),
+                          ],
+                        ),
+                        pw.SizedBox(height: 8),
+                        pw.Text(
+                          product.name,
+                          maxLines: 2,
+                          style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#0F172A')),
+                        ),
+                        if (product.description != null && product.description!.trim().isNotEmpty) ...[
+                          pw.SizedBox(height: 6),
+                          pw.Text(
+                            product.description!,
+                            maxLines: 2,
+                            style: pw.TextStyle(fontSize: 8.5, color: PdfColor.fromHex('#64748B')),
+                          ),
+                        ],
+                      ],
+                    ),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          CurrencyFormatter.format(product.salePrice),
+                          style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#059669')),
+                        ),
+                        if (product.code.isNotEmpty)
+                          pw.Text('Ref: ${product.code}', style: pw.TextStyle(fontSize: 7.5, color: PdfColor.fromHex('#94A3B8'))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 4 o 6 Productos por página (Modo Cuadrícula)
+    final double cardHeight = itemsPerPage == 4 ? 245 : 195;
+    final double imageHeight = itemsPerPage == 4 ? 130 : 95;
+    final double titleFontSize = itemsPerPage == 4 ? 10.5 : 9;
+    final double priceFontSize = itemsPerPage == 4 ? 14 : 12.5;
+
     return pw.Container(
-      height: 200,
+      height: cardHeight,
       decoration: pw.BoxDecoration(
         color: PdfColors.white,
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
@@ -340,9 +583,8 @@ class CatalogPdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          // 1. Imagen del Producto o Placeholder con inicial
           pw.Container(
-            height: 98,
+            height: imageHeight,
             width: double.infinity,
             decoration: pw.BoxDecoration(
               color: PdfColor.fromHex('#F8FAFC'),
@@ -352,49 +594,33 @@ class CatalogPdfService {
                 ? pw.ClipRRect(
                     horizontalRadius: 8,
                     verticalRadius: 8,
-                    child: pw.Image(
-                      pw.MemoryImage(imageBytes),
-                      fit: pw.BoxFit.cover,
-                    ),
+                    child: pw.Image(pw.MemoryImage(imageBytes), fit: pw.BoxFit.cover),
                   )
                 : pw.Center(
                     child: pw.Column(
                       mainAxisAlignment: pw.MainAxisAlignment.center,
                       children: [
                         pw.Container(
-                          width: 38,
-                          height: 38,
-                          decoration: pw.BoxDecoration(
-                            color: PdfColor.fromHex('#E2E8F0'),
-                            shape: pw.BoxShape.circle,
-                          ),
+                          width: 32,
+                          height: 32,
+                          decoration: pw.BoxDecoration(color: PdfColor.fromHex('#E2E8F0'), shape: pw.BoxShape.circle),
                           alignment: pw.Alignment.center,
                           child: pw.Text(
                             product.name.trim().isNotEmpty ? product.name.trim()[0].toUpperCase() : 'P',
-                            style: pw.TextStyle(
-                              fontSize: 18,
-                              fontWeight: pw.FontWeight.bold,
-                              color: PdfColor.fromHex('#64748B'),
-                            ),
+                            style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#64748B')),
                           ),
                         ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          product.category,
-                          style: pw.TextStyle(fontSize: 7, color: PdfColor.fromHex('#94A3B8')),
-                        ),
+                        pw.SizedBox(height: 3),
+                        pw.Text(product.category, style: pw.TextStyle(fontSize: 6.5, color: PdfColor.fromHex('#94A3B8'))),
                       ],
                     ),
                   ),
           ),
-
-          // 2. Información del Producto
           pw.Padding(
-            padding: const pw.EdgeInsets.all(8),
+            padding: const pw.EdgeInsets.all(7),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                // Categoría y Badge de Disponibilidad
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
@@ -406,11 +632,7 @@ class CatalogPdfService {
                       ),
                       child: pw.Text(
                         product.category.toUpperCase(),
-                        style: pw.TextStyle(
-                          fontSize: 6.5,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColor.fromHex('#2563EB'),
-                        ),
+                        style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#2563EB')),
                       ),
                     ),
                     pw.Container(
@@ -420,48 +642,29 @@ class CatalogPdfService {
                         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
                       ),
                       child: pw.Text(
-                        showExactStock ? 'Stock: ${product.stock} und.' : 'Disponible',
-                        style: pw.TextStyle(
-                          fontSize: 6.5,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColor.fromHex('#059669'),
-                        ),
+                        showExactStock ? 'Stock: ${product.stock}' : 'Disponible',
+                        style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#059669')),
                       ),
                     ),
                   ],
                 ),
                 pw.SizedBox(height: 4),
-
-                // Nombre del producto
                 pw.Text(
                   product.name,
                   maxLines: 2,
-                  style: pw.TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromHex('#0F172A'),
-                  ),
+                  style: pw.TextStyle(fontSize: titleFontSize, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#0F172A')),
                 ),
                 pw.SizedBox(height: 4),
-
-                // Precio de venta destacado y Código
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
                     pw.Text(
                       CurrencyFormatter.format(product.salePrice),
-                      style: pw.TextStyle(
-                        fontSize: 13,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColor.fromHex('#059669'),
-                      ),
+                      style: pw.TextStyle(fontSize: priceFontSize, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#059669')),
                     ),
                     if (product.code.isNotEmpty)
-                      pw.Text(
-                        'Ref: ${product.code}',
-                        style: pw.TextStyle(fontSize: 7, color: PdfColor.fromHex('#94A3B8')),
-                      ),
+                      pw.Text('Ref: ${product.code}', style: pw.TextStyle(fontSize: 6.5, color: PdfColor.fromHex('#94A3B8'))),
                   ],
                 ),
               ],
@@ -472,7 +675,7 @@ class CatalogPdfService {
     );
   }
 
-  /// Pie de página con numeración y contacto
+  /// Pie de página con numeración y contacto (sin glifos no soportados)
   pw.Widget _buildFooter(int pageIndex, int totalPages, String? contactPhone) {
     return pw.Container(
       padding: const pw.EdgeInsets.only(top: 6),
@@ -491,7 +694,7 @@ class CatalogPdfService {
             style: pw.TextStyle(fontSize: 7.5, color: PdfColor.fromHex('#64748B')),
           ),
           pw.Text(
-            'Página $pageIndex de $totalPages • Stockealo',
+            'Pagina $pageIndex de $totalPages   |   Stockealo',
             style: pw.TextStyle(fontSize: 7.5, color: PdfColor.fromHex('#94A3B8')),
           ),
         ],

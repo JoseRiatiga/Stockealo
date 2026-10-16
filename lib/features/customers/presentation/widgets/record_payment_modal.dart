@@ -365,7 +365,18 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                 children: [
                   Expanded(
                     child: ChoiceChip(
-                      label: const Center(child: Text('💵 Efectivo')),
+                      label: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.payments_outlined,
+                            size: 14,
+                            color: _paymentMethod == 'EFECTIVO' ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)) : textMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text('Efectivo'),
+                        ],
+                      ),
                       selected: _paymentMethod == 'EFECTIVO',
                       selectedColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
                       labelStyle: TextStyle(
@@ -380,7 +391,18 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ChoiceChip(
-                      label: const Center(child: Text('📱 Transferencia')),
+                      label: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.account_balance_outlined,
+                            size: 14,
+                            color: _paymentMethod == 'TRANSFERENCIA' ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)) : textMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text('Transferencia'),
+                        ],
+                      ),
                       selected: _paymentMethod == 'TRANSFERENCIA',
                       selectedColor: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
                       labelStyle: TextStyle(

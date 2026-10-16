@@ -722,7 +722,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
                             child: _buildMetricTile(
                               title: 'Respaldo',
                               value: _isCloudSync ? 'En la Nube' : 'Modo Local',
-                              subtitle: _isCloudSync ? '☁️ Sincronizado' : '🔒 Este equipo',
+                              subtitle: _isCloudSync ? 'Sincronizado con Supabase' : 'Solo en este equipo',
                               icon: _isCloudSync ? Icons.cloud_done_rounded : Icons.phone_android_rounded,
                               color: _isCloudSync ? const Color(0xFF059669) : const Color(0xFF64748B),
                               isDark: isDark,

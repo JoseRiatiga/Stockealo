@@ -441,12 +441,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         ),
                       ),
                       if (customer.phone?.isNotEmpty == true)
-                        Text(
-                          '📞 ${customer.phone}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                          ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.phone_outlined,
+                              size: 11,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              customer.phone!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
                         ),
                     ],
                   ),

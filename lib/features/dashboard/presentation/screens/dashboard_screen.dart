@@ -755,7 +755,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '¡Hola, $userName! 👋',
+                            '¡Hola, $userName!',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -1633,8 +1633,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    final medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1666,7 +1664,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ...topProducts.asMap().entries.map((entry) {
             final idx = entry.key;
             final item = entry.value;
-            final medal = idx < medals.length ? medals[idx] : '•';
             final share = (item['share'] as num?)?.toDouble() ?? 0.0;
             final revenue = (item['revenue'] as num?)?.toDouble() ?? 0.0;
 
@@ -1677,8 +1674,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Row(
                     children: [
-                      Text(medal, style: const TextStyle(fontSize: 16)),
-                      const SizedBox(width: 8),
+                      _buildRankingBadge(idx, isDark),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           item['name'] as String,
@@ -1718,6 +1715,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }),
         ],
       ),
+    );
+  }
+
+  Widget _buildRankingBadge(int rank, bool isDark) {
+    Color badgeColor;
+    Widget child;
+
+    switch (rank) {
+      case 0: // 1er Lugar - Oro
+        badgeColor = const Color(0xFFF59E0B);
+        child = const Icon(Icons.emoji_events_rounded, size: 13, color: Colors.white);
+        break;
+      case 1: // 2do Lugar - Plata
+        badgeColor = const Color(0xFF94A3B8);
+        child = const Icon(Icons.military_tech_rounded, size: 14, color: Colors.white);
+        break;
+      case 2: // 3er Lugar - Bronce
+        badgeColor = const Color(0xFFD97706);
+        child = const Icon(Icons.military_tech_outlined, size: 14, color: Colors.white);
+        break;
+      default: // 4to y 5to
+        badgeColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+        final textColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+        child = Text(
+          '#${rank + 1}',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
+        );
+    }
+
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: badgeColor,
+        shape: BoxShape.circle,
+        boxShadow: rank < 3
+            ? [
+                BoxShadow(
+                  color: badgeColor.withOpacity(0.35),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                )
+              ]
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: child,
     );
   }
 }

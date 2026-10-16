@@ -1431,9 +1431,15 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                               builder: (_) {
                                                 final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
                                                 final isOwner = role == 'OWNER';
-                                                final roleText = isOwner
-                                                    ? '👑 Dueño'
-                                                    : (role == 'ADMIN' ? '🛡️ Admin' : '👤 Cajero');
+                                                final roleLabel = isOwner
+                                                    ? 'Dueño'
+                                                    : (role == 'ADMIN' ? 'Admin' : 'Cajero');
+                                                final roleIcon = isOwner
+                                                    ? Icons.workspace_premium_rounded
+                                                    : (role == 'ADMIN' ? Icons.shield_outlined : Icons.point_of_sale_outlined);
+                                                final roleColor = isOwner
+                                                    ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                                    : (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB));
                                                 return Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                   decoration: BoxDecoration(
@@ -1448,15 +1454,20 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                                       width: 0.8,
                                                     ),
                                                   ),
-                                                  child: Text(
-                                                    roleText,
-                                                    style: TextStyle(
-                                                      color: isOwner
-                                                          ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                                                          : (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)),
-                                                      fontSize: 9,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(roleIcon, size: 10, color: roleColor),
+                                                      const SizedBox(width: 3),
+                                                      Text(
+                                                        roleLabel,
+                                                        style: TextStyle(
+                                                          color: roleColor,
+                                                          fontSize: 9,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 );
                                               },

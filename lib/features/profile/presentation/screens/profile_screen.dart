@@ -262,7 +262,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🔒 Modo Local Privado activo. Tus datos ya no se sincronizan a internet.'),
+          content: Text('Modo Local Privado activo. Tus datos se guardan únicamente en este equipo.'),
           backgroundColor: Color(0xFF475569),
         ),
       );
@@ -763,10 +763,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: TextStyle(fontSize: 12, color: secondaryTextColor),
                           ),
                           if (user?.phone?.isNotEmpty == true) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              '📞 ${user!.phone}',
-                              style: TextStyle(fontSize: 12, color: secondaryTextColor),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Icon(Icons.phone_outlined, size: 12, color: secondaryTextColor),
+                                const SizedBox(width: 4),
+                                Text(
+                                  user!.phone!,
+                                  style: TextStyle(fontSize: 12, color: secondaryTextColor),
+                                ),
+                              ],
                             ),
                           ],
                         ],
@@ -927,15 +933,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(
-                _isCloudSyncEnabled ? '☁️ Nube' : '🔒 Local',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.bold,
-                  color: _isCloudSyncEnabled
-                      ? const Color(0xFF059669)
-                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isCloudSyncEnabled ? Icons.cloud_done_rounded : Icons.lock_outline_rounded,
+                    size: 11,
+                    color: _isCloudSyncEnabled
+                        ? const Color(0xFF059669)
+                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _isCloudSyncEnabled ? 'Nube' : 'Local',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                      color: _isCloudSyncEnabled
+                          ? const Color(0xFF059669)
+                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                    ),
+                  ),
+                ],
               ),
             ),
             child: Column(

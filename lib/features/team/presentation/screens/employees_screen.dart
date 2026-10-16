@@ -834,7 +834,11 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('👑', style: TextStyle(fontSize: 11)),
+                          Icon(
+                            Icons.workspace_premium_rounded,
+                            size: 13,
+                            color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Dueño',

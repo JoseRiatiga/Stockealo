@@ -303,11 +303,11 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
 
             Row(
               children: [
-                _buildPaymentMethodChip('EFECTIVO', '💵 Efectivo', isDark),
+                _buildPaymentMethodChip('EFECTIVO', Icons.payments_outlined, 'Efectivo', isDark),
                 const SizedBox(width: 8),
-                _buildPaymentMethodChip('TRANSFERENCIA', '📱 Transf.', isDark),
+                _buildPaymentMethodChip('TRANSFERENCIA', Icons.account_balance_outlined, 'Transf.', isDark),
                 const SizedBox(width: 8),
-                _buildPaymentMethodChip('FIADO', '📝 Fiado', isDark),
+                _buildPaymentMethodChip('FIADO', Icons.assignment_outlined, 'Fiado', isDark),
               ],
             ),
 
@@ -515,7 +515,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
     );
   }
 
-  Widget _buildPaymentMethodChip(String method, String label, bool isDark) {
+  Widget _buildPaymentMethodChip(String method, IconData icon, String label, bool isDark) {
     final isSelected = _paymentMethod == method;
     return Expanded(
       child: InkWell(
@@ -535,15 +535,29 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                   : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
             ),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isSelected
-                  ? Colors.white
-                  : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 13,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                ),
+              ),
+            ],
           ),
         ),
       ),

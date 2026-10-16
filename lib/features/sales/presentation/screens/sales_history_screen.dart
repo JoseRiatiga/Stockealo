@@ -567,11 +567,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           // Desglose por Método de Pago
           Row(
             children: [
-              _buildPaymentPill('💵 Efectivo', CurrencyFormatter.format(efectivo), const Color(0xFF059669)),
+              _buildPaymentPill(Icons.payments_outlined, 'Efectivo', CurrencyFormatter.format(efectivo), const Color(0xFF059669)),
               const SizedBox(width: 8),
-              _buildPaymentPill('📱 Transf.', CurrencyFormatter.format(transf), const Color(0xFF2563EB)),
+              _buildPaymentPill(Icons.account_balance_outlined, 'Transf.', CurrencyFormatter.format(transf), const Color(0xFF2563EB)),
               const SizedBox(width: 8),
-              _buildPaymentPill('📝 Fiado', CurrencyFormatter.format(fiado), const Color(0xFFD97706)),
+              _buildPaymentPill(Icons.assignment_outlined, 'Fiado', CurrencyFormatter.format(fiado), const Color(0xFFD97706)),
             ],
           ),
         ],
@@ -579,10 +579,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  Widget _buildPaymentPill(String title, String amount, Color color) {
+  Widget _buildPaymentPill(IconData icon, String title, String amount, Color color) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
         decoration: BoxDecoration(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(10),
@@ -590,11 +590,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         ),
         child: Column(
           children: [
-            Text(
-              title,
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 11, color: color),
+                const SizedBox(width: 3),
+                Text(
+                  title,
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 3),
             Text(
               amount,
               maxLines: 1,

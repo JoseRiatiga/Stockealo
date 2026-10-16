@@ -95,7 +95,7 @@ class _AppSidebarProState extends State<AppSidebarPro> {
                             ),
                           ),
                           Text(
-                            'Bento Pro Suite',
+                            'Control de Inventario',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,

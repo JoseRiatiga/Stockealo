@@ -152,7 +152,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                 ? 'Catálogo de Inventario'
                                 : (_currentIndex == 2 ? 'Historial de Ventas' : 'Ajustes y Configuración')),
                         subtitle: _currentIndex == 0
-                            ? 'Bento Dashboard Operativo en Tiempo Real'
+                            ? 'Resumen Operativo en Tiempo Real'
                             : 'Gestión Comercial Inteligente',
                         onQuickSale: () => _navigateToTab(2),
                         onSearchTap: () => _navigateToTab(1),

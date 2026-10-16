@@ -480,7 +480,28 @@ class SupabaseService {
             resolvedUserId = userId;
           }
           final memberRole = (m['role'] ?? 'CASHIER').toString().toUpperCase();
-          final memberName = m['user_name'] ?? m['name'] ?? memberEmail.split('@').first;
+          var memberName = (m['user_name'] ?? m['name']) as String?;
+
+          // Si el nombre descargado está vacío o es solo el prefijo del correo, buscar el nombre real en users
+          if (memberName == null || memberName.trim().isEmpty || memberName.trim().toLowerCase() == memberEmail.split('@').first.toLowerCase()) {
+            final uRows = await db.query('users', columns: ['name'], where: 'LOWER(email) = ? OR id = ?', whereArgs: [memberEmail, resolvedUserId ?? ''], limit: 1);
+            if (uRows.isNotEmpty && uRows.first['name'] != null && (uRows.first['name'] as String).trim().isNotEmpty) {
+              memberName = (uRows.first['name'] as String).trim();
+            }
+          }
+          if (memberName == null || memberName.trim().isEmpty) {
+            memberName = memberEmail.split('@').first;
+          }
+
+          // Si el miembro es el usuario autenticado y su nombre en el perfil es real, sincronizarlo a Supabase
+          if (userEmail != null && memberEmail == userEmail.trim().toLowerCase() && memberName != memberEmail.split('@').first) {
+            try {
+              await client!.from('business_members').update({
+                'user_name': memberName,
+                'user_id': resolvedUserId ?? userId,
+              }).eq('id', m['id']);
+            } catch (_) {}
+          }
           await db.insert(
             'business_members',
             {

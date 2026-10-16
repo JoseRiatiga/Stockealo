@@ -17,7 +17,12 @@ class TeamRepository {
   Future<List<BusinessMember>> getMembers(String businessId) async {
     final db = await _dbProvider.database;
     final List<Map<String, dynamic>> maps = await db.rawQuery('''
-      SELECT bm.*, COALESCE(bm.name, u.name) as resolved_name
+      SELECT bm.*, 
+        CASE 
+          WHEN u.name IS NOT NULL AND TRIM(u.name) != '' THEN u.name
+          WHEN bm.name IS NOT NULL AND TRIM(bm.name) != '' THEN bm.name
+          ELSE bm.email
+        END as resolved_name
       FROM business_members bm
       LEFT JOIN users u ON (bm.user_id = u.id OR LOWER(bm.email) = LOWER(u.email))
       WHERE bm.business_id = ?
@@ -26,8 +31,9 @@ class TeamRepository {
 
     return maps.map((m) {
       final data = Map<String, dynamic>.from(m);
-      if (data['name'] == null || (data['name'] as String).trim().isEmpty) {
-        data['name'] = data['resolved_name'];
+      final resolved = data['resolved_name'] as String?;
+      if (resolved != null && resolved.trim().isNotEmpty) {
+        data['name'] = resolved.trim();
       }
       return BusinessMember.fromMap(data);
     }).toList();

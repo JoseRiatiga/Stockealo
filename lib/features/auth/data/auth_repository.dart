@@ -282,6 +282,28 @@ class AuthRepository {
       );
     }
 
+    // Actualizar nombre en todas las membresías de equipo asociadas a este usuario
+    if (name != null && name.trim().isNotEmpty) {
+      final cleanName = name.trim();
+      final userEmail = _currentUser?.email.toLowerCase() ?? '';
+      await db.update(
+        'business_members',
+        {'name': cleanName},
+        where: 'user_id = ? OR LOWER(email) = ?',
+        whereArgs: [userId, userEmail],
+      );
+
+      final client = SupabaseService.instance.client;
+      if (client != null && userEmail.isNotEmpty) {
+        try {
+          await client.from('business_members').update({
+            'user_name': cleanName,
+            'user_id': userId,
+          }).eq('user_email', userEmail);
+        } catch (_) {}
+      }
+    }
+
     // Sincronizar perfil actualizado a Supabase en tiempo real
     final updatedUserMap = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
     if (updatedUserMap.isNotEmpty) {

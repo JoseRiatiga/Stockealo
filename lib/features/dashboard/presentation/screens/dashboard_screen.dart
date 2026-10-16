@@ -301,6 +301,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     switch (actionId) {
       case 'sell':
+        _openQuickSale();
+        break;
+      case 'scan':
         _scanToSell();
         break;
       case 'add_product':
@@ -667,6 +670,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           type: ToastType.success,
         );
       }
+    }
+  }
+
+  Future<void> _openQuickSale() async {
+    final sold = await QuickSaleDialog.show(context);
+    if (sold == true) {
+      _loadData();
     }
   }
 

@@ -10,6 +10,7 @@ import '../../models/product.dart';
 import 'barcode_scanner_screen.dart';
 import '../widgets/manage_categories_modal.dart';
 import '../widgets/product_image_view.dart';
+import '../../../../core/widgets/image_source_picker_modal.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -95,12 +96,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    Navigator.pop(context); // Cerrar selector modal
     final path = source == ImageSource.camera
         ? await ImageHelper.pickFromCamera()
         : await ImageHelper.pickFromGallery();
 
-    if (path != null) {
+    if (path != null && mounted) {
       setState(() {
         _photoPath = path;
       });
@@ -108,56 +108,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   }
 
   void _showImagePickerModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Foto del Producto',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFECFDF5),
-                  child: Icon(Icons.camera_alt, color: Color(0xFF059669)),
-                ),
-                title: const Text('Tomar foto con la cámara'),
-                onTap: () => _pickImage(ImageSource.camera),
-              ),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFEFF6FF),
-                  child: Icon(Icons.photo_library, color: Color(0xFF2563EB)),
-                ),
-                title: const Text('Elegir de la galería'),
-                onTap: () => _pickImage(ImageSource.gallery),
-              ),
-              if (_photoPath != null && _photoPath!.trim().isNotEmpty)
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFFEE2E2),
-                    child: Icon(Icons.delete_outline, color: Color(0xFFDC2626)),
-                  ),
-                  title: const Text('Eliminar foto actual'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _photoPath = null;
-                    });
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
+    ImageSourcePickerModal.show(
+      context,
+      title: 'Foto del Producto',
+      subtitle: 'Elige cómo capturar o subir la imagen del producto',
+      hasExistingImage: _photoPath != null && _photoPath!.trim().isNotEmpty,
+      onSelected: (source) => _pickImage(source),
+      onRemove: () {
+        setState(() {
+          _photoPath = null;
+        });
+      },
     );
   }
 

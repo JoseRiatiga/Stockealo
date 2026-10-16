@@ -38,7 +38,7 @@ class _AppSidebarProState extends State<AppSidebarPro> {
     final navItems = [
       {'icon': Icons.dashboard_rounded, 'label': 'Dashboard', 'index': 0},
       {'icon': Icons.inventory_2_rounded, 'label': 'Inventario', 'index': 1},
-      {'icon': Icons.point_of_sale_rounded, 'label': 'Ventas & POS', 'index': 2},
+      {'icon': Icons.point_of_sale_rounded, 'label': 'Ventas', 'index': 2},
       {'icon': Icons.tune_rounded, 'label': 'Ajustes', 'index': 3},
     ];
 

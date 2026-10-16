@@ -44,7 +44,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   List<Product> _products = [];
   List<Category> _categories = [];
   String _selectedCategory = 'Todos';
-  String _sortOption = 'default';
+  String _sortOption = 'name_asc';
   String _stockFilterOption = 'all';
   Map<String, dynamic> _stats = {};
   bool _isLoading = true;
@@ -148,7 +148,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       filteredProducts = filteredProducts.where((p) => p.isOutOfStock).toList();
     }
 
-    // Criterio de ordenamiento
+    // Criterio de ordenamiento (Predeterminado: A a la Z)
     switch (_sortOption) {
       case 'stock_desc':
         filteredProducts.sort((a, b) => b.stock.compareTo(a.stock));
@@ -166,11 +166,13 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         filteredProducts.sort((a, b) =>
             (b.salePrice - b.purchasePrice).compareTo(a.salePrice - a.purchasePrice));
         break;
-      case 'name_asc':
-        filteredProducts.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-        break;
       case 'name_desc':
         filteredProducts.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        break;
+      case 'default':
+      case 'name_asc':
+      default:
+        filteredProducts.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
         break;
     }
 
@@ -213,15 +215,52 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Ajustar Stock: ${product.name}'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nuevo Stock',
-            prefixIcon: Icon(Icons.inventory_2_outlined),
-          ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF10B981), size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Ajustar Stock', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold)),
+                  Text(
+                    product.name,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ingresa el número total de unidades disponibles:',
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Nuevo Stock',
+                prefixIcon: Icon(Icons.pin_outlined),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -229,6 +268,12 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            ),
             onPressed: () {
               final val = int.tryParse(controller.text.trim());
               if (val != null && val >= 0) {
@@ -365,10 +410,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
-            final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+            final cardBg = isDark ? const Color(0xFF131126) : Colors.white;
             final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
             final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-            final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+            final borderColor = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
 
             Widget buildSortItem(String value, String label, IconData icon) {
               final isSelected = tempSort == value;
@@ -380,11 +425,11 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                   margin: const EdgeInsets.only(bottom: 6),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? (const Color(0xFF059669).withOpacity(0.12))
+                        ? (const Color(0xFF8B5CF6).withOpacity(0.12))
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF059669) : borderColor,
+                      color: isSelected ? const Color(0xFF8B5CF6) : borderColor,
                     ),
                   ),
                   child: Row(
@@ -392,7 +437,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                       Icon(
                         icon,
                         size: 18,
-                        color: isSelected ? const Color(0xFF059669) : textMuted,
+                        color: isSelected ? const Color(0xFF8B5CF6) : textMuted,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -401,12 +446,12 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: isSelected ? const Color(0xFF059669) : textMain,
+                            color: isSelected ? const Color(0xFF8B5CF6) : textMain,
                           ),
                         ),
                       ),
                       if (isSelected)
-                        const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF059669)),
+                        const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF8B5CF6)),
                     ],
                   ),
                 ),
@@ -484,7 +529,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                         TextButton(
                           onPressed: () {
                             setModalState(() {
-                              tempSort = 'default';
+                              tempSort = 'name_asc';
                               tempStockFilter = 'all';
                             });
                           },
@@ -500,7 +545,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        buildStockFilterChip('all', 'Todos', const Color(0xFF059669)),
+                        buildStockFilterChip('all', 'Todos', const Color(0xFF8B5CF6)),
                         const SizedBox(width: 8),
                         buildStockFilterChip('low_stock', 'Bajo Stock', const Color(0xFFD97706)),
                         const SizedBox(width: 8),
@@ -513,14 +558,13 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textMuted),
                     ),
                     const SizedBox(height: 8),
-                    buildSortItem('default', 'Predeterminado (Más recientes)', Icons.schedule_rounded),
+                    buildSortItem('name_asc', 'Alfabético (A - Z) • Predeterminado', Icons.sort_by_alpha_rounded),
+                    buildSortItem('name_desc', 'Alfabético (Z - A)', Icons.sort_by_alpha_rounded),
                     buildSortItem('stock_desc', 'Mayor stock disponible', Icons.inventory_2_rounded),
                     buildSortItem('stock_asc', 'Menor stock (Por agotarse)', Icons.production_quantity_limits_rounded),
                     buildSortItem('price_desc', 'Mayor precio de venta', Icons.arrow_upward_rounded),
                     buildSortItem('price_asc', 'Menor precio de venta', Icons.arrow_downward_rounded),
                     buildSortItem('margin_desc', 'Mayor margen de ganancia', Icons.trending_up_rounded),
-                    buildSortItem('name_asc', 'Alfabético (A - Z)', Icons.sort_by_alpha_rounded),
-                    buildSortItem('name_desc', 'Alfabético (Z - A)', Icons.sort_by_alpha_rounded),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
@@ -660,9 +704,83 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             final pagedList = _pagedProducts;
             final totalPages = (_products.length / _pageSize).ceil();
 
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+
             return CustomScrollView(
               controller: _scrollController,
               slivers: [
+                // Barra de Herramientas Destacadas en Desktop
+                if (isDesktop)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPadding, 16, hPadding, 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 8,
+                            children: [
+                              _buildDesktopActionButton(
+                                icon: Icons.picture_as_pdf_rounded,
+                                label: 'Catálogo PDF',
+                                color: const Color(0xFFEF4444),
+                                onTap: _openCatalogModal,
+                                isDark: isDark,
+                              ),
+                              _buildDesktopActionButton(
+                                icon: Icons.local_shipping_outlined,
+                                label: 'Pedido Proveedor',
+                                color: const Color(0xFFD97706),
+                                onTap: _openRestockOrderModal,
+                                isDark: isDark,
+                              ),
+                              _buildDesktopActionButton(
+                                icon: Icons.table_chart_rounded,
+                                label: 'Exportar Excel',
+                                color: const Color(0xFF10B981),
+                                onTap: _exportToExcel,
+                                isDark: isDark,
+                              ),
+                              _buildDesktopActionButton(
+                                icon: Icons.tune_rounded,
+                                label: 'Categorías',
+                                color: const Color(0xFF8B5CF6),
+                                onTap: _openManageCategories,
+                                isDark: isDark,
+                              ),
+                            ],
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              if (_activeBusiness == null) return;
+                              final created = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
+                                ),
+                              );
+                              if (created == true) {
+                                _loadData();
+                              }
+                            },
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: const Text(
+                              '+ Nuevo Producto',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF8B5CF6),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 // Resumen de Métricas de Stock Superior
                 SliverToBoxAdapter(
                   child: Padding(
@@ -671,7 +789,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                   ),
                 ),
 
-                // Barra de búsqueda con lector de código y botón de filtros
+                // Barra de búsqueda con lector de código, chip de orden rápido y botón de filtros
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(hPadding, 8, hPadding, 8),
@@ -700,7 +818,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                                       },
                                     ),
                                   IconButton(
-                                    icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF059669)),
+                                    icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF8B5CF6)),
                                     tooltip: 'Escanear para buscar',
                                     onPressed: _scanToSearch,
                                   ),
@@ -710,24 +828,70 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
+
+                        // Chip de Orden Rápido A - Z
+                        InkWell(
+                          onTap: _openSortFilterModal,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF131126) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
+                                    ? const Color(0xFF8B5CF6)
+                                    : (isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1)),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.sort_by_alpha_rounded,
+                                  size: 17,
+                                  color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
+                                      ? const Color(0xFF8B5CF6)
+                                      : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _getSortLabel(_sortOption),
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
+                                        ? const Color(0xFF8B5CF6)
+                                        : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 18,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Botón de filtros avanzados
                         InkWell(
                           onTap: _openSortFilterModal,
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: (_sortOption != 'default' || _stockFilterOption != 'all')
-                                  ? const Color(0xFF059669).withOpacity(0.15)
-                                  : (Theme.of(context).brightness == Brightness.dark
-                                      ? const Color(0xFF1E293B)
-                                      : Colors.white),
+                              color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
+                                  ? const Color(0xFF8B5CF6).withOpacity(0.15)
+                                  : (isDark ? const Color(0xFF131126) : Colors.white),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: (_sortOption != 'default' || _stockFilterOption != 'all')
-                                    ? const Color(0xFF059669)
-                                    : (Theme.of(context).brightness == Brightness.dark
-                                        ? const Color(0xFF334155)
-                                        : const Color(0xFFCBD5E1)),
+                                color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
+                                    ? const Color(0xFF8B5CF6)
+                                    : (isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1)),
                               ),
                             ),
                             child: Stack(
@@ -736,11 +900,11 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                                 Icon(
                                   Icons.tune_rounded,
                                   size: 22,
-                                  color: (_sortOption != 'default' || _stockFilterOption != 'all')
-                                      ? const Color(0xFF059669)
+                                  color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
+                                      ? const Color(0xFF8B5CF6)
                                       : const Color(0xFF64748B),
                                 ),
-                                if (_sortOption != 'default' || _stockFilterOption != 'all')
+                                if (_sortOption != 'name_asc' || _stockFilterOption != 'all')
                                   Positioned(
                                     top: -2,
                                     right: -2,
@@ -748,7 +912,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                                       width: 8,
                                       height: 8,
                                       decoration: const BoxDecoration(
-                                        color: Color(0xFF059669),
+                                        color: Color(0xFF8B5CF6),
                                         shape: BoxShape.circle,
                                       ),
                                     ),
@@ -1094,9 +1258,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        color: isDark ? const Color(0xFF131126) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -1172,6 +1336,79 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  String _getSortLabel(String option) {
+    switch (option) {
+      case 'name_desc':
+        return 'Z - A';
+      case 'stock_desc':
+        return 'Stock ↑';
+      case 'stock_asc':
+        return 'Stock ↓';
+      case 'price_desc':
+        return 'Precio ↑';
+      case 'price_asc':
+        return 'Precio ↓';
+      case 'margin_desc':
+        return 'Margen ↑';
+      case 'name_asc':
+      case 'default':
+      default:
+        return 'A - Z';
+    }
+  }
+
+  Widget _buildDesktopActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF131126) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 16, color: color),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

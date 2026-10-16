@@ -113,25 +113,46 @@ class AppTheme {
         side: const BorderSide(color: Color(0xFF26214A)),
       ),
     ),
-    dialogTheme: const DialogTheme(
-      backgroundColor: Color(0xFF131126),
+    dialogTheme: DialogTheme(
+      backgroundColor: const Color(0xFF131126),
       surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: const BorderSide(color: Color(0xFF26214A), width: 1.2),
+      ),
+      titleTextStyle: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFFF8FAFC),
+      ),
+      contentTextStyle: const TextStyle(
+        fontSize: 13.5,
+        color: Color(0xFF94A3B8),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFFCBD5E1),
+        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: const Color(0xFF18152F),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      prefixIconColor: const Color(0xFFA78BFA),
+      suffixIconColor: const Color(0xFF94A3B8),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFF26214A)),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFF26214A)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF06B6D4), width: 1.8),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.8),
       ),
       labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
       hintStyle: const TextStyle(color: Color(0xFF64748B)),

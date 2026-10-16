@@ -8,6 +8,7 @@ import '../../../business/data/business_repository.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../models/sale.dart';
 import '../widgets/digital_ticket_modal.dart';
+import '../widgets/quick_sale_dialog.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../../../../core/services/supabase_service.dart';
@@ -29,6 +30,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   List<Sale> _sales = [];
   Map<String, dynamic> _summary = {};
   bool _isLoading = true;
+
+  // Filtros y paginación
+  String _selectedDateFilter = 'all'; // 'all', 'today', '7days', 'month', 'custom'
+  DateTimeRange? _customDateRange;
+  String _selectedPaymentMethod = 'ALL'; // 'ALL', 'EFECTIVO', 'TRANSFERENCIA', 'FIADO'
+  int _currentPage = 1;
+  static const int _pageSize = 10;
 
   @override
   void initState() {
@@ -231,24 +239,186 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
+  Future<void> _openQuickSale() async {
+    await QuickSaleDialog.show(context);
+    if (mounted) {
+      _loadSales();
+    }
+  }
+
+  Future<void> _pickCustomDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: now.add(const Duration(days: 1)),
+      initialDateRange: _customDateRange ??
+          DateTimeRange(
+            start: now.subtract(const Duration(days: 7)),
+            end: now,
+          ),
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: isDark
+                ? const ColorScheme.dark(
+                    primary: Color(0xFF8B5CF6),
+                    onPrimary: Colors.white,
+                    surface: Color(0xFF131126),
+                    onSurface: Color(0xFFF8FAFC),
+                  )
+                : const ColorScheme.light(
+                    primary: Color(0xFF8B5CF6),
+                    onPrimary: Colors.white,
+                  ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _customDateRange = picked;
+        _selectedDateFilter = 'custom';
+        _currentPage = 1;
+      });
+    }
+  }
+
+  List<Sale> get _filteredSales {
+    return _sales.where((sale) {
+      // Filtro de método de pago
+      if (_selectedPaymentMethod != 'ALL') {
+        if (sale.paymentMethod != _selectedPaymentMethod) return false;
+      }
+
+      // Filtro de fecha
+      final now = DateTime.now();
+      switch (_selectedDateFilter) {
+        case 'today':
+          if (sale.date.year != now.year ||
+              sale.date.month != now.month ||
+              sale.date.day != now.day) {
+            return false;
+          }
+          break;
+        case '7days':
+          final sevenDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 7));
+          if (sale.date.isBefore(sevenDaysAgo)) return false;
+          break;
+        case 'month':
+          if (sale.date.year != now.year || sale.date.month != now.month) return false;
+          break;
+        case 'custom':
+          if (_customDateRange != null) {
+            final start = DateTime(
+              _customDateRange!.start.year,
+              _customDateRange!.start.month,
+              _customDateRange!.start.day,
+            );
+            final end = DateTime(
+              _customDateRange!.end.year,
+              _customDateRange!.end.month,
+              _customDateRange!.end.day,
+              23,
+              59,
+              59,
+            );
+            if (sale.date.isBefore(start) || sale.date.isAfter(end)) return false;
+          }
+          break;
+        case 'all':
+        default:
+          break;
+      }
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= 850;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final filtered = _filteredSales;
+    final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
+    final currentPageClamped = _currentPage.clamp(1, totalPages);
+    final pagedSales = filtered
+        .skip((currentPageClamped - 1) * _pageSize)
+        .take(_pageSize)
+        .toList();
+
     return Scaffold(
       appBar: isDesktop
           ? null
           : AppBar(
               title: const Text('Historial de Ventas'),
+              actions: [
+                IconButton(
+                  onPressed: _openQuickSale,
+                  icon: const Icon(Icons.add_shopping_cart_rounded, color: Color(0xFF8B5CF6)),
+                  tooltip: 'Registrar Venta',
+                ),
+              ],
             ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
-        color: const Color(0xFF059669),
+        color: const Color(0xFF8B5CF6),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final double hPadding = math.max(16.0, (constraints.maxWidth - 1000) / 2);
 
             return CustomScrollView(
               slivers: [
+                // Cabecera Pro en Desktop con botón Registrar Venta
+                if (isDesktop)
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(hPadding + 16, 20, hPadding + 16, 4),
+                    sliver: SliverToBoxAdapter(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Historial de Transacciones',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Monitoreo de ingresos, arqueo y detalle de ventas',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _openQuickSale,
+                            icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                            label: const Text(
+                              '+ Registrar Venta',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF8B5CF6),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 // Resumen de Métricas de Ventas de Hoy
                 SliverPadding(
                   padding: EdgeInsets.symmetric(horizontal: hPadding),
@@ -265,30 +435,45 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ),
                 ),
 
-                // Encabezado de la lista
+                // Barra de Filtros interactiva (Fecha y Método de Pago)
                 SliverPadding(
-                  padding: EdgeInsets.fromLTRB(hPadding + 20, 16, hPadding + 20, 8),
+                  padding: EdgeInsets.symmetric(horizontal: hPadding),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildFiltersBar(isDark),
+                  ),
+                ),
+
+                // Encabezado de la lista con métrica filtrada
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(hPadding + 20, 14, hPadding + 20, 8),
                   sliver: SliverToBoxAdapter(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Registro de Transacciones',
+                          'Ventas Registradas',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15.5,
                             fontWeight: FontWeight.bold,
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xFFF8FAFC)
-                                : const Color(0xFF1E293B),
+                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                           ),
                         ),
-                        Text(
-                          '${_sales.length} ventas',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF64748B),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Text(
+                            '${filtered.length} venta${filtered.length == 1 ? '' : 's'}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                            ),
                           ),
                         ),
                       ],
@@ -296,13 +481,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ),
                 ),
 
-                // Lista de ventas
+                // Lista de ventas paginada
                 if (_isLoading)
                   const SliverFillRemaining(
                     hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(child: CircularProgressIndicator(color: Color(0xFF8B5CF6))),
                   )
-                else if (_sales.isEmpty)
+                else if (filtered.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: Center(
@@ -314,57 +499,91 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).brightness == Brightness.dark
-                                    ? const Color(0xFF064E3B)
-                                    : const Color(0xFFECFDF5),
+                                color: isDark ? const Color(0xFF18152F) : const Color(0xFFF3E8FF),
                                 shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE9D5FF),
+                                ),
                               ),
                               child: const Icon(
                                 Icons.receipt_long_outlined,
                                 size: 48,
-                                color: Color(0xFF059669),
+                                color: Color(0xFF8B5CF6),
                               ),
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Aún no hay ventas registradas',
+                              _sales.isEmpty ? 'Aún no hay ventas registradas' : 'Sin ventas con estos filtros',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 17,
                                 fontWeight: FontWeight.bold,
-                                color: Theme.of(context).brightness == Brightness.dark
-                                    ? const Color(0xFFF8FAFC)
-                                    : const Color(0xFF1E293B),
+                                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                               ),
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Cuando descuentes productos de stock por venta, aparecerán detallados aquí.',
+                              _sales.isEmpty
+                                  ? 'Cuando descuentes productos de stock por venta, aparecerán detallados aquí.'
+                                  : 'Prueba cambiando el rango de fechas o el método de pago seleccionado.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Theme.of(context).brightness == Brightness.dark
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF64748B),
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                               ),
                             ),
+                            if (_sales.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedDateFilter = 'all';
+                                    _selectedPaymentMethod = 'ALL';
+                                    _customDateRange = null;
+                                    _currentPage = 1;
+                                  });
+                                },
+                                icon: const Icon(Icons.refresh_rounded, size: 16),
+                                label: const Text('Limpiar Filtros'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF8B5CF6),
+                                  side: const BorderSide(color: Color(0xFF8B5CF6)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
                     ),
                   )
-                else
+                else ...[
                   SliverPadding(
                     padding: EdgeInsets.symmetric(horizontal: hPadding),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          final sale = _sales[index];
+                          final sale = pagedSales[index];
                           return _buildSaleCard(sale);
                         },
-                        childCount: _sales.length,
+                        childCount: pagedSales.length,
                       ),
                     ),
                   ),
+
+                  // Controles de Paginación
+                  if (totalPages > 1)
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(hPadding + 16, 16, hPadding + 16, 8),
+                      sliver: SliverToBoxAdapter(
+                        child: _buildPaginationBar(
+                          isDark: isDark,
+                          currentPage: currentPageClamped,
+                          totalPages: totalPages,
+                          totalItems: filtered.length,
+                        ),
+                      ),
+                    ),
+                ],
 
                 SliverToBoxAdapter(
                   child: SizedBox(height: MediaQuery.of(context).padding.bottom + 30),
@@ -373,6 +592,236 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildFiltersBar(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131126) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Filtros de Fecha
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  size: 14,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 8),
+                _buildFilterChip(
+                  label: 'Todas las fechas',
+                  isSelected: _selectedDateFilter == 'all',
+                  onTap: () => setState(() {
+                    _selectedDateFilter = 'all';
+                    _currentPage = 1;
+                  }),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 6),
+                _buildFilterChip(
+                  label: 'Hoy',
+                  isSelected: _selectedDateFilter == 'today',
+                  onTap: () => setState(() {
+                    _selectedDateFilter = 'today';
+                    _currentPage = 1;
+                  }),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 6),
+                _buildFilterChip(
+                  label: 'Últimos 7 días',
+                  isSelected: _selectedDateFilter == '7days',
+                  onTap: () => setState(() {
+                    _selectedDateFilter = '7days';
+                    _currentPage = 1;
+                  }),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 6),
+                _buildFilterChip(
+                  label: 'Este mes',
+                  isSelected: _selectedDateFilter == 'month',
+                  onTap: () => setState(() {
+                    _selectedDateFilter = 'month';
+                    _currentPage = 1;
+                  }),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 6),
+                _buildFilterChip(
+                  label: _customDateRange != null && _selectedDateFilter == 'custom'
+                      ? '${DateFormat('dd/MM').format(_customDateRange!.start)} - ${DateFormat('dd/MM').format(_customDateRange!.end)}'
+                      : 'Rango 📅',
+                  isSelected: _selectedDateFilter == 'custom',
+                  onTap: _pickCustomDateRange,
+                  isDark: isDark,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Divider(height: 1, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
+          const SizedBox(height: 10),
+
+          // Filtros de Método de Pago
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.filter_list_rounded,
+                  size: 15,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 8),
+                _buildFilterChip(
+                  label: 'Todos los pagos',
+                  isSelected: _selectedPaymentMethod == 'ALL',
+                  onTap: () => setState(() {
+                    _selectedPaymentMethod = 'ALL';
+                    _currentPage = 1;
+                  }),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 6),
+                _buildFilterChip(
+                  label: '💵 Efectivo',
+                  isSelected: _selectedPaymentMethod == 'EFECTIVO',
+                  onTap: () => setState(() {
+                    _selectedPaymentMethod = 'EFECTIVO';
+                    _currentPage = 1;
+                  }),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 6),
+                _buildFilterChip(
+                  label: '🏦 Transferencia',
+                  isSelected: _selectedPaymentMethod == 'TRANSFERENCIA',
+                  onTap: () => setState(() {
+                    _selectedPaymentMethod = 'TRANSFERENCIA';
+                    _currentPage = 1;
+                  }),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 6),
+                _buildFilterChip(
+                  label: '📝 Fiado',
+                  isSelected: _selectedPaymentMethod == 'FIADO',
+                  onTap: () => setState(() {
+                    _selectedPaymentMethod = 'FIADO';
+                    _currentPage = 1;
+                  }),
+                  isDark: isDark,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF8B5CF6)
+              : (isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF8B5CF6)
+                : (isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1)),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected
+                ? Colors.white
+                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationBar({
+    required bool isDark,
+    required int currentPage,
+    required int totalPages,
+    required int totalItems,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131126) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Página $currentPage de $totalPages ($totalItems transacciones)',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: currentPage > 1
+                    ? () => setState(() => _currentPage--)
+                    : null,
+                icon: const Icon(Icons.chevron_left_rounded),
+                iconSize: 22,
+                tooltip: 'Página anterior',
+                color: const Color(0xFF8B5CF6),
+                disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                onPressed: currentPage < totalPages
+                    ? () => setState(() => _currentPage++)
+                    : null,
+                icon: const Icon(Icons.chevron_right_rounded),
+                iconSize: 22,
+                tooltip: 'Página siguiente',
+                color: const Color(0xFF8B5CF6),
+                disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -581,7 +1030,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               ),
             ],
           ),
-          Divider(height: 24, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          Divider(height: 24, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
 
           // Desglose por Método de Pago
           Row(
@@ -740,7 +1189,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
                     ),
                   ),
                   child: ClipRRect(
@@ -809,10 +1258,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1F1C3B) : const Color(0xFFF8FAFC),
+                color: isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF2D2856) : const Color(0xFFE2E8F0),
+                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Row(
@@ -935,7 +1384,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       height: 24,
       width: 1,
       margin: const EdgeInsets.symmetric(horizontal: 4),
-      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+      color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/currency_formatter.dart';
 
-class SplineAreaChart extends StatelessWidget {
+class SplineAreaChart extends StatefulWidget {
   final List<Map<String, dynamic>> data; // [{'label': 'Lun', 'value': 120.0}, ...]
   final String title;
   final String? subtitle;
@@ -13,27 +14,58 @@ class SplineAreaChart extends StatelessWidget {
     required this.data,
     required this.title,
     this.subtitle,
-    this.primaryColor = const Color(0xFF06B6D4), // Cyan brillante
-    this.secondaryColor = const Color(0xFFEC4899), // Magenta acento
+    this.primaryColor = const Color(0xFF8B5CF6), // Violeta brillante Obsidian
+    this.secondaryColor = const Color(0xFF10B981), // Esmeralda acento
     this.height = 180.0,
   });
+
+  @override
+  State<SplineAreaChart> createState() => _SplineAreaChartState();
+}
+
+class _SplineAreaChartState extends State<SplineAreaChart> {
+  int? _hoveredIndex;
+
+  void _updateHover(Offset localPosition, double width) {
+    if (widget.data.isEmpty) return;
+    if (widget.data.length == 1) {
+      if (_hoveredIndex != 0) setState(() => _hoveredIndex = 0);
+      return;
+    }
+    final stepX = width / (widget.data.length - 1);
+    final rawIndex = (localPosition.dx / stepX).round();
+    final clamped = rawIndex.clamp(0, widget.data.length - 1);
+    if (_hoveredIndex != clamped) {
+      setState(() => _hoveredIndex = clamped);
+    }
+  }
+
+  void _clearHover() {
+    if (_hoveredIndex != null) {
+      setState(() => _hoveredIndex = null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final hoveredItem = (_hoveredIndex != null && _hoveredIndex! < widget.data.length)
+        ? widget.data[_hoveredIndex!]
+        : null;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131127) : Colors.white,
+        color: isDark ? const Color(0xFF131126) : Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isDark ? const Color(0xFF262046) : const Color(0xFFE2E8F0),
+          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.03),
             blurRadius: 18,
             offset: const Offset(0, 4),
           ),
@@ -49,18 +81,39 @@ class SplineAreaChart extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
+                    widget.title,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 14.5,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.2,
                       color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                     ),
                   ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
+                  const SizedBox(height: 2),
+                  if (hoveredItem != null) ...[
+                    Row(
+                      children: [
+                        Text(
+                          '${hoveredItem['label']}: ',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                          ),
+                        ),
+                        Text(
+                          CurrencyFormatter.format((hoveredItem['value'] as num?)?.toDouble() ?? 0.0),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (widget.subtitle != null) ...[
                     Text(
-                      subtitle!,
+                      widget.subtitle!,
                       style: TextStyle(
                         fontSize: 11.5,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -72,9 +125,9 @@ class SplineAreaChart extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.12),
+                  color: widget.primaryColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: primaryColor.withOpacity(0.3)),
+                  border: Border.all(color: widget.primaryColor.withOpacity(0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -83,7 +136,7 @@ class SplineAreaChart extends StatelessWidget {
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: primaryColor,
+                        color: widget.primaryColor,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -93,7 +146,7 @@ class SplineAreaChart extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: primaryColor,
+                        color: widget.primaryColor,
                       ),
                     ),
                   ],
@@ -103,15 +156,32 @@ class SplineAreaChart extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: height,
+            height: widget.height,
             width: double.infinity,
-            child: CustomPaint(
-              painter: _SplineChartPainter(
-                data: data,
-                primaryColor: primaryColor,
-                secondaryColor: secondaryColor,
-                isDark: isDark,
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return MouseRegion(
+                  onHover: (event) => _updateHover(event.localPosition, constraints.maxWidth),
+                  onExit: (_) => _clearHover(),
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onPanUpdate: (details) => _updateHover(details.localPosition, constraints.maxWidth),
+                    onPanEnd: (_) => _clearHover(),
+                    onTapDown: (details) => _updateHover(details.localPosition, constraints.maxWidth),
+                    onTapUp: (_) => _clearHover(),
+                    child: CustomPaint(
+                      size: Size(constraints.maxWidth, widget.height),
+                      painter: _SplineChartPainter(
+                        data: widget.data,
+                        primaryColor: widget.primaryColor,
+                        secondaryColor: widget.secondaryColor,
+                        isDark: isDark,
+                        hoveredIndex: _hoveredIndex,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -125,12 +195,14 @@ class _SplineChartPainter extends CustomPainter {
   final Color primaryColor;
   final Color secondaryColor;
   final bool isDark;
+  final int? hoveredIndex;
 
   _SplineChartPainter({
     required this.data,
     required this.primaryColor,
     required this.secondaryColor,
     required this.isDark,
+    this.hoveredIndex,
   });
 
   @override
@@ -138,7 +210,7 @@ class _SplineChartPainter extends CustomPainter {
     if (data.isEmpty) return;
 
     const bottomPadding = 26.0;
-    const topPadding = 12.0;
+    const topPadding = 16.0;
     final chartHeight = size.height - bottomPadding - topPadding;
     final chartWidth = size.width;
 
@@ -151,7 +223,7 @@ class _SplineChartPainter extends CustomPainter {
 
     // 1. Líneas de referencia horizontales suaves (Grid)
     final gridPaint = Paint()
-      ..color = (isDark ? const Color(0xFF332F53) : const Color(0xFFE2E8F0)).withOpacity(0.6)
+      ..color = (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)).withOpacity(0.6)
       ..strokeWidth = 1.0;
 
     for (int i = 0; i <= 3; i++) {
@@ -201,7 +273,7 @@ class _SplineChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          primaryColor.withOpacity(isDark ? 0.35 : 0.25),
+          primaryColor.withOpacity(isDark ? 0.35 : 0.22),
           primaryColor.withOpacity(0.0),
         ],
       ).createShader(Rect.fromLTWH(0, topPadding, chartWidth, chartHeight));
@@ -219,29 +291,49 @@ class _SplineChartPainter extends CustomPainter {
 
     canvas.drawPath(path, strokePaint);
 
-    // 6. Puntos destacados con halo
+    // 6. Línea vertical de crosshair si hay hover
+    if (hoveredIndex != null && hoveredIndex! < points.length) {
+      final hp = points[hoveredIndex!];
+      final crosshairPaint = Paint()
+        ..color = primaryColor.withOpacity(0.5)
+        ..strokeWidth = 1.5;
+
+      // Línea punteada o continua vertical
+      double startY = topPadding;
+      while (startY < topPadding + chartHeight) {
+        canvas.drawLine(
+          Offset(hp.dx, startY),
+          Offset(hp.dx, startY + 4),
+          crosshairPaint,
+        );
+        startY += 8;
+      }
+    }
+
+    // 7. Puntos destacados con halo y etiquetas
     for (int i = 0; i < points.length; i++) {
       final p = points[i];
+      final isHovered = hoveredIndex == i;
 
       // Halo exterior
       canvas.drawCircle(
         p,
-        6,
-        Paint()..color = primaryColor.withOpacity(0.25),
+        isHovered ? 9 : 5.5,
+        Paint()..color = (isHovered ? primaryColor : primaryColor).withOpacity(isHovered ? 0.35 : 0.2),
       );
       // Punto interior blanco con borde
       canvas.drawCircle(
         p,
-        3.5,
+        isHovered ? 4.5 : 3.2,
         Paint()..color = Colors.white,
       );
       canvas.drawCircle(
         p,
-        3.5,
+        isHovered ? 4.5 : 3.2,
         Paint()
           ..color = primaryColor
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
+          ..strokeWidth = isHovered ? 2.2 : 1.5,
       );
 
       // Etiqueta del eje X
@@ -250,9 +342,11 @@ class _SplineChartPainter extends CustomPainter {
         text: TextSpan(
           text: label,
           style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+            fontSize: 10.5,
+            fontWeight: isHovered ? FontWeight.bold : FontWeight.w600,
+            color: isHovered
+                ? (isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED))
+                : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -263,12 +357,65 @@ class _SplineChartPainter extends CustomPainter {
         Offset(p.dx - textPainter.width / 2, size.height - bottomPadding + 8),
       );
     }
+
+    // 8. Tooltip flotante animado sobre el punto seleccionado
+    if (hoveredIndex != null && hoveredIndex! < points.length) {
+      final hp = points[hoveredIndex!];
+      final val = (data[hoveredIndex!]['value'] as num?)?.toDouble() ?? 0.0;
+      final valText = CurrencyFormatter.format(val);
+
+      final tooltipPainter = TextPainter(
+        text: TextSpan(
+          text: valText,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      final tooltipWidth = tooltipPainter.width + 16;
+      final tooltipHeight = tooltipPainter.height + 8;
+      double tooltipX = hp.dx - tooltipWidth / 2;
+      double tooltipY = hp.dy - tooltipHeight - 10;
+
+      // Ajuste si se sale de los bordes
+      if (tooltipX < 4) tooltipX = 4;
+      if (tooltipX + tooltipWidth > chartWidth - 4) {
+        tooltipX = chartWidth - tooltipWidth - 4;
+      }
+      if (tooltipY < 2) tooltipY = hp.dy + 12;
+
+      final tooltipRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(tooltipX, tooltipY, tooltipWidth, tooltipHeight),
+        const Radius.circular(8),
+      );
+
+      final bgPaint = Paint()
+        ..color = isDark ? const Color(0xFF18152F) : const Color(0xFF0F172A)
+        ..style = PaintingStyle.fill;
+      final borderPaint = Paint()
+        ..color = primaryColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+
+      canvas.drawRRect(tooltipRect, bgPaint);
+      canvas.drawRRect(tooltipRect, borderPaint);
+
+      tooltipPainter.paint(
+        canvas,
+        Offset(tooltipX + 8, tooltipY + 4),
+      );
+    }
   }
 
   @override
   bool shouldRepaint(covariant _SplineChartPainter oldDelegate) {
     return oldDelegate.data != data ||
         oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.isDark != isDark;
+        oldDelegate.isDark != isDark ||
+        oldDelegate.hoveredIndex != hoveredIndex;
   }
 }

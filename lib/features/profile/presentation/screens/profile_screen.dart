@@ -19,6 +19,7 @@ import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/services/update_service.dart';
 import '../../../../core/widgets/update_dialog.dart';
 import '../../../../core/widgets/modern_dialog.dart';
+import '../../../../core/widgets/image_source_picker_modal.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -103,11 +104,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF131126) : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
           side: BorderSide(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
             width: 1.5,
           ),
         ),
@@ -147,10 +148,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
                   ),
                 ),
                 child: Text(
@@ -331,43 +332,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showAvatarPickerModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Foto de Perfil', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFECFDF5),
-                  child: Icon(Icons.camera_alt, color: Color(0xFF059669)),
-                ),
-                title: const Text('Tomar foto con la cámara'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickAvatar(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFEFF6FF),
-                  child: Icon(Icons.photo_library, color: Color(0xFF2563EB)),
-                ),
-                title: const Text('Elegir de la galería'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickAvatar(ImageSource.gallery);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+    ImageSourcePickerModal.show(
+      context,
+      title: 'Foto de Perfil',
+      subtitle: 'Elige cómo actualizar tu foto de cuenta',
+      hasExistingImage: _avatarPath != null && _avatarPath!.isNotEmpty,
+      onSelected: (source) => _pickAvatar(source),
+      onRemove: () {
+        setState(() => _avatarPath = null);
+        _saveProfile();
+      },
     );
   }
 
@@ -458,7 +432,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: OutlinedButton.styleFrom(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 side: BorderSide(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
@@ -677,7 +651,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: OutlinedButton.styleFrom(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   side: BorderSide(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
@@ -726,7 +700,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final user = _user;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryTextColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final primaryTextColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
     final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
     final isDesktop = MediaQuery.of(context).size.width >= 850;
 
@@ -971,7 +945,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               decoration: BoxDecoration(
                 color: _isCloudSyncEnabled
                     ? const Color(0xFF059669).withOpacity(0.12)
-                    : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                    : (isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9)),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
@@ -1099,7 +1073,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    backgroundColor: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
                     child: Icon(
                       Icons.description_outlined,
                       color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
@@ -1171,11 +1145,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
                 side: BorderSide(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
                 ),
               ),
               elevation: 0,
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              color: isDark ? const Color(0xFF131126) : Colors.white,
               child: ListTile(
                 leading: CircleAvatar(
                   backgroundColor: const Color(0xFF059669).withOpacity(0.15),
@@ -1215,9 +1189,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           // 7. Botón Cerrar Sesión
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+              ),
+            ),
             elevation: 0,
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            color: isDark ? const Color(0xFF131126) : Colors.white,
             child: ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14)),
@@ -1249,10 +1228,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           margin: const EdgeInsets.only(right: 14),
           padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+            color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+              color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
               width: 1,
             ),
           ),
@@ -1375,7 +1354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final defaultBg = isDark ? const Color(0xFF131127) : Colors.white;
     final defaultBorder = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
-    final defaultTitleColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
+    final defaultTitleColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1398,7 +1377,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Row(
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 18, color: titleColor ?? const Color(0xFF059669)),
+                  Icon(icon, size: 18, color: titleColor ?? const Color(0xFF8B5CF6)),
                   const SizedBox(width: 8),
                 ],
                 Text(
@@ -1411,7 +1390,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            Divider(height: 20, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            Divider(height: 20, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
           ],
           child,
         ],
@@ -1433,9 +1412,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Widget? trailingBadge,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final defaultBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final defaultBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final defaultTitleColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
+    final defaultBg = isDark ? const Color(0xFF131126) : Colors.white;
+    final defaultBorder = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
+    final defaultTitleColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
     final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Container(
@@ -1524,7 +1503,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Divider(
                     height: 16,
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
                   ),
                   child,
                 ],

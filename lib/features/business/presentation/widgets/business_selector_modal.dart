@@ -13,11 +13,13 @@ import '../../models/business.dart';
 class BusinessSelectorModal extends StatefulWidget {
   final String userId;
   final VoidCallback? onLogout;
+  final bool isDialog;
 
   const BusinessSelectorModal({
     super.key,
     required this.userId,
     this.onLogout,
+    this.isDialog = false,
   });
 
   static Future<bool?> show(
@@ -25,6 +27,29 @@ class BusinessSelectorModal extends StatefulWidget {
     required String userId,
     VoidCallback? onLogout,
   }) {
+    final isDesktop = MediaQuery.of(context).size.width >= 850;
+
+    if (isDesktop) {
+      return showDialog<bool>(
+        context: context,
+        builder: (_) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BusinessSelectorModal(
+                userId: userId,
+                onLogout: onLogout,
+                isDialog: true,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -33,6 +58,7 @@ class BusinessSelectorModal extends StatefulWidget {
       builder: (_) => BusinessSelectorModal(
         userId: userId,
         onLogout: onLogout,
+        isDialog: false,
       ),
     );
   }
@@ -91,7 +117,31 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) => AlertDialog(
-            title: const Text('Crear Nueva Empresa'),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.storefront_rounded, color: Color(0xFF10B981), size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Crear Nueva Empresa', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Ingresa el nombre y moneda de tu sede',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -133,7 +183,13 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Cancelar'),
               ),
-              ElevatedButton(
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                ),
                 onPressed: () {
                   if (nameController.text.trim().isNotEmpty) {
                     Navigator.pop(ctx, {
@@ -142,7 +198,8 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                     });
                   }
                 },
-                child: const Text('Crear y Entrar'),
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: const Text('Crear y Entrar'),
               ),
             ],
           ),
@@ -413,7 +470,31 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) => AlertDialog(
-            title: const Text('Editar Empresa'),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF059669).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.edit_note_rounded, color: Color(0xFF10B981), size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Editar Empresa', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Modifica el nombre o moneda principal',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -454,7 +535,13 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Cancelar'),
               ),
-              ElevatedButton(
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                ),
                 onPressed: () {
                   if (nameController.text.trim().isNotEmpty) {
                     Navigator.pop(ctx, {
@@ -463,7 +550,8 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                     });
                   }
                 },
-                child: const Text('Guardar'),
+                icon: const Icon(Icons.save_rounded, size: 18),
+                label: const Text('Guardar'),
               ),
             ],
           ),
@@ -1205,32 +1293,38 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF131126) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
 
     return Container(
       padding: EdgeInsets.fromLTRB(
         24,
         24,
         24,
-        MediaQuery.of(context).padding.bottom + 24,
+        widget.isDialog ? 24 : MediaQuery.of(context).padding.bottom + 24,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        color: bgColor,
+        borderRadius: widget.isDialog
+            ? BorderRadius.circular(24)
+            : const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(color: borderColor, width: 1.2),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF334155) : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+          if (!widget.isDialog)
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF332D5C) : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 16),
           Text(
             'Tus Empresas / Negocios',
@@ -1265,9 +1359,9 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2563EB),
+                    foregroundColor: const Color(0xFF38BDF8),
                     side: BorderSide(
-                      color: isDark ? const Color(0xFF3B82F6) : const Color(0xFF93C5FD),
+                      color: isDark ? const Color(0xFF2563EB) : const Color(0xFF93C5FD),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1309,10 +1403,10 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                color: isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Center(
@@ -1353,13 +1447,13 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                   return Container(
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? (isDark ? const Color(0xFF064E3B).withOpacity(0.5) : const Color(0xFFECFDF5))
-                          : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                          ? (isDark ? const Color(0xFF0F2D24) : const Color(0xFFECFDF5))
+                          : (isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC)),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: isSelected
-                            ? (isDark ? const Color(0xFF10B981) : const Color(0xFF059669))
-                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            ? const Color(0xFF10B981)
+                            : (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
                         width: isSelected ? 1.5 : 1,
                       ),
                     ),
@@ -1379,7 +1473,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                                   CircleAvatar(
                                     backgroundColor: isSelected
                                         ? const Color(0xFF059669)
-                                        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                        : (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
                                     foregroundColor: isSelected
                                         ? Colors.white
                                         : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
@@ -1590,7 +1684,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
               ),
             ),
 
-          Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          Divider(height: 1, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
           const SizedBox(height: 4),
 
           // Términos y Privacidad

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
 import '../../../products/presentation/screens/products_list_screen.dart';
 import '../../../sales/presentation/screens/sales_history_screen.dart';
@@ -12,6 +13,8 @@ import '../../../../core/services/update_service.dart';
 import '../../../../core/widgets/update_dialog.dart';
 import '../widgets/app_sidebar_pro.dart';
 import '../widgets/app_header_bar.dart';
+import '../widgets/global_search_dialog.dart';
+import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -123,91 +126,109 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
     ];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 850;
-
-        if (isWide) {
-          return Scaffold(
-            body: Row(
-              children: [
-                // Sidebar Pro tipo Bento / Nuxt Suite
-                AppSidebarPro(
-                  selectedIndex: _currentIndex,
-                  onItemSelected: _navigateToTab,
-                  activeBusiness: _activeBusiness,
-                  userName: _userName,
-                  userRole: _userRole,
-                  onSelectBusiness: _handleSelectBusiness,
-                  onLogout: widget.onLogout,
-                ),
-                // Área Principal con Header Bar
-                Expanded(
-                  child: Column(
-                    children: [
-                      AppHeaderBar(
-                        title: _currentIndex == 0
-                            ? (_activeBusiness?.name ?? 'Stockealo Pro')
-                            : (_currentIndex == 1
-                                ? 'Catálogo de Inventario'
-                                : (_currentIndex == 2 ? 'Historial de Ventas' : 'Ajustes y Configuración')),
-                        subtitle: _currentIndex == 0
-                            ? 'Resumen Operativo en Tiempo Real'
-                            : 'Gestión Comercial Inteligente',
-                        onQuickSale: () => _navigateToTab(2),
-                        onSearchTap: () => _navigateToTab(1),
-                      ),
-                      Expanded(
-                        child: IndexedStack(
-                          index: _currentIndex,
-                          children: screens,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () {
+          GlobalSearchDialog.show(
+            context,
+            businessId: _activeBusiness?.id,
+            onNavigateToTab: _navigateToTab,
           );
-        }
-
-        // Modo Móvil
-        return Scaffold(
-          body: IndexedStack(
-            index: _currentIndex,
-            children: screens,
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: _navigateToTab,
-            backgroundColor: isDark ? const Color(0xFF131127) : Colors.white,
-            elevation: 3,
-            indicatorColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard, color: Color(0xFF059669)),
-                label: 'Inicio',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.inventory_2_outlined),
-                selectedIcon: Icon(Icons.inventory_2, color: Color(0xFF059669)),
-                label: 'Inventario',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.point_of_sale_outlined),
-                selectedIcon: Icon(Icons.point_of_sale, color: Color(0xFF059669)),
-                label: 'Ventas',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings, color: Color(0xFF059669)),
-                label: 'Ajustes',
-              ),
-            ],
-          ),
-        );
+        },
       },
+      child: Focus(
+        autofocus: true,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 850;
+
+            if (isWide) {
+              return Scaffold(
+                body: Row(
+                  children: [
+                    // Sidebar Pro tipo Bento / Nuxt Suite
+                    AppSidebarPro(
+                      selectedIndex: _currentIndex,
+                      onItemSelected: _navigateToTab,
+                      activeBusiness: _activeBusiness,
+                      userName: _userName,
+                      userRole: _userRole,
+                      onSelectBusiness: _handleSelectBusiness,
+                      onLogout: widget.onLogout,
+                    ),
+                    // Área Principal con Header Bar
+                    Expanded(
+                      child: Column(
+                        children: [
+                          AppHeaderBar(
+                            title: _currentIndex == 0
+                                ? (_activeBusiness?.name ?? 'Stockealo Pro')
+                                : (_currentIndex == 1
+                                    ? 'Catálogo de Inventario'
+                                    : (_currentIndex == 2 ? 'Historial de Ventas' : 'Ajustes y Configuración')),
+                            subtitle: _currentIndex == 0
+                                ? 'Resumen Operativo en Tiempo Real'
+                                : 'Gestión Comercial Inteligente',
+                            onQuickSale: () => QuickSaleDialog.show(context),
+                            onSearchTap: () => GlobalSearchDialog.show(
+                              context,
+                              businessId: _activeBusiness?.id,
+                              onNavigateToTab: _navigateToTab,
+                            ),
+                          ),
+                          Expanded(
+                            child: IndexedStack(
+                              index: _currentIndex,
+                              children: screens,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Modo Móvil
+            return Scaffold(
+              body: IndexedStack(
+                index: _currentIndex,
+                children: screens,
+              ),
+              bottomNavigationBar: NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: _navigateToTab,
+                backgroundColor: isDark ? const Color(0xFF131126) : Colors.white,
+                elevation: 3,
+                indicatorColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_outlined),
+                    selectedIcon: Icon(Icons.dashboard, color: Color(0xFF059669)),
+                    label: 'Inicio',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.inventory_2_outlined),
+                    selectedIcon: Icon(Icons.inventory_2, color: Color(0xFF059669)),
+                    label: 'Inventario',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.point_of_sale_outlined),
+                    selectedIcon: Icon(Icons.point_of_sale, color: Color(0xFF059669)),
+                    label: 'Ventas',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings, color: Color(0xFF059669)),
+                    label: 'Ajustes',
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

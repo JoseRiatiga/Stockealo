@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/widgets/modern_dialog.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
 import '../../data/team_repository.dart';
@@ -124,94 +125,121 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     final updated = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              const Icon(Icons.manage_accounts_outlined, color: Color(0xFF059669)),
-              const SizedBox(width: 10),
-              Expanded(
+        builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return ModernDialog(
+            icon: Icons.manage_accounts_outlined,
+            iconColor: const Color(0xFF059669),
+            title: 'Ajustar Rol',
+            subtitle: member.displayName,
+            maxWidth: 440,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.email_outlined, size: 16, color: Color(0xFF64748B)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          member.email,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Nivel de permisos:',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+
+                // Opción Cajero
+                RadioListTile<String>(
+                  value: 'CASHIER',
+                  groupValue: selectedRole,
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: const Color(0xFF059669),
+                  title: const Text('Cajero / Vendedor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  subtitle: const Text(
+                    'Solo registra ventas. Precios de compra y costos protegidos.',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                  ),
+                  onChanged: (val) => setDialogState(() => selectedRole = val!),
+                ),
+
+                // Opción Administrador
+                RadioListTile<String>(
+                  value: 'ADMIN',
+                  groupValue: selectedRole,
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: const Color(0xFF059669),
+                  title: const Text('Administrador', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  subtitle: const Text(
+                    'Puede ingresar inventario, modificar precios y ver márgenes.',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                  ),
+                  onChanged: (val) => setDialogState(() => selectedRole = val!),
+                ),
+              ],
+            ),
+            actions: [
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  side: BorderSide(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                onPressed: () => Navigator.pop(ctx, false),
                 child: Text(
-                  'Ajustar Rol: ${member.displayName}',
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
+                  'Cancelar',
+                  style: TextStyle(
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Nombre: ${member.displayName}',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Correo: ${member.email}',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Selecciona el nivel de acceso:',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-
-              // Opción Cajero
-              RadioListTile<String>(
-                value: 'CASHIER',
-                groupValue: selectedRole,
-                contentPadding: EdgeInsets.zero,
-                activeColor: const Color(0xFF059669),
-                title: const Text('Cajero / Vendedor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                subtitle: const Text(
-                  'Solo registra ventas. Precios de compra y costos protegidos.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              const SizedBox(width: 10),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 ),
-                onChanged: (val) => setDialogState(() => selectedRole = val!),
-              ),
-
-              // Opción Administrador
-              RadioListTile<String>(
-                value: 'ADMIN',
-                groupValue: selectedRole,
-                contentPadding: EdgeInsets.zero,
-                activeColor: const Color(0xFF059669),
-                title: const Text('Administrador', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                subtitle: const Text(
-                  'Puede ingresar inventario, modificar precios y ver márgenes.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                ),
-                onChanged: (val) => setDialogState(() => selectedRole = val!),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () async {
-                try {
-                  await _teamRepo.updateRole(member.id, selectedRole);
-                  if (ctx.mounted) Navigator.pop(ctx, true);
-                } catch (e) {
-                  if (context.mounted) {
-                    AppToast.showError(context, e.toString().replaceAll('Exception: ', ''));
+                onPressed: () async {
+                  try {
+                    await _teamRepo.updateRole(member.id, selectedRole);
+                    if (ctx.mounted) Navigator.pop(ctx, true);
+                  } catch (e) {
+                    if (context.mounted) {
+                      AppToast.showError(context, e.toString().replaceAll('Exception: ', ''));
+                    }
                   }
-                }
-              },
-              child: const Text('Guardar Rol'),
-            ),
-          ],
-        ),
+                },
+                child: const Text('Guardar Rol', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
 
@@ -228,20 +256,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   }
 
   Future<void> _removeMember(BusinessMember member) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await ModernConfirmDialog.show(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Desvincular Empleado'),
-        content: Text('¿Seguro que deseas remover a ${member.displayName} (${member.email}) del equipo de ${widget.business.name}?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Desvincular'),
-          ),
-        ],
-      ),
+      title: 'Desvincular Empleado',
+      message: '¿Seguro que deseas remover a ${member.displayName} (${member.email}) del equipo de ${widget.business.name}?',
+      confirmText: 'Desvincular',
+      isDestructive: true,
     );
 
     if (confirm == true) {

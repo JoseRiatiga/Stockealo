@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/auth_repository.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
+import '../widgets/stocky_mascot.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -21,6 +22,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _confirmPasswordFocus = FocusNode();
+
+  StockyState _mascotState = StockyState.idle;
+  double _mascotLookProgress = 0.0;
+
   bool _isRegisterMode = false;
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -28,7 +36,46 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
 
   @override
+  void initState() {
+    super.initState();
+    _emailFocus.addListener(_onFocusChanged);
+    _passwordFocus.addListener(_onFocusChanged);
+    _confirmPasswordFocus.addListener(_onFocusChanged);
+    _emailController.addListener(_onEmailChanged);
+  }
+
+  void _onEmailChanged() {
+    final text = _emailController.text;
+    final len = text.length;
+    final p = ((len / 25.0) * 2.0 - 1.0).clamp(-1.0, 1.0);
+    if (_mascotLookProgress != p) {
+      setState(() => _mascotLookProgress = p);
+    }
+  }
+
+  void _onFocusChanged() {
+    if (_isLoading) return;
+    if (_passwordFocus.hasFocus || _confirmPasswordFocus.hasFocus) {
+      if (_mascotState != StockyState.coveringEyes) {
+        setState(() => _mascotState = StockyState.coveringEyes);
+      }
+    } else if (_emailFocus.hasFocus) {
+      if (_mascotState != StockyState.trackingEmail) {
+        setState(() => _mascotState = StockyState.trackingEmail);
+      }
+    } else {
+      if (_mascotState != StockyState.idle && _errorMessage == null) {
+        setState(() => _mascotState = StockyState.idle);
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    _confirmPasswordFocus.dispose();
+    _emailController.removeListener(_onEmailChanged);
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
@@ -39,7 +86,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _clearError() {
     if (_errorMessage != null) {
-      setState(() => _errorMessage = null);
+      setState(() {
+        _errorMessage = null;
+        _onFocusChanged();
+      });
     }
   }
 
@@ -67,6 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _mascotState = StockyState.loading;
     });
 
     try {
@@ -82,13 +133,18 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (mounted) {
-        widget.onLoginSuccess();
+        setState(() => _mascotState = StockyState.success);
+        await Future.delayed(const Duration(milliseconds: 650));
+        if (mounted) {
+          widget.onLoginSuccess();
+        }
       }
     } catch (e) {
       if (mounted) {
         final rawMsg = e.toString().replaceAll('Exception: ', '');
         setState(() {
           _errorMessage = rawMsg;
+          _mascotState = StockyState.error;
         });
       }
     } finally {
@@ -140,23 +196,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                  // Logo e Identidad
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0),
-                        width: 2,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.inventory_2,
-                      size: 42,
-                      color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                    ),
+                  // Mascota Interactiva Stocky
+                  StockyMascot(
+                    size: 96,
+                    state: _mascotState,
+                    lookProgress: _mascotLookProgress,
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -375,6 +419,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Campo Correo
                   TextFormField(
                     controller: _emailController,
+                    focusNode: _emailFocus,
                     keyboardType: TextInputType.emailAddress,
                     onChanged: (_) => _clearError(),
                     decoration: const InputDecoration(
@@ -393,6 +438,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Campo Contraseña
                   TextFormField(
                     controller: _passwordController,
+                    focusNode: _passwordFocus,
                     obscureText: _obscurePassword,
                     onChanged: (_) => _clearError(),
                     decoration: InputDecoration(
@@ -418,6 +464,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _confirmPasswordController,
+                      focusNode: _confirmPasswordFocus,
                       obscureText: _obscurePassword,
                       onChanged: (_) => _clearError(),
                       decoration: const InputDecoration(

@@ -11,6 +11,7 @@ import 'features/home/presentation/screens/main_navigation_screen.dart';
 
 import 'core/services/supabase_service.dart';
 import 'core/theme/theme_controller.dart';
+import 'features/auth/presentation/widgets/stockealo_splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,12 +84,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       future: _sessionFuture,
       builder: (context, sessionSnapshot) {
         if (sessionSnapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            body: const Center(
-              child: CircularProgressIndicator(color: Color(0xFF059669)),
-            ),
-          );
+          return const StockealoSplashScreen(statusMessage: 'Verificando sesión...');
         }
 
         final currentUser = _authRepo.currentUser;
@@ -105,12 +101,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           future: _businessRepo.getActiveBusiness(currentUser.id, currentUser.email),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return Scaffold(
-                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                body: const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF059669)),
-                ),
-              );
+              return const StockealoSplashScreen(statusMessage: 'Cargando tu negocio...');
             }
 
             final activeBusiness = snapshot.data;

@@ -18,6 +18,7 @@ import '../../../team/data/team_repository.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/services/update_service.dart';
 import '../../../../core/widgets/update_dialog.dart';
+import '../../../../core/widgets/modern_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -413,70 +414,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Cambiar Contraseña', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 380, maxWidth: 420),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: currentPassController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Contraseña Actual', prefixIcon: Icon(Icons.lock_outline)),
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return ModernDialog(
+          icon: Icons.lock_reset_rounded,
+          iconColor: const Color(0xFF059669),
+          title: 'Cambiar Contraseña',
+          subtitle: 'Actualiza tu clave de acceso de manera segura',
+          maxWidth: 440,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: currentPassController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Contraseña Actual',
+                  prefixIcon: Icon(Icons.lock_outline),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: newPassController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Nueva Contraseña', prefixIcon: Icon(Icons.lock_reset)),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: newPassController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Nueva Contraseña',
+                  prefixIcon: Icon(Icons.lock_reset),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: confirmPassController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Confirmar Nueva Contraseña', prefixIcon: Icon(Icons.check_circle_outline)),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: confirmPassController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Confirmar Nueva Contraseña',
+                  prefixIcon: Icon(Icons.check_circle_outline),
                 ),
-              ],
+              ),
+            ],
+          ),
+          actions: [
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                side: BorderSide(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () async {
-              if (newPassController.text != confirmPassController.text) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Las contraseñas no coinciden'), backgroundColor: Colors.orange),
-                );
-                return;
-              }
-              try {
-                await _authRepo.changePassword(
-                  userId: _user!.id,
-                  currentPassword: currentPassController.text,
-                  newPassword: newPassController.text,
-                );
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) {
+            const SizedBox(width: 10),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              onPressed: () async {
+                if (newPassController.text != confirmPassController.text) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Contraseña actualizada correctamente'), backgroundColor: Color(0xFF059669)),
+                    const SnackBar(content: Text('Las contraseñas no coinciden'), backgroundColor: Colors.orange),
                   );
+                  return;
                 }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red),
+                try {
+                  await _authRepo.changePassword(
+                    userId: _user!.id,
+                    currentPassword: currentPassController.text,
+                    newPassword: newPassController.text,
                   );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Contraseña actualizada correctamente'), backgroundColor: Color(0xFF059669)),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red),
+                    );
+                  }
                 }
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
+              },
+              child: const Text('Guardar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -558,37 +592,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Opción A: Confirmación para purgar únicamente los datos en la nube
   Future<void> _showPurgeCloudDialog() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await ModernConfirmDialog.show(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.cloud_off_rounded, color: Colors.orange, size: 24),
-            SizedBox(width: 10),
-            Text('Purgar datos de la Nube', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
-          '¿Deseas eliminar únicamente tus copias en la nube?\n\n'
+      title: 'Purgar datos de la Nube',
+      message: '¿Deseas eliminar únicamente tus copias en la nube?\n\n'
           '• Se borrarán tus registros en la nube.\n'
           '• Tus datos en este dispositivo seguirán 100% INTACTOS.\n'
           '• La app volverá al Modo Local Privado.',
-          style: TextStyle(
-            fontSize: 13,
-            height: 1.4,
-            color: Theme.of(ctx).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Purgar Nube'),
-          ),
-        ],
-      ),
+      icon: Icons.cloud_off_rounded,
+      iconColor: Colors.orange,
+      confirmText: 'Purgar Nube',
+      confirmColor: Colors.orange,
     );
 
     if (confirmed == true && _user != null) {
@@ -620,28 +634,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 26),
-              SizedBox(width: 10),
-              Text('Eliminar Cuenta Definitivamente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red)),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
+        builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return ModernDialog(
+            icon: Icons.warning_amber_rounded,
+            iconColor: const Color(0xFFDC2626),
+            title: 'Eliminar Cuenta Definitivamente',
+            subtitle: 'Esta acción es irreversible y permanente',
+            maxWidth: 440,
+            content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Esta acción es IRREVERSIBLE y permanente.\n\n'
                   'Se borrarán por completo tus empresas, catálogo de productos, registro de ventas, clientes e historial contable tanto de este dispositivo como de la nube.\n\n'
                   'Para confirmar, escribe la palabra "ELIMINAR" a continuación:',
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.4,
-                    color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -661,33 +672,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: canProceed ? Colors.red : Colors.grey.shade300,
-                foregroundColor: Colors.white,
+            actions: [
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  side: BorderSide(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Cancelar',
+                  style: TextStyle(
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-              onPressed: canProceed
-                  ? () async {
-                      Navigator.pop(ctx);
-                      if (_user != null) {
-                        setState(() => _isLoading = true);
-                        await _supabase.deleteAccountCompletely(
-                          userId: _user!.id,
-                          userEmail: _user!.email,
-                        );
-                        if (mounted) {
-                          widget.onLogout();
+              const SizedBox(width: 10),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: canProceed ? const Color(0xFFDC2626) : Colors.grey.shade400,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                onPressed: canProceed
+                    ? () async {
+                        Navigator.pop(ctx);
+                        if (_user != null) {
+                          setState(() => _isLoading = true);
+                          await _supabase.deleteAccountCompletely(
+                            userId: _user!.id,
+                            userEmail: _user!.email,
+                          );
+                          if (mounted) {
+                            widget.onLogout();
+                          }
                         }
                       }
-                    }
-                  : null,
-              child: const Text('Eliminar Todo'),
-            ),
-          ],
-        ),
+                    : null,
+                child: const Text('Eliminar Todo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

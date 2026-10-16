@@ -138,26 +138,116 @@ class DashboardRepository {
     final int lowStock = (stockRow['low_stock'] as num?)?.toInt() ?? 0;
     final int totalProducts = (stockRow['total'] as num?)?.toInt() ?? 0;
 
-    // 5. Ventas de los últimos 7 días para gráfico de barras
+    // 5. Timeline de ventas dinámico según el periodo seleccionado (Hoy, 7 Días, Este Mes, Histórico)
+    final List<Map<String, dynamic>> periodTimelineSales = [];
     final List<Map<String, dynamic>> weeklySales = [];
     final dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-    for (int i = 6; i >= 0; i--) {
-      final dayDate = now.subtract(Duration(days: i));
-      final datePattern = "${dayDate.year.toString().padLeft(4, '0')}-${dayDate.month.toString().padLeft(2, '0')}-${dayDate.day.toString().padLeft(2, '0')}%";
+    if (period == 'today') {
+      // 6 bloques horarios del día actual
+      final todayDateStr = "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      final timeSlots = [
+        {'label': '6-9h', 'start': '06:00:00', 'end': '09:59:59'},
+        {'label': '10-12h', 'start': '10:00:00', 'end': '12:59:59'},
+        {'label': '13-15h', 'start': '13:00:00', 'end': '15:59:59'},
+        {'label': '16-18h', 'start': '16:00:00', 'end': '18:59:59'},
+        {'label': '19-21h', 'start': '19:00:00', 'end': '21:59:59'},
+        {'label': '22h+', 'start': '22:00:00', 'end': '23:59:59'},
+      ];
 
-      final dayRes = await db.rawQuery('''
-        SELECT COALESCE(SUM(total), 0.0) as day_total 
-        FROM sales 
-        WHERE business_id = ? AND date LIKE ?
-      ''', [businessId, datePattern]);
+      for (final slot in timeSlots) {
+        final startIso = "${todayDateStr}T${slot['start']}";
+        final endIso = "${todayDateStr}T${slot['end']}";
+        final slotRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(total), 0.0) as slot_total 
+          FROM sales 
+          WHERE business_id = ? AND date >= ? AND date <= ?
+        ''', [businessId, startIso, endIso]);
+        final slotTotal = (slotRes.first['slot_total'] as num?)?.toDouble() ?? 0.0;
+        periodTimelineSales.add({
+          'day': slot['label'] as String,
+          'total': slotTotal,
+        });
+      }
+    } else if (period == 'month') {
+      // 4 semanas del mes actual
+      final firstDayOfMonth = DateTime(now.year, now.month, 1);
+      for (int w = 0; w < 4; w++) {
+        final startDay = firstDayOfMonth.add(Duration(days: w * 7));
+        final endDay = w == 3
+            ? DateTime(now.year, now.month + 1, 0, 23, 59, 59)
+            : startDay.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
 
-      final dayTotal = (dayRes.first['day_total'] as num?)?.toDouble() ?? 0.0;
-      weeklySales.add({
-        'day': dayNames[dayDate.weekday % 7],
-        'total': dayTotal,
-        'date': dayDate,
-      });
+        final startIso = "${startDay.year.toString().padLeft(4, '0')}-${startDay.month.toString().padLeft(2, '0')}-${startDay.day.toString().padLeft(2, '0')}T00:00:00";
+        final endIso = "${endDay.year.toString().padLeft(4, '0')}-${endDay.month.toString().padLeft(2, '0')}-${endDay.day.toString().padLeft(2, '0')}T23:59:59";
+
+        final weekRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(total), 0.0) as week_total 
+          FROM sales 
+          WHERE business_id = ? AND date >= ? AND date <= ?
+        ''', [businessId, startIso, endIso]);
+        final weekTotal = (weekRes.first['week_total'] as num?)?.toDouble() ?? 0.0;
+        periodTimelineSales.add({
+          'day': 'Sem ${w + 1}',
+          'total': weekTotal,
+        });
+      }
+    } else if (period == 'all') {
+      // Últimos 6 meses
+      final monthNames = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      for (int m = 5; m >= 0; m--) {
+        final targetMonthDate = DateTime(now.year, now.month - m, 1);
+        final prefix = "${targetMonthDate.year.toString().padLeft(4, '0')}-${targetMonthDate.month.toString().padLeft(2, '0')}%";
+        final mRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(total), 0.0) as m_total 
+          FROM sales 
+          WHERE business_id = ? AND date LIKE ?
+        ''', [businessId, prefix]);
+        final mTotal = (mRes.first['m_total'] as num?)?.toDouble() ?? 0.0;
+        periodTimelineSales.add({
+          'day': monthNames[targetMonthDate.month],
+          'total': mTotal,
+        });
+      }
+    } else {
+      // Default / 'week': Últimos 7 días
+      for (int i = 6; i >= 0; i--) {
+        final dayDate = now.subtract(Duration(days: i));
+        final datePattern = "${dayDate.year.toString().padLeft(4, '0')}-${dayDate.month.toString().padLeft(2, '0')}-${dayDate.day.toString().padLeft(2, '0')}%";
+
+        final dayRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(total), 0.0) as day_total 
+          FROM sales 
+          WHERE business_id = ? AND date LIKE ?
+        ''', [businessId, datePattern]);
+
+        final dayTotal = (dayRes.first['day_total'] as num?)?.toDouble() ?? 0.0;
+        final item = {
+          'day': dayNames[dayDate.weekday % 7],
+          'total': dayTotal,
+          'date': dayDate,
+        };
+        periodTimelineSales.add(item);
+        weeklySales.add(item);
+      }
+    }
+
+    if (weeklySales.isEmpty) {
+      for (int i = 6; i >= 0; i--) {
+        final dayDate = now.subtract(Duration(days: i));
+        final datePattern = "${dayDate.year.toString().padLeft(4, '0')}-${dayDate.month.toString().padLeft(2, '0')}-${dayDate.day.toString().padLeft(2, '0')}%";
+        final dayRes = await db.rawQuery('''
+          SELECT COALESCE(SUM(total), 0.0) as day_total 
+          FROM sales 
+          WHERE business_id = ? AND date LIKE ?
+        ''', [businessId, datePattern]);
+        final dayTotal = (dayRes.first['day_total'] as num?)?.toDouble() ?? 0.0;
+        weeklySales.add({
+          'day': dayNames[dayDate.weekday % 7],
+          'total': dayTotal,
+          'date': dayDate,
+        });
+      }
     }
 
     // 6. Distribución de ventas por Categoría (Para Gráfico de Pastel / Donut)
@@ -240,6 +330,7 @@ class DashboardRepository {
       'lowStock': lowStock,
       'totalProducts': totalProducts,
       'weeklySales': weeklySales,
+      'periodTimelineSales': periodTimelineSales,
       'categorySales': categorySales,
       'topProducts': topProducts,
     };

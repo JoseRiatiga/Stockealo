@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -239,93 +240,47 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
         color: const Color(0xFF059669),
-        child: CustomScrollView(
-          slivers: [
-            // Resumen de Métricas de Ventas de Hoy
-            SliverToBoxAdapter(
-              child: _buildSummaryCard(),
-            ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final double hPadding = math.max(0.0, (constraints.maxWidth - 1100) / 2);
 
-            // Accesos Rápidos Destacados: Clientes / Fiados y Exportación Excel
-            SliverToBoxAdapter(
-              child: _buildQuickModulesBar(),
-            ),
-
-            // Encabezado de la lista
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Registro de Transacciones',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xFFF8FAFC)
-                            : const Color(0xFF1E293B),
-                      ),
-                    ),
-                    Text(
-                      '${_sales.length} ventas',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
+            return CustomScrollView(
+              slivers: [
+                // Resumen de Métricas de Ventas de Hoy
+                SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: hPadding),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildSummaryCard(),
+                  ),
                 ),
-              ),
-            ),
 
-            // Lista de ventas
-            if (_isLoading)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_sales.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                // Accesos Rápidos Destacados: Clientes / Fiados y Exportación Excel
+                SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: hPadding),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildQuickModulesBar(),
+                  ),
+                ),
+
+                // Encabezado de la lista
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(hPadding + 20, 16, hPadding + 20, 8),
+                  sliver: SliverToBoxAdapter(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xFF064E3B)
-                                : const Color(0xFFECFDF5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.receipt_long_outlined,
-                            size: 48,
-                            color: Color(0xFF059669),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                         Text(
-                          'Aún no hay ventas registradas',
+                          'Registro de Transacciones',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Theme.of(context).brightness == Brightness.dark
                                 ? const Color(0xFFF8FAFC)
                                 : const Color(0xFF1E293B),
                           ),
                         ),
-                        const SizedBox(height: 6),
                         Text(
-                          'Cuando descuentes productos de stock por venta, aparecerán detallados aquí.',
-                          textAlign: TextAlign.center,
+                          '${_sales.length} ventas',
                           style: TextStyle(
                             fontSize: 13,
                             color: Theme.of(context).brightness == Brightness.dark
@@ -337,22 +292,83 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     ),
                   ),
                 ),
-              )
-            else
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final sale = _sales[index];
-                    return _buildSaleCard(sale);
-                  },
-                  childCount: _sales.length,
-                ),
-              ),
 
-            SliverToBoxAdapter(
-              child: SizedBox(height: MediaQuery.of(context).padding.bottom + 30),
-            ),
-          ],
+                // Lista de ventas
+                if (_isLoading)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_sales.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? const Color(0xFF064E3B)
+                                    : const Color(0xFFECFDF5),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.receipt_long_outlined,
+                                size: 48,
+                                color: Color(0xFF059669),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Aún no hay ventas registradas',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? const Color(0xFFF8FAFC)
+                                    : const Color(0xFF1E293B),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Cuando descuentes productos de stock por venta, aparecerán detallados aquí.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: hPadding),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final sale = _sales[index];
+                          return _buildSaleCard(sale);
+                        },
+                        childCount: _sales.length,
+                      ),
+                    ),
+                  ),
+
+                SliverToBoxAdapter(
+                  child: SizedBox(height: MediaQuery.of(context).padding.bottom + 30),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

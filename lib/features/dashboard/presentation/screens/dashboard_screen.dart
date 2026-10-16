@@ -1292,8 +1292,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildSalesPerformanceChart() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final List<dynamic> weeklySales = _summary['weeklySales'] ?? [];
+    final List<dynamic> timelineSales = _summary['periodTimelineSales'] ?? _summary['weeklySales'] ?? [];
     final List<dynamic> categorySales = _summary['categorySales'] ?? [];
+
+    String timelineTitle = 'Ventas de la Semana (7 días)';
+    if (_selectedPeriod == 'today') {
+      timelineTitle = 'Ventas de Hoy por Horario';
+    } else if (_selectedPeriod == 'month') {
+      timelineTitle = 'Ventas del Mes por Semanas';
+    } else if (_selectedPeriod == 'all') {
+      timelineTitle = 'Ventas Históricas por Meses';
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1319,7 +1328,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(
                 child: Text(
                   _chartPresentation == 'bars'
-                      ? 'Ventas de la Semana (7 días)'
+                      ? timelineTitle
                       : 'Participación por Categorías',
                   style: TextStyle(
                     fontSize: 14,
@@ -1406,7 +1415,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           // Contenido del Gráfico según toggle
           if (_chartPresentation == 'bars')
-            _buildBarsChartContent(weeklySales, isDark)
+            _buildBarsChartContent(timelineSales, isDark)
           else
             _buildCategoryPieChartContent(categorySales, isDark),
         ],
@@ -1415,8 +1424,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildDesktopCharts(bool isDark) {
-    final List<dynamic> weeklySales = _summary['weeklySales'] ?? [];
+    final List<dynamic> timelineSales = _summary['periodTimelineSales'] ?? _summary['weeklySales'] ?? [];
     final List<dynamic> categorySales = _summary['categorySales'] ?? [];
+
+    String timelineTitle = 'Ventas de la Semana (7 días)';
+    if (_selectedPeriod == 'today') {
+      timelineTitle = 'Ventas de Hoy por Horario';
+    } else if (_selectedPeriod == 'month') {
+      timelineTitle = 'Ventas del Mes por Semanas';
+    } else if (_selectedPeriod == 'all') {
+      timelineTitle = 'Ventas Históricas por Meses';
+    }
 
     Widget buildCard({required String title, required Widget child}) {
       return Container(
@@ -1435,39 +1453,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                child,
+              ],
             ),
-            const SizedBox(height: 18),
-            child,
           ],
         ),
       );
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: buildCard(
-            title: 'Ventas de la Semana (7 días)',
-            child: _buildBarsChartContent(weeklySales, isDark),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: buildCard(
+              title: timelineTitle,
+              child: _buildBarsChartContent(timelineSales, isDark),
+            ),
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: buildCard(
-            title: 'Participación por Categorías',
-            child: _buildCategoryPieChartContent(categorySales, isDark),
+          const SizedBox(width: 16),
+          Expanded(
+            child: buildCard(
+              title: 'Participación por Categorías',
+              child: _buildCategoryPieChartContent(categorySales, isDark),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1680,6 +1706,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ],
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: InkWell(
+            onTap: widget.onNavigateToInventory,
+            child: const Text(
+              'Ver catálogo en inventario →',
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+            ),
+          ),
+        ),
       ],
     );
   }

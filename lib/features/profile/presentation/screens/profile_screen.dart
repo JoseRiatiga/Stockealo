@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -415,28 +416,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Cambiar Contraseña', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentPassController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Contraseña Actual', prefixIcon: Icon(Icons.lock_outline)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: newPassController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Nueva Contraseña', prefixIcon: Icon(Icons.lock_reset)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: confirmPassController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Confirmar Nueva Contraseña', prefixIcon: Icon(Icons.check_circle_outline)),
-              ),
-            ],
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 380, maxWidth: 420),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: currentPassController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Contraseña Actual', prefixIcon: Icon(Icons.lock_outline)),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newPassController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Nueva Contraseña', prefixIcon: Icon(Icons.lock_reset)),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPassController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Confirmar Nueva Contraseña', prefixIcon: Icon(Icons.check_circle_outline)),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -707,14 +711,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildCompactThemeToggle(isDark),
         ],
       ),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          14,
-          16,
-          MediaQuery.of(context).padding.bottom + 28,
-        ),
-        children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final double hPadding = math.max(16.0, (constraints.maxWidth - 820) / 2);
+
+          return ListView(
+            padding: EdgeInsets.fromLTRB(
+              hPadding,
+              14,
+              hPadding,
+              MediaQuery.of(context).padding.bottom + 28,
+            ),
+            children: [
           // 1. Tarjeta: Perfil Comercial y Cuenta
           _buildCard(
             child: Column(
@@ -1124,51 +1132,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 18),
 
-          // 6. Tarjeta de Versión y Actualizaciones
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-              ),
-            ),
-            elevation: 0,
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: const Color(0xFF059669).withOpacity(0.15),
-                child: const Icon(Icons.system_update_rounded, color: Color(0xFF10B981), size: 22),
-              ),
-              title: Text(
-                'Stockealo v$_currentAppVersion',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+          // 6. Tarjeta de Versión y Actualizaciones (Solo en apps móviles nativas)
+          if (!kIsWeb) ...[
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                 ),
               ),
-              subtitle: Text(
-                'Buscar actualizaciones',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              elevation: 0,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: const Color(0xFF059669).withOpacity(0.15),
+                  child: const Icon(Icons.system_update_rounded, color: Color(0xFF10B981), size: 22),
                 ),
+                title: Text(
+                  'Stockealo v$_currentAppVersion',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                  ),
+                ),
+                subtitle: Text(
+                  'Buscar actualizaciones',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+                trailing: _isCheckingUpdate
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)),
+                      )
+                    : Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                      ),
+                onTap: _isCheckingUpdate ? null : _handleCheckForUpdates,
               ),
-              trailing: _isCheckingUpdate
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)),
-                    )
-                  : Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 16,
-                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                    ),
-              onTap: _isCheckingUpdate ? null : _handleCheckForUpdates,
             ),
-          ),
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
+          ],
 
           // 7. Botón Cerrar Sesión
           Card(
@@ -1191,9 +1201,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 24),
         ],
-      ),
-    );
-  }
+      );
+    },
+  ),
+);
+}
 
   Widget _buildCompactThemeToggle(bool isDark) {
     return AnimatedBuilder(

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/database/app_database.dart';
@@ -403,14 +404,18 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
       ),
       body: _isLoadingMetrics
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
-          : ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                14,
-                16,
-                MediaQuery.of(context).padding.bottom + 24,
-              ),
-              children: [
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final double hPadding = math.max(16.0, (constraints.maxWidth - 860) / 2);
+
+                return ListView(
+                  padding: EdgeInsets.fromLTRB(
+                    hPadding,
+                    14,
+                    hPadding,
+                    MediaQuery.of(context).padding.bottom + 24,
+                  ),
+                  children: [
                 // 1. Tarjeta Principal: Identidad del Negocio
                 Container(
                   padding: const EdgeInsets.all(18),
@@ -592,7 +597,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              '${_members.length + 1} Colaboradores',
+                              '${_members.length} ${_members.length == 1 ? "Colaborador" : "Colaboradores"}',
                               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
                             ),
                           ),
@@ -804,7 +809,9 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
                   const SizedBox(height: 20),
                 ],
               ],
-            ),
+            );
+          },
+        ),
     );
   }
 

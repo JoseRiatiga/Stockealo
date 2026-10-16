@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/product_repository.dart';
@@ -37,6 +38,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   final _repository = ProductRepository();
   final _businessRepo = BusinessRepository.instance;
   final _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   Business? _activeBusiness;
   List<Product> _products = [];
@@ -46,6 +48,19 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   String _stockFilterOption = 'all';
   Map<String, dynamic> _stats = {};
   bool _isLoading = true;
+
+  int _currentPage = 1;
+  static const int _pageSize = 12;
+
+  List<Product> get _pagedProducts {
+    if (_products.isEmpty) return [];
+    final startIndex = (_currentPage - 1) * _pageSize;
+    if (startIndex >= _products.length) {
+      return _products.take(_pageSize).toList();
+    }
+    final endIndex = math.min(startIndex + _pageSize, _products.length);
+    return _products.sublist(startIndex, endIndex);
+  }
 
   @override
   void initState() {
@@ -90,6 +105,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   void dispose() {
     _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -635,218 +651,247 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
         color: const Color(0xFF059669),
-        child: CustomScrollView(
-          slivers: [
-            // Resumen de Métricas de Stock Superior
-            SliverToBoxAdapter(
-              child: _buildStatsHeader(),
-            ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final double hPadding = math.max(16.0, (constraints.maxWidth - 1200) / 2);
+            final pagedList = _pagedProducts;
+            final totalPages = (_products.length / _pageSize).ceil();
 
-            // Barra de búsqueda con lector de código y botón de filtros
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (_) => _loadData(),
-                        decoration: InputDecoration(
-                          hintText: 'Buscar por nombre o código...',
-                          prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_searchController.text.isNotEmpty)
-                                IconButton(
-                                  icon: const Icon(Icons.clear, size: 18),
-                                  onPressed: () {
-                                    _searchController.clear();
+            return CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                // Resumen de Métricas de Stock Superior
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: hPadding),
+                    child: _buildStatsHeader(),
+                  ),
+                ),
+
+                // Barra de búsqueda con lector de código y botón de filtros
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding, 8, hPadding, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (_) {
+                              _currentPage = 1;
+                              _loadData();
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Buscar por nombre o código...',
+                              prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_searchController.text.isNotEmpty)
+                                    IconButton(
+                                      icon: const Icon(Icons.clear, size: 18),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        _currentPage = 1;
+                                        _loadData();
+                                      },
+                                    ),
+                                  IconButton(
+                                    icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF059669)),
+                                    tooltip: 'Escanear para buscar',
+                                    onPressed: _scanToSearch,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: _openSortFilterModal,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: (_sortOption != 'default' || _stockFilterOption != 'all')
+                                  ? const Color(0xFF059669).withOpacity(0.15)
+                                  : (Theme.of(context).brightness == Brightness.dark
+                                      ? const Color(0xFF1E293B)
+                                      : Colors.white),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: (_sortOption != 'default' || _stockFilterOption != 'all')
+                                    ? const Color(0xFF059669)
+                                    : (Theme.of(context).brightness == Brightness.dark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFCBD5E1)),
+                              ),
+                            ),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  Icons.tune_rounded,
+                                  size: 22,
+                                  color: (_sortOption != 'default' || _stockFilterOption != 'all')
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFF64748B),
+                                ),
+                                if (_sortOption != 'default' || _stockFilterOption != 'all')
+                                  Positioned(
+                                    top: -2,
+                                    right: -2,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF059669),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Filtro por categorías con botón de gestión
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding, 0, hPadding, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: CategoryFilterBar(
+                            categories: _categories,
+                            selectedCategory: _selectedCategory,
+                            onCategorySelected: (cat) {
+                              setState(() {
+                                _selectedCategory = cat;
+                                _currentPage = 1;
+                              });
+                              _loadData();
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: IconButton(
+                            icon: const Icon(Icons.tune, size: 20, color: Color(0xFF64748B)),
+                            tooltip: 'Gestionar categorías',
+                            onPressed: _openManageCategories,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Lista de productos
+                if (_isLoading)
+                  const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_products.isEmpty)
+                  SliverFillRemaining(
+                    child: _buildEmptyState(),
+                  )
+                else
+                  SliverLayoutBuilder(
+                    builder: (context, innerConstraints) {
+                      final isWide = innerConstraints.crossAxisExtent >= 680;
+                      if (isWide) {
+                        return SliverPadding(
+                          padding: EdgeInsets.symmetric(horizontal: hPadding),
+                          sliver: SliverGrid(
+                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 380,
+                              mainAxisExtent: 130,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 10,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final product = pagedList[index];
+                                return ProductCard(
+                                  product: product,
+                                  margin: EdgeInsets.zero,
+                                  onTap: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ProductDetailScreen(product: product),
+                                      ),
+                                    );
                                     _loadData();
                                   },
-                                ),
-                              IconButton(
-                                icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF059669)),
-                                tooltip: 'Escanear para buscar',
-                                onPressed: _scanToSearch,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: _openSortFilterModal,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: (_sortOption != 'default' || _stockFilterOption != 'all')
-                              ? const Color(0xFF059669).withOpacity(0.15)
-                              : (Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0xFF1E293B)
-                                  : Colors.white),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: (_sortOption != 'default' || _stockFilterOption != 'all')
-                                ? const Color(0xFF059669)
-                                : (Theme.of(context).brightness == Brightness.dark
-                                    ? const Color(0xFF334155)
-                                    : const Color(0xFFCBD5E1)),
-                          ),
-                        ),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Icon(
-                              Icons.tune_rounded,
-                              size: 22,
-                              color: (_sortOption != 'default' || _stockFilterOption != 'all')
-                                  ? const Color(0xFF059669)
-                                  : const Color(0xFF64748B),
-                            ),
-                            if (_sortOption != 'default' || _stockFilterOption != 'all')
-                              Positioned(
-                                top: -2,
-                                right: -2,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF059669),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Filtro por categorías con botón de gestión
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CategoryFilterBar(
-                        categories: _categories,
-                        selectedCategory: _selectedCategory,
-                        onCategorySelected: (cat) {
-                          setState(() {
-                            _selectedCategory = cat;
-                          });
-                          _loadData();
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: IconButton(
-                        icon: const Icon(Icons.tune, size: 20, color: Color(0xFF64748B)),
-                        tooltip: 'Gestionar categorías',
-                        onPressed: _openManageCategories,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Lista de productos
-            if (_isLoading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_products.isEmpty)
-              SliverFillRemaining(
-                child: _buildEmptyState(),
-              )
-            else
-              SliverLayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.crossAxisExtent >= 680;
-                  if (isWide) {
-                    return SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverGrid(
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 440,
-                          mainAxisExtent: 132,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 10,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final product = _products[index];
-                            return ProductCard(
-                              product: product,
-                              margin: EdgeInsets.zero,
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProductDetailScreen(product: product),
-                                  ),
+                                  onAdjustStock: () => _showQuickStockDialog(product),
+                                  onSale: () async {
+                                    final sold = await QuickSaleDialog.show(context, product);
+                                    if (sold == true) {
+                                      _loadData();
+                                    }
+                                  },
                                 );
-                                _loadData();
                               },
-                              onAdjustStock: () => _showQuickStockDialog(product),
-                              onSale: () async {
-                                final sold = await QuickSaleDialog.show(context, product);
-                                if (sold == true) {
-                                  _loadData();
-                                }
-                              },
-                            );
-                          },
-                          childCount: _products.length,
-                        ),
-                      ),
-                    );
-                  }
-
-                  return SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final product = _products[index];
-                        return ProductCard(
-                          product: product,
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ProductDetailScreen(product: product),
-                              ),
-                            );
-                            _loadData();
-                          },
-                          onAdjustStock: () => _showQuickStockDialog(product),
-                          onSale: () async {
-                            final sold = await QuickSaleDialog.show(context, product);
-                            if (sold == true) {
-                              _loadData();
-                            }
-                          },
+                              childCount: pagedList.length,
+                            ),
+                          ),
                         );
-                      },
-                      childCount: _products.length,
-                    ),
-                  );
-                },
-              ),
+                      }
 
-            SliverToBoxAdapter(
-              child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80), // Margen dinámico para Android safe area y el FAB
-            ),
-          ],
+                      return SliverPadding(
+                        padding: EdgeInsets.symmetric(horizontal: hPadding),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final product = pagedList[index];
+                              return ProductCard(
+                                product: product,
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ProductDetailScreen(product: product),
+                                    ),
+                                  );
+                                  _loadData();
+                                },
+                                onAdjustStock: () => _showQuickStockDialog(product),
+                                onSale: () async {
+                                  final sold = await QuickSaleDialog.show(context, product);
+                                  if (sold == true) {
+                                    _loadData();
+                                  }
+                                },
+                              );
+                            },
+                            childCount: pagedList.length,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                // Controles de Paginación
+                if (_products.length > _pageSize)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPadding, 16, hPadding, MediaQuery.of(context).padding.bottom + 80),
+                      child: _buildPaginationControls(totalPages),
+                    ),
+                  )
+                else
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
+                  ),
+              ],
+            );
+          },
         ),
       ),
       floatingActionButton: Padding(
@@ -883,7 +928,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     final totalValue = _stats['totalValue'] ?? 0.0;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      margin: const EdgeInsets.fromLTRB(0, 16, 0, 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -1034,6 +1079,96 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls(int totalPages) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final startIndex = (_currentPage - 1) * _pageSize + 1;
+    final endIndex = math.min(_currentPage * _pageSize, _products.length);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Mostrando $startIndex-$endIndex de ${_products.length} productos',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+          ),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: _currentPage > 1
+                    ? () {
+                        setState(() => _currentPage--);
+                        if (_scrollController.hasClients) {
+                          _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+                        }
+                      }
+                    : null,
+                icon: const Icon(Icons.chevron_left_rounded, size: 18),
+                label: const Text('Anterior', style: TextStyle(fontSize: 12)),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF059669).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_currentPage / $totalPages',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF059669),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: _currentPage < totalPages
+                    ? () {
+                        setState(() => _currentPage++);
+                        if (_scrollController.hasClients) {
+                          _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+                        }
+                      }
+                    : null,
+                icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                label: const Text('Siguiente', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

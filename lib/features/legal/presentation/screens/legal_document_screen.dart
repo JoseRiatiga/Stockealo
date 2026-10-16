@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class LegalDocumentScreen extends StatelessWidget {
@@ -55,9 +56,12 @@ class _TermsOfServiceView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double hPadding = math.max(20.0, (constraints.maxWidth - 780) / 2);
+        return ListView(
+          padding: EdgeInsets.fromLTRB(hPadding, 20, hPadding, 30),
+          children: [
         _buildHeader(
           icon: Icons.gavel_rounded,
           title: 'Términos y Condiciones de Uso',
@@ -118,10 +122,12 @@ class _TermsOfServiceView extends StatelessWidget {
           content:
               'Nos reservamos el derecho de actualizar estos términos en cualquier momento. Te notificaremos dentro de la aplicación ante cualquier cambio sustancial.',
         ),
-        const SizedBox(height: 30),
-      ],
-    );
-  }
+          const SizedBox(height: 30),
+        ],
+      );
+    },
+  );
+}
 }
 
 class _PrivacyPolicyView extends StatelessWidget {
@@ -129,9 +135,12 @@ class _PrivacyPolicyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double hPadding = math.max(20.0, (constraints.maxWidth - 780) / 2);
+        return ListView(
+          padding: EdgeInsets.fromLTRB(hPadding, 20, hPadding, 30),
+          children: [
         _buildHeader(
           icon: Icons.shield_rounded,
           title: 'Política de Privacidad y Tratamiento de Datos',
@@ -187,7 +196,9 @@ class _PrivacyPolicyView extends StatelessWidget {
         const SizedBox(height: 30),
       ],
     );
-  }
+  },
+);
+}
 }
 
 Widget _buildHeader({

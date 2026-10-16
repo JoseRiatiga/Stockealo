@@ -10,6 +10,7 @@ class ProductCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onAdjustStock;
   final VoidCallback? onSale;
+  final EdgeInsetsGeometry? margin;
 
   const ProductCard({
     super.key,
@@ -17,6 +18,7 @@ class ProductCard extends StatelessWidget {
     required this.onTap,
     required this.onAdjustStock,
     this.onSale,
+    this.margin,
   });
 
   @override
@@ -24,7 +26,7 @@ class ProductCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       elevation: 0,
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(

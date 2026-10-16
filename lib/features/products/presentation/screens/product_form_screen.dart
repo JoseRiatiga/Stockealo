@@ -315,10 +315,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(20),
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
                 children: [
                   // 1. Selector de Foto
                   Center(
@@ -699,6 +702,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
                 ],
               ),
+            ),
+            ),
             ),
     );
   }

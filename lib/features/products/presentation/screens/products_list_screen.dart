@@ -770,32 +770,77 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                 child: _buildEmptyState(),
               )
             else
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final product = _products[index];
-                    return ProductCard(
-                      product: product,
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProductDetailScreen(product: product),
-                          ),
-                        );
-                        _loadData();
-                      },
-                      onAdjustStock: () => _showQuickStockDialog(product),
-                      onSale: () async {
-                        final sold = await QuickSaleDialog.show(context, product);
-                        if (sold == true) {
-                          _loadData();
-                        }
-                      },
+              SliverLayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.crossAxisExtent >= 680;
+                  if (isWide) {
+                    return SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 440,
+                          mainAxisExtent: 132,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 10,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final product = _products[index];
+                            return ProductCard(
+                              product: product,
+                              margin: EdgeInsets.zero,
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ProductDetailScreen(product: product),
+                                  ),
+                                );
+                                _loadData();
+                              },
+                              onAdjustStock: () => _showQuickStockDialog(product),
+                              onSale: () async {
+                                final sold = await QuickSaleDialog.show(context, product);
+                                if (sold == true) {
+                                  _loadData();
+                                }
+                              },
+                            );
+                          },
+                          childCount: _products.length,
+                        ),
+                      ),
                     );
-                  },
-                  childCount: _products.length,
-                ),
+                  }
+
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final product = _products[index];
+                        return ProductCard(
+                          product: product,
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ProductDetailScreen(product: product),
+                              ),
+                            );
+                            _loadData();
+                          },
+                          onAdjustStock: () => _showQuickStockDialog(product),
+                          onSale: () async {
+                            final sold = await QuickSaleDialog.show(context, product);
+                            if (sold == true) {
+                              _loadData();
+                            }
+                          },
+                        );
+                      },
+                      childCount: _products.length,
+                    ),
+                  );
+                },
               ),
 
             SliverToBoxAdapter(

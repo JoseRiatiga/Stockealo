@@ -223,8 +223,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         foregroundColor: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
       ),
-      body: Column(
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            children: [
           // Banner de resumen de cartera/deuda
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -361,6 +364,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       ),
           ),
         ],
+      ),
+      ),
       ),
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),

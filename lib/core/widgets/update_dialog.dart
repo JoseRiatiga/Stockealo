@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/update_service.dart';
+import 'formatted_changelog_view.dart';
 
 class UpdateDialog extends StatefulWidget {
   final AppUpdateInfo updateInfo;
@@ -77,11 +78,13 @@ class _UpdateDialogState extends State<UpdateDialog> {
         ),
       ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 1. Cabecera con Icono y Badge de Versión
             Row(
@@ -170,15 +173,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 ),
               ),
               child: SingleChildScrollView(
-                child: Text(
-                  widget.updateInfo.releaseNotes?.trim().isNotEmpty == true
+                child: FormattedChangelogView(
+                  rawChangelog: widget.updateInfo.releaseNotes?.trim().isNotEmpty == true
                       ? widget.updateInfo.releaseNotes!.trim()
-                      : '• Mejoras en estabilidad y rendimiento general.',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.45,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                  ),
+                      : '• Mejoras continuas en rendimiento y estabilidad general.',
+                  isDark: isDark,
                 ),
               ),
             ),
@@ -310,6 +309,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
               ),
           ],
         ),
+      ),
       ),
     );
   }

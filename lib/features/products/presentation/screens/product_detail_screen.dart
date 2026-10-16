@@ -206,8 +206,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
         ],
       ),
-      body: ListView(
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            children: [
           // Imagen Principal
           ProductImageView(
             imagePath: _product.photoPath,
@@ -489,6 +492,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
         ],
+      ),
+      ),
       ),
     );
   }

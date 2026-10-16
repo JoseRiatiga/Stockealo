@@ -628,8 +628,11 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
-          : ListView(
-              padding: EdgeInsets.fromLTRB(
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(
                 16,
                 16,
                 16,
@@ -995,6 +998,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                     );
                   }),
               ],
+            ),
+            ),
             ),
     );
   }

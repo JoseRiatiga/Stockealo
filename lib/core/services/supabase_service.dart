@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/app_database.dart';
 import 'package:sqflite/sqflite.dart';
@@ -1003,38 +1005,62 @@ class SupabaseService {
     }
   }
 
-  /// Envía un código OTP de 6 dígitos al correo para restablecimiento de contraseña
+  /// Envía un código OTP de 6 dígitos al correo usando la API REST directa de Supabase (sin enlaces ni redirecciones a localhost)
   Future<void> sendPasswordResetOtp(String email) async {
     final cleanEmail = email.trim().toLowerCase();
-    if (!_isInitialized) await initialize();
-    if (client == null) {
-      throw Exception('No se pudo conectar con el servidor en la nube.');
-    }
-    await client!.auth.signInWithOtp(
-      email: cleanEmail,
+    final url = Uri.parse('$supabaseUrl/auth/v1/otp');
+    final response = await http.post(
+      url,
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'email': cleanEmail,
+        'create_user': true,
+      }),
     );
+
+    if (response.statusCode >= 400) {
+      try {
+        final body = jsonDecode(response.body);
+        final msg = body['msg'] ?? body['message'] ?? 'Error al enviar código.';
+        throw Exception(msg);
+      } catch (e) {
+        if (e is Exception && !e.toString().contains('FormatException')) rethrow;
+        throw Exception('Error al enviar código de recuperación (${response.statusCode}).');
+      }
+    }
   }
 
-  /// Verifica si el código OTP de 6 dígitos ingresado es válido
+  /// Verifica si el código OTP de 6 dígitos ingresado es válido directamente por la API REST
   Future<bool> verifyOtp({required String email, required String token}) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanToken = token.trim();
-    if (!_isInitialized) await initialize();
-    if (client == null) {
-      throw Exception('No se pudo conectar con el servidor en la nube.');
+    final url = Uri.parse('$supabaseUrl/auth/v1/verify');
+    final response = await http.post(
+      url,
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'type': 'email',
+        'email': cleanEmail,
+        'token': cleanToken,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return true;
     }
+
     try {
-      final response = await client!.auth.verifyOTP(
-        email: cleanEmail,
-        token: cleanToken,
-        type: OtpType.email,
-      );
-      return response.user != null || response.session != null;
-    } on AuthException catch (e) {
-      debugPrint('Error AuthException al validar código OTP: ${e.message}');
-      throw Exception('Código incorrecto o expirado.');
+      final body = jsonDecode(response.body);
+      final msg = body['msg'] ?? body['message'] ?? 'Código incorrecto o expirado.';
+      throw Exception(msg);
     } catch (e) {
-      debugPrint('Error al validar código OTP: $e');
+      if (e is Exception && !e.toString().contains('FormatException')) rethrow;
       throw Exception('Código incorrecto o expirado.');
     }
   }

@@ -65,67 +65,147 @@ class StockyAssistantService {
     final business = BusinessRepository.instance.currentActiveBusiness;
     final bizName = business?.name ?? 'tu negocio';
 
-    // 1. Saludos y bienvenida
+    // 1. Despedidas
+    if (_isFarewell(cleanPrompt)) {
+      return _buildFarewellResponse(bizName);
+    }
+
+    // 2. Agradecimientos y confirmaciones
+    if (_isGratitude(cleanPrompt)) {
+      return _buildGratitudeResponse();
+    }
+
+    // 3. Elogios / Piropo al asistente
+    if (_isPraise(cleanPrompt)) {
+      return _buildPraiseResponse();
+    }
+
+    // 4. Identidad / Quién eres / Qué eres
+    if (_isIdentity(cleanPrompt)) {
+      return _buildIdentityResponse(bizName);
+    }
+
+    // 5. Conversación casual / "¿Cómo estás?" / "¿Cómo te va?"
+    if (_isCasualCheckIn(cleanPrompt)) {
+      return _buildCasualCheckInResponse(userName, bizName);
+    }
+
+    // 6. Saludos clásicos
     if (_isGreeting(cleanPrompt)) {
       return _buildGreetingResponse(userName, bizName);
     }
 
-    // 2. Ayuda general
+    // 7. Ayuda general
     if (_isHelp(cleanPrompt)) {
       return _buildHelpResponse();
     }
 
-    // 3. Ventas de hoy
+    // 8. Estado general / Termómetro del negocio ("¿Cómo va el negocio?", "¿Cómo vamos?")
+    if (_isBusinessHealth(cleanPrompt)) {
+      return await _buildBusinessHealthResponse(businessId, bizName);
+    }
+
+    // 9. Valor comercial / monetario del inventario
+    if (_isInventoryValue(cleanPrompt)) {
+      return await _buildInventoryValueResponse(businessId, bizName);
+    }
+
+    // 10. Conteo y detalle del catálogo / productos
+    if (_isProductCount(cleanPrompt)) {
+      return await _buildProductCountResponse(businessId, bizName);
+    }
+
+    // 11. Información de clientes
+    if (_isCustomerInfo(cleanPrompt)) {
+      return await _buildCustomerInfoResponse(businessId, bizName);
+    }
+
+    // 12. Preguntas de cómo hacer cosas (tutorial rápido)
+    if (_isHowTo(cleanPrompt)) {
+      return _buildHowToResponse(cleanPrompt);
+    }
+
+    // 13. Ventas de hoy
     if (_isSalesToday(cleanPrompt)) {
       return await _buildSalesTodayResponse(businessId, bizName);
     }
 
-    // 4. Ganancias / Rentabilidad
+    // 14. Ganancias / Rentabilidad
     if (_isProfit(cleanPrompt)) {
       return await _buildProfitResponse(businessId, bizName);
     }
 
-    // 5. Stock Crítico / Agotados / Inventario
+    // 15. Stock Crítico / Agotados / Inventario
     if (_isLowStock(cleanPrompt)) {
       return await _buildLowStockResponse(businessId);
     }
 
-    // 6. Fiados / Cuentas por Cobrar / Deudas
+    // 16. Fiados / Cuentas por Cobrar / Deudas
     if (_isDebts(cleanPrompt)) {
       return await _buildDebtsResponse(businessId, bizName);
     }
 
-    // 7. Productos más vendidos (Top)
+    // 17. Productos más vendidos (Top)
     if (_isTopProducts(cleanPrompt)) {
       return await _buildTopProductsResponse(businessId);
     }
 
-    // 8. Mercadería estancada / Sin movimiento
+    // 18. Mercadería estancada / Sin movimiento
     if (_isStagnantProducts(cleanPrompt)) {
       return await _buildStagnantProductsResponse(businessId);
     }
 
-    // 9. Consejos de negocio
+    // 19. Consejos de negocio
     if (_isAdvice(cleanPrompt)) {
       return await _buildBusinessAdviceResponse(businessId, bizName);
     }
 
-    // 10. Búsqueda específica de un producto en inventario
+    // 20. Búsqueda específica de un producto en inventario
     final productLookup = await _tryFindProductInQuery(cleanPrompt, businessId);
     if (productLookup != null) {
       return productLookup;
     }
 
-    // 11. Fallback contextual amable
-    return _buildFallbackResponse(prompt);
+    // 21. Fallback contextual amable
+    return _buildFallbackResponse(prompt, bizName);
   }
 
   // ==========================================
   // CLASIFICADORES DE INTENCIÓN (NLP RULES)
   // ==========================================
 
+  bool _isFarewell(String text) {
+    final regex = RegExp(r'\b(chao|adios|hasta luego|hasta manana|nos vemos|bye|hasta pronto|me voy|buenas noches)\b');
+    return regex.hasMatch(text);
+  }
+
+  bool _isGratitude(String text) {
+    final regex = RegExp(r'\b(gracias|muchas gracias|mil gracias|vale gracias|ok gracias|listo gracias|buena esa|excelente|genial|perfecto|muy bien|crack|de acuerdo|entendido|ok)\b');
+    return regex.hasMatch(text) && text.split(' ').length <= 4;
+  }
+
+  bool _isPraise(String text) {
+    final regex = RegExp(r'\b(eres genial|buen trabajo|te quiero|eres el mejor|sos un crack|eres una ia|eres un bot|buen asistente|muy util|te amo)\b');
+    return regex.hasMatch(text);
+  }
+
+  bool _isIdentity(String text) {
+    return text.contains('quien eres') ||
+        text.contains('como te llamas') ||
+        text.contains('que eres') ||
+        text.contains('presentate') ||
+        text.contains('que funcion tienes') ||
+        text.contains('para que sirves') ||
+        text.contains('cual es tu nombre');
+  }
+
+  bool _isCasualCheckIn(String text) {
+    final regex = RegExp(r'\b(como estas|como te va|como vas|como andas|que tal|que haces|que onda|que mas|que hubo|que hay|todo bien|que cuentas|como te encuentras)\b');
+    return regex.hasMatch(text);
+  }
+
   bool _isGreeting(String text) {
-    final regex = RegExp(r'\b(hola|buen(os|as)?\s*(dias|tardes|noches)?|hey|saludos|que tal|quien eres|stocky)\b');
+    final regex = RegExp(r'\b(hola|buen(os|as)?\s*(dias|tardes|noches)?|hey|saludos|stocky)\b');
     return regex.hasMatch(text) && text.split(' ').length <= 4;
   }
 
@@ -135,6 +215,52 @@ class StockyAssistantService {
         text.contains('ayuda') ||
         text.contains('comandos') ||
         text.contains('opciones');
+  }
+
+  bool _isBusinessHealth(String text) {
+    return text.contains('como va el negocio') ||
+        text.contains('como vamos') ||
+        text.contains('como va todo') ||
+        text.contains('como esta el negocio') ||
+        text.contains('estado del negocio') ||
+        text.contains('resumen general') ||
+        text.contains('termometro') ||
+        text.contains('balance del negocio') ||
+        text.contains('como va mi negocio');
+  }
+
+  bool _isInventoryValue(String text) {
+    return text.contains('cuanto vale mi inventario') ||
+        text.contains('valor del inventario') ||
+        text.contains('valor comercial') ||
+        text.contains('dinero en stock') ||
+        text.contains('capital en mercancia') ||
+        text.contains('cuanto tengo en mercancia') ||
+        text.contains('cuanto dinero tengo en productos') ||
+        text.contains('valor de los productos') ||
+        text.contains('plata en inventario');
+  }
+
+  bool _isProductCount(String text) {
+    return text.contains('cuantos productos') ||
+        text.contains('total de productos') ||
+        text.contains('cuantos articulos') ||
+        text.contains('cantidad de productos') ||
+        text.contains('total de items') ||
+        text.contains('total catalogo');
+  }
+
+  bool _isCustomerInfo(String text) {
+    return text.contains('cuantos clientes') ||
+        text.contains('mis clientes') ||
+        text.contains('lista de clientes') ||
+        text.contains('total clientes') ||
+        text.contains('directorio de clientes') ||
+        text.contains('base de clientes');
+  }
+
+  bool _isHowTo(String text) {
+    return text.startsWith('como ') || text.contains('como puedo ') || text.contains('como se ');
   }
 
   bool _isSalesToday(String text) {
@@ -211,12 +337,341 @@ class StockyAssistantService {
         .replaceAll('í', 'i')
         .replaceAll('ó', 'o')
         .replaceAll('ú', 'u')
+        .replaceAll(RegExp(r'[^\w\s]'), '')
         .trim();
   }
 
   // ==========================================
   // GENERADORES DE RESPUESTAS CON CONTEXTO REAL
   // ==========================================
+
+  StockyAssistantMessage _buildFarewellResponse(String bizName) {
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: '¡Hasta luego! 👋 Que descanses y que la próxima jornada esté llena de ventas y prosperidad en **$bizName**.\n\n¡Aquí estaré listo cuando vuelvas! 🚀',
+      timestamp: DateTime.now(),
+      type: StockyMessageType.text,
+    );
+  }
+
+  StockyAssistantMessage _buildGratitudeResponse() {
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: '¡Con todo el gusto! 🌟 ¡Para eso estoy aquí!\n\nSiempre que necesites consultar cualquier número, producto o deuda de tu negocio, estaré a solo un toque de distancia.\n\n¡A seguir vendiendo con toda! 💪',
+      timestamp: DateTime.now(),
+      type: StockyMessageType.text,
+      actions: const [
+        StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+        StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
+      ],
+    );
+  }
+
+  StockyAssistantMessage _buildPraiseResponse() {
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: '¡Muchas gracias por la buena energía! 💚🤖\n\nMe encanta hacer equipo contigo. Mi misión es que tu negocio crezca todos los días, que nunca te quedes sin stock y que tus cuentas estén 100% claras.\n\n¿Qué miramos ahora?',
+      timestamp: DateTime.now(),
+      type: StockyMessageType.text,
+      actions: const [
+        StockyAction(label: '📊 Ventas hoy', actionType: 'query_sales'),
+        StockyAction(label: '💡 Consejo del día', actionType: 'query_advice'),
+      ],
+    );
+  }
+
+  StockyAssistantMessage _buildIdentityResponse(String bizName) {
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: '¡Mucho gusto! Soy **Stocky** 🤖, el copiloto comercial inteligente de **Stockealo** creado para ser tu mano derecha en **$bizName**.\n\n'
+          '🔒 **100% Offline & Seguro:** Vivo directamente en tu teléfono, por lo que nunca dependes de internet ni pagas mensualidades por consultarme.\n\n'
+          '⚡ **¿Qué puedo hacer por ti?**\n'
+          '• **Ventas y Utilidades:** Decirte cuánto has vendido y tu ganancia real al instante.\n'
+          '• **Control de Stock:** Alertarte sobre productos agotados antes de que pierdas ventas.\n'
+          '• **Fiados y Cobros:** Recordarte quién te debe y ayudarte a cobrar por WhatsApp en 1 tap.\n'
+          '• **Diagnóstico de Negocio:** Analizar tu inventario comercial y darte consejos para vender más.\n\n'
+          '¡Pregúntame lo que necesites como si habláramos por chat!',
+      timestamp: DateTime.now(),
+      type: StockyMessageType.text,
+      actions: const [
+        StockyAction(label: '📊 Ventas de hoy', actionType: 'query_sales'),
+        StockyAction(label: '⚠️ Stock crítico', actionType: 'query_stock'),
+        StockyAction(label: '👥 Fiados pendientes', actionType: 'query_debts'),
+      ],
+    );
+  }
+
+  StockyAssistantMessage _buildCasualCheckInResponse(String? userName, String bizName) {
+    final nameStr = userName != null && userName.isNotEmpty ? ' $userName' : '';
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: '¡Excelente y con toda la energía$nameStr! 🤖⚡\n\n'
+          'Estoy al 100% monitoreando las operaciones de **$bizName**. Tenemos todo listo para vender, revisar stock y cuidar tus cuentas.\n\n'
+          '¿Cómo va la jornada? ¿Quieres que revisemos cómo van las ventas de hoy o el inventario?',
+      timestamp: DateTime.now(),
+      type: StockyMessageType.text,
+      actions: const [
+        StockyAction(label: '📊 Ventas de hoy', actionType: 'query_sales'),
+        StockyAction(label: '⚠️ Stock crítico', actionType: 'query_stock'),
+        StockyAction(label: '👥 Fiados pendientes', actionType: 'query_debts'),
+        StockyAction(label: '💡 Consejo del día', actionType: 'query_advice'),
+      ],
+    );
+  }
+
+  Future<StockyAssistantMessage> _buildBusinessHealthResponse(String businessId, String bizName) async {
+    final dbSummary = await DashboardRepository.instance.getDashboardSummary(businessId, period: 'today');
+    final todayTotal = (dbSummary['periodTotal'] as num?)?.toDouble() ?? 0.0;
+    final todayCount = (dbSummary['periodCount'] as num?)?.toInt() ?? 0;
+    final todayProfit = (dbSummary['periodProfit'] as num?)?.toDouble() ?? 0.0;
+    final outOfStock = (dbSummary['outOfStock'] as num?)?.toInt() ?? 0;
+    final lowStock = (dbSummary['lowStock'] as num?)?.toInt() ?? 0;
+    final totalProducts = (dbSummary['totalProducts'] as num?)?.toInt() ?? 0;
+    final totalDebt = (dbSummary['totalDebt'] as num?)?.toDouble() ?? 0.0;
+
+    final buffer = StringBuffer();
+    buffer.writeln('📈 **Termómetro Operativo de $bizName:**\n');
+
+    if (todayCount > 0) {
+      buffer.writeln('• **Ventas de hoy:** ${CurrencyFormatter.formatCOP(todayTotal)} ($todayCount transacciones, +${CurrencyFormatter.formatCOP(todayProfit)} ganancia neta).');
+    } else {
+      buffer.writeln('• **Ventas de hoy:** Aún sin ventas registradas hoy.');
+    }
+
+    if (outOfStock > 0 || lowStock > 0) {
+      buffer.writeln('• **Inventario:** ⚠️ Tienes **$outOfStock agotados** y **$lowStock con stock bajo** (de un total de $totalProducts productos).');
+    } else {
+      buffer.writeln('• **Inventario:** 🟢 Todo el stock está saludable ($totalProducts productos activos).');
+    }
+
+    if (totalDebt > 0) {
+      buffer.writeln('• **Fiados por cobrar:** ⏳ **${CurrencyFormatter.formatCOP(totalDebt)}** pendientes en cartera de clientes.');
+    } else {
+      buffer.writeln('• **Cartera:** 🥳 No tienes deudas pendientes por cobrar. ¡Cuentas al día!');
+    }
+
+    buffer.writeln('\n¿Deseas profundizar en alguna de estas áreas?');
+
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: buffer.toString(),
+      timestamp: DateTime.now(),
+      type: StockyMessageType.text,
+      actions: [
+        if (outOfStock > 0 || lowStock > 0)
+          const StockyAction(label: '⚠️ Ver Stock Crítico', actionType: 'query_stock'),
+        if (totalDebt > 0)
+          const StockyAction(label: '👥 Cobrar Fiados', actionType: 'query_debts'),
+        const StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+        const StockyAction(label: 'Ver Historial', actionType: 'navigate_sales'),
+      ],
+    );
+  }
+
+  Future<StockyAssistantMessage> _buildInventoryValueResponse(String businessId, String bizName) async {
+    final db = await AppDatabase.instance.database;
+    final res = await db.rawQuery('''
+      SELECT 
+        COUNT(*) as total_prods,
+        COALESCE(SUM(stock * sale_price), 0.0) as total_commercial,
+        COALESCE(SUM(stock * purchase_price), 0.0) as total_cost,
+        COALESCE(SUM(stock), 0) as total_units
+      FROM products
+      WHERE business_id = ? AND is_active = 1
+    ''', [businessId]);
+
+    final row = res.first;
+    final totalProds = (row['total_prods'] as num?)?.toInt() ?? 0;
+    final commercialVal = (row['total_commercial'] as num?)?.toDouble() ?? 0.0;
+    final costVal = (row['total_cost'] as num?)?.toDouble() ?? 0.0;
+    final totalUnits = (row['total_units'] as num?)?.toInt() ?? 0;
+    final potentialProfit = commercialVal - costVal;
+
+    final text = '💰 **Valorización de Inventario de $bizName:**\n\n'
+        '• **Valor Comercial en Venta:** **${CurrencyFormatter.formatCOP(commercialVal)}**\n'
+        '• **Inversión / Costo de Compra:** ${CurrencyFormatter.formatCOP(costVal)}\n'
+        '• **Ganancia Proyectada al Vender Todo:** **+${CurrencyFormatter.formatCOP(potentialProfit)}**\n'
+        '• **Unidades Físicas Almacenadas:** $totalUnits unidades ($totalProds productos distintos)\n\n'
+        '💡 Este es el capital comercial que tienes activo en tus estantes listo para monetizar.';
+
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: text,
+      timestamp: DateTime.now(),
+      type: StockyMessageType.text,
+      actions: const [
+        StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
+        StockyAction(label: 'Stock Crítico', actionType: 'query_stock'),
+      ],
+    );
+  }
+
+  Future<StockyAssistantMessage> _buildProductCountResponse(String businessId, String bizName) async {
+    final db = await AppDatabase.instance.database;
+    final res = await db.rawQuery('''
+      SELECT 
+        COUNT(*) as total,
+        COALESCE(SUM(CASE WHEN stock <= 0 THEN 1 ELSE 0 END), 0) as out_of_stock,
+        COALESCE(SUM(CASE WHEN stock > 0 AND stock <= min_stock THEN 1 ELSE 0 END), 0) as low_stock,
+        COALESCE(SUM(CASE WHEN stock > min_stock THEN 1 ELSE 0 END), 0) as healthy_stock,
+        COALESCE(SUM(stock), 0) as total_units
+      FROM products
+      WHERE business_id = ? AND is_active = 1
+    ''', [businessId]);
+
+    final row = res.first;
+    final total = (row['total'] as num?)?.toInt() ?? 0;
+    final outOfStock = (row['out_of_stock'] as num?)?.toInt() ?? 0;
+    final lowStock = (row['low_stock'] as num?)?.toInt() ?? 0;
+    final healthy = (row['healthy_stock'] as num?)?.toInt() ?? 0;
+    final totalUnits = (row['total_units'] as num?)?.toInt() ?? 0;
+
+    final text = '📦 **Detalle del Catálogo de $bizName:**\n\n'
+        'Tienes registrados **$total productos activos** ($totalUnits unidades en total):\n\n'
+        '• 🟢 **En stock normal:** $healthy productos\n'
+        '• 🟠 **Con stock bajo:** $lowStock productos\n'
+        '• 🔴 **Agotados (0 unidades):** $outOfStock productos\n\n'
+        '¿Deseas revisar los que necesitan reposición?';
+
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: text,
+      timestamp: DateTime.now(),
+      type: StockyMessageType.text,
+      actions: [
+        if (outOfStock > 0 || lowStock > 0)
+          const StockyAction(label: '⚠️ Ver Stock Crítico', actionType: 'query_stock'),
+        const StockyAction(label: 'Ver Todo el Inventario', actionType: 'navigate_inventory'),
+      ],
+    );
+  }
+
+  Future<StockyAssistantMessage> _buildCustomerInfoResponse(String businessId, String bizName) async {
+    final db = await AppDatabase.instance.database;
+    final res = await db.rawQuery('''
+      SELECT 
+        COUNT(*) as total,
+        COALESCE(SUM(CASE WHEN debt_balance > 0 THEN 1 ELSE 0 END), 0) as debtors_count,
+        COALESCE(SUM(debt_balance), 0.0) as total_debt
+      FROM customers
+      WHERE business_id = ?
+    ''', [businessId]);
+
+    final row = res.first;
+    final total = (row['total'] as num?)?.toInt() ?? 0;
+    final debtorsCount = (row['debtors_count'] as num?)?.toInt() ?? 0;
+    final totalDebt = (row['total_debt'] as num?)?.toDouble() ?? 0.0;
+
+    String text;
+    if (total == 0) {
+      text = 'Aún no tienes clientes registrados en tu libreta de **$bizName**.\n\n'
+          '💡 Al registrar una venta a crédito (fiado), el cliente se crea automáticamente para que lleves su saldo y puedas cobrarle por WhatsApp.';
+    } else {
+      text = '👥 **Base de Clientes de $bizName:**\n\n'
+          '• **Total de Clientes:** $total personas registradas\n'
+          '• **Con saldo pendiente (fiado):** $debtorsCount clientes (${CurrencyFormatter.formatCOP(totalDebt)})\n'
+          '• **Al día:** ${total - debtorsCount} clientes';
+    }
+
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: text,
+      timestamp: DateTime.now(),
+      type: StockyMessageType.text,
+      actions: const [
+        StockyAction(label: 'Ver Clientes', actionType: 'navigate_customers'),
+        StockyAction(label: 'Fiados Pendientes', actionType: 'query_debts'),
+      ],
+    );
+  }
+
+  StockyAssistantMessage _buildHowToResponse(String query) {
+    if (query.contains('venta') || query.contains('vender') || query.contains('factur') || query.contains('cobrar en caja')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '🛍️ **Cómo registrar una venta en Stockealo:**\n\n'
+            '1. Toca el botón **+ Venta Rápida** o ve al módulo de **Ventas**.\n'
+            '2. Selecciona los productos de la lista o escanea su código de barras con la cámara.\n'
+            '3. Elige el medio de pago:\n'
+            '   • **Efectivo** (calcula cambio automático)\n'
+            '   • **Transferencia** (Nequi, Daviplata, etc.)\n'
+            '   • **Fiado** (asócialo a un cliente para cobrar luego)\n'
+            '4. Toca **Confirmar Venta**. El stock se descontará al instante y podrás compartir el ticket digital.',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.text,
+        actions: const [
+          StockyAction(label: '+ Registrar Venta Ahora', actionType: 'quick_sale'),
+          StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
+        ],
+      );
+    }
+
+    if (query.contains('producto') || query.contains('articulo') || query.contains('inventario') || query.contains('mercaderia') || query.contains('agregar') || query.contains('crear')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '📦 **Cómo agregar un nuevo producto:**\n\n'
+            '1. Ve a la pestaña **Inventario** en la barra inferior.\n'
+            '2. Pulsa el botón flotante verde con el signo **(+)**.\n'
+            '3. Escribe el nombre, precio de compra (tu costo) y precio de venta al público.\n'
+            '4. Ingresa el stock actual y el stock mínimo para recibir alertas.\n'
+            '5. Puedes tomarle una foto o asignarle código de barras.\n'
+            '6. Guarda y ¡listo para vender!',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.text,
+        actions: const [
+          StockyAction(label: 'Ir a Inventario', actionType: 'navigate_inventory'),
+        ],
+      );
+    }
+
+    if (query.contains('fiado') || query.contains('cobrar') || query.contains('deuda') || query.contains('whatsapp')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '👥 **Cómo cobrar y gestionar fiados:**\n\n'
+            '1. Ve a **Ventas** -> Botón **Clientes / Fiados** (o pregúntame * "¿Quién me debe dinero?" *).\n'
+            '2. Verás la lista de personas con saldo pendiente.\n'
+            '3. Toca **"Recordar por WhatsApp"** para enviar un mensaje cordial prediseñado con el monto exacto.\n'
+            '4. Cuando te abonen o paguen, toca **Abonar / Liquidar** para actualizar su saldo a cero.',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.text,
+        actions: const [
+          StockyAction(label: 'Ver Fiados Pendientes', actionType: 'query_debts'),
+          StockyAction(label: 'Ir a Clientes', actionType: 'navigate_customers'),
+        ],
+      );
+    }
+
+    if (query.contains('excel') || query.contains('export') || query.contains('reporte') || query.contains('informe') || query.contains('descargar')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '📊 **Cómo exportar tus reportes a Excel:**\n\n'
+            '1. Entra al módulo de **Historial de Ventas**.\n'
+            '2. En los botones superiores, toca **Excel (.xlsx)**.\n'
+            '3. Selecciona el periodo (hoy, este mes, rango personalizado).\n'
+            '4. Se generará una planilla completa con fecha, cliente, medio de pago, totales y margen de ganancia lista para compartir o abrir en Excel.',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.text,
+        actions: const [
+          StockyAction(label: 'Ir a Historial de Ventas', actionType: 'navigate_sales'),
+        ],
+      );
+    }
+
+    return _buildHelpResponse();
+  }
 
   StockyAssistantMessage _buildGreetingResponse(String? userName, String bizName) {
     final nameStr = userName != null && userName.isNotEmpty ? ' $userName' : '';
@@ -705,25 +1160,25 @@ class StockyAssistantService {
     );
   }
 
-  StockyAssistantMessage _buildFallbackResponse(String prompt) {
+  StockyAssistantMessage _buildFallbackResponse(String prompt, String bizName) {
     return StockyAssistantMessage(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       isUser: false,
-      text: 'Entendí tu mensaje: *"$prompt"*, pero aún estoy aprendiendo patrones específicos sobre eso. 🤖\n\n'
-          'Puedes preguntarme con naturalidad sobre:\n'
-          '• **"¿Cuánto vendimos hoy?"**\n'
-          '• **"¿Qué productos tienen poco stock?"**\n'
-          '• **"¿Quién me debe dinero?"**\n'
-          '• **"¿Cuáles son los más vendidos?"**\n'
-          '• **"¿Qué mercadería está estancada?"**\n'
-          '• O toca uno de los accesos directos:',
+      text: 'Entendí tu mensaje: *"$prompt"*, pero aún no tengo una respuesta programada para esa consulta. 🤖\n\n'
+          'Recuerda que puedo darte información en vivo sobre **$bizName** si me preguntas:\n'
+          '• **"¿Cómo va el negocio?"** o **"¿Cómo estamos hoy?"**\n'
+          '• **"¿Cuánto vendimos hoy?"** o **"¿Cuál es mi ganancia?"**\n'
+          '• **"¿Cuánto vale mi inventario?"** o **"¿Cuántos productos tengo?"**\n'
+          '• **"¿Qué productos tienen poco stock?"** o **"¿Quién me debe?"**\n'
+          '• **"¿Cómo hago una venta?"** o **"¿Cómo agrego un producto?"**\n\n'
+          'O toca una de estas opciones rápidas:',
       timestamp: DateTime.now(),
       type: StockyMessageType.text,
       actions: const [
+        StockyAction(label: '📈 Termómetro general', actionType: 'query_health'),
         StockyAction(label: '📊 Ventas hoy', actionType: 'query_sales'),
         StockyAction(label: '⚠️ Stock crítico', actionType: 'query_stock'),
-        StockyAction(label: '👥 Fiados', actionType: 'query_debts'),
-        StockyAction(label: '💡 Consejo del día', actionType: 'query_advice'),
+        StockyAction(label: '💰 Valor inventario', actionType: 'query_value'),
       ],
     );
   }

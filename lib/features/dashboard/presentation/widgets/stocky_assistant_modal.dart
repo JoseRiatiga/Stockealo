@@ -52,8 +52,10 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
 
   // Sugerencias rápidas tipo chip para consulta inmediata con 1 tap
   static const List<Map<String, String>> _quickChips = [
+    {'label': '📈 Termómetro negocio', 'prompt': 'como va el negocio'},
     {'label': '📊 Ventas de hoy', 'prompt': 'ventas de hoy'},
     {'label': '⚠️ Stock crítico', 'prompt': 'stock critico y agotados'},
+    {'label': '💰 Valor inventario', 'prompt': 'cuanto vale mi inventario'},
     {'label': '👥 Fiados pendientes', 'prompt': 'quien me debe dinero'},
     {'label': '🏆 Más vendidos', 'prompt': 'cuales son los productos mas vendidos'},
     {'label': '💡 Consejo de hoy', 'prompt': 'dame un consejo para vender mas'},
@@ -200,6 +202,8 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
       case 'query_debts':
       case 'query_advice':
       case 'query_top':
+      case 'query_health':
+      case 'query_value':
         final prompt = action.label.replaceAll(RegExp(r'[^\w\s]'), '').trim();
         _handleSendMessage(prompt);
         break;

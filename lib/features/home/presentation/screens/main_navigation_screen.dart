@@ -17,6 +17,7 @@ import '../widgets/app_header_bar.dart';
 import '../widgets/global_search_dialog.dart';
 import '../widgets/notifications_modal.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
+import '../../../dashboard/presentation/widgets/stocky_assistant_modal.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -195,6 +196,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                   userRole: _userRole,
                                   onNavigateToTab: _navigateToTab,
                                 ),
+                                onStockyAssistantTap: _currentIndex != 3
+                                    ? () => StockyAssistantModal.show(
+                                          context,
+                                          businessId: _activeBusiness?.id,
+                                          onNavigateToTab: _navigateToTab,
+                                        )
+                                    : null,
                               );
                             },
                           ),

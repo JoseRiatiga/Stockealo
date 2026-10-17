@@ -8,6 +8,7 @@ import '../models/product.dart';
 import '../models/product_variant.dart';
 
 class ProductRepository {
+  static final ProductRepository instance = ProductRepository();
   final AppDatabase _dbProvider = AppDatabase.instance;
 
   /// Obtiene todos los productos activos de la empresa especificada

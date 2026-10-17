@@ -26,6 +26,8 @@ import '../widgets/recent_transactions_card.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../home/presentation/widgets/notifications_modal.dart';
 import '../widgets/stocky_copilot_card.dart';
+import '../widgets/stocky_face_button.dart';
+import '../widgets/stocky_assistant_modal.dart';
 
 class QuickActionDef {
   final String id;
@@ -754,6 +756,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         actions: [
+          StockyFaceButton(
+            businessId: _activeBusiness?.id,
+            onNavigateToTab: (index) {
+              if (index == 1) widget.onNavigateToInventory();
+              if (index == 2) widget.onNavigateToSales();
+            },
+          ),
           AnimatedBuilder(
             animation: NotificationService.instance,
             builder: (context, _) {
@@ -903,6 +912,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   ),
                                 ).then((_) => _loadData())
                             : null,
+                        businessId: _activeBusiness?.id,
+                        onOpenChat: () => StockyAssistantModal.show(
+                          context,
+                          businessId: _activeBusiness?.id,
+                          onNavigateToTab: (index) {
+                            if (index == 1) widget.onNavigateToInventory();
+                            if (index == 2) widget.onNavigateToSales();
+                          },
+                        ),
                       ),
                       const SizedBox(height: 14),
 

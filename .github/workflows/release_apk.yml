@@ -59,13 +59,15 @@ jobs:
           name: Stockealo ${{ github.ref_name }}
           body: |
             ## 🚀 Novedades de la versión ${{ github.ref_name }}
+            - 🤖 **Stocky Copiloto Asistente Conversacional**: Nuevo asistente interactivo con chat dedicado disponible en todos los módulos (Inicio, Inventario y Ventas). Consulta en lenguaje natural o con botones rápidos tus ventas del día, productos con stock crítico, clientes con fiados pendientes, productos estrella y consejos comerciales en tiempo real con 100% de funcionamiento offline ($0.00 costo).
+            - 💬 **Cobro Rápido por WhatsApp con 1 Toque**: Stocky redacta y prepara recordatorios de pago cordiales para clientes con saldos pendientes listos para enviar por WhatsApp.
+            - 📱 **Optimizaciones Responsivas 360px**: Ajuste milimétrico para pantallas compactas en tarjetas de equipo de trabajo, historial de ventas, chips de periodo y diálogo de recuperación de contraseña.
             - 🔑 **Recuperación de Contraseña por Correo (OTP 6 Dígitos)**: Autoservicio para usuarios con código de verificación enviado directamente desde la cuenta oficial de soporte (`soporte.stockealo@gmail.com`) y cifrado seguro SHA-256 + Pepper.
             - 🔐 **Firma Oficial Permanente (Keystore Unificada)**: Todas las versiones ahora comparten la misma firma criptográfica oficial para permitir actualizaciones fluidas con 1 solo toque sin conflicto de paquetes.
             - 👗 **Variantes de Producto (Tallas, Colores y Modelos)**: Creación opcional de variantes con stock independiente por talla/color (presets rápidos de ropa y calzado, códigos de barras por talla y selector visual en el punto de venta).
             - 🛒 **Terminal POS & Carrito Multi-Producto**: Facturación unificada para múltiples productos en una sola compra, buscador integrado, lector de código de barras y preservación de la venta rápida de 1 producto en 3 segundos.
             - 🏷️ **Motor de Descuentos por Mayor & Blindaje Anti-Pérdidas**: Descuentos en porcentaje (%) o monto fijo ($) con validación matemática en vivo para proteger la rentabilidad y bloquear ventas a pérdida en cajeros.
             - 📄 **Gestor de Cotizaciones / Proformas**: Creación de presupuestos con validez de 15 días, compartibles por WhatsApp y convertibles a venta final en 1 solo clic con validación automática de inventario.
-            - 🤖 **Stocky Cyber-Bot & Copiloto Comercial**: Nueva anatomía con propulsores de levitación iónica, LED reactivo y asistente inteligente en el Dashboard con diagnósticos proactivos de inventario y fiados.
             - 📱 **Catálogo para Redes Sociales & Historias**: Exportación dual en PDF y tarjetas PNG 9:16 en Ultra-HD para WhatsApp e Instagram Stories, con selector de densidad (1, 2, 4 o 6 productos) y pedidos directos a WhatsApp.
             - 🔔 **Notificaciones Push / Realtime en Vivo**: Alertas instantáneas y campanita con badge cuando cajeros registran ventas en tiempo real, sin requerir configuración manual.
             - 🛡️ **Seguridad y Blindaje de Roles**: Protección total para cajeros (costos de compra y márgenes ocultos; acceso restringido para crear o modificar catálogo).

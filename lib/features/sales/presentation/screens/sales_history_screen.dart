@@ -16,6 +16,7 @@ import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
 import '../widgets/quotations_list_modal.dart';
+import '../../../dashboard/presentation/widgets/stocky_face_button.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -376,6 +377,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           : AppBar(
               title: const Text('Historial de Ventas'),
               actions: [
+                StockyFaceButton(businessId: widget.businessId ?? _businessRepo.currentActiveBusiness?.id),
                 IconButton(
                   onPressed: _openQuickSale,
                   icon: const Icon(Icons.add_shopping_cart_rounded, color: Color(0xFF8B5CF6)),

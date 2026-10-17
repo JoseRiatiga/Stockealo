@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../dashboard/presentation/widgets/stocky_face_button.dart';
 
 class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -7,6 +8,7 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onQuickSale;
   final VoidCallback? onSearchTap;
   final VoidCallback? onNotificationsTap;
+  final VoidCallback? onStockyAssistantTap;
   final int alertCount;
 
   const AppHeaderBar({
@@ -16,6 +18,7 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
     this.onQuickSale,
     this.onSearchTap,
     this.onNotificationsTap,
+    this.onStockyAssistantTap,
     this.alertCount = 0,
   });
 
@@ -120,6 +123,15 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
           const SizedBox(width: 18),
+
+          // Botón Asistente Copiloto Stocky (solo en módulos activos, no en Ajustes)
+          if (onStockyAssistantTap != null) ...[
+            StockyFaceButton(
+              showLabel: true,
+              onTap: onStockyAssistantTap,
+            ),
+            const SizedBox(width: 12),
+          ],
 
           // Botón Acción Rápida + Vender
           if (onQuickSale != null)

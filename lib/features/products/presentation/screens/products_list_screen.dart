@@ -21,6 +21,7 @@ import '../widgets/catalog_generator_modal.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
+import '../../../dashboard/presentation/widgets/stocky_face_button.dart';
 
 class ProductsListScreen extends StatefulWidget {
   final String userId;
@@ -656,6 +657,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
           ),
         ),
         actions: [
+          StockyFaceButton(businessId: _activeBusiness?.id),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             tooltip: 'Más opciones',

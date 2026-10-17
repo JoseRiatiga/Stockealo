@@ -8,6 +8,7 @@ import '../models/cart_item.dart';
 import '../models/quotation.dart';
 
 class SalesRepository {
+  static final SalesRepository instance = SalesRepository();
   final AppDatabase _dbProvider = AppDatabase.instance;
 
   /// Registra una venta aislada por empresa y descuenta stock

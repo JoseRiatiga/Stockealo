@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../auth/presentation/widgets/stocky_mascot.dart';
+import 'stocky_assistant_modal.dart';
 
 class StockyCopilotCard extends StatefulWidget {
   final int lowStockCount;
@@ -15,6 +15,8 @@ class StockyCopilotCard extends StatefulWidget {
   final VoidCallback? onOpenCatalog;
   final VoidCallback? onQuickSale;
   final VoidCallback? onNavigateToCustomers;
+  final VoidCallback? onOpenChat;
+  final String? businessId;
 
   const StockyCopilotCard({
     super.key,
@@ -29,6 +31,8 @@ class StockyCopilotCard extends StatefulWidget {
     this.onOpenCatalog,
     this.onQuickSale,
     this.onNavigateToCustomers,
+    this.onOpenChat,
+    this.businessId,
   });
 
   @override
@@ -36,34 +40,7 @@ class StockyCopilotCard extends StatefulWidget {
 }
 
 class _StockyCopilotCardState extends State<StockyCopilotCard> {
-  StockyState _mascotState = StockyState.idle;
-  String? _easterEggMessage;
-  int _easterEggIndex = 0;
-
-  static const List<String> _tips = [
-    '¡Al 100% para registrar todas tus ventas hoy! 🚀',
-    'Tip Pro: Presiona Ctrl + K en PC para buscar cualquier producto o cliente en 1 segundo.',
-    'Recuerda que puedes descargar el catálogo en PDF o crear Historias 9:16 para WhatsApp e Instagram.',
-    'Todo lo que registres se sincroniza en tiempo real con Supabase y tu equipo.',
-  ];
-
-  void _triggerEasterEgg() {
-    HapticFeedback.mediumImpact();
-    setState(() {
-      _mascotState = StockyState.success;
-      _easterEggMessage = _tips[_easterEggIndex % _tips.length];
-      _easterEggIndex++;
-    });
-
-    Future.delayed(const Duration(milliseconds: 3200), () {
-      if (mounted) {
-        setState(() {
-          _mascotState = StockyState.idle;
-          _easterEggMessage = null;
-        });
-      }
-    });
-  }
+  final StockyState _mascotState = StockyState.idle;
 
   @override
   Widget build(BuildContext context) {
@@ -81,10 +58,7 @@ class _StockyCopilotCardState extends State<StockyCopilotCard> {
     String insightText;
     List<Widget> actionButtons = [];
 
-    if (_easterEggMessage != null) {
-      insightTitle = 'Stocky dice:';
-      insightText = _easterEggMessage!;
-    } else if (totalAlerts > 0) {
+    if (totalAlerts > 0) {
       insightTitle = 'Inventario Crítico';
       insightText = 'Hay $totalAlerts productos agotados o con stock bajo. ¿Hacemos el pedido a proveedores para no detener ventas?';
       if (widget.onRestockOrder != null) {
@@ -176,6 +150,22 @@ class _StockyCopilotCardState extends State<StockyCopilotCard> {
       }
     }
 
+    actionButtons.insert(
+      0,
+      _buildActionButton(
+        label: 'Pregúntale a Stocky',
+        icon: Icons.chat_bubble_outline_rounded,
+        color: const Color(0xFF8B5CF6),
+        onPressed: () {
+          if (widget.onOpenChat != null) {
+            widget.onOpenChat!();
+          } else {
+            StockyAssistantModal.show(context, businessId: widget.businessId);
+          }
+        },
+      ),
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: bgColor,
@@ -195,9 +185,15 @@ class _StockyCopilotCardState extends State<StockyCopilotCard> {
         children: [
           // Mascota Interactiva Stocky con Tooltip y Tap
           Tooltip(
-            message: 'Toca a Stocky para recibir un consejo',
+            message: 'Toca para hablar con Stocky',
             child: GestureDetector(
-              onTap: _triggerEasterEgg,
+              onTap: () {
+                if (widget.onOpenChat != null) {
+                  widget.onOpenChat!();
+                } else {
+                  StockyAssistantModal.show(context, businessId: widget.businessId);
+                }
+              },
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(

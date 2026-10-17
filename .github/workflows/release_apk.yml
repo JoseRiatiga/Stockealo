@@ -59,7 +59,12 @@ jobs:
           name: Stockealo ${{ github.ref_name }}
           body: |
             ## 🚀 Novedades de la versión ${{ github.ref_name }}
-            - 🤖 **Stocky Copiloto Asistente Conversacional**: Nuevo asistente interactivo con chat dedicado disponible en todos los módulos (Inicio, Inventario y Ventas). Consulta en lenguaje natural o con botones rápidos tus ventas del día, productos con stock crítico, clientes con fiados pendientes, productos estrella y consejos comerciales en tiempo real con 100% de funcionamiento offline ($0.00 costo).
+            - 🤖 **Stocky Asistente Flotante**: Reubicado estratégicamente en la esquina inferior derecha justo encima de la barra de módulos para acceso con una sola mano en Inicio, Inventario y Ventas.
+            - 💥 **Bocadillos con Tips Proactivos y Animación de Explosión**: Consejos comerciales esporádicos con estallido visual de partículas/chispas que asesoran en ventas por impulso en caja, combos para rotar mercancía estancada, regla 80/20 y cobro de fiados.
+            - 🪟 **Apertura Suave Blossom y Modal Compacto**: Apertura con escala suave desde el botón flotante y altura compacta (~60%) para mantener siempre visible el contexto del negocio.
+            - 💾 **Persistencia de Conversación en Sesión**: Mantiene la conversación local activa entre aperturas del modal hasta cerrar sesión o refrescar manualmente.
+            - 🏷️ **Header Limpio e Identidad Renovada**: Identidad unificada como "asistente", título "Stocky", subtítulo "• En línea" y retiro del banner redundante en el Dashboard.
+            - 🖼️ **Miniaturas y Fotos de Producto Optimizadas**: Soporte integral de fotos en el carrito POS, selector de tallas/variantes, solicitudes de reposición a proveedores y comprobantes digitales de venta.
             - 💬 **Cobro Rápido por WhatsApp con 1 Toque**: Stocky redacta y prepara recordatorios de pago cordiales para clientes con saldos pendientes listos para enviar por WhatsApp.
             - 📱 **Optimizaciones Responsivas 360px**: Ajuste milimétrico para pantallas compactas en tarjetas de equipo de trabajo, historial de ventas, chips de periodo y diálogo de recuperación de contraseña.
             - 🔑 **Recuperación de Contraseña por Correo (OTP 6 Dígitos)**: Autoservicio para usuarios con código de verificación enviado directamente desde la cuenta oficial de soporte (`soporte.stockealo@gmail.com`) y cifrado seguro SHA-256 + Pepper.

@@ -61,7 +61,7 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
     return ScaleTransition(
       scale: _scaleAnimation,
       child: Tooltip(
-        message: 'Stocky Copiloto - Asistente Comercial',
+        message: 'Stocky',
         child: Material(
           color: Colors.transparent,
           child: InkWell(

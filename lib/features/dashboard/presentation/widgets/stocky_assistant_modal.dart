@@ -349,7 +349,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                 ),
                 const SizedBox(width: 12),
 
-                // Título y Estado En Línea (100% Offline)
+                // Título y Estado En Línea
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,7 +359,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                         children: [
                           Flexible(
                             child: Text(
-                              'Stocky Copiloto',
+                              'Stocky',
                               style: TextStyle(
                                 fontSize: 16.5,
                                 fontWeight: FontWeight.w800,
@@ -401,7 +401,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'En línea • 100% Offline (\$0 costo)',
+                            'En línea',
                             style: TextStyle(
                               fontSize: 11,
                               color: textMuted,

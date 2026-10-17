@@ -65,7 +65,7 @@ class StockyFaceButton extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               const Text(
-                'Copiloto Stocky',
+                'Stocky',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -89,7 +89,7 @@ class StockyFaceButton extends StatelessWidget {
 
     // Versión Móvil Compacta para AppBar Actions (Avatar Circular 36x36 con 42x42 tap area)
     return Tooltip(
-      message: 'Stocky Copiloto - Asistente Comercial',
+      message: 'Stocky',
       child: InkWell(
         onTap: () => _handleTap(context),
         borderRadius: BorderRadius.circular(22),

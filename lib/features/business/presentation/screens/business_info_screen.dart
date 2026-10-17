@@ -394,9 +394,13 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'Información de tu Negocio',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Información de tu Negocio',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          ),
         ),
         actions: [
           IconButton(

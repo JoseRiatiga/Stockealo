@@ -989,7 +989,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               borderRadius: BorderRadius.circular(12),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? const Color(0xFF059669)
@@ -1015,16 +1015,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Icon(
                       p['icon'] as IconData,
-                      size: 15,
+                      size: 14,
                       color: isSelected
                           ? Colors.white
                           : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Text(
                       p['label'] as String,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 11.5,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                         color: isSelected
                             ? Colors.white

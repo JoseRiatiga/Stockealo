@@ -99,6 +99,26 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
     });
   }
 
+  String _translateAuthError(dynamic error) {
+    final raw = error.toString().replaceAll('Exception: ', '').trim();
+    final msg = raw.toLowerCase();
+    if (msg.contains('for security purposes') || (msg.contains('after') && msg.contains('seconds')) || msg.contains('rate limit')) {
+      final match = RegExp(r'(\d+)\s*seconds').firstMatch(msg);
+      final sec = match != null ? match.group(1) : '15';
+      return 'Por seguridad, debes esperar $sec segundos antes de solicitar un nuevo código.';
+    }
+    if (msg.contains('invalid token') || msg.contains('token has expired') || msg.contains('otp expired') || msg.contains('código inválido')) {
+      return 'El código ingresado es incorrecto o ya expiró.';
+    }
+    if (msg.contains('user not found')) {
+      return 'No encontramos ninguna cuenta registrada con este correo.';
+    }
+    if (msg.contains('network') || msg.contains('socketexception') || msg.contains('failed host lookup')) {
+      return 'Error de conexión. Verifica tu internet e inténtalo de nuevo.';
+    }
+    return raw;
+  }
+
   Future<void> _handleSendOtp() async {
     setState(() => _errorMessage = null);
     if (!_emailFormKey.currentState!.validate()) return;
@@ -120,7 +140,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = _translateAuthError(e);
         });
       }
     }
@@ -149,7 +169,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = _translateAuthError(e);
         });
       }
     } finally {
@@ -162,8 +182,8 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
     if (!_otpFormKey.currentState!.validate()) return;
 
     final code = _otpController.text.trim();
-    if (code.length < 6 || code.length > 8) {
-      setState(() => _errorMessage = 'El código debe tener entre 6 y 8 dígitos.');
+    if (code.length != 6) {
+      setState(() => _errorMessage = 'El código debe tener exactamente 6 dígitos.');
       return;
     }
 
@@ -207,7 +227,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = _translateAuthError(e);
         });
       }
     }
@@ -506,19 +526,19 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             autofocus: true,
-            maxLength: 8,
+            maxLength: 6,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             style: const TextStyle(
               fontSize: 24,
-              letterSpacing: 6,
+              letterSpacing: 8,
               fontWeight: FontWeight.bold,
             ),
             decoration: InputDecoration(
               counterText: '',
-              hintText: '••••••••',
+              hintText: '• • • • • •',
               hintStyle: TextStyle(
                 color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
-                letterSpacing: 6,
+                letterSpacing: 8,
               ),
               filled: true,
               fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -529,8 +549,8 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Ingresa el código de seguridad';
-              if (v.trim().length < 6 || v.trim().length > 8) {
-                return 'El código debe tener entre 6 y 8 dígitos';
+              if (v.trim().length != 6) {
+                return 'El código debe tener exactamente 6 dígitos';
               }
               return null;
             },
@@ -571,6 +591,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
           Row(
             children: [
               Expanded(
+                flex: 4,
                 child: OutlinedButton(
                   onPressed: () {
                     setState(() {
@@ -579,28 +600,43 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                     });
                   },
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                   ),
-                  child: Text(
-                    'Cambiar correo',
-                    style: TextStyle(
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      fontSize: 13,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.arrow_back_rounded,
+                          size: 14,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Cambiar correo',
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                flex: 2,
+                flex: 5,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleVerifyOtp,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading
@@ -609,9 +645,12 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                           height: 20,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : const Text(
-                          'Verificar código',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      : const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Verificar código',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
                         ),
                 ),
               ),

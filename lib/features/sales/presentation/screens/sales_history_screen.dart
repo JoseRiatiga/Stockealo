@@ -718,17 +718,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     ),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Text(
-                        dateLabel,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: _selectedDateFilter != 'all' ? FontWeight.bold : FontWeight.w500,
-                          color: _selectedDateFilter != 'all'
-                              ? const Color(0xFF8B5CF6)
-                              : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          dateLabel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: _selectedDateFilter != 'all' ? FontWeight.bold : FontWeight.w500,
+                            color: _selectedDateFilter != 'all'
+                                ? const Color(0xFF8B5CF6)
+                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                          ),
+                          maxLines: 1,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Icon(
@@ -786,17 +789,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     ),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Text(
-                        methodLabel,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: _selectedPaymentMethod != 'ALL' ? FontWeight.bold : FontWeight.w500,
-                          color: _selectedPaymentMethod != 'ALL'
-                              ? const Color(0xFF059669)
-                              : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          methodLabel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: _selectedPaymentMethod != 'ALL' ? FontWeight.bold : FontWeight.w500,
+                            color: _selectedPaymentMethod != 'ALL'
+                                ? const Color(0xFF059669)
+                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                          ),
+                          maxLines: 1,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Icon(
@@ -930,7 +936,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               onTap: _navigateToCustomers,
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF131127) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -942,32 +948,37 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1F1C3B) : const Color(0xFFEFF6FF),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.people_alt_rounded, size: 16, color: Color(0xFF38BDF8)),
+                      child: const Icon(Icons.people_alt_rounded, size: 15, color: Color(0xFF38BDF8)),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Clientes',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            'Fiados',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Clientes',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                             ),
-                            maxLines: 1,
+                          ),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Fiados',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -977,7 +988,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
           // Tarjeta Cotizaciones / Proformas
           Expanded(
@@ -990,7 +1001,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               },
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF131127) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -1002,32 +1013,37 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF26214A) : const Color(0xFFF5F3FF),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.description_outlined, size: 16, color: Color(0xFF8B5CF6)),
+                      child: const Icon(Icons.description_outlined, size: 15, color: Color(0xFF8B5CF6)),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Cotizaciones',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            'Proformas',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Cotizar',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                             ),
-                            maxLines: 1,
+                          ),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Proformas',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -1037,7 +1053,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
           // Tarjeta Exportar Excel
           Expanded(
@@ -1045,7 +1061,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               onTap: _exportToExcel,
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF131127) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -1057,32 +1073,37 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF064E3B).withOpacity(0.4) : const Color(0xFFECFDF5),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.table_chart_rounded, size: 16, color: Color(0xFF059669)),
+                      child: const Icon(Icons.table_chart_rounded, size: 15, color: Color(0xFF059669)),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Excel',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            '.xlsx',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Excel',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                             ),
-                            maxLines: 1,
+                          ),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '.xlsx',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
                           ),
                         ],
                       ),

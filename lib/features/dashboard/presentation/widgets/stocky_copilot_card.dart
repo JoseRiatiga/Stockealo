@@ -257,12 +257,18 @@ class _StockyCopilotCardState extends State<StockyCopilotCard> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      insightTitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: textMain,
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          insightTitle,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: textMain,
+                          ),
+                        ),
                       ),
                     ),
                   ],

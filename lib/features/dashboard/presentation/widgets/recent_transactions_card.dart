@@ -34,7 +34,7 @@ class RecentTransactionsCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF131127) : Colors.white,
         borderRadius: BorderRadius.circular(22),
@@ -56,26 +56,34 @@ class RecentTransactionsCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'ÚLTIMAS TRANSACCIONES',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'ÚLTIMAS TRANSACCIONES',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               InkWell(
                 onTap: onSeeAll,
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         'Ver todo el historial',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.bold,
                           color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                         ),
@@ -143,7 +151,7 @@ class RecentTransactionsCard extends StatelessWidget {
                               fontWeight: FontWeight.bold,
                               color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                             ),
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),

@@ -917,115 +917,132 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                         ? (isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF))
                         : (isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7));
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      color: isDark ? const Color(0xFF131127) : Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: BorderSide(
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF131127) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
                           color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
                         ),
                       ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        onTap: (isOwner && !isSelf) ? () => _showEditRoleDialog(member) : null,
-                        leading: CircleAvatar(
-                          backgroundColor: roleBg,
-                          child: Text(
-                            (member.displayName.isNotEmpty ? member.displayName[0] : 'E').toUpperCase(),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: roleColor,
-                            ),
-                          ),
-                        ),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                member.displayName,
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: primaryTextColor),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isSelf) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: roleBg,
                                 child: Text(
-                                  'Tú',
+                                  (member.displayName.isNotEmpty ? member.displayName[0] : 'E').toUpperCase(),
                                   style: TextStyle(
-                                    fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                    fontSize: 16,
+                                    color: roleColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            member.displayName,
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: primaryTextColor),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (isSelf) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              'Tú',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      member.email,
+                                      style: TextStyle(fontSize: 12, color: secondaryTextColor),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isOwner && !isSelf)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                  tooltip: 'Desvincular',
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => _removeMember(member),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Divider(height: 1, color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  member.roleDescription,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: (isOwner && !isSelf) ? () => _showEditRoleDialog(member) : null,
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: roleBg,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: roleColor.withOpacity(0.5)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        member.roleDisplayName,
+                                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: roleColor),
+                                      ),
+                                      if (isOwner && !isSelf) ...[
+                                        const SizedBox(width: 4),
+                                        Icon(Icons.edit, size: 12, color: roleColor),
+                                      ],
+                                    ],
                                   ),
                                 ),
                               ),
                             ],
-                          ],
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                member.email,
-                                style: TextStyle(fontSize: 12, color: secondaryTextColor),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                member.roleDescription,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                                ),
-                              ),
-                            ],
                           ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            InkWell(
-                              onTap: (isOwner && !isSelf) ? () => _showEditRoleDialog(member) : null,
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: roleBg,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: roleColor.withOpacity(0.5)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      member.roleDisplayName,
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: roleColor),
-                                    ),
-                                    if (isOwner && !isSelf) ...[
-                                      const SizedBox(width: 4),
-                                      Icon(Icons.edit, size: 12, color: roleColor),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                            if (isOwner && !isSelf)
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                tooltip: 'Desvincular',
-                                onPressed: () => _removeMember(member),
-                              ),
-                          ],
-                        ),
+                        ],
                       ),
                     );
                   }),

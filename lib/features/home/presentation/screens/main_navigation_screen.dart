@@ -18,6 +18,7 @@ import '../widgets/global_search_dialog.dart';
 import '../widgets/notifications_modal.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 import '../../../dashboard/presentation/widgets/stocky_assistant_modal.dart';
+import '../../../dashboard/presentation/widgets/stocky_floating_button.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -221,10 +222,30 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             }
 
             // Modo Móvil
+            final showStockyFab = _currentIndex != 3;
+
             return Scaffold(
-              body: IndexedStack(
-                index: _currentIndex,
-                children: screens,
+              body: Stack(
+                children: [
+                  IndexedStack(
+                    index: _currentIndex,
+                    children: screens,
+                  ),
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    right: 16,
+                    bottom: showStockyFab ? 16 : -80,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: showStockyFab ? 1.0 : 0.0,
+                      child: StockyFloatingButton(
+                        businessId: _activeBusiness?.id,
+                        onNavigateToTab: _navigateToTab,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               bottomNavigationBar: NavigationBar(
                 selectedIndex: _currentIndex,

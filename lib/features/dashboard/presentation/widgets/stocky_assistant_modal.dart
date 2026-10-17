@@ -84,18 +84,24 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     final activeBiz = BusinessRepository.instance.currentActiveBusiness;
     _effectiveBusinessId = widget.businessId ?? activeBiz?.id ?? '';
 
-    // Mensaje de bienvenida inicial
-    final bizName = activeBiz?.name ?? 'tu negocio';
-    _messages.add(
-      StockyAssistantMessage(
-        id: 'welcome_msg',
+    // Si no hay historial previo para este negocio en la sesión activa, inicializamos con el mensaje de bienvenida
+    if (!StockyAssistantService.instance.hasConversation(_effectiveBusinessId)) {
+      final bizName = activeBiz?.name ?? 'tu negocio';
+      final welcome = StockyAssistantMessage(
+        id: 'welcome_msg_${DateTime.now().millisecondsSinceEpoch}',
         isUser: false,
         text: '¡Hola $_userName! 👋 Soy **Stocky**, tu copiloto de negocio para **$bizName**.\n\n'
             '¿Qué te gustaría saber hoy? Puedo analizar tus ventas, avisarte qué stock debes reponer, recordarte tus fiados pendientes o darte consejos de venta.',
         timestamp: DateTime.now(),
         type: StockyMessageType.text,
-      ),
-    );
+      );
+      StockyAssistantService.instance.addMessage(_effectiveBusinessId, welcome);
+    }
+
+    _messages.clear();
+    _messages.addAll(StockyAssistantService.instance.getConversation(_effectiveBusinessId));
+
+    _scrollToBottom(animate: false);
   }
 
   Future<void> _handleSendMessage([String? overrideText]) async {
@@ -108,16 +114,17 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
 
     HapticFeedback.lightImpact();
 
-    // Agregar mensaje del usuario
+    // Guardar y mostrar mensaje del usuario
+    final userMsg = StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: true,
+      text: query,
+      timestamp: DateTime.now(),
+    );
+    StockyAssistantService.instance.addMessage(_effectiveBusinessId, userMsg);
+
     setState(() {
-      _messages.add(
-        StockyAssistantMessage(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          isUser: true,
-          text: query,
-          timestamp: DateTime.now(),
-        ),
-      );
+      _messages.add(userMsg);
       _isThinking = true;
       _mascotState = StockyState.loading;
     });
@@ -136,6 +143,8 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
         userName: _userName,
       );
 
+      StockyAssistantService.instance.addMessage(_effectiveBusinessId, response);
+
       if (mounted) {
         setState(() {
           _messages.add(response);
@@ -153,15 +162,16 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
       }
     } catch (e) {
       if (mounted) {
+        final errorMsg = StockyAssistantMessage(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          isUser: false,
+          text: 'Ups, ocurrió un detalle al consultar los datos locales. Intenta preguntarme de nuevo.',
+          timestamp: DateTime.now(),
+        );
+        StockyAssistantService.instance.addMessage(_effectiveBusinessId, errorMsg);
+
         setState(() {
-          _messages.add(
-            StockyAssistantMessage(
-              id: DateTime.now().microsecondsSinceEpoch.toString(),
-              isUser: false,
-              text: 'Ups, ocurrió un detalle al consultar los datos locales. Intenta preguntarme de nuevo.',
-              timestamp: DateTime.now(),
-            ),
-          );
+          _messages.add(errorMsg);
           _isThinking = false;
           _mascotState = StockyState.idle;
         });
@@ -170,20 +180,25 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     }
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 80,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+        if (animate) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent + 80,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        } else {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
       }
     });
   }
 
   void _resetChat() {
     HapticFeedback.mediumImpact();
+    StockyAssistantService.instance.clearConversation(_effectiveBusinessId);
     setState(() {
       _messages.clear();
       _isThinking = false;

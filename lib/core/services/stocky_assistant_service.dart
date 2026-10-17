@@ -55,6 +55,32 @@ class StockyAssistantService {
   static final StockyAssistantService instance = StockyAssistantService._internal();
   StockyAssistantService._internal();
 
+  /// Historial en memoria de mensajes de chat por negocio durante la sesión activa.
+  /// Se mantiene entre aperturas y cierres del modal, y se limpia al cerrar sesión.
+  final Map<String, List<StockyAssistantMessage>> _sessionConversations = {};
+
+  bool hasConversation(String businessId) {
+    return _sessionConversations.containsKey(businessId) &&
+        _sessionConversations[businessId]!.isNotEmpty;
+  }
+
+  List<StockyAssistantMessage> getConversation(String businessId) {
+    return _sessionConversations.putIfAbsent(businessId, () => []);
+  }
+
+  void addMessage(String businessId, StockyAssistantMessage message) {
+    final list = getConversation(businessId);
+    list.add(message);
+  }
+
+  void clearConversation(String businessId) {
+    _sessionConversations.remove(businessId);
+  }
+
+  void clearAllConversations() {
+    _sessionConversations.clear();
+  }
+
   /// Procesa una consulta en lenguaje natural u opción rápida y retorna la respuesta inteligente de Stocky
   Future<StockyAssistantMessage> processQuery({
     required String prompt,

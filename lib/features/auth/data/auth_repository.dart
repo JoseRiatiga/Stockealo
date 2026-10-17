@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/stocky_assistant_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/hash_helper.dart';
 import '../models/app_user.dart';
@@ -250,6 +251,7 @@ class AuthRepository {
   Future<void> logout() async {
     _currentUser = null;
     await _dbProvider.setSetting('active_user_id', null);
+    StockyAssistantService.instance.clearAllConversations();
   }
 
   /// Actualiza los datos del perfil del usuario (nombre, teléfono, foto)

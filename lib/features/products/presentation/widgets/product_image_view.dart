@@ -69,6 +69,7 @@ class ProductImageView extends StatelessWidget {
           width: width,
           height: height,
           fit: fit,
+          gaplessPlayback: true,
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
             return Container(
@@ -94,18 +95,23 @@ class ProductImageView extends StatelessWidget {
 
     // 2. Archivo Local en la memoria del dispositivo (solo en plataformas con sistema de archivos)
     if (!kIsWeb) {
-      final file = File(path);
-      if (file.existsSync()) {
-        return _wrapRadius(
-          Image.file(
-            file,
-            width: width,
-            height: height,
-            fit: fit,
-            errorBuilder: (_, __, ___) => placeholder,
-          ),
-        );
-      }
+      try {
+        final file = path.startsWith('file://')
+            ? File.fromUri(Uri.parse(path))
+            : File(path);
+        if (file.existsSync()) {
+          return _wrapRadius(
+            Image.file(
+              file,
+              width: width,
+              height: height,
+              fit: fit,
+              gaplessPlayback: true,
+              errorBuilder: (_, __, ___) => placeholder,
+            ),
+          );
+        }
+      } catch (_) {}
     }
 
     // 3. Fallback si no existe en local ni es URL

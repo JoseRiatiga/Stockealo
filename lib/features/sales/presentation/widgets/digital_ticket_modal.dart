@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../business/data/business_repository.dart';
+import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../models/sale.dart';
 
 class DigitalTicketModal extends StatelessWidget {
@@ -235,8 +236,15 @@ class DigitalTicketModal extends StatelessWidget {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
+                            ProductImageView(
+                              imagePath: item.productPhotoPath,
+                              width: 36,
+                              height: 36,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,

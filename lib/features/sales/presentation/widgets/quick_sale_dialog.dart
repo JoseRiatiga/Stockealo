@@ -259,15 +259,13 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
               const SizedBox(height: 14),
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF8B5CF6).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.style_outlined, color: Color(0xFF8B5CF6), size: 20),
+                  ProductImageView(
+                    imagePath: p.photoPath,
+                    width: 44,
+                    height: 44,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

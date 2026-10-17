@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/stocky_assistant_service.dart';
@@ -12,27 +13,50 @@ import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 class StockyAssistantModal extends StatefulWidget {
   final String? businessId;
   final ValueChanged<int>? onNavigateToTab;
+  final String? initialPrompt;
 
   const StockyAssistantModal({
     super.key,
     this.businessId,
     this.onNavigateToTab,
+    this.initialPrompt,
   });
 
   static Future<void> show(
     BuildContext context, {
     String? businessId,
     ValueChanged<int>? onNavigateToTab,
+    String? initialPrompt,
   }) {
     HapticFeedback.lightImpact();
-    return showModalBottomSheet(
+    return showGeneralDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StockyAssistantModal(
-        businessId: businessId,
-        onNavigateToTab: onNavigateToTab,
-      ),
+      barrierDismissible: true,
+      barrierLabel: 'Cerrar asistente',
+      barrierColor: Colors.black.withOpacity(0.40),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (ctx, anim, secondaryAnim) {
+        return StockyAssistantModal(
+          businessId: businessId,
+          onNavigateToTab: onNavigateToTab,
+          initialPrompt: initialPrompt,
+        );
+      },
+      transitionBuilder: (ctx, anim, secondaryAnim, child) {
+        final curve = CurvedAnimation(
+          parent: anim,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return Transform.scale(
+          scale: Tween<double>(begin: 0.78, end: 1.0).evaluate(curve),
+          alignment: const Alignment(0.85, 0.90), // Nace orgánicamente desde la esquina de Stocky
+          child: FadeTransition(
+            opacity: curve,
+            child: child,
+          ),
+        );
+      },
     );
   }
 
@@ -67,6 +91,11 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
   void initState() {
     super.initState();
     _initSession();
+    if (widget.initialPrompt != null && widget.initialPrompt!.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleSendMessage(widget.initialPrompt!);
+      });
+    }
   }
 
   @override
@@ -90,7 +119,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
       final welcome = StockyAssistantMessage(
         id: 'welcome_msg_${DateTime.now().millisecondsSinceEpoch}',
         isUser: false,
-        text: '¡Hola $_userName! 👋 Soy **Stocky**, tu copiloto de negocio para **$bizName**.\n\n'
+        text: '¡Hola $_userName! 👋 Soy **Stocky**, tu asistente de negocio para **$bizName**.\n\n'
             '¿Qué te gustaría saber hoy? Puedo analizar tus ventas, avisarte qué stock debes reponer, recordarte tus fiados pendientes o darte consejos de venta.',
         timestamp: DateTime.now(),
         type: StockyMessageType.text,
@@ -282,6 +311,10 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.viewInsets.bottom;
     final screenHeight = mediaQuery.size.height;
+    final screenWidth = mediaQuery.size.width;
+
+    // Altura óptima (60% de la pantalla) para no tapar todo el fondo
+    final modalHeight = (screenHeight * 0.60).clamp(400.0, 580.0);
 
     // Paleta Obsidian Violet Bento
     final sheetBg = isDark ? const Color(0xFF0F0E1E) : Colors.white;
@@ -290,36 +323,38 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
     final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-    return Container(
-      height: screenHeight * 0.88,
-      decoration: BoxDecoration(
-        color: sheetBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(color: borderColor, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.35),
-            blurRadius: 30,
-            offset: const Offset(0, -6),
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 10,
+            right: 10,
+            bottom: bottomInset > 0 ? bottomInset + 8 : 12,
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Drag handle pill
-          Center(
+          child: Material(
+            color: Colors.transparent,
             child: Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 6),
-              width: 44,
-              height: 4.5,
+              height: modalHeight,
+              width: math.min(screenWidth - 20, 500.0),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF3B336A) : const Color(0xFFCBD5E1),
-                borderRadius: BorderRadius.circular(10),
+                color: sheetBg,
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: borderColor, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.35),
+                    blurRadius: 30,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-            ),
-          ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: Column(
+                  children: [
 
-          // Header de Stocky Copiloto
+          // Header de Stocky Asistente
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -488,9 +523,9 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
             ),
           ),
 
-          // Campo de Entrada de Texto con Botón Enviar (Respeta teclado)
+          // Campo de Entrada de Texto con Botón Enviar
           Padding(
-            padding: EdgeInsets.fromLTRB(14, 0, 14, bottomInset + 12),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
             child: Row(
               children: [
                 Expanded(
@@ -540,7 +575,12 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
           ),
         ],
       ),
-    );
+    ),
+  ),
+),
+),
+),
+);
   }
 
   Widget _buildThinkingBubble(bool isDark) {

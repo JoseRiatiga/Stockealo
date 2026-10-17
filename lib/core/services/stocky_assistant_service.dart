@@ -183,7 +183,7 @@ class StockyAssistantService {
 
     // 19. Consejos de negocio
     if (_isAdvice(cleanPrompt)) {
-      return await _buildBusinessAdviceResponse(businessId, bizName);
+      return await _buildBusinessAdviceResponse(businessId, bizName, cleanPrompt);
     }
 
     // 20. Búsqueda específica de un producto en inventario
@@ -413,7 +413,7 @@ class StockyAssistantService {
     return StockyAssistantMessage(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       isUser: false,
-      text: '¡Mucho gusto! Soy **Stocky** 🤖, el copiloto comercial inteligente de **Stockealo** creado para ser tu mano derecha en **$bizName**.\n\n'
+      text: '¡Mucho gusto! Soy **Stocky** 🤖, el asistente comercial inteligente de **Stockealo** creado para ser tu mano derecha en **$bizName**.\n\n'
           '🔒 **100% Offline & Seguro:** Vivo directamente en tu teléfono, por lo que nunca dependes de internet ni pagas mensualidades por consultarme.\n\n'
           '⚡ **¿Qué puedo hacer por ti?**\n'
           '• **Ventas y Utilidades:** Decirte cuánto has vendido y tu ganancia real al instante.\n'
@@ -704,7 +704,7 @@ class StockyAssistantService {
     return StockyAssistantMessage(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       isUser: false,
-      text: '¡Hola$nameStr! 👋 Soy **Stocky**, tu copiloto comercial para **$bizName**.\n\nEstoy aquí para darte respuestas al instante sobre tus ventas, alertas de stock, cuentas por cobrar y consejos de negocio en tiempo real.\n\n¿Qué te gustaría revisar hoy?',
+      text: '¡Hola$nameStr! 👋 Soy **Stocky**, tu asistente comercial para **$bizName**.\n\nEstoy aquí para darte respuestas al instante sobre tus ventas, alertas de stock, cuentas por cobrar y consejos de negocio en tiempo real.\n\n¿Qué te gustaría revisar hoy?',
       timestamp: DateTime.now(),
       type: StockyMessageType.text,
       actions: const [
@@ -1079,7 +1079,124 @@ class StockyAssistantService {
     );
   }
 
-  Future<StockyAssistantMessage> _buildBusinessAdviceResponse(String businessId, String bizName) async {
+  Future<StockyAssistantMessage> _buildBusinessAdviceResponse(String businessId, String bizName, [String? prompt]) async {
+    final cleanPrompt = prompt != null ? _normalize(prompt) : '';
+
+    // Respuestas a temas específicos de asesoría empresarial
+    if (cleanPrompt.contains('impulso') || cleanPrompt.contains('caja') || cleanPrompt.contains('mostrador')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '💡 **Venta por Impulso en Caja:**\n\n'
+            'El mostrador y la caja registradora son los metros cuadrados más valiosos de tu negocio. El 30% de las decisiones de compra se toman mientras el cliente espera para pagar.\n\n'
+            '👉 **Técnicas clave:**\n'
+            '1. **Coloca productos de bajo costo:** Chicles, snacks, pilas, fósforos o accesorios pequeños que no requieran pensar.\n'
+            '2. **La pregunta mágica:** Al cobrar, di siempre: *"¿Llevas el paquete de fósforos/dulce por solo \$1.000 más?"*\n'
+            '3. **Carteles de antojo:** Un producto visible en caja con precio redondo se vende 4 veces más rápido.',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.businessAdvice,
+        actions: const [
+          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+          StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
+        ],
+      );
+    }
+
+    if (cleanPrompt.contains('estancad') || cleanPrompt.contains('liquidar') || cleanPrompt.contains('combo') || cleanPrompt.contains('lento')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '💡 **Estrategia para Mercadería Detenida:**\n\n'
+            'Tener productos quietos es tener dinero congelado que pierde valor con el tiempo y ocupa espacio valioso en tus estantes.\n\n'
+            '👉 **3 Maneras de liquidar sin perder:**\n'
+            '1. **Arma Combos Ganadores:** Combina un producto estancado con uno de tus más vendidos con un descuento del 10% en el combo.\n'
+            '2. **Llévalos al frente:** Muchos productos no se venden simplemente porque el cliente no sabe que los tienes. Cambia su exhibición.\n'
+            '3. **Oferta Flash por WhatsApp:** Publica una historia con *"Solo por hoy: últimas 5 unidades a precio especial"*.',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.businessAdvice,
+        actions: const [
+          StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
+          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+        ],
+      );
+    }
+
+    if (cleanPrompt.contains('recuperar') || cleanPrompt.contains('fiado') || cleanPrompt.contains('cobrar') || cleanPrompt.contains('cartera')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '💡 **Estrategia de Cobranza Asertiva:**\n\n'
+            'Cobrar fiados da pena a muchos comerciantes, pero el dinero es el sustento de tu negocio y familia. La clave es la constancia y la cordialidad.\n\n'
+            '👉 **Reglas de oro de cobranza:**\n'
+            '1. **Cobra temprano:** Entre 8:00 AM y 10:00 AM las personas suelen tener mayor disposición mental y liquidez en sus cuentas.\n'
+            '2. **Usa mensajes cordiales:** Nunca acuses; saluda, desea bendiciones y comparte el saldo con gentileza.\n'
+            '3. **Facilita medios de pago:** Ofrece transferencias por Nequi, Daviplata o pasar a recogerlo.',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.businessAdvice,
+        actions: const [
+          StockyAction(label: '👥 Cobrar Fiados', actionType: 'navigate_customers'),
+        ],
+      );
+    }
+
+    if (cleanPrompt.contains('8020') || cleanPrompt.contains('80 20') || cleanPrompt.contains('pareto')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '💡 **La Ley de Pareto (80/20) en tu Negocio:**\n\n'
+            'En el 90% de los comercios, el **80% de las ventas proviene de solo el 20% de tus productos** (tus "productos estrella").\n\n'
+            '👉 **Cómo aplicarlo:**\n'
+            '• Identifica cuáles son esos 5 o 10 productos más vendidos y **NUNCA** permitas que se te agoten.\n'
+            '• Negocia mejores precios por volumen con tus proveedores para esos productos clave.\n'
+            '• Si tienes poco capital para invertir, dedícalo prioritariamente a este 20% ganador.',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.businessAdvice,
+        actions: const [
+          StockyAction(label: '⭐ Productos Más Vendidos', actionType: 'query_top_products'),
+          StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
+        ],
+      );
+    }
+
+    if (cleanPrompt.contains('fideliz') || cleanPrompt.contains('retener') || cleanPrompt.contains('clientes')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '💡 **Fidelización de Clientes:**\n\n'
+            'Conseguir un cliente nuevo cuesta 5 veces más caro que retener a uno que ya te compró.\n\n'
+            '👉 **Acciones de alto impacto:**\n'
+            '1. **Aprende sus nombres:** Llamar a alguien por su nombre activa una conexión de confianza inmediata.\n'
+            '2. **Recuerda sus gustos:** *"¿Lo de siempre, don Carlos?"* hace que el cliente sienta que el negocio es suyo.\n'
+            '3. **Guarda sus contactos:** Registra a tus clientes frecuentes en Stockealo para tener su WhatsApp listo y avisarles cuando lleguen novedades.',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.businessAdvice,
+        actions: const [
+          StockyAction(label: '👥 Directorio de Clientes', actionType: 'navigate_customers'),
+          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+        ],
+      );
+    }
+
+    if (cleanPrompt.contains('precio') || cleanPrompt.contains('psicolog') || cleanPrompt.contains('margen')) {
+      return StockyAssistantMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        isUser: false,
+        text: '💡 **Psicología de Precios y Márgenes:**\n\n'
+            'El precio no solo indica costo, también comunica valor y calidad a tus clientes.\n\n'
+            '👉 **Consejos prácticos:**\n'
+            '1. **Precios en .900:** \$9.900 se percibe subconscientemente más cercano a \$9.000 que a \$10.000.\n'
+            '2. **Regla del 30%:** Como regla general en comercio al detal, busca márgenes brutos iguales o superiores al 30%.\n'
+            '3. **No compitas solo por precio bajo:** Compite por atención rápida, amabilidad y tener siempre el producto que el cliente busca.',
+        timestamp: DateTime.now(),
+        type: StockyMessageType.businessAdvice,
+        actions: const [
+          StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
+          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+        ],
+      );
+    }
+
+    // Análisis dinámico del estado real del negocio si no es un tema puntual
     final dbSummary = await DashboardRepository.instance.getDashboardSummary(businessId, period: 'today');
     final outOfStock = dbSummary['outOfStock'] as int? ?? 0;
     final lowStock = dbSummary['lowStock'] as int? ?? 0;

@@ -6,6 +6,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../business/models/business.dart';
 import '../../data/product_repository.dart';
 import '../../models/product.dart';
+import 'product_image_view.dart';
 
 class RestockOrderItem {
   final Product product;
@@ -160,6 +161,12 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                             itemBuilder: (context, index) {
                               final p = filtered[index];
                               return ListTile(
+                                leading: ProductImageView(
+                                  imagePath: p.photoPath,
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                                 title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                                 subtitle: Text('Stock actual: ${p.stock} • Cód: ${p.code}'),
                                 trailing: const Icon(Icons.add_circle_outline, color: Color(0xFF059669)),
@@ -513,6 +520,16 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                                       setState(() => item.isSelected = val ?? false);
                                     },
                                   ),
+                                  const SizedBox(width: 4),
+
+                                  // Foto del producto
+                                  ProductImageView(
+                                    imagePath: p.photoPath,
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  const SizedBox(width: 10),
 
                                   // Product details
                                   Expanded(

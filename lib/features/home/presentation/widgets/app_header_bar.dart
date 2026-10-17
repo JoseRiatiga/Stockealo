@@ -124,7 +124,7 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           const SizedBox(width: 18),
 
-          // Botón Asistente Copiloto Stocky (solo en módulos activos, no en Ajustes)
+          // Botón Asistente Stocky (solo en módulos activos, no en Ajustes)
           if (onStockyAssistantTap != null) ...[
             StockyFaceButton(
               showLabel: true,

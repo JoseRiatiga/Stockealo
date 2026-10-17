@@ -178,9 +178,11 @@ class _StockyPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final center = Offset(w / 2, h / 2);
+    canvas.save();
+    canvas.scale(size.width / 100.0, size.height / 100.0);
+    const w = 100.0;
+    const h = 100.0;
+    const center = Offset(50.0, 50.0);
 
     // Sombra en el suelo interactiva
     final shadowPaint = Paint()
@@ -211,7 +213,7 @@ class _StockyPainter extends CustomPainter {
         colors: isDark
             ? [const Color(0xFF2E2A54), const Color(0xFF131126)]
             : [const Color(0xFF475569), const Color(0xFF1E293B)],
-      ).createShader(Rect.fromLTWH(0, 0, w, h));
+      ).createShader(const Rect.fromLTWH(0, 0, 100, 100));
 
     // Toberas metálicas cilíndricas
     final podLeft = RRect.fromRectAndRadius(
@@ -450,7 +452,7 @@ class _StockyPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [Color(0xFF34D399), Color(0xFF059669)],
-      ).createShader(Rect.fromLTWH(0, 0, w, h));
+      ).createShader(const Rect.fromLTWH(0, 0, 100, 100));
 
     final handStroke = Paint()
       ..color = Colors.white.withOpacity(0.3)
@@ -493,6 +495,7 @@ class _StockyPainter extends CustomPainter {
         canvas.drawLine(Offset(handPos.dx + 3, handPos.dy - 4), Offset(handPos.dx + 3, handPos.dy + 3), fingerPaint);
       }
     }
+    canvas.restore();
   }
 
   @override

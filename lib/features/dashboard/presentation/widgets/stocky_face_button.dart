@@ -87,66 +87,75 @@ class StockyFaceButton extends StatelessWidget {
       );
     }
 
-    // Versión Móvil Compacta para AppBar Actions (Avatar Circular 36x36)
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: Tooltip(
-        message: 'Stocky Copiloto - Asistente Comercial',
-        child: InkWell(
-          onTap: () => _handleTap(context),
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isDark ? const Color(0xFF1C1838) : const Color(0xFFECFDF5),
-              border: Border.all(
-                color: const Color(0xFF8B5CF6).withOpacity(0.5),
-                width: 1.4,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.2),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+    // Versión Móvil Compacta para AppBar Actions (Avatar Circular 36x36 con 42x42 tap area)
+    return Tooltip(
+      message: 'Stocky Copiloto - Asistente Comercial',
+      child: InkWell(
+        onTap: () => _handleTap(context),
+        borderRadius: BorderRadius.circular(22),
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Center(
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark ? const Color(0xFF1C1838) : const Color(0xFFECFDF5),
+                border: Border.all(
+                  color: const Color(0xFF8B5CF6).withOpacity(0.6),
+                  width: 1.5,
                 ),
-              ],
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Center(
-                  child: StockyMascot(
-                    size: 26,
-                    state: StockyState.idle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF8B5CF6).withOpacity(0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
-                ),
-                // Indicador luminoso "En línea"
-                Positioned(
-                  right: 1,
-                  bottom: 1,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF1C1838) : Colors.white,
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF10B981).withOpacity(0.8),
-                          blurRadius: 4,
-                          spreadRadius: 1,
+                ],
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Center(
+                    child: ClipOval(
+                      child: SizedBox(
+                        width: 30,
+                        height: 30,
+                        child: StockyMascot(
+                          size: 28,
+                          state: StockyState.idle,
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  // Indicador luminoso "En línea"
+                  Positioned(
+                    right: -1,
+                    bottom: -1,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF1C1838) : Colors.white,
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF10B981).withOpacity(0.8),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -97,6 +97,9 @@ begin
 end;
 $$;
 
+-- Solo la usan los triggers; no debe poder llamarse como RPC
+revoke all on function public.limit_cashier_updates() from public, anon, authenticated;
+
 drop trigger if exists limit_cashier_updates on public.products;
 create trigger limit_cashier_updates
   before update on public.products

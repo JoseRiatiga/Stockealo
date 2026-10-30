@@ -295,10 +295,15 @@ class AuthRepository {
     _validatePassword(newPassword, label: 'La nueva contraseña');
     final auth = await _requireAuth();
 
-    try {
-      await auth.verifyOTP(email: cleanEmail, token: otpCode.trim(), type: OtpType.email);
-    } catch (e) {
-      throw Exception(_translateAuthError(e));
+    // Un código solo sirve una vez: si un intento anterior de este mismo restablecimiento
+    // ya lo verificó, la sesión sigue abierta y no se vuelve a verificar
+    final alreadyVerified = auth.currentUser?.email?.toLowerCase() == cleanEmail && _currentUser == null;
+    if (!alreadyVerified) {
+      try {
+        await auth.verifyOTP(email: cleanEmail, token: otpCode.trim(), type: OtpType.email);
+      } catch (e) {
+        throw Exception(_translateAuthError(e));
+      }
     }
 
     // El código prueba que el correo es suyo; aun así solo se restablecen cuentas existentes
@@ -310,8 +315,12 @@ class AuthRepository {
 
     try {
       await auth.updateUser(UserAttributes(password: newPassword));
+    } on AuthException catch (e) {
+      // Elegir la misma contraseña que ya tenía no es un error: ya puede ingresar con ella.
+      // Ante otros errores la sesión verificada se mantiene para reintentar con otra
+      // contraseña; cancelPasswordReset la cierra si el usuario abandona.
+      if (!_isSamePassword(e)) throw Exception(_translateAuthError(e));
     } catch (e) {
-      await _signOutQuietly(auth);
       throw Exception(_translateAuthError(e));
     }
 
@@ -328,6 +337,17 @@ class AuthRepository {
     // El usuario vuelve a la pantalla de ingreso con su nueva contraseña
     await _signOutQuietly(auth);
   }
+
+  /// Cierra la sesión que abre la verificación del código si el usuario abandona
+  /// la recuperación de contraseña sin terminarla (no afecta a una sesión normal).
+  Future<void> cancelPasswordReset() async {
+    if (_currentUser != null) return;
+    final auth = SupabaseService.instance.client?.auth;
+    if (auth?.currentSession != null) await _signOutQuietly(auth!);
+  }
+
+  static bool _isSamePassword(AuthException e) =>
+      '${e.code} ${e.message}'.toLowerCase().contains('same_password');
 
   // ---------------------------------------------------------------------------
   // Internos

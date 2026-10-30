@@ -65,6 +65,8 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
 
   @override
   void dispose() {
+    // Si se cerró sin terminar, no dejar abierta la sesión del código verificado
+    if (_currentStep != 4) _authRepo.cancelPasswordReset();
     _emailController.dispose();
     _otpController.dispose();
     _passwordController.dispose();

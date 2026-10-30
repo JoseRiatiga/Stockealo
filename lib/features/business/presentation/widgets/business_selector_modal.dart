@@ -223,6 +223,8 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
   Future<void> _showJoinBusinessDialog() async {
     final codeController = TextEditingController();
     bool isSubmitting = false;
+    // Se muestra dentro del diálogo: un SnackBar quedaría oculto tras él y la hoja de negocios
+    String? errorText;
 
     await showDialog<void>(
       context: context,
@@ -309,18 +311,20 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                   decoration: InputDecoration(
                     labelText: 'Código de Invitación',
                     hintText: 'Ej. 6CC1-4831',
+                    errorText: errorText,
+                    errorMaxLines: 3,
                     prefixIcon: const Icon(Icons.pin, color: Color(0xFF64748B)),
                     suffixIcon: codeController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear, size: 18),
                             onPressed: () {
                               codeController.clear();
-                              setDialogState(() {});
+                              setDialogState(() => errorText = null);
                             },
                           )
                         : null,
                   ),
-                  onChanged: (_) => setDialogState(() {}),
+                  onChanged: (_) => setDialogState(() => errorText = null),
                 ),
               ],
             ),
@@ -338,7 +342,10 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
               onPressed: isSubmitting || codeController.text.trim().isEmpty
                   ? null
                   : () async {
-                      setDialogState(() => isSubmitting = true);
+                      setDialogState(() {
+                        isSubmitting = true;
+                        errorText = null;
+                      });
                       try {
                         final user = AuthRepository.instance.currentUser;
                         final userEmail = user?.email ?? '';
@@ -363,14 +370,11 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                         );
                         Navigator.pop(context, true);
                       } catch (e) {
-                        setDialogState(() => isSubmitting = false);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(e.toString().replaceAll('Exception: ', '')),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                        if (!dialogCtx.mounted) return;
+                        setDialogState(() {
+                          isSubmitting = false;
+                          errorText = e.toString().replaceAll('Exception: ', '');
+                        });
                       }
                     },
               child: isSubmitting

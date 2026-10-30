@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -15,6 +17,8 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
+  static const int _schemaVersion = 6;
+
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
   static String _openFile = _legacyDbFile;
@@ -86,7 +90,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: _schemaVersion,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -538,6 +542,52 @@ class AppDatabase {
         {'key': key, 'value': value},
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+    }
+  }
+
+  /// Copia consistente de la base de la cuenta en uso (sirve aunque esté abierta)
+  Future<void> exportTo(String destinationPath) async {
+    final file = File(destinationPath);
+    if (await file.exists()) await file.delete();
+    final db = await database;
+    await db.execute('VACUUM INTO ?', [destinationPath]);
+  }
+
+  /// Reemplaza la base de la cuenta en uso por un respaldo. Valida antes que sea
+  /// una base de Stockealo; los cambios pendientes de subir se descartan porque
+  /// pertenecen a los datos que se reemplazan.
+  Future<void> restoreFrom(String backupPath) async {
+    await _validateBackup(backupPath);
+
+    final target = p.join(await getDatabasesPath(), _openFile);
+    await close();
+    await File(backupPath).copy(target);
+    final journal = File('$target-journal');
+    if (await journal.exists()) await journal.delete();
+
+    // Al reabrir se aplican las migraciones si el respaldo es de una versión anterior
+    final db = await database;
+    await db.delete('pending_sync');
+    await db.delete('app_settings', where: 'key = ?', whereArgs: ['initial_upload_done']);
+  }
+
+  static Future<void> _validateBackup(String path) async {
+    Database? backup;
+    try {
+      backup = await openDatabase(path, readOnly: true, singleInstance: false);
+      final tables = (await backup.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table'"))
+          .map((r) => r['name'] as String)
+          .toSet();
+      if (!tables.containsAll(['businesses', 'products', 'sales'])) {
+        throw Exception('El archivo no es un respaldo de Stockealo.');
+      }
+      if (await backup.getVersion() > _schemaVersion) {
+        throw Exception('El respaldo es de una versión más nueva de la app. Actualiza Stockealo primero.');
+      }
+    } on DatabaseException {
+      throw Exception('El archivo no es un respaldo de Stockealo.');
+    } finally {
+      await backup?.close();
     }
   }
 

@@ -20,6 +20,7 @@ import '../../../../core/services/update_service.dart';
 import '../../../../core/widgets/update_dialog.dart';
 import '../../../../core/widgets/modern_dialog.dart';
 import '../../../../core/widgets/image_source_picker_modal.dart';
+import '../../../backup/data/backup_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -486,6 +487,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+  }
+
+  Future<void> _exportBackup() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await BackupService.instance.exportBackup();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+    }
+  }
+
+  Future<void> _restoreBackup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Restaurar un respaldo?'),
+        content: const Text(
+          'Los datos de esta cuenta en este teléfono se reemplazarán por los del archivo. '
+          'Lo que no esté en el respaldo se perderá. Te recomendamos exportar un respaldo antes.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Elegir archivo')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final restored = await BackupService.instance.importBackup();
+      if (restored) {
+        messenger.showSnackBar(const SnackBar(content: Text('Respaldo restaurado.'), backgroundColor: Color(0xFF059669)));
+      }
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red));
+    }
   }
 
   Future<void> _exportToExcel() async {
@@ -1049,6 +1087,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                 ),
+                if (BackupService.instance.isSupported) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _restoreBackup,
+                          icon: const Icon(Icons.settings_backup_restore_rounded, size: 17),
+                          label: const Text('Restaurar respaldo', style: TextStyle(fontSize: 12)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: primaryTextColor,
+                            side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _exportBackup,
+                          icon: const Icon(Icons.backup_outlined, size: 17),
+                          label: const Text('Exportar respaldo', style: TextStyle(fontSize: 12)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF059669),
+                            side: const BorderSide(color: Color(0xFF059669)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

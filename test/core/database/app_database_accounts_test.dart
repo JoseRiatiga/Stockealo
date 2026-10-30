@@ -67,6 +67,22 @@ void main() {
       expect(appDb.openFile, legacy);
     });
 
+    test('una base nueva ya trae el esquema completo', () async {
+      await appDb.useAccount('a', 'a@x.com');
+      final db = await appDb.database;
+      Future<Set<String>> columnsOf(String table) async =>
+          (await db.rawQuery('PRAGMA table_info($table)')).map((c) => c['name'] as String).toSet();
+
+      expect(
+        await columnsOf('sales'),
+        containsAll(['invoice_number', 'discount_amount', 'variant_id', 'variant_name', 'seller_name']),
+      );
+      expect(await columnsOf('quotation_items'), containsAll(['variant_id', 'variant_name']));
+      expect(await columnsOf('businesses'), containsAll(['is_deleted', 'deleted_at', 'description']));
+      expect(await columnsOf('app_settings'), isNotEmpty);
+      expect(await db.getVersion(), 4);
+    });
+
     test('respeta al dueño que dejó la actualización a v3', () async {
       await appDb.setSetting('db_owner_email', 'a@x.com');
       await appDb.close();

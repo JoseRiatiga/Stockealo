@@ -14,6 +14,8 @@ class BusinessRepository extends ChangeNotifier {
   static Business? _activeBusiness;
   /// Usuario para el que se eligió el negocio activo en memoria
   static String? _activeBusinessUserId;
+  /// Clave en app_settings (cada cuenta tiene su propio archivo de base de datos)
+  static const String _activeBusinessKey = 'active_business_id';
 
   /// Notificador reactivo del negocio activo actual
   final ValueNotifier<Business?> activeBusinessNotifier = ValueNotifier<Business?>(null);
@@ -36,7 +38,9 @@ class BusinessRepository extends ChangeNotifier {
     // piden su negocio con el userId viejo. No deben dejarlo activo para la siguiente cuenta.
     if (AuthRepository.instance.currentUser?.id != userId) return null;
 
-    _activeBusiness = list.isNotEmpty ? list.first : null;
+    // Retomar el último negocio elegido; si ya no está disponible, el primero
+    final savedId = await _dbProvider.getSetting(_activeBusinessKey);
+    _activeBusiness = list.where((b) => b.id == savedId).firstOrNull ?? list.firstOrNull;
     _activeBusinessUserId = userId;
     activeBusinessNotifier.value = _activeBusiness;
     notifyListeners();
@@ -49,6 +53,16 @@ class BusinessRepository extends ChangeNotifier {
     _activeBusinessUserId = business == null ? null : AuthRepository.instance.currentUser?.id;
     activeBusinessNotifier.value = business;
     notifyListeners();
+    // null llega al cerrar sesión: se conserva la elección para el próximo ingreso
+    if (business != null) _rememberActiveBusiness(business.id);
+  }
+
+  Future<void> _rememberActiveBusiness(String businessId) async {
+    try {
+      await _dbProvider.setSetting(_activeBusinessKey, businessId);
+    } catch (e) {
+      debugPrint('No se pudo guardar el negocio activo: $e');
+    }
   }
 
   /// Purga definitivamente empresas en papelera que superaron los 7 días
@@ -108,6 +122,7 @@ class BusinessRepository extends ChangeNotifier {
     await db.insert('businesses', business.toMap());
     _activeBusiness = business;
     _activeBusinessUserId = userId;
+    await _rememberActiveBusiness(business.id);
     activeBusinessNotifier.value = business;
     notifyListeners();
 

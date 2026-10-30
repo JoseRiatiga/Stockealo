@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/database/app_database.dart';
-import '../../../core/services/stocky_assistant_service.dart';
+import '../../stocky/data/stocky_assistant_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../models/app_user.dart';
 

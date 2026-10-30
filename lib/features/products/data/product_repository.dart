@@ -51,17 +51,37 @@ class ProductRepository {
       orderBy: 'name ASC',
     );
 
-    final List<Product> result = [];
-    for (final map in maps) {
-      final p = Product.fromMap(map);
-      if (p.hasVariants) {
-        final variants = await getVariantsForProduct(p.id);
-        result.add(p.copyWith(variants: variants));
-      } else {
-        result.add(p);
+    final products = maps.map(Product.fromMap).toList();
+    final variantsByProduct = await _variantsFor(
+      products.where((p) => p.hasVariants).map((p) => p.id).toList(),
+    );
+    return [
+      for (final p in products)
+        p.hasVariants ? p.copyWith(variants: variantsByProduct[p.id] ?? const []) : p,
+    ];
+  }
+
+  /// Variantes de varios productos en una sola consulta (evita una consulta por producto)
+  Future<Map<String, List<ProductVariant>>> _variantsFor(List<String> productIds) async {
+    if (productIds.isEmpty) return {};
+    final db = await _dbProvider.database;
+    final byProduct = <String, List<ProductVariant>>{};
+    // SQLite limita la cantidad de parámetros por consulta; se consulta por lotes
+    const batchSize = 500;
+    for (var i = 0; i < productIds.length; i += batchSize) {
+      final batch = productIds.sublist(i, (i + batchSize).clamp(0, productIds.length));
+      final rows = await db.query(
+        'product_variants',
+        where: 'product_id IN (${List.filled(batch.length, '?').join(', ')})',
+        whereArgs: batch,
+        orderBy: 'created_at ASC',
+      );
+      for (final row in rows) {
+        final variant = ProductVariant.fromMap(row);
+        byProduct.putIfAbsent(variant.productId, () => []).add(variant);
       }
     }
-    return result;
+    return byProduct;
   }
 
   /// Obtener variantes asociadas a un producto

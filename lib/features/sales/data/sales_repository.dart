@@ -440,18 +440,20 @@ class SalesRepository {
       orderBy: 'created_at DESC',
     );
 
-    final List<Quotation> list = [];
-    for (final row in rows) {
-      final qId = row['id'] as String;
-      final itemRows = await db.query(
-        'quotation_items',
-        where: 'quotation_id = ?',
-        whereArgs: [qId],
-      );
-      final items = itemRows.map((m) => QuotationItem.fromMap(m)).toList();
-      list.add(Quotation.fromMap(row, items));
+    // Todos los ítems de las cotizaciones del negocio en una sola consulta
+    final itemRows = await db.rawQuery('''
+      SELECT qi.* FROM quotation_items qi
+      JOIN quotations q ON q.id = qi.quotation_id
+      WHERE q.business_id = ?
+    ''', [businessId]);
+    final itemsByQuotation = <String, List<QuotationItem>>{};
+    for (final m in itemRows) {
+      itemsByQuotation.putIfAbsent(m['quotation_id'] as String, () => []).add(QuotationItem.fromMap(m));
     }
-    return list;
+
+    return [
+      for (final row in rows) Quotation.fromMap(row, itemsByQuotation[row['id'] as String] ?? []),
+    ];
   }
 
   /// Elimina una cotización

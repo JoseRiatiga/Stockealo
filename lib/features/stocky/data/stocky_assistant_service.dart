@@ -1,11 +1,11 @@
 import 'package:share_plus/share_plus.dart';
-import '../../features/business/data/business_repository.dart';
-import '../../features/customers/data/customer_repository.dart';
-import '../../features/dashboard/data/dashboard_repository.dart';
-import '../../features/products/data/product_repository.dart';
-import '../../features/sales/data/sales_repository.dart';
-import '../../core/utils/currency_formatter.dart';
-import '../database/app_database.dart';
+import '../../business/data/business_repository.dart';
+import '../../customers/data/customer_repository.dart';
+import '../../dashboard/data/dashboard_repository.dart';
+import '../../products/data/product_repository.dart';
+import '../../sales/data/sales_repository.dart';
+import '../../../core/utils/currency_formatter.dart';
+import '../../../core/database/app_database.dart';
 
 enum StockyMessageType {
   text,

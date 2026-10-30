@@ -86,107 +86,9 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
-      onOpen: (db) async {
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS app_settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-          )
-        ''');
-        try {
-          await db.execute('ALTER TABLE businesses ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE businesses ADD COLUMN deleted_at TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE businesses ADD COLUMN description TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE business_members ADD COLUMN name TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE sales ADD COLUMN product_photo_path TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE sales ADD COLUMN seller_name TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE sales ADD COLUMN invoice_number TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE sales ADD COLUMN discount_amount REAL DEFAULT 0.0');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE products ADD COLUMN has_variants INTEGER DEFAULT 0');
-        } catch (_) {}
-        try {
-          await db.execute('''
-            CREATE TABLE IF NOT EXISTS product_variants (
-              id TEXT PRIMARY KEY,
-              business_id TEXT NOT NULL,
-              product_id TEXT NOT NULL,
-              attribute_name TEXT NOT NULL DEFAULT 'Talla',
-              attribute_value TEXT NOT NULL,
-              sku_or_barcode TEXT,
-              stock INTEGER NOT NULL DEFAULT 0,
-              additional_price REAL DEFAULT 0.0,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              is_synced INTEGER DEFAULT 0,
-              FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
-            )
-          ''');
-          await db.execute('CREATE INDEX IF NOT EXISTS idx_variants_product ON product_variants(product_id)');
-          await db.execute('CREATE INDEX IF NOT EXISTS idx_variants_barcode ON product_variants(sku_or_barcode)');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE sales ADD COLUMN variant_id TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE sales ADD COLUMN variant_name TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE quotation_items ADD COLUMN variant_id TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('ALTER TABLE quotation_items ADD COLUMN variant_name TEXT');
-        } catch (_) {}
-        try {
-          await db.execute('''
-            CREATE TABLE IF NOT EXISTS quotations (
-              id TEXT PRIMARY KEY,
-              business_id TEXT NOT NULL,
-              quotation_number TEXT NOT NULL,
-              customer_name TEXT,
-              customer_phone TEXT,
-              total_amount REAL NOT NULL,
-              discount_amount REAL NOT NULL DEFAULT 0.0,
-              notes TEXT,
-              status TEXT NOT NULL DEFAULT 'PENDIENTE',
-              valid_until TEXT,
-              created_at TEXT NOT NULL,
-              seller_name TEXT
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE IF NOT EXISTS quotation_items (
-              id TEXT PRIMARY KEY,
-              quotation_id TEXT NOT NULL,
-              product_id TEXT NOT NULL,
-              product_name TEXT NOT NULL,
-              quantity INTEGER NOT NULL,
-              unit_price REAL NOT NULL,
-              subtotal REAL NOT NULL,
-              variant_id TEXT,
-              variant_name TEXT
-            )
-          ''');
-        } catch (_) {}
-      },
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -196,8 +98,26 @@ class AppDatabase {
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) =>
       upgradeSchema(db, oldVersion, newVersion);
 
+  static const String _createAppSettings = '''
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  ''';
+
+  /// Agrega una columna solo si falta (SQLite no tiene ADD COLUMN IF NOT EXISTS)
+  static Future<void> _addColumnIfMissing(Database db, String table, String column, String definition) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    // Tabla inexistente (base muy antigua o parcial): no hay nada que completar
+    if (columns.isEmpty || columns.any((c) => c['name'] == column)) return;
+    await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
+  }
+
   @visibleForTesting
   static Future<void> upgradeSchema(Database db, int oldVersion, int newVersion) async {
+    // Bases muy antiguas no tenían app_settings y algunos pasos la usan
+    await db.execute(_createAppSettings);
+
     if (oldVersion < 2) {
       try {
         await db.execute('ALTER TABLE users ADD COLUMN name TEXT');
@@ -229,7 +149,6 @@ class AppDatabase {
       // Las credenciales pasan a Supabase Auth: se eliminan los hashes guardados en el dispositivo.
       // La columna se conserva (NOT NULL) con un marcador para no reconstruir la tabla.
       await db.update('users', {'password': authManagedPassword});
-      // app_settings se crea en onOpen, que corre después de onUpgrade: puede no existir aún.
       try {
         // Antes de olvidar la sesión, recordar de quién es este archivo (ver useAccount)
         final active = await db.rawQuery('''
@@ -247,9 +166,74 @@ class AppDatabase {
         await db.delete('app_settings', where: 'key = ?', whereArgs: ['active_user_id']);
       } catch (_) {}
     }
+    if (oldVersion < 4 && newVersion >= 4) {
+      // Columnas y tablas que antes se agregaban en cada apertura (onOpen) ocultando errores
+      await _addColumnIfMissing(db, 'businesses', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
+      await _addColumnIfMissing(db, 'businesses', 'deleted_at', 'TEXT');
+      await _addColumnIfMissing(db, 'businesses', 'description', 'TEXT');
+      await _addColumnIfMissing(db, 'business_members', 'name', 'TEXT');
+      await _addColumnIfMissing(db, 'products', 'has_variants', 'INTEGER DEFAULT 0');
+      for (final column in ['product_photo_path', 'seller_name', 'invoice_number', 'variant_id', 'variant_name']) {
+        await _addColumnIfMissing(db, 'sales', column, 'TEXT');
+      }
+      await _addColumnIfMissing(db, 'sales', 'discount_amount', 'REAL DEFAULT 0.0');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS product_variants (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          product_id TEXT NOT NULL,
+          attribute_name TEXT NOT NULL DEFAULT 'Talla',
+          attribute_value TEXT NOT NULL,
+          sku_or_barcode TEXT,
+          stock INTEGER NOT NULL DEFAULT 0,
+          additional_price REAL DEFAULT 0.0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          is_synced INTEGER DEFAULT 0,
+          FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_variants_product ON product_variants(product_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_variants_barcode ON product_variants(sku_or_barcode)');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS quotations (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          quotation_number TEXT NOT NULL,
+          customer_name TEXT,
+          customer_phone TEXT,
+          total_amount REAL NOT NULL,
+          discount_amount REAL NOT NULL DEFAULT 0.0,
+          notes TEXT,
+          status TEXT NOT NULL DEFAULT 'PENDIENTE',
+          valid_until TEXT,
+          created_at TEXT NOT NULL,
+          seller_name TEXT
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS quotation_items (
+          id TEXT PRIMARY KEY,
+          quotation_id TEXT NOT NULL,
+          product_id TEXT NOT NULL,
+          product_name TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          unit_price REAL NOT NULL,
+          subtotal REAL NOT NULL,
+          variant_id TEXT,
+          variant_name TEXT
+        )
+      ''');
+      await _addColumnIfMissing(db, 'quotation_items', 'variant_id', 'TEXT');
+      await _addColumnIfMissing(db, 'quotation_items', 'variant_name', 'TEXT');
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
+    await db.execute(_createAppSettings);
+
     // 1. Tabla de Usuarios (Cuentas)
     await db.execute('''
       CREATE TABLE users (
@@ -382,6 +366,10 @@ class AppDatabase {
         payment_status TEXT NOT NULL DEFAULT 'PAGADO',
         seller_name TEXT,
         notes TEXT,
+        invoice_number TEXT,
+        discount_amount REAL DEFAULT 0.0,
+        variant_id TEXT,
+        variant_name TEXT,
         created_at TEXT NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE,
@@ -466,6 +454,8 @@ class AppDatabase {
         quantity INTEGER NOT NULL,
         unit_price REAL NOT NULL,
         subtotal REAL NOT NULL,
+        variant_id TEXT,
+        variant_name TEXT,
         FOREIGN KEY (quotation_id) REFERENCES quotations (id) ON DELETE CASCADE
       )
     ''');

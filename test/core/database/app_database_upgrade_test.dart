@@ -76,4 +76,37 @@ void main() {
       await expectLater(AppDatabase.upgradeSchema(db, 2, 3), completes);
     });
   });
+
+  group('upgradeSchema v3 -> v4', () {
+    Future<Set<String>> columnsOf(String table) async =>
+        (await db.rawQuery('PRAGMA table_info($table)')).map((c) => c['name'] as String).toSet();
+
+    setUp(() async {
+      // Esquema de una base antigua, sin las columnas que antes agregaba onOpen
+      await db.execute('CREATE TABLE businesses (id TEXT PRIMARY KEY, user_id TEXT, name TEXT, created_at TEXT)');
+      await db.execute('CREATE TABLE business_members (id TEXT PRIMARY KEY, business_id TEXT, email TEXT)');
+      await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY, business_id TEXT, name TEXT)');
+      await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, business_id TEXT, total REAL)');
+    });
+
+    test('agrega las columnas y tablas que faltan', () async {
+      await AppDatabase.upgradeSchema(db, 3, 4);
+
+      expect(await columnsOf('businesses'), containsAll(['is_deleted', 'deleted_at', 'description']));
+      expect(await columnsOf('business_members'), contains('name'));
+      expect(await columnsOf('products'), contains('has_variants'));
+      expect(
+        await columnsOf('sales'),
+        containsAll(['product_photo_path', 'seller_name', 'invoice_number', 'discount_amount', 'variant_id', 'variant_name']),
+      );
+      expect(await columnsOf('quotation_items'), containsAll(['variant_id', 'variant_name']));
+      expect(await columnsOf('product_variants'), isNotEmpty);
+      expect(await columnsOf('app_settings'), isNotEmpty);
+    });
+
+    test('se puede ejecutar dos veces sin fallar', () async {
+      await AppDatabase.upgradeSchema(db, 3, 4);
+      await expectLater(AppDatabase.upgradeSchema(db, 3, 4), completes);
+    });
+  });
 }

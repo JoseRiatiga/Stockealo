@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../core/services/stocky_assistant_service.dart';
+import '../../../stocky/data/stocky_assistant_service.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../auth/presentation/widgets/stocky_mascot.dart';
 import '../../../business/data/business_repository.dart';

@@ -813,7 +813,21 @@ class SupabaseService {
     }
   }
 
-  Future<void> _write(String operation, Map<String, dynamic> payload) async {
+  /// Escrituras en curso; varias pantallas las lanzan sin esperarlas
+  final Set<Future<void>> _pendingWrites = {};
+
+  /// Espera a que terminen las escrituras lanzadas sin esperar. Las pruebas lo usan
+  /// antes de cerrar o borrar la base local, que esas escrituras todavía leen.
+  @visibleForTesting
+  Future<void> waitForPendingWrites() => Future.wait(_pendingWrites.toList());
+
+  Future<void> _write(String operation, Map<String, dynamic> payload) {
+    final write = _enqueueAndFlush(operation, payload);
+    _pendingWrites.add(write);
+    return write.whenComplete(() => _pendingWrites.remove(write));
+  }
+
+  Future<void> _enqueueAndFlush(String operation, Map<String, dynamic> payload) async {
     if (!(await isCloudSyncEnabled())) return;
     try {
       // Hora de la edición: la nube descarta ediciones más viejas que la guardada

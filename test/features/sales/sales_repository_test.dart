@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:stockealo/core/database/app_database.dart';
+import 'package:stockealo/core/services/supabase_service.dart';
 import 'package:stockealo/features/business/models/business.dart';
 import 'package:stockealo/features/products/models/product.dart';
 import 'package:stockealo/features/sales/data/sales_repository.dart';
@@ -64,7 +65,9 @@ void main() {
   }
 
   setUp(() async {
-    // Cada prueba usa un archivo propio y vacío; no toca la base de ninguna cuenta real
+    // Cada prueba usa un archivo propio y vacío; no toca la base de ninguna cuenta real.
+    // Antes se espera a las escrituras a la nube de la prueba anterior, que aún leen la base
+    await SupabaseService.instance.waitForPendingWrites();
     await appDb.useAccount(null);
     await appDb.close();
     await deleteDbFile();
@@ -83,6 +86,7 @@ void main() {
   });
 
   tearDownAll(() async {
+    await SupabaseService.instance.waitForPendingWrites();
     await appDb.useAccount(null);
     await appDb.close();
     await deleteDbFile();

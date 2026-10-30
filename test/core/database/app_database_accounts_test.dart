@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -6,6 +8,16 @@ import 'package:stockealo/core/database/app_database.dart';
 void main() {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
+
+  // Carpeta propia por archivo de pruebas: flutter test ejecuta los archivos en paralelo
+  late Directory dbDir;
+  setUpAll(() async {
+    dbDir = await Directory.systemTemp.createTemp('stockealo_accounts_');
+    await databaseFactory.setDatabasesPath(dbDir.path);
+  });
+  tearDownAll(() async {
+    if (await dbDir.exists()) await dbDir.delete(recursive: true);
+  });
 
   final appDb = AppDatabase.instance;
   const legacy = 'stockealo_v2.db';

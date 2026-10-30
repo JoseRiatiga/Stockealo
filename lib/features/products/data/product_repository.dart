@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
@@ -328,7 +329,9 @@ class ProductRepository {
           .update({'category': cleanNewName})
           .eq('business_id', businessId)
           .eq('category', oldName);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('No se pudo renombrar la categoría en los productos de la nube: $e');
+    }
   }
 
   /// Eliminar categoría y reasignar productos a 'General'
@@ -364,7 +367,9 @@ class ProductRepository {
           .update({'category': 'General'})
           .eq('business_id', businessId)
           .eq('category', categoryName);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('No se pudo mover los productos a "General" en la nube: $e');
+    }
   }
 
   /// Contar cuántos productos pertenecen a una categoría

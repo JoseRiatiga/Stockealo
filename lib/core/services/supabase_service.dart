@@ -548,7 +548,9 @@ class SupabaseService {
           if (userEmail != null && memberEmail == userEmail.trim().toLowerCase() && memberName != memberEmail.split('@').first) {
             try {
               await client!.rpc('link_my_memberships', params: {'p_name': memberName});
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('No se pudo vincular la membresía en Supabase: $e');
+            }
           }
           await db.insert(
             'business_members',
@@ -961,27 +963,7 @@ class SupabaseService {
       if (!_isInitialized) await initialize();
       if (client == null) return;
 
-      // 1. Eliminar datos hijos en la nube
-      try {
-        await client!.from('sales').delete().eq('business_id', businessId);
-      } catch (_) {}
-      try {
-        await client!.from('customers').delete().eq('business_id', businessId);
-      } catch (_) {}
-      try {
-        await client!.from('products').delete().eq('business_id', businessId);
-      } catch (_) {}
-      try {
-        await client!.from('categories').delete().eq('business_id', businessId);
-      } catch (_) {}
-      try {
-        await client!.from('business_members').delete().eq('business_id', businessId);
-      } catch (_) {}
-
-      // 2. Eliminar la empresa
-      await client!.from('businesses').delete().eq('id', businessId);
-
-      // 3. Eliminar fotos del Storage correspondientes a este negocio
+      // 1. Fotos primero: al borrar el negocio se pierde el permiso sobre su carpeta
       try {
         final files = await client!.storage.from('product-images').list(path: businessId);
         if (files.isNotEmpty) {
@@ -990,6 +972,13 @@ class SupabaseService {
         }
       } catch (storageErr) {
         debugPrint('Nota al eliminar fotos de Storage en Supabase: $storageErr');
+      }
+
+      // 2. Borrar el negocio: ventas, clientes, productos, categorías y miembros caen
+      //    en cascada. Con RLS un borrado sin permiso no da error, solo 0 filas.
+      if (!await _deleteBusinessRow(businessId)) {
+        debugPrint('No se pudo eliminar el negocio $businessId en Supabase (sin permiso o inexistente).');
+        return;
       }
       debugPrint('Empresa $businessId destruida permanentemente de Supabase.');
     } catch (e) {
@@ -1105,20 +1094,32 @@ class SupabaseService {
       final localBusinesses = await db.query('businesses', where: 'user_id = ?', whereArgs: [userId]);
       final bizIds = localBusinesses.map((b) => b['id'] as String).toList();
 
+      // Cada negocio arrastra en cascada sus ventas, productos, clientes, categorías y miembros
+      var allDeleted = true;
       for (final bizId in bizIds) {
-        try { await client!.from('sales').delete().eq('business_id', bizId); } catch (_) {}
-        try { await client!.from('products').delete().eq('business_id', bizId); } catch (_) {}
-        try { await client!.from('customers').delete().eq('business_id', bizId); } catch (_) {}
-        try { await client!.from('categories').delete().eq('business_id', bizId); } catch (_) {}
-        try { await client!.from('business_members').delete().eq('business_id', bizId); } catch (_) {}
-        try { await client!.from('businesses').delete().eq('id', bizId); } catch (_) {}
+        if (!await _deleteBusinessRow(bizId)) {
+          debugPrint('No se pudo purgar el negocio $bizId en Supabase.');
+          allDeleted = false;
+        }
       }
+      if (!allDeleted) return false;
 
       // Desactivar el flag de sincronización en la nube (volver a Modo Local Privado)
       await setCloudSyncEnabled(false);
       return true;
     } catch (e) {
       debugPrint('Error purgando datos de Supabase: $e');
+      return false;
+    }
+  }
+
+  /// Borra un negocio en la nube y confirma que se borró de verdad
+  Future<bool> _deleteBusinessRow(String businessId) async {
+    try {
+      final deleted = await client!.from('businesses').delete().eq('id', businessId).select('id');
+      return deleted.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error eliminando el negocio $businessId en Supabase: $e');
       return false;
     }
   }

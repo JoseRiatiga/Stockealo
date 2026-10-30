@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -104,7 +105,9 @@ class TeamRepository {
             linkedUserName = cloudUser['name'] as String?;
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('No se pudo buscar el usuario invitado en la nube: $e');
+      }
     }
 
     final memberName = linkedUserName ?? cleanEmail.split('@').first;
@@ -210,7 +213,9 @@ class TeamRepository {
           );
           return cloudRole;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('No se pudo consultar el rol en la nube: $e');
+      }
     }
 
     // 3. Verificar si existe algún dueño ya registrado en miembros para evitar usurpación accidental

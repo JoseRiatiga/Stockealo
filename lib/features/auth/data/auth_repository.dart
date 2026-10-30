@@ -187,7 +187,9 @@ class AuthRepository {
       if (client != null && userEmail.isNotEmpty) {
         try {
           await client.rpc('link_my_memberships', params: {'p_name': cleanName});
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('No se pudo actualizar el nombre en las membresías: $e');
+        }
       }
     }
 

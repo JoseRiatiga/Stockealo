@@ -1,3 +1,4 @@
+import '../../../customers/data/debt_reminder.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -295,10 +296,11 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
           final cName = payload['customerName'] as String? ?? 'Cliente';
           final dAmount = (payload['debtAmount'] as num?)?.toDouble() ?? 0.0;
           final bName = payload['bizName'] as String? ?? 'Mi Negocio';
-          StockyAssistantService.sendWhatsAppReminder(
+          DebtReminder.send(
             customerName: cName,
             debtAmount: dAmount,
-            bizName: bName,
+            businessName: bName,
+            phone: payload['phone'] as String?,
           );
         }
         break;

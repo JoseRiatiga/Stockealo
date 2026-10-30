@@ -1,3 +1,4 @@
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
@@ -144,7 +145,8 @@ class SalesRepository {
       date: now,
     );
 
-    // Sincronizar venta y stock actualizado en tiempo real a Supabase
+    // Sincronizar cliente (deuda del fiado), venta y stock a Supabase
+    await _syncCustomer(db, businessId, customerName, paymentMethod);
     SupabaseService.instance.insertSaleToCloud(sale.toMap());
     SupabaseService.instance.updateProductStockInCloud(product.id, newStock);
 
@@ -196,6 +198,7 @@ class SalesRepository {
         : (currentUser?.email.split('@').first ?? 'Vendedor');
 
     final List<Sale> createdSales = [];
+    final Map<String, int> newStocks = {};
 
     await db.transaction((txn) async {
       String? customerId;
@@ -338,14 +341,30 @@ class SalesRepository {
         );
 
         createdSales.add(sale);
-
-        // Sincronización a la nube en segundo plano
-        SupabaseService.instance.insertSaleToCloud(sale.toMap());
-        SupabaseService.instance.updateProductStockInCloud(product.id, newStock);
+        newStocks[product.id] = newStock;
       }
     });
 
+    // Sincronización a la nube fuera de la transacción: cliente, ventas y stock final
+    await _syncCustomer(db, businessId, customerName, paymentMethod);
+    for (final sale in createdSales) {
+      SupabaseService.instance.insertSaleToCloud(sale.toMap());
+    }
+    newStocks.forEach(SupabaseService.instance.updateProductStockInCloud);
     return createdSales;
+  }
+
+  /// En un fiado el cliente se crea o se le suma deuda dentro de la transacción;
+  /// aquí se envía su estado final a la nube.
+  Future<void> _syncCustomer(Database db, String businessId, String? customerName, String paymentMethod) async {
+    if (paymentMethod != 'FIADO' || customerName == null || customerName.trim().isEmpty) return;
+    final rows = await db.query(
+      'customers',
+      where: 'business_id = ? AND LOWER(name) = ?',
+      whereArgs: [businessId, customerName.trim().toLowerCase()],
+      limit: 1,
+    );
+    if (rows.isNotEmpty) await SupabaseService.instance.upsertCustomerToCloud(rows.first);
   }
 
   /// Guarda una cotización formal (proforma) sin descontar inventario
@@ -565,12 +584,21 @@ class SalesRepository {
   /// Cancelar / Revertir una venta por error en la empresa correspondiente
   Future<void> cancelSale(Sale sale) async {
     final db = await _dbProvider.database;
+    int? restoredStock;
+    Map<String, dynamic>? updatedCustomer;
     await db.transaction((txn) async {
       // Reponer stock
       await txn.rawUpdate(
         'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
         [sale.quantity, sale.productId, sale.businessId],
       );
+      final productRows = await txn.query(
+        'products',
+        columns: ['stock'],
+        where: 'id = ? AND business_id = ?',
+        whereArgs: [sale.productId, sale.businessId],
+      );
+      restoredStock = productRows.isNotEmpty ? productRows.first['stock'] as int : null;
 
       // Registrar reverso en kardex
       await txn.insert('stock_movements', {
@@ -579,7 +607,7 @@ class SalesRepository {
         'product_id': sale.productId,
         'type': 'AJUSTE',
         'quantity': sale.quantity,
-        'resulting_stock': 0,
+        'resulting_stock': restoredStock ?? 0,
         'reason': 'Venta cancelada / reversada',
         'date': DateTime.now().toIso8601String(),
       });
@@ -590,6 +618,13 @@ class SalesRepository {
           'UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE business_id = ? AND LOWER(name) = ?',
           [sale.totalAmount, sale.businessId, sale.customerName!.toLowerCase()],
         );
+        final customerRows = await txn.query(
+          'customers',
+          where: 'business_id = ? AND LOWER(name) = ?',
+          whereArgs: [sale.businessId, sale.customerName!.toLowerCase()],
+          limit: 1,
+        );
+        updatedCustomer = customerRows.isNotEmpty ? customerRows.first : null;
       }
 
       // Eliminar registro de venta
@@ -599,5 +634,11 @@ class SalesRepository {
         whereArgs: [sale.id, sale.businessId],
       );
     });
+
+    // Reflejar la anulación en la nube; si no, la venta reaparecería al descargar
+    final cloud = SupabaseService.instance;
+    await cloud.deleteSaleFromCloud(sale.id);
+    if (restoredStock != null) await cloud.updateProductStockInCloud(sale.productId, restoredStock!);
+    if (updatedCustomer != null) await cloud.upsertCustomerToCloud(updatedCustomer!);
   }
 }

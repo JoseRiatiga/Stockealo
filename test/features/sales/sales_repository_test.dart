@@ -142,6 +142,22 @@ void main() {
     });
   });
 
+  group('cancelSale', () {
+    test('repone el stock, descuenta la deuda y borra la venta', () async {
+      final product = await addProduct('p1');
+      final sale = await repo.recordSale(product: product, quantity: 3, paymentMethod: 'FIADO', customerName: 'Ana');
+
+      await repo.cancelSale(sale);
+
+      expect(await stockOf('p1'), 10);
+      expect(await debtOf('Ana'), 0);
+      final db = await appDb.database;
+      expect(await db.query('sales'), isEmpty);
+      final reversal = (await db.query('stock_movements', where: "type = 'AJUSTE'")).single;
+      expect(reversal['resulting_stock'], 10);
+    });
+  });
+
   group('recordMultiProductSale', () {
     test('reparte un descuento fijo en proporción al subtotal de cada producto', () async {
       final a = await addProduct('a', price: 1000);

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/app_database.dart';
+import 'sync_queue.dart';
 import 'package:sqflite/sqflite.dart';
 
 class SyncResult {
@@ -436,6 +437,17 @@ class SupabaseService {
         }
       }
 
+      // Subir antes de bajar: la descarga reemplaza filas locales y borraría
+      // cambios que todavía no llegaron a la nube (por ejemplo, ventas sin conexión)
+      await _initialUploadOnce();
+      final pending = await flushPendingSync();
+      if (pending != 0) {
+        return const SyncResult(
+          success: false,
+          errorMessage: 'Hay cambios sin enviar a la nube; se descargará cuando se envíen.',
+        );
+      }
+
       final db = await AppDatabase.instance.database;
       try {
         await db.execute('PRAGMA foreign_keys = OFF');
@@ -769,17 +781,254 @@ class SupabaseService {
     }
   }
 
-  /// Elimina un producto de Supabase inmediatamente
-  Future<void> deleteProductFromCloud(String productId) async {
+  // ---------------------------------------------------------------------------
+  // Escrituras a la nube
+  //
+  // Cada método público guarda el cambio en la cola local (SyncQueue) y luego
+  // intenta enviarla. Si no hay conexión el cambio queda pendiente y se reintenta
+  // en la próxima escritura, al iniciar sesión o al volver a la app.
+  // ---------------------------------------------------------------------------
+
+  /// Una sola vez por cuenta: sube todo lo local. Cubre los datos creados antes de
+  /// que existiera la cola; desde entonces solo se envían los cambios.
+  Future<void> _initialUploadOnce() async {
+    const key = 'initial_upload_done';
     try {
       if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      await client?.from('products').delete().eq('id', productId);
-      debugPrint('Producto $productId eliminado de Supabase con éxito.');
+      if (await AppDatabase.instance.getSetting(key) != null) return;
+      final result = await syncToCloud();
+      if (result.success) await AppDatabase.instance.setSetting(key, '1');
     } catch (e) {
-      debugPrint('Error al eliminar producto en Supabase: $e');
+      debugPrint('Error en la subida inicial: $e');
     }
   }
+
+  Future<void> _write(String operation, Map<String, dynamic> payload) async {
+    if (!(await isCloudSyncEnabled())) return;
+    try {
+      await SyncQueue.instance.enqueue(operation, payload);
+    } catch (e) {
+      debugPrint('No se pudo encolar "$operation": $e');
+      return;
+    }
+    await flushPendingSync();
+  }
+
+  /// Envía los cambios pendientes. Devuelve cuántos siguen sin enviarse (-1 si falló).
+  Future<int> flushPendingSync() async {
+    try {
+      if (!(await isCloudSyncEnabled())) return 0;
+      if (!_isInitialized) await initialize();
+      // Sin sesión, RLS rechazaría todo: se espera al próximo inicio de sesión
+      if (client?.auth.currentSession == null) return await SyncQueue.instance.pendingCount();
+      return await SyncQueue.instance.flush(_send);
+    } catch (e) {
+      debugPrint('Error enviando cambios pendientes: $e');
+      return -1;
+    }
+  }
+
+  Future<void> _send(String operation, Map<String, dynamic> p) async {
+    final db = client;
+    if (db == null) throw StateError('Supabase no está inicializado');
+    switch (operation) {
+      case 'upsert_product':
+        await _sendProduct(db, p);
+      case 'delete_product':
+        await db.from('products').delete().eq('id', p['id'] as String);
+      case 'update_stock':
+        await db.from('products').update({'current_stock': p['stock']}).eq('id', p['id'] as String);
+      case 'upsert_sale':
+        await _sendSale(db, p);
+      case 'delete_sale':
+        await db.from('sales').delete().eq('id', p['id'] as String);
+      case 'upsert_business':
+        await db.from('businesses').upsert({
+          'id': p['id'],
+          'name': p['name'],
+          'type': (p['type'] ?? 'Comercio General').toString(),
+          'currency': p['currency'] ?? 'COP',
+          'is_deleted': (p['is_deleted'] as int?) ?? 0,
+          'created_at': p['created_at'],
+        }, onConflict: 'id');
+      case 'update_business_deleted':
+        await db.from('businesses').update({
+          'is_deleted': p['is_deleted'],
+          'deleted_at': p['deleted_at'],
+        }).eq('id', p['id'] as String);
+      case 'upsert_customer':
+        await db.from('customers').upsert({
+          'id': p['id'],
+          'business_id': p['business_id'],
+          'name': p['name'],
+          'phone': p['phone'],
+          'address': p['address'],
+          'debt_balance': (p['debt_balance'] as num?)?.toDouble() ?? 0.0,
+          'created_at': p['created_at'],
+        }, onConflict: 'id');
+      case 'update_user':
+        // La fila se crea al registrarse; aquí nunca se envían credenciales
+        await db.from('users').update({
+          'name': p['name'],
+          'phone': p['phone'],
+          'avatar_path': p['avatar_path'],
+        }).eq('id', p['id'] as String);
+      case 'upsert_category':
+        await db.from('categories').upsert({
+          'id': p['id'],
+          'business_id': p['business_id'],
+          'name': p['name'],
+          'color_hex': p['color_hex'] ?? '0xFF059669',
+        }, onConflict: 'id');
+      case 'delete_category':
+        await db.from('categories').delete().eq('id', p['id'] as String);
+      case 'upsert_member':
+        final userEmail = (p['email'] ?? p['user_email'] ?? '').toString();
+        final rawUserId = p['user_id'] as String?;
+        await db.from('business_members').upsert({
+          'id': p['id'],
+          'business_id': p['business_id'],
+          'user_id': (rawUserId != null && rawUserId.trim().isNotEmpty) ? rawUserId.trim() : '',
+          'user_email': userEmail,
+          'user_name': (p['name'] ?? p['user_name'] ??
+                  (userEmail.isNotEmpty ? userEmail.split('@').first : 'Colaborador'))
+              .toString(),
+          'role': p['role'] ?? 'CASHIER',
+          'created_at': p['created_at'] ?? DateTime.now().toIso8601String(),
+        }, onConflict: 'id');
+      case 'delete_member':
+        await db.from('business_members').delete().eq('id', p['id'] as String);
+      default:
+        throw ArgumentError('Operación de sincronización desconocida: $operation');
+    }
+  }
+
+  Future<void> _sendProduct(SupabaseClient db, Map<String, dynamic> p) async {
+    String? imageUrl = p['photo_path'] as String?;
+
+    // Si tiene una imagen guardada en el dispositivo, subirla primero a Storage
+    if (imageUrl != null && imageUrl.isNotEmpty && !imageUrl.startsWith('http')) {
+      final uploadedUrl = await uploadProductImage(
+        businessId: p['business_id'] as String,
+        productId: p['id'] as String,
+        localFilePath: imageUrl,
+      );
+      if (uploadedUrl != null) {
+        imageUrl = uploadedUrl;
+        final local = await AppDatabase.instance.database;
+        await local.update(
+          'products',
+          {'photo_path': uploadedUrl},
+          where: 'id = ?',
+          whereArgs: [p['id']],
+        );
+      } else {
+        // Una ruta local no sirve en otros dispositivos
+        imageUrl = null;
+      }
+    }
+
+    await db.from('products').upsert({
+      'id': p['id'],
+      'business_id': p['business_id'],
+      'name': p['name'],
+      'sku': p['code'] ?? '',
+      'category': p['category'] ?? 'General',
+      'cost_price': (p['purchase_price'] as num?)?.toDouble() ?? 0.0,
+      'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
+      'current_stock': (p['stock'] as num?)?.toInt() ?? 0,
+      'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
+      'image_url': imageUrl,
+      'created_at': p['created_at'],
+    }, onConflict: 'id');
+  }
+
+  Future<void> _sendSale(SupabaseClient db, Map<String, dynamic> s) async {
+    final total = (s['total_amount'] as num?)?.toDouble() ?? (s['total'] as num?)?.toDouble() ?? 0.0;
+    final qty = (s['quantity'] as num?)?.toInt() ?? 1;
+    final unitPrice = (s['unit_price'] as num?)?.toDouble() ?? (qty > 0 ? total / qty : 0.0);
+    final totalCost = (s['total_cost'] as num?)?.toDouble() ?? 0.0;
+    final unitCost = (s['unit_cost'] as num?)?.toDouble() ?? (qty > 0 ? totalCost / qty : 0.0);
+
+    final payload = {
+      'id': s['id'],
+      'business_id': s['business_id'],
+      'product_id': s['product_id'],
+      'product_name': s['product_name'],
+      'quantity': qty,
+      'unit_price': unitPrice,
+      'unit_cost': unitCost,
+      'total_amount': total,
+      'payment_method': s['payment_method'] ?? 'Efectivo',
+      'customer_id': s['customer_id'],
+      'customer_name': s['customer_name'],
+      'sale_date': s['date'] ?? s['created_at'] ?? DateTime.now().toIso8601String(),
+    };
+
+    // upsert: si un reintento llega después de que la venta ya se guardó, no se duplica
+    try {
+      await db.from('sales').upsert(payload, onConflict: 'id');
+    } catch (e) {
+      if (e.toString().contains('product_name') ||
+          e.toString().contains('customer_name') ||
+          e.toString().contains('42703')) {
+        payload.remove('product_name');
+        payload.remove('customer_name');
+        await db.from('sales').upsert(payload, onConflict: 'id');
+      } else {
+        rethrow;
+      }
+    }
+  }
+
+  /// Elimina un producto de Supabase
+  Future<void> deleteProductFromCloud(String productId) => _write('delete_product', {'id': productId});
+
+  /// Crea o actualiza un producto en Supabase (incluida su foto)
+  Future<void> upsertProductToCloud(Map<String, dynamic> p) => _write('upsert_product', p);
+
+  /// Registra una venta en Supabase
+  Future<void> insertSaleToCloud(Map<String, dynamic> s) => _write('upsert_sale', s);
+
+  /// Elimina una venta anulada de Supabase
+  Future<void> deleteSaleFromCloud(String saleId) => _write('delete_sale', {'id': saleId});
+
+  /// Actualiza el stock de un producto en Supabase
+  Future<void> updateProductStockInCloud(String productId, int newStock) =>
+      _write('update_stock', {'id': productId, 'stock': newStock});
+
+  /// Guarda o actualiza una empresa en Supabase
+  Future<void> upsertBusinessToCloud(Map<String, dynamic> b) => _write('upsert_business', b);
+
+  /// Actualiza el estado de eliminación (papelera) de una empresa en Supabase
+  Future<void> updateBusinessDeletedStatus(String businessId, bool isDeleted) => _write('update_business_deleted', {
+        'id': businessId,
+        'is_deleted': isDeleted ? 1 : 0,
+        'deleted_at': isDeleted ? DateTime.now().toIso8601String() : null,
+      });
+
+  /// Guarda o actualiza un cliente en Supabase
+  Future<void> upsertCustomerToCloud(Map<String, dynamic> c) => _write('upsert_customer', c);
+
+  /// Actualiza el perfil (nombre, teléfono, foto) de un usuario en Supabase.
+  Future<void> upsertUserToCloud(Map<String, dynamic> u) => _write('update_user', {
+        'id': u['id'],
+        'name': u['name'],
+        'phone': u['phone'],
+        'avatar_path': u['avatar_path'],
+      });
+
+  /// Guarda o actualiza una categoría en Supabase
+  Future<void> upsertCategoryToCloud(Map<String, dynamic> c) => _write('upsert_category', c);
+
+  /// Elimina una categoría de Supabase
+  Future<void> deleteCategoryFromCloud(String categoryId) => _write('delete_category', {'id': categoryId});
+
+  /// Guarda o actualiza un miembro de equipo en Supabase
+  Future<void> upsertBusinessMemberToCloud(Map<String, dynamic> m) => _write('upsert_member', m);
+
+  /// Elimina un miembro de equipo de Supabase
+  Future<void> deleteBusinessMemberFromCloud(String memberId) => _write('delete_member', {'id': memberId});
 
   /// Sube la imagen del producto a Supabase Storage (bucket: product-images) y retorna la URL pública
   Future<String?> uploadProductImage({
@@ -819,143 +1068,6 @@ class SupabaseService {
     }
   }
 
-  /// Crea o actualiza un producto en Supabase inmediatamente
-  Future<void> upsertProductToCloud(Map<String, dynamic> p) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-
-      String? imageUrl = p['photo_path'] as String?;
-
-      // Si tiene una imagen local almacenada en el dispositivo, subirla a Supabase Storage
-      if (imageUrl != null && imageUrl.isNotEmpty && !imageUrl.startsWith('http')) {
-        final uploadedUrl = await uploadProductImage(
-          businessId: p['business_id'] as String,
-          productId: p['id'] as String,
-          localFilePath: imageUrl,
-        );
-        if (uploadedUrl != null) {
-          imageUrl = uploadedUrl;
-          final db = await AppDatabase.instance.database;
-          await db.update(
-            'products',
-            {'photo_path': uploadedUrl},
-            where: 'id = ?',
-            whereArgs: [p['id']],
-          );
-        }
-      }
-
-      await client?.from('products').upsert({
-        'id': p['id'],
-        'business_id': p['business_id'],
-        'name': p['name'],
-        'sku': p['code'] ?? '',
-        'category': p['category'] ?? 'General',
-        'cost_price': (p['purchase_price'] as num?)?.toDouble() ?? 0.0,
-        'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
-        'current_stock': (p['stock'] as num?)?.toInt() ?? 0,
-        'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
-        'image_url': imageUrl,
-        'created_at': p['created_at'],
-      }, onConflict: 'id');
-    } catch (e) {
-      debugPrint('Error al guardar producto en Supabase: $e');
-    }
-  }
-
-  /// Registra una venta en Supabase inmediatamente
-  Future<void> insertSaleToCloud(Map<String, dynamic> s) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-
-      final total = (s['total_amount'] as num?)?.toDouble() ??
-          (s['total'] as num?)?.toDouble() ??
-          0.0;
-      final qty = (s['quantity'] as num?)?.toInt() ?? 1;
-      final unitPrice = (s['unit_price'] as num?)?.toDouble() ??
-          (qty > 0 ? total / qty : 0.0);
-      final totalCost = (s['total_cost'] as num?)?.toDouble() ?? 0.0;
-      final unitCost = (s['unit_cost'] as num?)?.toDouble() ??
-          (qty > 0 ? totalCost / qty : 0.0);
-
-      final payload = {
-        'id': s['id'],
-        'business_id': s['business_id'],
-        'product_id': s['product_id'],
-        'product_name': s['product_name'],
-        'quantity': qty,
-        'unit_price': unitPrice,
-        'unit_cost': unitCost,
-        'total_amount': total,
-        'payment_method': s['payment_method'] ?? 'Efectivo',
-        'customer_id': s['customer_id'],
-        'customer_name': s['customer_name'],
-        'sale_date': s['date'] ?? s['created_at'] ?? DateTime.now().toIso8601String(),
-      };
-
-      try {
-        await client?.from('sales').insert(payload);
-      } catch (e) {
-        if (e.toString().contains('product_name') ||
-            e.toString().contains('customer_name') ||
-            e.toString().contains('42703')) {
-          payload.remove('product_name');
-          payload.remove('customer_name');
-          await client?.from('sales').insert(payload);
-        } else {
-          rethrow;
-        }
-      }
-    } catch (e) {
-      debugPrint('Error al insertar venta en Supabase: $e');
-    }
-  }
-
-  /// Actualiza el stock de un producto en Supabase en tiempo real
-  Future<void> updateProductStockInCloud(String productId, int newStock) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      await client?.from('products').update({'current_stock': newStock}).eq('id', productId);
-    } catch (e) {
-      debugPrint('Error al actualizar stock en Supabase: $e');
-    }
-  }
-
-  /// Guarda o actualiza una empresa en Supabase en tiempo real
-  Future<void> upsertBusinessToCloud(Map<String, dynamic> b) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      await client?.from('businesses').upsert({
-        'id': b['id'],
-        'name': b['name'],
-        'type': (b['type'] ?? 'Comercio General').toString(),
-        'currency': b['currency'] ?? 'COP',
-        'is_deleted': (b['is_deleted'] as int?) ?? 0,
-        'created_at': b['created_at'],
-      }, onConflict: 'id');
-    } catch (e) {
-      debugPrint('Error al guardar empresa en Supabase: $e');
-    }
-  }
-
-  /// Actualiza el estado de eliminación de una empresa en Supabase
-  Future<void> updateBusinessDeletedStatus(String businessId, bool isDeleted) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      await client?.from('businesses').update({
-        'is_deleted': isDeleted ? 1 : 0,
-        'deleted_at': isDeleted ? DateTime.now().toIso8601String() : null,
-      }).eq('id', businessId);
-    } catch (e) {
-      debugPrint('Error al actualizar estado de empresa en Supabase: $e');
-    }
-  }
-
   /// Elimina una empresa permanentemente de Supabase y todos sus datos relacionados
   Future<void> deleteBusinessPermanently(String businessId) async {
     try {
@@ -983,104 +1095,6 @@ class SupabaseService {
       debugPrint('Empresa $businessId destruida permanentemente de Supabase.');
     } catch (e) {
       debugPrint('Error al eliminar negocio permanentemente en Supabase: $e');
-    }
-  }
-
-  /// Guarda o actualiza un cliente en Supabase en tiempo real
-  Future<void> upsertCustomerToCloud(Map<String, dynamic> c) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      await client?.from('customers').upsert({
-        'id': c['id'],
-        'business_id': c['business_id'],
-        'name': c['name'],
-        'phone': c['phone'],
-        'address': c['address'],
-        'debt_balance': (c['debt_balance'] as num?)?.toDouble() ?? 0.0,
-        'created_at': c['created_at'],
-      }, onConflict: 'id');
-    } catch (e) {
-      debugPrint('Error al guardar cliente en Supabase: $e');
-    }
-  }
-
-  /// Actualiza el perfil (nombre, teléfono, foto) de un usuario en Supabase.
-  /// La fila se crea al registrarse; aquí nunca se envían credenciales.
-  Future<void> upsertUserToCloud(Map<String, dynamic> u) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      await client?.from('users').update({
-        'name': u['name'],
-        'phone': u['phone'],
-        'avatar_path': u['avatar_path'],
-      }).eq('id', u['id']);
-      debugPrint('Usuario ${u["email"]} sincronizado en Supabase.');
-    } catch (e) {
-      debugPrint('Error al guardar usuario en Supabase: $e');
-    }
-  }
-
-  /// Guarda o actualiza una categoría en Supabase en tiempo real
-  Future<void> upsertCategoryToCloud(Map<String, dynamic> c) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      await client?.from('categories').upsert({
-        'id': c['id'],
-        'business_id': c['business_id'],
-        'name': c['name'],
-        'color_hex': c['color_hex'] ?? '0xFF059669',
-      }, onConflict: 'id');
-    } catch (e) {
-      debugPrint('Error al guardar categoría en Supabase: $e');
-    }
-  }
-
-  /// Elimina una categoría de Supabase en tiempo real
-  Future<void> deleteCategoryFromCloud(String categoryId) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      await client?.from('categories').delete().eq('id', categoryId);
-    } catch (e) {
-      debugPrint('Error al eliminar categoría en Supabase: $e');
-    }
-  }
-
-  /// Guarda o actualiza un miembro de equipo en Supabase en tiempo real
-  Future<void> upsertBusinessMemberToCloud(Map<String, dynamic> m) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      final userEmail = (m['email'] ?? m['user_email'] ?? '').toString();
-      final userName = (m['name'] ?? m['user_name'] ?? (userEmail.isNotEmpty ? userEmail.split('@').first : 'Colaborador')).toString();
-      final rawUserId = m['user_id'] as String?;
-      await client?.from('business_members').upsert({
-        'id': m['id'],
-        'business_id': m['business_id'],
-        'user_id': (rawUserId != null && rawUserId.trim().isNotEmpty) ? rawUserId.trim() : '',
-        'user_email': userEmail,
-        'user_name': userName,
-        'role': m['role'] ?? 'CASHIER',
-        'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
-      }, onConflict: 'id');
-      debugPrint('Miembro $userEmail sincronizado en Supabase.');
-    } catch (e) {
-      debugPrint('Error al guardar miembro en Supabase: $e');
-    }
-  }
-
-  /// Elimina un miembro de equipo de Supabase en tiempo real
-  Future<void> deleteBusinessMemberFromCloud(String memberId) async {
-    try {
-      if (!(await isCloudSyncEnabled())) return;
-      if (!_isInitialized) await initialize();
-      await client?.from('business_members').delete().eq('id', memberId);
-      debugPrint('Miembro $memberId eliminado de Supabase.');
-    } catch (e) {
-      debugPrint('Error al eliminar miembro en Supabase: $e');
     }
   }
 

@@ -86,7 +86,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -97,6 +97,17 @@ class AppDatabase {
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) =>
       upgradeSchema(db, oldVersion, newVersion);
+
+  static const String _createPendingSync = '''
+    CREATE TABLE IF NOT EXISTS pending_sync (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      operation TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      created_at TEXT NOT NULL
+    )
+  ''';
 
   static const String _createAppSettings = '''
     CREATE TABLE IF NOT EXISTS app_settings (
@@ -229,10 +240,15 @@ class AppDatabase {
       await _addColumnIfMissing(db, 'quotation_items', 'variant_id', 'TEXT');
       await _addColumnIfMissing(db, 'quotation_items', 'variant_name', 'TEXT');
     }
+    if (oldVersion < 5 && newVersion >= 5) {
+      // Cola de escrituras pendientes hacia la nube (ver SyncQueue)
+      await db.execute(_createPendingSync);
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
     await db.execute(_createAppSettings);
+    await db.execute(_createPendingSync);
 
     // 1. Tabla de Usuarios (Cuentas)
     await db.execute('''

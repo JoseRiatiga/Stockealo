@@ -1,3 +1,4 @@
+import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../../../core/utils/currency_formatter.dart';
@@ -133,7 +134,10 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAware {
+  @override
+  void onActiveBusinessChanged() => _onBusinessChanged();
+
   final _dashboardRepo = DashboardRepository.instance;
   final _businessRepo = BusinessRepository.instance;
   final _authRepo = AuthRepository.instance;
@@ -151,7 +155,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadData();
-    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
     NotificationService.instance.remoteSalesVersion.addListener(_onRemoteSales);
     _syncSilently();
   }
@@ -198,7 +201,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
-    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
     NotificationService.instance.remoteSalesVersion.removeListener(_onRemoteSales);
     super.dispose();
   }

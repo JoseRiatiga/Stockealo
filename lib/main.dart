@@ -6,6 +6,7 @@ import 'features/auth/models/app_user.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/business/data/business_repository.dart';
 import 'features/business/models/business.dart';
+import 'features/business/presentation/active_business_scope.dart';
 import 'features/business/presentation/screens/create_initial_business_screen.dart';
 import 'features/home/presentation/screens/main_navigation_screen.dart';
 
@@ -41,6 +42,8 @@ class StockealoApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeController.instance.themeMode,
+          // Negocio activo disponible para toda la app, incluidos diálogos y rutas
+          builder: (context, child) => ActiveBusinessScope(child: child!),
           home: const AuthWrapper(),
         );
       },

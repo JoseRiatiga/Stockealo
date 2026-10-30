@@ -1,3 +1,4 @@
+import '../../../business/presentation/active_business_scope.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
@@ -31,7 +32,10 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware {
+  @override
+  void onActiveBusinessChanged() => _onBusinessChanged();
+
   final _authRepo = AuthRepository.instance;
   final _businessRepo = BusinessRepository.instance;
   final _supabase = SupabaseService.instance;
@@ -57,7 +61,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
     _user = _authRepo.currentUser;
     _nameController = TextEditingController(text: _user?.name ?? '');
     _phoneController = TextEditingController(text: _user?.phone ?? '');
@@ -209,7 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadActiveBusiness() async {
-    final current = _businessRepo.currentActiveBusiness;
+    final current = ActiveBusinessScope.read(context);
     Business? biz = current;
     if (biz == null && _user != null) {
       biz = await _businessRepo.getActiveBusiness(_user!.id, _user!.email);
@@ -244,7 +247,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
-    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
     _nameController.dispose();
     _phoneController.dispose();
     super.dispose();

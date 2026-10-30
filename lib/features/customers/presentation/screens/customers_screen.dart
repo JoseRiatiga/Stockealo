@@ -1,9 +1,9 @@
+import '../../../business/presentation/active_business_scope.dart';
 import '../../data/debt_reminder.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../business/data/business_repository.dart';
 import '../../data/customer_repository.dart';
 import '../../models/customer.dart';
 import '../widgets/record_payment_modal.dart';
@@ -208,7 +208,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     DebtReminder.send(
       customerName: customer.name,
       debtAmount: customer.debtBalance,
-      businessName: BusinessRepository.instance.currentActiveBusiness?.name ?? 'Mi Negocio',
+      businessName: ActiveBusinessScope.read(context)?.name ?? 'Mi Negocio',
       phone: customer.phone,
     );
   }

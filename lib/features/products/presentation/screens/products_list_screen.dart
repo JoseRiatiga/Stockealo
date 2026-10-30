@@ -1,3 +1,4 @@
+import '../../../business/presentation/active_business_scope.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -38,7 +39,10 @@ class ProductsListScreen extends StatefulWidget {
   State<ProductsListScreen> createState() => _ProductsListScreenState();
 }
 
-class _ProductsListScreenState extends State<ProductsListScreen> {
+class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusinessAware {
+  @override
+  void onActiveBusinessChanged() => _onBusinessChanged();
+
   final _repository = ProductRepository();
   final _businessRepo = BusinessRepository.instance;
   final _searchController = TextEditingController();
@@ -73,7 +77,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   @override
   void initState() {
     super.initState();
-    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
     _loadData();
     _syncSilently();
   }
@@ -111,7 +114,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
 
   @override
   void dispose() {
-    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();

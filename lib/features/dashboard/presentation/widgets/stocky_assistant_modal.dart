@@ -1,3 +1,4 @@
+import '../../../business/presentation/active_business_scope.dart';
 import '../../../customers/data/debt_reminder.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -6,7 +7,6 @@ import 'package:flutter/services.dart';
 import '../../../stocky/data/stocky_assistant_service.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../auth/presentation/widgets/stocky_mascot.dart';
-import '../../../business/data/business_repository.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../products/presentation/widgets/restock_order_modal.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
@@ -111,7 +111,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     if (user != null) {
       _userName = user.displayName.isNotEmpty ? user.displayName : user.email.split('@')[0];
     }
-    final activeBiz = BusinessRepository.instance.currentActiveBusiness;
+    final activeBiz = ActiveBusinessScope.read(context);
     _effectiveBusinessId = widget.businessId ?? activeBiz?.id ?? '';
 
     // Si no hay historial previo para este negocio en la sesión activa, inicializamos con el mensaje de bienvenida
@@ -239,7 +239,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
 
   void _handleActionTap(StockyAction action) async {
     HapticFeedback.selectionClick();
-    final activeBiz = BusinessRepository.instance.currentActiveBusiness;
+    final activeBiz = ActiveBusinessScope.read(context);
 
     switch (action.actionType) {
       case 'query_sales':

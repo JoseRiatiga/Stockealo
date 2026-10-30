@@ -1,3 +1,4 @@
+import '../../../business/presentation/active_business_scope.dart';
 import '../../../../core/services/notification_service.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -29,7 +30,10 @@ class SalesHistoryScreen extends StatefulWidget {
   State<SalesHistoryScreen> createState() => _SalesHistoryScreenState();
 }
 
-class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
+class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusinessAware {
+  @override
+  void onActiveBusinessChanged() => _onBusinessChanged();
+
   final _salesRepo = SalesRepository();
   final _businessRepo = BusinessRepository.instance;
 
@@ -52,7 +56,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
     NotificationService.instance.remoteSalesVersion.addListener(_onRemoteSales);
     _loadSales();
     _syncSilently();
@@ -100,14 +103,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   @override
   void dispose() {
-    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
     NotificationService.instance.remoteSalesVersion.removeListener(_onRemoteSales);
     super.dispose();
   }
 
   Future<void> _loadSales() async {
     setState(() => _isLoading = true);
-    var bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+    var bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
     if (bizId == null) {
       final user = AuthRepository.instance.currentUser;
       if (user != null) {
@@ -180,7 +182,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Future<void> _navigateToCustomers() async {
-    var bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+    var bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
     if (bizId == null) {
       final user = AuthRepository.instance.currentUser;
       if (user != null) {
@@ -199,7 +201,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Future<void> _exportToExcel() async {
-    final biz = _businessRepo.currentActiveBusiness;
+    final biz = ActiveBusinessScope.read(context);
     if (biz == null) {
       AppToast.showWarning(context, 'No hay una empresa activa seleccionada.');
       return;
@@ -271,7 +273,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Future<void> _openCashRegister() async {
-    final bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+    final bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
     if (bizId == null) return;
     final user = AuthRepository.instance.currentUser;
     await Navigator.push(
@@ -1035,7 +1037,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           Expanded(
             child: InkWell(
               onTap: () {
-                final bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+                final bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
                 if (bizId != null) {
                   QuotationsListModal.show(context, businessId: bizId);
                 }

@@ -123,8 +123,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       if (_isRegisterMode) {
-        await _authRepo.register(
+        await _authRepo.requestRegistrationCode(email);
+        if (!mounted) return;
+        final code = await _askVerificationCode(email);
+        if (code == null) {
+          setState(() => _mascotState = StockyState.idle);
+          return;
+        }
+        await _authRepo.completeRegistration(
           email: email,
+          code: code,
           password: password,
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
@@ -153,6 +161,66 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// Pide el código de 6 dígitos enviado al correo para confirmar el registro
+  Future<String?> _askVerificationCode(String email) {
+    final codeController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Confirma tu correo', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enviamos un código de 6 dígitos a $email. Escríbelo para crear tu cuenta.',
+              style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: codeController,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.w700),
+              decoration: InputDecoration(
+                counterText: '',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onSubmitted: (value) {
+                if (value.trim().length == 6) Navigator.pop(ctx, value.trim());
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              final code = codeController.text.trim();
+              if (code.length == 6) Navigator.pop(ctx, code);
+            },
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

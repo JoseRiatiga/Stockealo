@@ -1,12 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:uuid/uuid.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/stocky_assistant_service.dart';
 import '../../../core/services/supabase_service.dart';
-import '../../../core/utils/hash_helper.dart';
 import '../models/app_user.dart';
 
+/// Autenticación sobre Supabase Auth.
+///
+/// Las contraseñas solo existen en Supabase Auth: ni el dispositivo ni la tabla
+/// `users` guardan hashes. La fila de `users` conserva el perfil y el `id` de la
+/// app, que para cuentas antiguas difiere del `id` de Supabase Auth; el vínculo
+/// entre ambos es el correo verificado.
 class AuthRepository {
   static final AuthRepository instance = AuthRepository._internal();
   AuthRepository._internal();
@@ -17,234 +22,114 @@ class AuthRepository {
   AppUser? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
 
-  /// Registra un nuevo usuario con correo, contraseña cifrada, nombre y teléfono
-  Future<AppUser> register({
+  /// Paso 1 del registro: envía un código de 6 dígitos al correo
+  Future<void> requestRegistrationCode(String email) async {
+    final cleanEmail = _validateEmail(email);
+    final auth = await _requireAuth();
+    try {
+      await auth.signInWithOtp(email: cleanEmail, shouldCreateUser: true);
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
+    }
+  }
+
+  /// Paso 2 del registro: verifica el código, fija la contraseña y crea el perfil
+  Future<AppUser> completeRegistration({
     required String email,
+    required String code,
     required String password,
     String? name,
     String? phone,
   }) async {
-    final cleanEmail = email.trim().toLowerCase();
+    final cleanEmail = _validateEmail(email);
+    _validatePassword(password);
+    final auth = await _requireAuth();
+
+    try {
+      await auth.verifyOTP(email: cleanEmail, token: code.trim(), type: OtpType.email);
+      await auth.updateUser(UserAttributes(password: password));
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
+    }
+
+    await _dbProvider.useAccount(auth.currentUser!.id, cleanEmail);
     final cleanName = name?.trim();
     final cleanPhone = phone?.trim();
-
-    if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
-      throw Exception('Ingresa un correo electrónico válido.');
-    }
-    if (password.length < 6) {
-      throw Exception('La contraseña debe tener al menos 6 caracteres.');
-    }
-
-    final db = await _dbProvider.database;
-
-    // 1. Verificar si el correo ya existe localmente
-    final existing = await db.query(
-      'users',
-      where: 'email = ?',
-      whereArgs: [cleanEmail],
-      limit: 1,
-    );
-
-    if (existing.isNotEmpty) {
-      throw Exception('Ya existe una cuenta con este correo.');
-    }
-
-    // 2. Verificar si ya existe en Supabase
-    if (!SupabaseService.instance.isInitialized) {
-      await SupabaseService.instance.initialize();
-    }
-    final client = SupabaseService.instance.client;
-    if (client != null) {
-      try {
-        final cloudCheck = await client
-            .from('users')
-            .select('id')
-            .eq('email', cleanEmail)
-            .maybeSingle();
-        if (cloudCheck != null) {
-          throw Exception('Ya existe una cuenta con este correo en la nube. Inicia sesión con tus credenciales.');
-        }
-      } catch (e) {
-        if (e is Exception && e.toString().contains('Ya existe')) rethrow;
-        debugPrint('Nota: no se pudo verificar duplicado en Supabase: $e');
-      }
-    }
-
-    // Hasheo seguro unidireccional con SHA-256 y Salting
-    final hashedPassword = HashHelper.hashPassword(password);
-
-    final user = AppUser(
-      id: const Uuid().v4(),
-      email: cleanEmail,
+    final user = await _resolveAppUser(
+      auth.currentUser!,
       name: (cleanName != null && cleanName.isNotEmpty) ? cleanName : null,
       phone: (cleanPhone != null && cleanPhone.isNotEmpty) ? cleanPhone : null,
-      createdAt: DateTime.now(),
     );
 
-    final userMap = {
-      ...user.toMap(),
-      'password': hashedPassword,
-    };
-
-    await db.insert('users', userMap);
-
-    _currentUser = user;
-    await _dbProvider.setSetting('active_user_id', user.id);
-
-    // Sincronizar usuario a Supabase en tiempo real
-    await SupabaseService.instance.upsertUserToCloud(userMap);
-
-    // Descargar datos si este correo ya había sido invitado a algún negocio
-    await SupabaseService.instance.syncFromCloud(user.id, user.email);
-
-    // Si había membresías pendientes con este email, vincular su nuevo user_id local y en la nube
-    await db.update(
-      'business_members',
-      {'user_id': user.id},
-      where: "LOWER(email) = ? AND (user_id IS NULL OR TRIM(user_id) = '')",
-      whereArgs: [cleanEmail],
-    );
-
-    if (client != null) {
-      try {
-        await client
-            .from('business_members')
-            .update({'user_id': user.id})
-            .eq('user_email', cleanEmail);
-      } catch (_) {}
+    // Si este correo había sido invitado a algún negocio, vincular su user_id en la nube
+    try {
+      await SupabaseService.instance.client
+          ?.from('business_members')
+          .update({'user_id': user.id})
+          .eq('user_email', cleanEmail);
+    } catch (e) {
+      debugPrint('No se pudieron vincular invitaciones pendientes: $e');
     }
 
+    await _finishLogin(user);
     return user;
   }
 
-  /// Inicia sesión verificando credenciales localmente o consultando Supabase Cloud
+  /// Inicia sesión con Supabase Auth. Las cuentas creadas antes de la migración
+  /// se trasladan a Supabase Auth en el primer inicio de sesión.
   Future<AppUser> login(String email, String password) async {
-    final cleanEmail = email.trim().toLowerCase();
-    final db = await _dbProvider.database;
+    final cleanEmail = _validateEmail(email);
+    final auth = await _requireAuth();
 
-    // 1. Intentar autenticación con base de datos local SQLite
-    final maps = await db.query(
-      'users',
-      where: 'email = ?',
-      whereArgs: [cleanEmail],
-      limit: 1,
-    );
+    try {
+      await auth.signInWithPassword(email: cleanEmail, password: password);
+    } on AuthException catch (e) {
+      if (!_isInvalidCredentials(e)) throw Exception(_translateAuthError(e));
 
-    if (maps.isNotEmpty) {
-      final userRow = maps.first;
-      final storedPassword = userRow['password'] as String;
-
-      if (HashHelper.verifyPassword(password, storedPassword)) {
-        // Auto-migración si el usuario tenía contraseña previa en texto plano
-        final secureHash = HashHelper.hashPassword(password);
-        if (storedPassword != secureHash) {
-          await db.update(
-            'users',
-            {'password': secureHash},
-            where: 'id = ?',
-            whereArgs: [userRow['id']],
-          );
-        }
-
-        final user = AppUser.fromMap(userRow);
-        _currentUser = user;
-        await _dbProvider.setSetting('active_user_id', user.id);
-
-        // Descargar datos actualizados de la nube
-        await SupabaseService.instance.syncFromCloud(user.id, user.email);
-
-        // Vincular membresías locales si correspondía
-        await db.update(
-          'business_members',
-          {'user_id': user.id},
-          where: "LOWER(email) = ? AND (user_id IS NULL OR TRIM(user_id) = '')",
-          whereArgs: [cleanEmail],
-        );
-
-        return user;
-      }
-    }
-
-    // 2. Si no se encontró en SQLite o la contraseña local no coincidió,
-    // validar directamente contra Supabase Cloud
-    if (!SupabaseService.instance.isInitialized) {
-      await SupabaseService.instance.initialize();
-    }
-
-    final client = SupabaseService.instance.client;
-    if (client != null) {
+      final migrated = await _migrateLegacyAccount(cleanEmail, password);
+      if (!migrated) throw Exception('Correo o contraseña incorrectos.');
       try {
-        final cloudUser = await client
-            .from('users')
-            .select()
-            .eq('email', cleanEmail)
-            .maybeSingle();
-
-        if (cloudUser != null) {
-          final storedCloudPassword = cloudUser['password'] as String?;
-          final isMatch = storedCloudPassword != null &&
-              (HashHelper.verifyPassword(password, storedCloudPassword) ||
-               storedCloudPassword == password ||
-               storedCloudPassword == HashHelper.hashPassword(password));
-
-          if (isMatch) {
-            final user = AppUser(
-              id: cloudUser['id'] as String,
-              email: cloudUser['email'] as String,
-              name: cloudUser['name'] as String?,
-              phone: cloudUser['phone'] as String?,
-              avatarPath: cloudUser['avatar_path'] as String?,
-              createdAt: cloudUser['created_at'] != null
-                  ? DateTime.tryParse(cloudUser['created_at']) ?? DateTime.now()
-                  : DateTime.now(),
-            );
-
-            final secureHash = HashHelper.hashPassword(password);
-            final userMap = {
-              ...user.toMap(),
-              'password': secureHash,
-            };
-
-            // Guardar usuario en SQLite local para futuros inicios de sesión offline
-            await db.insert(
-              'users',
-              userMap,
-              conflictAlgorithm: ConflictAlgorithm.replace,
-            );
-
-            _currentUser = user;
-            await _dbProvider.setSetting('active_user_id', user.id);
-
-            // Descargar todas las empresas, productos, categorías y datos asociados desde la nube
-            await SupabaseService.instance.syncFromCloud(user.id, user.email);
-
-            // Vincular membresías locales si correspondía
-            await db.update(
-              'business_members',
-              {'user_id': user.id},
-              where: "LOWER(email) = ? AND (user_id IS NULL OR TRIM(user_id) = '')",
-              whereArgs: [cleanEmail],
-            );
-
-            return user;
-          }
-        }
+        await auth.signInWithPassword(email: cleanEmail, password: password);
       } catch (e) {
-        debugPrint('Error al verificar usuario en Supabase: $e');
+        throw Exception(_translateAuthError(e));
       }
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
     }
 
-    throw Exception('Correo o contraseña incorrectos.');
+    await _dbProvider.useAccount(auth.currentUser!.id, cleanEmail);
+    final user = await _resolveAppUser(auth.currentUser!);
+    await _finishLogin(user);
+    return user;
   }
 
-  /// Restaura la sesión guardada si existe
+  /// Restaura la sesión guardada por Supabase (funciona sin conexión)
   Future<AppUser?> restoreSession() async {
     if (_currentUser != null) return _currentUser;
-    final activeId = await _dbProvider.getSetting('active_user_id');
-    if (activeId != null) {
-      return await reloadUser(activeId);
+
+    // main() inicializa Supabase antes de runApp; sin cliente no hay sesión que restaurar
+    final authUser = SupabaseService.instance.client?.auth.currentUser;
+    final email = authUser?.email?.toLowerCase();
+    if (authUser == null || email == null) return null;
+
+    await _dbProvider.useAccount(authUser.id, email);
+    final db = await _dbProvider.database;
+    final maps = await db.query('users', where: 'LOWER(email) = ?', whereArgs: [email], limit: 1);
+    if (maps.isNotEmpty) {
+      _currentUser = AppUser.fromMap(maps.first);
+      await _dbProvider.setSetting('active_user_id', _currentUser!.id);
+      return _currentUser;
     }
-    return null;
+
+    // Sesión válida pero el perfil no está en este dispositivo: traerlo de la nube
+    try {
+      final user = await _resolveAppUser(authUser);
+      await _finishLogin(user);
+      return user;
+    } catch (e) {
+      debugPrint('No se pudo restaurar el perfil desde la nube: $e');
+      return null;
+    }
   }
 
   /// Cierra la sesión activa
@@ -252,6 +137,12 @@ class AuthRepository {
     _currentUser = null;
     await _dbProvider.setSetting('active_user_id', null);
     StockyAssistantService.instance.clearAllConversations();
+    try {
+      await SupabaseService.instance.client?.auth.signOut();
+    } catch (e) {
+      debugPrint('Error al cerrar sesión en Supabase: $e');
+    }
+    await _dbProvider.useAccount(null);
   }
 
   /// Actualiza los datos del perfil del usuario (nombre, teléfono, foto)
@@ -321,40 +212,16 @@ class AuthRepository {
     required String currentPassword,
     required String newPassword,
   }) async {
-    final db = await _dbProvider.database;
-    final check = await db.query(
-      'users',
-      where: 'id = ?',
-      whereArgs: [userId],
-      limit: 1,
-    );
-
-    if (check.isEmpty) {
-      throw Exception('Usuario no encontrado.');
-    }
-
-    final storedPassword = check.first['password'] as String;
-    if (!HashHelper.verifyPassword(currentPassword, storedPassword)) {
+    _validatePassword(newPassword, label: 'La nueva contraseña');
+    if (!await verifyCurrentPassword(currentPassword)) {
       throw Exception('La contraseña actual es incorrecta.');
     }
 
-    if (newPassword.length < 6) {
-      throw Exception('La nueva contraseña debe tener al menos 6 caracteres.');
-    }
-
-    final newHashedPassword = HashHelper.hashPassword(newPassword);
-
-    await db.update(
-      'users',
-      {'password': newHashedPassword},
-      where: 'id = ?',
-      whereArgs: [userId],
-    );
-
-    // Sincronizar contraseña actualizada a Supabase
-    final updatedUserMap = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
-    if (updatedUserMap.isNotEmpty) {
-      SupabaseService.instance.upsertUserToCloud(updatedUserMap.first);
+    final auth = await _requireAuth();
+    try {
+      await auth.updateUser(UserAttributes(password: newPassword));
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
     }
   }
 
@@ -369,71 +236,33 @@ class AuthRepository {
     return null;
   }
 
-  /// Verifica si la contraseña proporcionada coincide con la del usuario en sesión
+  /// Verifica si la contraseña proporcionada coincide con la del usuario en sesión.
+  /// Requiere conexión: la contraseña solo la conoce Supabase Auth.
   Future<bool> verifyCurrentPassword(String password) async {
     final user = _currentUser;
     if (user == null) return false;
-    final db = await _dbProvider.database;
-    final maps = await db.query(
-      'users',
-      where: 'id = ?',
-      whereArgs: [user.id],
-      limit: 1,
-    );
-    if (maps.isEmpty) return false;
-    final storedPassword = maps.first['password'] as String;
-    return HashHelper.verifyPassword(password, storedPassword);
+    final auth = await _requireAuth();
+    try {
+      await auth.signInWithPassword(email: user.email, password: password);
+      return true;
+    } on AuthException catch (e) {
+      if (_isInvalidCredentials(e)) return false;
+      throw Exception(_translateAuthError(e));
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
+    }
   }
 
-  /// Verifica si un correo está registrado en Stockealo (en SQLite local o Supabase Cloud)
-  Future<bool> isEmailRegistered(String email) async {
-    final cleanEmail = email.trim().toLowerCase();
-    final db = await _dbProvider.database;
-
-    // 1. Revisar SQLite local
-    final localUsers = await db.query(
-      'users',
-      where: 'LOWER(email) = ?',
-      whereArgs: [cleanEmail],
-      limit: 1,
-    );
-    if (localUsers.isNotEmpty) return true;
-
-    // 2. Revisar Supabase Cloud
-    if (!SupabaseService.instance.isInitialized) {
-      await SupabaseService.instance.initialize();
-    }
-    final client = SupabaseService.instance.client;
-    if (client != null) {
-      try {
-        final cloudUser = await client
-            .from('users')
-            .select('id')
-            .eq('email', cleanEmail)
-            .maybeSingle();
-        if (cloudUser != null) return true;
-      } catch (e) {
-        debugPrint('Error al verificar correo en Supabase: $e');
-      }
-    }
-    return false;
-  }
-
-  /// Solicita el código OTP de 6 dígitos para restablecer contraseña
+  /// Solicita el código OTP de 6 dígitos para restablecer contraseña.
+  /// No revela si el correo tiene cuenta: eso se comprueba al verificar el código.
   Future<void> requestPasswordResetOtp(String email) async {
-    final cleanEmail = email.trim().toLowerCase();
-    if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
-      throw Exception('Ingresa un correo electrónico válido.');
+    final cleanEmail = _validateEmail(email);
+    final auth = await _requireAuth();
+    try {
+      await auth.signInWithOtp(email: cleanEmail, shouldCreateUser: true);
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
     }
-
-    // 1. Validar si el usuario está registrado en Stockealo
-    final exists = await isEmailRegistered(cleanEmail);
-    if (!exists) {
-      throw Exception('No encontramos ninguna cuenta registrada con este correo en Stockealo.');
-    }
-
-    // 2. Solicitar envío de código OTP
-    await SupabaseService.instance.sendPasswordResetOtp(cleanEmail);
   }
 
   /// Verifica el código OTP y actualiza la contraseña del usuario
@@ -442,57 +271,197 @@ class AuthRepository {
     required String otpCode,
     required String newPassword,
   }) async {
-    final cleanEmail = email.trim().toLowerCase();
-    final cleanCode = otpCode.trim();
+    final cleanEmail = _validateEmail(email);
+    _validatePassword(newPassword, label: 'La nueva contraseña');
+    final auth = await _requireAuth();
 
-    if (newPassword.length < 6) {
-      throw Exception('La nueva contraseña debe tener al menos 6 caracteres.');
+    try {
+      await auth.verifyOTP(email: cleanEmail, token: otpCode.trim(), type: OtpType.email);
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
     }
 
-    // 1. Verificar el código OTP con Supabase
-    final isValid = await SupabaseService.instance.verifyOtp(
-      email: cleanEmail,
-      token: cleanCode,
+    // El código prueba que el correo es suyo; aun así solo se restablecen cuentas existentes
+    final profile = await _fetchCloudProfile(cleanEmail);
+    if (profile == null) {
+      await _signOutQuietly(auth);
+      throw Exception('No encontramos ninguna cuenta registrada con este correo en Stockealo.');
+    }
+
+    try {
+      await auth.updateUser(UserAttributes(password: newPassword));
+    } catch (e) {
+      await _signOutQuietly(auth);
+      throw Exception(_translateAuthError(e));
+    }
+
+    // Retirar el hash antiguo si la cuenta aún no se había migrado
+    try {
+      await SupabaseService.instance.client
+          ?.from('users')
+          .update({'password': authManagedPassword})
+          .eq('email', cleanEmail);
+    } catch (e) {
+      debugPrint('No se pudo retirar el hash antiguo: $e');
+    }
+
+    // El usuario vuelve a la pantalla de ingreso con su nueva contraseña
+    await _signOutQuietly(auth);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internos
+  // ---------------------------------------------------------------------------
+
+  Future<GoTrueClient> _requireAuth() async {
+    if (!SupabaseService.instance.isInitialized) {
+      await SupabaseService.instance.initialize();
+    }
+    final client = SupabaseService.instance.client;
+    if (client == null) {
+      throw Exception('No hay conexión con el servidor. Verifica tu internet e inténtalo de nuevo.');
+    }
+    return client.auth;
+  }
+
+  /// Traslada a Supabase Auth una cuenta creada antes de la migración.
+  /// La Edge Function `legacy-login` valida el hash antiguo en el servidor.
+  Future<bool> _migrateLegacyAccount(String email, String password) async {
+    final client = SupabaseService.instance.client;
+    if (client == null) return false;
+    try {
+      final response = await client.functions.invoke(
+        'legacy-login',
+        body: {'email': email, 'password': password},
+      );
+      final data = response.data;
+      return data is Map && data['migrated'] == true;
+    } catch (e) {
+      debugPrint('Migración de cuenta antigua no disponible: $e');
+      return false;
+    }
+  }
+
+  /// Busca el perfil de la app para el correo verificado, creándolo si no existe
+  Future<AppUser> _resolveAppUser(User authUser, {String? name, String? phone}) async {
+    final email = authUser.email!.toLowerCase();
+    final profile = await _fetchCloudProfile(email);
+
+    if (profile != null) {
+      return AppUser(
+        id: profile['id'] as String,
+        email: profile['email'] as String,
+        name: profile['name'] as String? ?? name,
+        phone: profile['phone'] as String? ?? phone,
+        avatarPath: profile['avatar_path'] as String?,
+        createdAt: DateTime.tryParse(profile['created_at']?.toString() ?? '') ?? DateTime.now(),
+      );
+    }
+
+    final user = AppUser(
+      id: authUser.id,
+      email: email,
+      name: name ?? authUser.userMetadata?['name'] as String?,
+      phone: phone,
+      createdAt: DateTime.now(),
     );
+    final client = SupabaseService.instance.client!;
+    await client.from('users').insert({
+      ...user.toMap(),
+      'password': authManagedPassword,
+    });
+    return user;
+  }
 
-    if (!isValid) {
-      throw Exception('El código de verificación es incorrecto o ha expirado.');
-    }
+  Future<Map<String, dynamic>?> _fetchCloudProfile(String email) async {
+    final client = SupabaseService.instance.client;
+    if (client == null) return null;
+    return await client
+        .from('users')
+        .select('id, email, name, phone, avatar_path, created_at')
+        .eq('email', email)
+        .maybeSingle();
+  }
 
-    // 2. Generar el hash seguro unidireccional con SHA-256 y Pepper
-    final secureHash = HashHelper.hashPassword(newPassword);
-
-    // 3. Actualizar en base de datos local SQLite
+  /// Guarda el perfil en el dispositivo, abre la sesión y descarga los datos
+  Future<void> _finishLogin(AppUser user) async {
     final db = await _dbProvider.database;
-    final updatedRows = await db.update(
+    await db.insert(
       'users',
-      {'password': secureHash},
-      where: 'LOWER(email) = ?',
-      whereArgs: [cleanEmail],
+      {...user.toMap(), 'password': authManagedPassword},
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    // Si el usuario no estaba en la base de datos local (ej. nuevo dispositivo), traerlo de la nube
-    if (updatedRows == 0) {
-      final client = SupabaseService.instance.client;
-      if (client != null) {
-        try {
-          final cloudUser = await client
-              .from('users')
-              .select()
-              .eq('email', cleanEmail)
-              .maybeSingle();
-          if (cloudUser != null) {
-            final userMap = Map<String, dynamic>.from(cloudUser);
-            userMap['password'] = secureHash;
-            await db.insert('users', userMap, conflictAlgorithm: ConflictAlgorithm.replace);
-          }
-        } catch (e) {
-          debugPrint('Error al descargar usuario tras reset: $e');
-        }
-      }
-    }
+    _currentUser = user;
+    await _dbProvider.setSetting('active_user_id', user.id);
 
-    // 4. Actualizar la contraseña en la nube de Supabase
-    await SupabaseService.instance.updatePasswordByEmail(cleanEmail, secureHash);
+    // Descargar empresas, productos, categorías y datos asociados desde la nube
+    await SupabaseService.instance.syncFromCloud(user.id, user.email);
+
+    // Vincular membresías locales si correspondía
+    await db.update(
+      'business_members',
+      {'user_id': user.id},
+      where: "LOWER(email) = ? AND (user_id IS NULL OR TRIM(user_id) = '')",
+      whereArgs: [user.email.toLowerCase()],
+    );
+  }
+
+  Future<void> _signOutQuietly(GoTrueClient auth) async {
+    try {
+      await auth.signOut();
+    } catch (_) {}
+  }
+
+  String _validateEmail(String email) {
+    final cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
+      throw Exception('Ingresa un correo electrónico válido.');
+    }
+    return cleanEmail;
+  }
+
+  void _validatePassword(String password, {String label = 'La contraseña'}) {
+    if (password.length < 6) {
+      throw Exception('$label debe tener al menos 6 caracteres.');
+    }
+  }
+
+  bool _isInvalidCredentials(AuthException e) =>
+      e.code == 'invalid_credentials' || e.message.toLowerCase().contains('invalid login credentials');
+
+  String _translateAuthError(Object e) => translateAuthError(e);
+
+  /// Convierte errores de Supabase Auth y de red en mensajes para el usuario
+  @visibleForTesting
+  static String translateAuthError(Object e) {
+    if (e is Exception && e is! AuthException && e.toString().startsWith('Exception: ')) {
+      return e.toString().replaceFirst('Exception: ', '');
+    }
+    final msg = (e is AuthException ? '${e.code} ${e.message}' : e.toString()).toLowerCase();
+    if (msg.contains('email_not_confirmed') || msg.contains('email not confirmed')) {
+      return 'Debes confirmar tu correo antes de ingresar.';
+    }
+    if (msg.contains('otp_expired') || msg.contains('token has expired') || msg.contains('invalid token')) {
+      return 'El código ingresado es incorrecto o ya expiró.';
+    }
+    if (msg.contains('over_email_send_rate_limit') || msg.contains('for security purposes')) {
+      return 'Por seguridad, espera unos segundos antes de solicitar un nuevo código.';
+    }
+    if (msg.contains('weak_password')) {
+      return 'La contraseña es demasiado débil. Usa una más larga o menos común.';
+    }
+    if (msg.contains('same_password')) {
+      return 'La nueva contraseña debe ser diferente a la actual.';
+    }
+    if (msg.contains('invalid_credentials') || msg.contains('invalid login credentials')) {
+      return 'Correo o contraseña incorrectos.';
+    }
+    if (msg.contains('socketexception') || msg.contains('failed host lookup') ||
+        msg.contains('clientexception') || msg.contains('network')) {
+      return 'Necesitas conexión a internet. Verifica tu red e inténtalo de nuevo.';
+    }
+    debugPrint('Error de autenticación sin traducir: $e');
+    return 'No se pudo completar la operación. Inténtalo de nuevo.';
   }
 }

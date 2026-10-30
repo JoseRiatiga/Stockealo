@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../auth/data/auth_repository.dart';
 import '../models/business.dart';
 
 class BusinessRepository extends ChangeNotifier {
@@ -11,6 +12,8 @@ class BusinessRepository extends ChangeNotifier {
 
   final AppDatabase _dbProvider = AppDatabase.instance;
   static Business? _activeBusiness;
+  /// Usuario para el que se eligió el negocio activo en memoria
+  static String? _activeBusinessUserId;
 
   /// Notificador reactivo del negocio activo actual
   final ValueNotifier<Business?> activeBusinessNotifier = ValueNotifier<Business?>(null);
@@ -20,7 +23,7 @@ class BusinessRepository extends ChangeNotifier {
 
   /// Obtiene el negocio activo para un usuario (null si no tiene empresas aún)
   Future<Business?> getActiveBusiness(String userId, [String? userEmail]) async {
-    if (_activeBusiness != null) {
+    if (_activeBusiness != null && _activeBusinessUserId == userId) {
       if (activeBusinessNotifier.value?.id != _activeBusiness!.id) {
         activeBusinessNotifier.value = _activeBusiness;
       }
@@ -28,22 +31,22 @@ class BusinessRepository extends ChangeNotifier {
     }
 
     final list = await getAllBusinesses(userId, userEmail);
-    if (list.isNotEmpty) {
-      _activeBusiness = list.first;
-      activeBusinessNotifier.value = _activeBusiness;
-      notifyListeners();
-      return _activeBusiness;
-    }
 
-    _activeBusiness = null;
-    activeBusinessNotifier.value = null;
+    // Tras un logout, las pantallas de la sesión anterior siguen montadas un instante y
+    // piden su negocio con el userId viejo. No deben dejarlo activo para la siguiente cuenta.
+    if (AuthRepository.instance.currentUser?.id != userId) return null;
+
+    _activeBusiness = list.isNotEmpty ? list.first : null;
+    _activeBusinessUserId = userId;
+    activeBusinessNotifier.value = _activeBusiness;
     notifyListeners();
-    return null;
+    return _activeBusiness;
   }
 
   /// Cambia la empresa activa en el contexto de trabajo y notifica inmediatamente a todos los módulos
   void setActiveBusiness(Business? business) {
     _activeBusiness = business;
+    _activeBusinessUserId = business == null ? null : AuthRepository.instance.currentUser?.id;
     activeBusinessNotifier.value = business;
     notifyListeners();
   }
@@ -104,6 +107,7 @@ class BusinessRepository extends ChangeNotifier {
 
     await db.insert('businesses', business.toMap());
     _activeBusiness = business;
+    _activeBusinessUserId = userId;
     activeBusinessNotifier.value = business;
     notifyListeners();
 

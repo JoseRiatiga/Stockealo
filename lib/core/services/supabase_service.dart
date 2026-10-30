@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/app_database.dart';
 import 'package:sqflite/sqflite.dart';
@@ -150,24 +148,19 @@ class SupabaseService {
 
       final db = await AppDatabase.instance.database;
 
-      // 0. Sincronizar Usuarios (Cuentas)
+      // 0. Sincronizar el perfil de la cuenta en sesión (nunca credenciales ni perfiles ajenos)
       try {
-        final localUsers = await db.query('users');
-        if (localUsers.isNotEmpty) {
-          final formattedUsers = localUsers.map((u) => {
-            'id': u['id'],
-            'email': u['email'],
-            'password': u['password'],
-            'name': u['name'],
-            'phone': u['phone'],
-            'avatar_path': u['avatar_path'],
-            'created_at': u['created_at'],
-          }).toList();
-
-          await client!.from('users').upsert(
-            formattedUsers,
-            onConflict: 'id',
+        final sessionEmail = client!.auth.currentUser?.email?.toLowerCase();
+        if (sessionEmail != null) {
+          final localUsers = await db.query(
+            'users',
+            where: 'LOWER(email) = ?',
+            whereArgs: [sessionEmail],
+            limit: 1,
           );
+          if (localUsers.isNotEmpty) {
+            await upsertUserToCloud(localUsers.first);
+          }
         }
       } catch (e) {
         debugPrint('Nota: error o tabla users no configurada en Supabase: $e');
@@ -985,99 +978,20 @@ class SupabaseService {
     }
   }
 
-  /// Guarda o actualiza un usuario/cuenta en Supabase en tiempo real
+  /// Actualiza el perfil (nombre, teléfono, foto) de un usuario en Supabase.
+  /// La fila se crea al registrarse; aquí nunca se envían credenciales.
   Future<void> upsertUserToCloud(Map<String, dynamic> u) async {
     try {
       if (!(await isCloudSyncEnabled())) return;
       if (!_isInitialized) await initialize();
-      await client?.from('users').upsert({
-        'id': u['id'],
-        'email': u['email'],
-        'password': u['password'],
+      await client?.from('users').update({
         'name': u['name'],
         'phone': u['phone'],
         'avatar_path': u['avatar_path'],
-        'created_at': u['created_at'],
-      }, onConflict: 'id');
+      }).eq('id', u['id']);
       debugPrint('Usuario ${u["email"]} sincronizado en Supabase.');
     } catch (e) {
       debugPrint('Error al guardar usuario en Supabase: $e');
-    }
-  }
-
-  /// Envía un código OTP de 6 dígitos al correo usando la API REST directa de Supabase (sin enlaces ni redirecciones a localhost)
-  Future<void> sendPasswordResetOtp(String email) async {
-    final cleanEmail = email.trim().toLowerCase();
-    final url = Uri.parse('$supabaseUrl/auth/v1/otp');
-    final response = await http.post(
-      url,
-      headers: {
-        'apikey': supabaseAnonKey,
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'email': cleanEmail,
-        'create_user': true,
-      }),
-    );
-
-    if (response.statusCode >= 400) {
-      try {
-        final body = jsonDecode(response.body);
-        final msg = body['msg'] ?? body['message'] ?? 'Error al enviar código.';
-        throw Exception(msg);
-      } catch (e) {
-        if (e is Exception && !e.toString().contains('FormatException')) rethrow;
-        throw Exception('Error al enviar código de recuperación (${response.statusCode}).');
-      }
-    }
-  }
-
-  /// Verifica si el código OTP de 6 dígitos ingresado es válido directamente por la API REST
-  Future<bool> verifyOtp({required String email, required String token}) async {
-    final cleanEmail = email.trim().toLowerCase();
-    final cleanToken = token.trim();
-    final url = Uri.parse('$supabaseUrl/auth/v1/verify');
-    final response = await http.post(
-      url,
-      headers: {
-        'apikey': supabaseAnonKey,
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'type': 'email',
-        'email': cleanEmail,
-        'token': cleanToken,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return true;
-    }
-
-    try {
-      final body = jsonDecode(response.body);
-      final msg = body['msg'] ?? body['message'] ?? 'Código incorrecto o expirado.';
-      throw Exception(msg);
-    } catch (e) {
-      if (e is Exception && !e.toString().contains('FormatException')) rethrow;
-      throw Exception('Código incorrecto o expirado.');
-    }
-  }
-
-  /// Actualiza la contraseña en Supabase para un usuario identificado por correo
-  Future<void> updatePasswordByEmail(String email, String hashedPassword) async {
-    final cleanEmail = email.trim().toLowerCase();
-    if (!_isInitialized) await initialize();
-    if (client == null) return;
-    try {
-      await client!.from('users').update({
-        'password': hashedPassword,
-      }).eq('email', cleanEmail);
-      debugPrint('Contraseña actualizada en la nube para $cleanEmail.');
-    } catch (e) {
-      debugPrint('Error al actualizar contraseña en la nube: $e');
-      throw Exception('No se pudo actualizar la contraseña en el servidor: $e');
     }
   }
 
@@ -1198,6 +1112,12 @@ class SupabaseService {
     await db.delete('businesses');
     await db.delete('users');
     await db.delete('app_settings');
+
+    // 4. Cerrar la sesión de Supabase Auth en este dispositivo.
+    // TODO(fase1-etapa2): borrar también la cuenta de auth.users vía Edge Function.
+    try {
+      await client?.auth.signOut();
+    } catch (_) {}
   }
 
   /// Script SQL listo para crear las tablas

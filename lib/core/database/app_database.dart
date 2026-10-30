@@ -3,16 +3,74 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
+/// Valor de la columna `users.password` cuando la contraseña la gestiona Supabase Auth.
+const String authManagedPassword = 'SUPABASE_AUTH';
+
+/// Archivo compartido de versiones anteriores. Pertenece a la primera cuenta que lo
+/// reclama y es también el que se usa mientras no hay sesión.
+const String _legacyDbFile = 'stockealo_v2.db';
+/// Supabase Auth id de la cuenta dueña de [_legacyDbFile]
+const String _ownerAuthIdKey = 'db_owner_auth_id';
+/// Correo de quien tenía la sesión abierta al actualizar a v3, para que reclame su archivo
+const String _ownerEmailKey = 'db_owner_email';
+
 class AppDatabase {
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
+  static String _openFile = _legacyDbFile;
 
   AppDatabase._init();
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('stockealo_v2.db');
+    _database = await _initDB(_openFile);
     return _database!;
+  }
+
+  /// Aísla los datos locales por cuenta: cada una usa su propio archivo SQLite, así
+  /// una cuenta no ve en el dispositivo los negocios de otra y nada se borra al salir.
+  /// [authUserId] null vuelve al archivo compartido (sin sesión).
+  Future<void> useAccount(String? authUserId, [String? email]) async {
+    final file = authUserId == null ? _legacyDbFile : await _fileForAccount(authUserId, email);
+    if (file == _openFile && _database != null) return;
+
+    final previous = _database;
+    _database = null;
+    _openFile = file;
+    await previous?.close();
+  }
+
+  Future<String> _fileForAccount(String authUserId, String? email) async {
+    // openDatabase devuelve la misma instancia si el archivo compartido ya está abierto
+    final legacy = await _initDB(_legacyDbFile);
+    try {
+      final owner = await _readSetting(legacy, _ownerAuthIdKey);
+      if (owner != null) return owner == authUserId ? _legacyDbFile : _accountFile(authUserId);
+
+      final ownerEmail = await _readSetting(legacy, _ownerEmailKey);
+      final cleanEmail = email?.trim().toLowerCase();
+      if (ownerEmail != null && ownerEmail != cleanEmail) return _accountFile(authUserId);
+
+      await legacy.insert(
+        'app_settings',
+        {'key': _ownerAuthIdKey, 'value': authUserId},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      return _legacyDbFile;
+    } finally {
+      if (!identical(legacy, _database)) await legacy.close();
+    }
+  }
+
+  static String _accountFile(String authUserId) => 'stockealo_$authUserId.db';
+
+  /// Archivo SQLite de la cuenta en uso
+  @visibleForTesting
+  String get openFile => _openFile;
+
+  static Future<String?> _readSetting(Database db, String key) async {
+    final res = await db.query('app_settings', where: 'key = ?', whereArgs: [key], limit: 1);
+    return res.isNotEmpty ? res.first['value'] as String? : null;
   }
 
   Future<Database> _initDB(String filePath) async {
@@ -28,7 +86,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onOpen: (db) async {
@@ -135,7 +193,11 @@ class AppDatabase {
     );
   }
 
-  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) =>
+      upgradeSchema(db, oldVersion, newVersion);
+
+  @visibleForTesting
+  static Future<void> upgradeSchema(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       try {
         await db.execute('ALTER TABLE users ADD COLUMN name TEXT');
@@ -162,6 +224,28 @@ class AppDatabase {
       ''');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_members_biz ON business_members(business_id)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_members_email ON business_members(email)');
+    }
+    if (oldVersion < 3) {
+      // Las credenciales pasan a Supabase Auth: se eliminan los hashes guardados en el dispositivo.
+      // La columna se conserva (NOT NULL) con un marcador para no reconstruir la tabla.
+      await db.update('users', {'password': authManagedPassword});
+      // app_settings se crea en onOpen, que corre después de onUpgrade: puede no existir aún.
+      try {
+        // Antes de olvidar la sesión, recordar de quién es este archivo (ver useAccount)
+        final active = await db.rawQuery('''
+          SELECT u.email FROM app_settings s JOIN users u ON u.id = s.value
+          WHERE s.key = 'active_user_id'
+        ''');
+        final email = (active.isNotEmpty ? active.first['email'] as String? : null)?.trim().toLowerCase();
+        if (email != null && email.isNotEmpty) {
+          await db.insert(
+            'app_settings',
+            {'key': _ownerEmailKey, 'value': email},
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        await db.delete('app_settings', where: 'key = ?', whereArgs: ['active_user_id']);
+      } catch (_) {}
     }
   }
 
@@ -432,7 +516,8 @@ class AppDatabase {
   }
 
   Future<void> close() async {
-    final db = await instance.database;
-    db.close();
+    final db = _database;
+    _database = null;
+    await db?.close();
   }
 }

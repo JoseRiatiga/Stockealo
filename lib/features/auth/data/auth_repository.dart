@@ -12,6 +12,15 @@ import '../models/app_user.dart';
 /// `users` guardan hashes. La fila de `users` conserva el perfil y el `id` de la
 /// app, que para cuentas antiguas difiere del `id` de Supabase Auth; el vínculo
 /// entre ambos es el correo verificado.
+/// La sesión del código verificado ya no existe (venció o se cerró): hay que
+/// pedir un código nuevo.
+class PasswordResetExpiredException implements Exception {
+  const PasswordResetExpiredException();
+
+  @override
+  String toString() => 'Exception: La verificación venció. Pide un código nuevo para continuar.';
+}
+
 class AuthRepository {
   static final AuthRepository instance = AuthRepository._internal();
   AuthRepository._internal();
@@ -285,25 +294,24 @@ class AuthRepository {
         msg.contains('signups not allowed for otp');
   }
 
-  /// Verifica el código OTP y actualiza la contraseña del usuario
-  Future<void> resetPasswordWithOtp({
-    required String email,
-    required String otpCode,
-    required String newPassword,
-  }) async {
-    final cleanEmail = _validateEmail(email);
-    _validatePassword(newPassword, label: 'La nueva contraseña');
-    final auth = await _requireAuth();
+  // ---------------------------------------------------------------------------
+  // Recuperación de contraseña en dos pasos
+  //
+  // 1. verifyPasswordResetCode: el código se verifica (y se consume) una sola vez;
+  //    deja una sesión temporal que prueba que el correo es del usuario.
+  // 2. setNewPassword: con esa sesión se puede intentar guardar la contraseña las
+  //    veces que haga falta, sin pedir otro código.
+  // finishPasswordReset / cancelPasswordReset cierran esa sesión temporal.
+  // ---------------------------------------------------------------------------
 
-    // Un código solo sirve una vez: si un intento anterior de este mismo restablecimiento
-    // ya lo verificó, la sesión sigue abierta y no se vuelve a verificar
-    final alreadyVerified = auth.currentUser?.email?.toLowerCase() == cleanEmail && _currentUser == null;
-    if (!alreadyVerified) {
-      try {
-        await auth.verifyOTP(email: cleanEmail, token: otpCode.trim(), type: OtpType.email);
-      } catch (e) {
-        throw Exception(_translateAuthError(e));
-      }
+  /// Paso 2: verifica el código. Lanza un error legible si es incorrecto o venció.
+  Future<void> verifyPasswordResetCode({required String email, required String code}) async {
+    final cleanEmail = _validateEmail(email);
+    final auth = await _requireAuth();
+    try {
+      await auth.verifyOTP(email: cleanEmail, token: code.trim(), type: OtpType.email);
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
     }
 
     // El código prueba que el correo es suyo; aun así solo se restablecen cuentas existentes
@@ -312,30 +320,45 @@ class AuthRepository {
       await _signOutQuietly(auth);
       throw Exception('No encontramos ninguna cuenta registrada con este correo en Stockealo.');
     }
+  }
+
+  /// Paso 3: guarda la nueva contraseña con la sesión del código verificado.
+  /// Devuelve false si es la misma que ya tenía (la sesión sigue abierta para que
+  /// el usuario elija otra o decida quedarse con la actual).
+  Future<bool> setNewPassword({required String email, required String newPassword}) async {
+    final cleanEmail = _validateEmail(email);
+    _validatePassword(newPassword, label: 'La nueva contraseña');
+    final auth = await _requireAuth();
+    if (auth.currentUser?.email?.toLowerCase() != cleanEmail) {
+      throw const PasswordResetExpiredException();
+    }
 
     try {
       await auth.updateUser(UserAttributes(password: newPassword));
     } on AuthException catch (e) {
-      // Elegir la misma contraseña que ya tenía no es un error: ya puede ingresar con ella.
-      // Ante otros errores la sesión verificada se mantiene para reintentar con otra
-      // contraseña; cancelPasswordReset la cierra si el usuario abandona.
-      if (!_isSamePassword(e)) throw Exception(_translateAuthError(e));
+      if (_isSamePassword(e)) return false;
+      if (_isSessionGone(e)) throw const PasswordResetExpiredException();
+      throw Exception(_translateAuthError(e));
     } catch (e) {
       throw Exception(_translateAuthError(e));
     }
 
-    // Retirar el hash antiguo si la cuenta aún no se había migrado
+    await finishPasswordReset(cleanEmail);
+    return true;
+  }
+
+  /// Termina la recuperación: retira el hash antiguo si quedaba y cierra la sesión
+  /// temporal para que el usuario ingrese con su contraseña.
+  Future<void> finishPasswordReset(String email) async {
     try {
       await SupabaseService.instance.client
           ?.from('users')
           .update({'password': authManagedPassword})
-          .eq('email', cleanEmail);
+          .eq('email', email.trim().toLowerCase());
     } catch (e) {
       debugPrint('No se pudo retirar el hash antiguo: $e');
     }
-
-    // El usuario vuelve a la pantalla de ingreso con su nueva contraseña
-    await _signOutQuietly(auth);
+    await cancelPasswordReset();
   }
 
   /// Cierra la sesión que abre la verificación del código si el usuario abandona
@@ -348,6 +371,11 @@ class AuthRepository {
 
   static bool _isSamePassword(AuthException e) =>
       '${e.code} ${e.message}'.toLowerCase().contains('same_password');
+
+  static bool _isSessionGone(AuthException e) {
+    final msg = '${e.code} ${e.message}'.toLowerCase();
+    return msg.contains('session_not_found') || msg.contains('session_expired') || msg.contains('jwt expired');
+  }
 
   // ---------------------------------------------------------------------------
   // Internos

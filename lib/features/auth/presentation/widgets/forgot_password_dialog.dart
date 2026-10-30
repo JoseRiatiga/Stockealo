@@ -57,6 +57,16 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
+  /// La nueva contraseña resultó ser la actual: se ofrece quedarse con ella
+  bool _samePasswordNotice = false;
+
+  /// Terminó quedándose con la contraseña actual (cambia el texto del paso 4)
+  bool _keptCurrentPassword = false;
+
+  /// La sesión del código verificado se cierra si el paso 3 queda abandonado
+  Timer? _sessionTimer;
+  static const _sessionTimeout = Duration(minutes: 10);
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +77,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
   void dispose() {
     // Si se cerró sin terminar, no dejar abierta la sesión del código verificado
     if (_currentStep != 4) _authRepo.cancelPasswordReset();
+    _sessionTimer?.cancel();
     _emailController.dispose();
     _otpController.dispose();
     _passwordController.dispose();
@@ -190,7 +201,53 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
     }
 
     setState(() {
-      _currentStep = 3;
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      await _authRepo.verifyPasswordResetCode(email: _emailController.text.trim(), code: code);
+      if (!mounted) return;
+      _sessionTimer?.cancel();
+      _sessionTimer = Timer(_sessionTimeout, () {
+        _expireVerification('Pasaron 10 minutos sin terminar. Pide un código nuevo para continuar.');
+      });
+      setState(() {
+        _currentStep = 3;
+        _samePasswordNotice = false;
+      });
+    } catch (e) {
+      // El error se muestra en el paso 2, junto al botón de reenviar el código
+      if (mounted) setState(() => _errorMessage = _translateAuthError(e));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// La verificación ya no sirve: volver al paso del código y permitir pedir otro
+  void _expireVerification(String message) {
+    _sessionTimer?.cancel();
+    _authRepo.cancelPasswordReset();
+    if (!mounted) return;
+    setState(() {
+      _currentStep = 2;
+      _otpController.clear();
+      _samePasswordNotice = false;
+      _canResend = true;
+      _resendTimer?.cancel();
+      _errorMessage = message;
+    });
+  }
+
+  /// Quedarse con la contraseña actual cuando se eligió la misma
+  Future<void> _keepCurrentPassword() async {
+    setState(() => _isLoading = true);
+    await _authRepo.finishPasswordReset(_emailController.text.trim());
+    _sessionTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _keptCurrentPassword = true;
+      _currentStep = 4;
+      _isLoading = false;
       _errorMessage = null;
     });
   }
@@ -200,7 +257,6 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
     if (!_passwordFormKey.currentState!.validate()) return;
 
     final email = _emailController.text.trim();
-    final otp = _otpController.text.trim();
     final newPassword = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
@@ -212,19 +268,25 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
     setState(() => _isLoading = true);
 
     try {
-      await _authRepo.resetPasswordWithOtp(
-        email: email,
-        otpCode: otp,
-        newPassword: newPassword,
-      );
-
-      if (mounted) {
+      final changed = await _authRepo.setNewPassword(email: email, newPassword: newPassword);
+      if (!mounted) return;
+      if (!changed) {
+        // Misma contraseña: no es un error; la sesión sigue para elegir otra
         setState(() {
-          _currentStep = 4;
+          _samePasswordNotice = true;
           _isLoading = false;
-          _errorMessage = null;
         });
+        return;
       }
+      _sessionTimer?.cancel();
+      setState(() {
+        _currentStep = 4;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } on PasswordResetExpiredException {
+      _expireVerification('La verificación venció. Pide un código nuevo para continuar.');
+      if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -692,6 +754,9 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             controller: _passwordController,
             obscureText: _obscurePassword,
             autofocus: true,
+            onChanged: (_) {
+              if (_samePasswordNotice) setState(() => _samePasswordNotice = false);
+            },
             decoration: InputDecoration(
               labelText: 'Nueva Contraseña',
               prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF64748B)),
@@ -764,6 +829,34 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                     ),
             ),
           ),
+          if (_samePasswordNotice) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.25)),
+              ),
+              child: const Text(
+                'Esa ya es tu contraseña actual. Puedes ingresar con ella o escribir una diferente arriba.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF2563EB), height: 1.4),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 44,
+              child: OutlinedButton(
+                onPressed: _isLoading ? null : _keepCurrentPassword,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primaryColor,
+                  side: BorderSide(color: primaryColor),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Usar mi contraseña actual', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -792,7 +885,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
         ),
         const SizedBox(height: 16),
         Text(
-          '¡Contraseña actualizada!',
+          _keptCurrentPassword ? 'Mantienes tu contraseña' : '¡Contraseña actualizada!',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -802,7 +895,9 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Tu contraseña ha sido restablecida exitosamente. Ahora puedes ingresar con tus nuevas credenciales.',
+          _keptCurrentPassword
+              ? 'Tu correo quedó verificado y tu contraseña no cambió. Ingresa con la que ya usabas.'
+              : 'Tu contraseña ha sido restablecida exitosamente. Ahora puedes ingresar con tus nuevas credenciales.',
           style: TextStyle(
             fontSize: 13,
             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),

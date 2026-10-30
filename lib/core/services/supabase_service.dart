@@ -327,9 +327,12 @@ class SupabaseService {
           });
         }
 
+        // Solo crea los que faltan: el stock de los existentes cambia por diferencia
+        // (ventas) y pisarlo con el de este teléfono borraría ventas de otros
         await client!.from('products').upsert(
           formattedProducts,
           onConflict: 'id',
+          ignoreDuplicates: true,
         );
       }
 
@@ -346,9 +349,11 @@ class SupabaseService {
           'created_at': c['created_at'],
         }).toList();
 
+        // Igual que los productos: la deuda de los existentes no se pisa
         await client!.from('customers').upsert(
           formattedCustomers,
           onConflict: 'id',
+          ignoreDuplicates: true,
         );
       }
 
@@ -806,7 +811,9 @@ class SupabaseService {
   Future<void> _write(String operation, Map<String, dynamic> payload) async {
     if (!(await isCloudSyncEnabled())) return;
     try {
-      await SyncQueue.instance.enqueue(operation, payload);
+      // Hora de la edición: la nube descarta ediciones más viejas que la guardada
+      final stamped = {...payload, _editedAtKey: DateTime.now().toUtc().toIso8601String()};
+      await SyncQueue.instance.enqueue(operation, stamped);
     } catch (e) {
       debugPrint('No se pudo encolar "$operation": $e');
       return;
@@ -828,16 +835,39 @@ class SupabaseService {
     }
   }
 
+  static const String _editedAtKey = '_edited_at';
+
+  /// Actualiza una fila existente sin tocar [keepColumns] (valores que se ajustan
+  /// por diferencia, como stock o deuda) y, si la fila no existe, la crea completa.
+  /// Si la nube descartó la edición por ser más vieja, el insert no hace nada.
+  Future<void> _updateOrInsert(
+    SupabaseClient db,
+    String table,
+    Map<String, dynamic> row, {
+    required List<String> keepColumns,
+  }) async {
+    final changes = Map<String, dynamic>.from(row)..removeWhere((k, _) => keepColumns.contains(k) || k == 'id');
+    final updated = await db.from(table).update(changes).eq('id', row['id'] as String).select('id');
+    if (updated.isNotEmpty) return;
+    await db.from(table).upsert(row, onConflict: 'id', ignoreDuplicates: true);
+  }
+
   Future<void> _send(String operation, Map<String, dynamic> p) async {
     final db = client;
     if (db == null) throw StateError('Supabase no está inicializado');
+    final editedAt = p[_editedAtKey] as String?;
     switch (operation) {
       case 'upsert_product':
         await _sendProduct(db, p);
       case 'delete_product':
         await db.from('products').delete().eq('id', p['id'] as String);
       case 'update_stock':
+        // Ajuste manual o importación: el usuario fija el valor exacto
         await db.from('products').update({'current_stock': p['stock']}).eq('id', p['id'] as String);
+      case 'adjust_stock':
+        await db.rpc('adjust_product_stock', params: {'p_product_id': p['id'], 'p_delta': p['delta']});
+      case 'adjust_debt':
+        await db.rpc('adjust_customer_debt', params: {'p_customer_id': p['id'], 'p_delta': p['delta']});
       case 'upsert_sale':
         await _sendSale(db, p);
       case 'delete_sale':
@@ -850,6 +880,7 @@ class SupabaseService {
           'currency': p['currency'] ?? 'COP',
           'is_deleted': (p['is_deleted'] as int?) ?? 0,
           'created_at': p['created_at'],
+          if (editedAt != null) 'updated_at': editedAt,
         }, onConflict: 'id');
       case 'update_business_deleted':
         await db.from('businesses').update({
@@ -857,7 +888,8 @@ class SupabaseService {
           'deleted_at': p['deleted_at'],
         }).eq('id', p['id'] as String);
       case 'upsert_customer':
-        await db.from('customers').upsert({
+        // La deuda solo se fija al crear al cliente; luego cambia con adjust_debt
+        await _updateOrInsert(db, 'customers', {
           'id': p['id'],
           'business_id': p['business_id'],
           'name': p['name'],
@@ -865,7 +897,8 @@ class SupabaseService {
           'address': p['address'],
           'debt_balance': (p['debt_balance'] as num?)?.toDouble() ?? 0.0,
           'created_at': p['created_at'],
-        }, onConflict: 'id');
+          if (editedAt != null) 'updated_at': editedAt,
+        }, keepColumns: ['debt_balance', 'created_at']);
       case 'update_user':
         // La fila se crea al registrarse; aquí nunca se envían credenciales
         await db.from('users').update({
@@ -879,6 +912,7 @@ class SupabaseService {
           'business_id': p['business_id'],
           'name': p['name'],
           'color_hex': p['color_hex'] ?? '0xFF059669',
+          if (editedAt != null) 'updated_at': editedAt,
         }, onConflict: 'id');
       case 'delete_category':
         await db.from('categories').delete().eq('id', p['id'] as String);
@@ -928,7 +962,9 @@ class SupabaseService {
       }
     }
 
-    await db.from('products').upsert({
+    // El stock solo se fija al crear el producto; luego cambia con adjust_stock o update_stock
+    final editedAt = p[_editedAtKey] as String?;
+    await _updateOrInsert(db, 'products', {
       'id': p['id'],
       'business_id': p['business_id'],
       'name': p['name'],
@@ -940,7 +976,8 @@ class SupabaseService {
       'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
       'image_url': imageUrl,
       'created_at': p['created_at'],
-    }, onConflict: 'id');
+      if (editedAt != null) 'updated_at': editedAt,
+    }, keepColumns: ['current_stock', 'created_at']);
   }
 
   Future<void> _sendSale(SupabaseClient db, Map<String, dynamic> s) async {
@@ -993,9 +1030,17 @@ class SupabaseService {
   /// Elimina una venta anulada de Supabase
   Future<void> deleteSaleFromCloud(String saleId) => _write('delete_sale', {'id': saleId});
 
-  /// Actualiza el stock de un producto en Supabase
+  /// Fija el stock exacto de un producto (ajuste manual o importación)
   Future<void> updateProductStockInCloud(String productId, int newStock) =>
       _write('update_stock', {'id': productId, 'stock': newStock});
+
+  /// Suma o resta stock (ventas y anulaciones): no se pisa con otros dispositivos
+  Future<void> adjustProductStockInCloud(String productId, int delta) =>
+      _write('adjust_stock', {'id': productId, 'delta': delta});
+
+  /// Suma o resta deuda de un cliente (fiados, abonos y anulaciones)
+  Future<void> adjustCustomerDebtInCloud(String customerId, double delta) =>
+      _write('adjust_debt', {'id': customerId, 'delta': delta});
 
   /// Guarda o actualiza una empresa en Supabase
   Future<void> upsertBusinessToCloud(Map<String, dynamic> b) => _write('upsert_business', b);

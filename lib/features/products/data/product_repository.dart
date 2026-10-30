@@ -196,6 +196,8 @@ class ProductRepository {
   /// Actualizar producto (y sincronizar variantes)
   Future<void> updateProduct(Product product) async {
     final db = await _dbProvider.database;
+    final previous = await db.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [product.id]);
+    final previousStock = previous.isNotEmpty ? previous.first['stock'] as int : null;
     await db.transaction((txn) async {
       await txn.update(
         'products',
@@ -212,8 +214,12 @@ class ProductRepository {
       }
     });
 
-    // Sincronizar actualización en tiempo real a Supabase
+    // Sincronizar a Supabase. Editar el producto no envía el stock; si el usuario lo
+    // cambió en el formulario, se fija aparte como un ajuste manual.
     SupabaseService.instance.upsertProductToCloud(product.toMap());
+    if (previousStock != null && previousStock != product.stock) {
+      SupabaseService.instance.updateProductStockInCloud(product.id, product.stock);
+    }
   }
 
   /// Eliminar producto

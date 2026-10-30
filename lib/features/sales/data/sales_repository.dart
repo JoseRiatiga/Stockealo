@@ -46,6 +46,9 @@ class SalesRepository {
         ? currentUser.name!
         : (currentUser?.email.split('@').first ?? 'Vendedor');
 
+    String? customerId;
+    var customerIsNew = false;
+
     await db.transaction((txn) async {
       // 2. Descontar stock del producto dentro de la empresa
       await txn.update(
@@ -70,7 +73,6 @@ class SalesRepository {
         'date': now.toIso8601String(),
       });
 
-      String? customerId;
       // 4. Si es FIADO, registrar o actualizar deuda del cliente para esta empresa
       if (paymentMethod == 'FIADO' && customerName != null && customerName.trim().isNotEmpty) {
         final cleanName = customerName.trim();
@@ -94,6 +96,7 @@ class SalesRepository {
           );
         } else {
           customerId = const Uuid().v4();
+          customerIsNew = true;
           await txn.insert('customers', {
             'id': customerId,
             'business_id': businessId,
@@ -145,10 +148,11 @@ class SalesRepository {
       date: now,
     );
 
-    // Sincronizar cliente (deuda del fiado), venta y stock a Supabase
-    await _syncCustomer(db, businessId, customerName, paymentMethod);
+    // Sincronizar cliente (deuda del fiado), venta y stock a Supabase.
+    // El stock se envía como diferencia para no pisar ventas de otros dispositivos.
+    await _syncCustomer(db, customerId, customerIsNew, total);
     SupabaseService.instance.insertSaleToCloud(sale.toMap());
-    SupabaseService.instance.updateProductStockInCloud(product.id, newStock);
+    SupabaseService.instance.adjustProductStockInCloud(product.id, -quantity);
 
     return sale;
   }
@@ -198,10 +202,11 @@ class SalesRepository {
         : (currentUser?.email.split('@').first ?? 'Vendedor');
 
     final List<Sale> createdSales = [];
-    final Map<String, int> newStocks = {};
+    final Map<String, int> stockDeltas = {};
+    String? customerId;
+    var customerIsNew = false;
 
     await db.transaction((txn) async {
-      String? customerId;
       // Registrar o actualizar deuda de fiado si corresponde
       if (paymentMethod == 'FIADO' && customerName != null && customerName.trim().isNotEmpty) {
         final cleanName = customerName.trim();
@@ -223,6 +228,7 @@ class SalesRepository {
           );
         } else {
           customerId = const Uuid().v4();
+          customerIsNew = true;
           await txn.insert('customers', {
             'id': customerId,
             'business_id': businessId,
@@ -341,29 +347,28 @@ class SalesRepository {
         );
 
         createdSales.add(sale);
-        newStocks[product.id] = newStock;
+        stockDeltas[product.id] = (stockDeltas[product.id] ?? 0) - item.quantity;
       }
     });
 
     // Sincronización a la nube fuera de la transacción: cliente, ventas y stock final
-    await _syncCustomer(db, businessId, customerName, paymentMethod);
+    await _syncCustomer(db, customerId, customerIsNew, finalTotal);
     for (final sale in createdSales) {
       SupabaseService.instance.insertSaleToCloud(sale.toMap());
     }
-    newStocks.forEach(SupabaseService.instance.updateProductStockInCloud);
+    stockDeltas.forEach(SupabaseService.instance.adjustProductStockInCloud);
     return createdSales;
   }
 
-  /// En un fiado el cliente se crea o se le suma deuda dentro de la transacción;
-  /// aquí se envía su estado final a la nube.
-  Future<void> _syncCustomer(Database db, String businessId, String? customerName, String paymentMethod) async {
-    if (paymentMethod != 'FIADO' || customerName == null || customerName.trim().isEmpty) return;
-    final rows = await db.query(
-      'customers',
-      where: 'business_id = ? AND LOWER(name) = ?',
-      whereArgs: [businessId, customerName.trim().toLowerCase()],
-      limit: 1,
-    );
+  /// Lleva a la nube el fiado: un cliente nuevo se crea con su deuda; a uno
+  /// existente se le suma la diferencia, para no pisar abonos de otros dispositivos.
+  Future<void> _syncCustomer(Database db, String? customerId, bool isNew, double amount) async {
+    if (customerId == null) return;
+    if (!isNew) {
+      await SupabaseService.instance.adjustCustomerDebtInCloud(customerId, amount);
+      return;
+    }
+    final rows = await db.query('customers', where: 'id = ?', whereArgs: [customerId], limit: 1);
     if (rows.isNotEmpty) await SupabaseService.instance.upsertCustomerToCloud(rows.first);
   }
 
@@ -585,7 +590,7 @@ class SalesRepository {
   Future<void> cancelSale(Sale sale) async {
     final db = await _dbProvider.database;
     int? restoredStock;
-    Map<String, dynamic>? updatedCustomer;
+    String? debtorId;
     await db.transaction((txn) async {
       // Reponer stock
       await txn.rawUpdate(
@@ -624,7 +629,7 @@ class SalesRepository {
           whereArgs: [sale.businessId, sale.customerName!.toLowerCase()],
           limit: 1,
         );
-        updatedCustomer = customerRows.isNotEmpty ? customerRows.first : null;
+        debtorId = customerRows.isNotEmpty ? customerRows.first['id'] as String : null;
       }
 
       // Eliminar registro de venta
@@ -638,7 +643,7 @@ class SalesRepository {
     // Reflejar la anulación en la nube; si no, la venta reaparecería al descargar
     final cloud = SupabaseService.instance;
     await cloud.deleteSaleFromCloud(sale.id);
-    if (restoredStock != null) await cloud.updateProductStockInCloud(sale.productId, restoredStock!);
-    if (updatedCustomer != null) await cloud.upsertCustomerToCloud(updatedCustomer!);
+    if (restoredStock != null) await cloud.adjustProductStockInCloud(sale.productId, sale.quantity);
+    if (debtorId != null) await cloud.adjustCustomerDebtInCloud(debtorId!, -sale.totalAmount);
   }
 }

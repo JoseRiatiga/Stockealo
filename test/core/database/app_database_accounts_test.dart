@@ -80,7 +80,7 @@ void main() {
       expect(await columnsOf('quotation_items'), containsAll(['variant_id', 'variant_name']));
       expect(await columnsOf('businesses'), containsAll(['is_deleted', 'deleted_at', 'description']));
       expect(await columnsOf('app_settings'), isNotEmpty);
-      expect(await db.getVersion(), 5);
+      expect(await db.getVersion(), 6);
       expect(await columnsOf('pending_sync'), isNotEmpty);
     });
 

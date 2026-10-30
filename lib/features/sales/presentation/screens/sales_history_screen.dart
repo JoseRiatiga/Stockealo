@@ -17,6 +17,7 @@ import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
 import '../widgets/quotations_list_modal.dart';
+import '../../../cash/presentation/screens/cash_register_screen.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -269,6 +270,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
+  Future<void> _openCashRegister() async {
+    final bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+    if (bizId == null) return;
+    final user = AuthRepository.instance.currentUser;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CashRegisterScreen(
+          businessId: bizId,
+          userName: user?.displayName ?? 'Vendedor',
+        ),
+      ),
+    );
+  }
+
   Future<void> _openQuickSale() async {
     await QuickSaleDialog.show(context);
     if (mounted) {
@@ -385,6 +401,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               title: const Text('Historial de Ventas'),
               actions: [
                 IconButton(
+                  onPressed: _openCashRegister,
+                  icon: const Icon(Icons.point_of_sale_rounded, color: Colors.white),
+                  tooltip: 'Arqueo de caja',
+                ),
+                IconButton(
                   onPressed: _openQuickSale,
                   icon: const Icon(Icons.add_shopping_cart_rounded, color: Color(0xFF8B5CF6)),
                   tooltip: 'Registrar Venta',
@@ -429,6 +450,18 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                               ),
                             ],
                           ),
+                          const Spacer(),
+                          OutlinedButton.icon(
+                            onPressed: _openCashRegister,
+                            icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+                            label: const Text('Arqueo de caja'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF059669),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
                           ElevatedButton.icon(
                             onPressed: _openQuickSale,
                             icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),

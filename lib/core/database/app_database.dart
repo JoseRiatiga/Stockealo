@@ -86,7 +86,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -106,6 +106,21 @@ class AppDatabase {
       attempts INTEGER NOT NULL DEFAULT 0,
       last_error TEXT,
       created_at TEXT NOT NULL
+    )
+  ''';
+
+  static const String _createCashSessions = '''
+    CREATE TABLE IF NOT EXISTS cash_sessions (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      opened_by TEXT NOT NULL,
+      opened_at TEXT NOT NULL,
+      opening_amount REAL NOT NULL,
+      closed_at TEXT,
+      expected_amount REAL,
+      counted_amount REAL,
+      notes TEXT,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
     )
   ''';
 
@@ -244,11 +259,16 @@ class AppDatabase {
       // Cola de escrituras pendientes hacia la nube (ver SyncQueue)
       await db.execute(_createPendingSync);
     }
+    if (oldVersion < 6 && newVersion >= 6) {
+      // Arqueo de caja (turnos con base inicial y conteo al cierre)
+      await db.execute(_createCashSessions);
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
     await db.execute(_createAppSettings);
     await db.execute(_createPendingSync);
+    await db.execute(_createCashSessions);
 
     // 1. Tabla de Usuarios (Cuentas)
     await db.execute('''

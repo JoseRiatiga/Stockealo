@@ -148,6 +148,50 @@ class SupabaseService {
 
       final db = await AppDatabase.instance.database;
 
+      // Solo se suben filas de negocios donde la cuenta es miembro, y según su rol:
+      // con RLS, una sola fila no permitida haría fallar el lote completo.
+      final myEmail = client!.auth.currentUser?.email?.toLowerCase();
+      if (myEmail == null) {
+        return const SyncResult(
+          success: false,
+          errorMessage: 'Inicia sesión para sincronizar con la nube.',
+        );
+      }
+      final myRoles = <String, String>{};
+      final myMemberships = await db.query(
+        'business_members',
+        columns: ['business_id', 'role'],
+        where: 'LOWER(email) = ?',
+        whereArgs: [myEmail],
+      );
+      for (final m in myMemberships) {
+        myRoles[m['business_id'] as String] = ((m['role'] as String?) ?? 'CASHIER').toUpperCase();
+      }
+      final memberIds = myRoles.keys.toList();
+      final managedIds = [
+        for (final e in myRoles.entries)
+          if (e.value == 'OWNER' || e.value == 'ADMIN') e.key,
+      ];
+      final ownedIds = [
+        for (final e in myRoles.entries)
+          if (e.value == 'OWNER') e.key,
+      ];
+
+      Future<List<Map<String, dynamic>>> rowsOf(
+        String table,
+        List<String> businessIds, {
+        String idColumn = 'business_id',
+        String? where,
+      }) async {
+        if (businessIds.isEmpty) return [];
+        final marks = List.filled(businessIds.length, '?').join(', ');
+        return db.query(
+          table,
+          where: '$idColumn IN ($marks)${where == null ? '' : ' AND $where'}',
+          whereArgs: businessIds,
+        );
+      }
+
       // 0. Sincronizar el perfil de la cuenta en sesión (nunca credenciales ni perfiles ajenos)
       try {
         final sessionEmail = client!.auth.currentUser?.email?.toLowerCase();
@@ -167,10 +211,7 @@ class SupabaseService {
       }
 
       // 1. Sincronizar Businesses
-      final localBusinesses = await db.query(
-        'businesses',
-        where: 'is_deleted = 0',
-      );
+      final localBusinesses = await rowsOf('businesses', managedIds, idColumn: 'id', where: 'is_deleted = 0');
       if (localBusinesses.isNotEmpty) {
         final formattedBusinesses = localBusinesses.map((b) => {
           'id': b['id'],
@@ -189,7 +230,7 @@ class SupabaseService {
 
       // 1.1 Sincronizar Categories
       try {
-        final localCategories = await db.query('categories');
+        final localCategories = await rowsOf('categories', managedIds);
         if (localCategories.isNotEmpty) {
           final formattedCategories = localCategories.map((c) => {
             'id': c['id'],
@@ -210,7 +251,7 @@ class SupabaseService {
       // 1.2 Sincronizar Miembros de Equipos (business_members)
       int localMembersCount = 0;
       try {
-        final localMembers = await db.query('business_members');
+        final localMembers = await rowsOf('business_members', ownedIds);
         if (localMembers.isNotEmpty) {
           final formattedMembers = localMembers.map((m) {
             final email = (m['email'] ?? '').toString();
@@ -241,14 +282,14 @@ class SupabaseService {
 
       // 2. Sincronizar Products
       // Primero eliminar de Supabase los productos que fueron eliminados localmente (is_active = 0)
-      final inactiveProducts = await db.query('products', where: 'is_active = 0');
+      final inactiveProducts = await rowsOf('products', managedIds, where: 'is_active = 0');
       if (inactiveProducts.isNotEmpty) {
         final inactiveIds = inactiveProducts.map((p) => p['id'] as String).toList();
         await client!.from('products').delete().inFilter('id', inactiveIds);
       }
 
       // Luego sincronizar únicamente los productos activos (is_active = 1)
-      final localProducts = await db.query('products', where: 'is_active = 1');
+      final localProducts = await rowsOf('products', managedIds, where: 'is_active = 1');
       if (localProducts.isNotEmpty) {
         final List<Map<String, dynamic>> formattedProducts = [];
         for (final p in localProducts) {
@@ -292,7 +333,7 @@ class SupabaseService {
       }
 
       // 3. Sincronizar Customers
-      final localCustomers = await db.query('customers');
+      final localCustomers = await rowsOf('customers', memberIds);
       if (localCustomers.isNotEmpty) {
         final formattedCustomers = localCustomers.map((c) => {
           'id': c['id'],
@@ -311,7 +352,7 @@ class SupabaseService {
       }
 
       // 4. Sincronizar Sales
-      final localSales = await db.query('sales');
+      final localSales = await rowsOf('sales', memberIds);
       if (localSales.isNotEmpty) {
         final formattedSales = localSales.map((s) {
           final qty = (s['quantity'] as num?)?.toInt() ?? 1;
@@ -506,10 +547,7 @@ class SupabaseService {
           // Si el miembro es el usuario autenticado y su nombre en el perfil es real, sincronizarlo a Supabase
           if (userEmail != null && memberEmail == userEmail.trim().toLowerCase() && memberName != memberEmail.split('@').first) {
             try {
-              await client!.from('business_members').update({
-                'user_name': memberName,
-                'user_id': resolvedUserId ?? userId,
-              }).eq('id', m['id']);
+              await client!.rpc('link_my_memberships', params: {'p_name': memberName});
             } catch (_) {}
           }
           await db.insert(

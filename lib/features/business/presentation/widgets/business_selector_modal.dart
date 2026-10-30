@@ -431,7 +431,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
               .from('business_members')
               .delete()
               .eq('business_id', biz.id)
-              .or('user_id.eq.${widget.userId},email.ilike.$userEmail');
+              .eq('user_email', userEmail.toLowerCase());
         }
       } catch (_) {}
 

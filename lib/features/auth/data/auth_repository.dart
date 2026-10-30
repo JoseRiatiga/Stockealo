@@ -63,10 +63,7 @@ class AuthRepository {
 
     // Si este correo había sido invitado a algún negocio, vincular su user_id en la nube
     try {
-      await SupabaseService.instance.client
-          ?.from('business_members')
-          .update({'user_id': user.id})
-          .eq('user_email', cleanEmail);
+      await SupabaseService.instance.client?.rpc('link_my_memberships');
     } catch (e) {
       debugPrint('No se pudieron vincular invitaciones pendientes: $e');
     }
@@ -189,10 +186,7 @@ class AuthRepository {
       final client = SupabaseService.instance.client;
       if (client != null && userEmail.isNotEmpty) {
         try {
-          await client.from('business_members').update({
-            'user_name': cleanName,
-            'user_id': userId,
-          }).eq('user_email', userEmail);
+          await client.rpc('link_my_memberships', params: {'p_name': cleanName});
         } catch (_) {}
       }
     }

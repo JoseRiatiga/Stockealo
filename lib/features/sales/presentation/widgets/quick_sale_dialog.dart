@@ -84,7 +84,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   List<Customer> _existingCustomers = [];
 
   String _userRole = 'OWNER';
-  bool get _isCashier => _userRole == 'CAJERO';
+  bool get _isCashier => _userRole == 'CASHIER';
 
   @override
   void initState() {

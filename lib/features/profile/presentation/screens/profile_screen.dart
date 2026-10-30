@@ -676,11 +676,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ? () async {
                         Navigator.pop(ctx);
                         if (_user != null) {
+                          final messenger = ScaffoldMessenger.of(this.context);
                           setState(() => _isLoading = true);
-                          await _supabase.deleteAccountCompletely(
-                            userId: _user!.id,
-                            userEmail: _user!.email,
-                          );
+                          try {
+                            await _supabase.deleteAccountCompletely();
+                          } catch (e) {
+                            if (mounted) {
+                              setState(() => _isLoading = false);
+                              messenger.showSnackBar(
+                                SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                              );
+                            }
+                            return;
+                          }
                           if (mounted) {
                             widget.onLogout();
                           }

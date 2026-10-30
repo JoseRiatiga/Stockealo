@@ -1086,21 +1086,30 @@ class SupabaseService {
   }
 
   /// Opción B: Eliminación Total y Definitiva de la Cuenta (Nube + Teléfono)
-  Future<void> deleteAccountCompletely({
-    required String userId,
-    String? userEmail,
-  }) async {
-    // 1. Purgar datos de negocio en la nube primero
-    await purgeCloudDataForUser(userId, userEmail);
-
-    // 2. Eliminar el registro de usuario / cuenta en la nube
-    try { await client?.from('users').delete().eq('id', userId); } catch (_) {}
-    if (userEmail != null && userEmail.isNotEmpty) {
-      try { await client?.from('users').delete().eq('email', userEmail.toLowerCase().trim()); } catch (_) {}
+  ///
+  /// La Edge Function `delete-account` borra en el servidor los negocios donde la
+  /// cuenta es dueña única, sus membresías, su perfil y su usuario de Supabase Auth.
+  /// Solo si eso funciona se limpia el teléfono, para no dejar una cuenta a medias.
+  Future<void> deleteAccountCompletely() async {
+    if (!_isInitialized) await initialize();
+    if (client?.auth.currentSession == null) {
+      throw Exception('Necesitas conexión a internet y una sesión activa para eliminar tu cuenta.');
     }
 
-    // 3. Limpiar todas las tablas locales en SQLite
+    try {
+      final res = await client!.functions.invoke('delete-account');
+      final data = res.data;
+      if (data is! Map || data['deleted'] != true) throw Exception('respuesta inesperada: $data');
+    } catch (e) {
+      debugPrint('Error eliminando la cuenta en Supabase: $e');
+      throw Exception('No se pudo eliminar la cuenta en la nube. Revisa tu conexión e inténtalo de nuevo.');
+    }
+
+    // Limpiar todas las tablas locales del archivo de esta cuenta
     final db = await AppDatabase.instance.database;
+    for (final table in ['quotation_items', 'quotations', 'product_variants']) {
+      try { await db.delete(table); } catch (_) {}
+    }
     await db.delete('stock_movements');
     await db.delete('customer_payments');
     await db.delete('sale_items');
@@ -1113,8 +1122,7 @@ class SupabaseService {
     await db.delete('users');
     await db.delete('app_settings');
 
-    // 4. Cerrar la sesión de Supabase Auth en este dispositivo.
-    // TODO(fase1-etapa2): borrar también la cuenta de auth.users vía Edge Function.
+    // Cerrar la sesión local (el usuario de Auth ya no existe en el servidor)
     try {
       await client?.auth.signOut();
     } catch (_) {}

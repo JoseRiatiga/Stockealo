@@ -1,3 +1,4 @@
+import '../active_business_scope.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -274,8 +275,8 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
       userId: user.id,
       onLogout: widget.onLogout,
     );
-    if (changed == true) {
-      final active = _businessRepo.currentActiveBusiness;
+    if (changed == true && mounted) {
+      final active = ActiveBusinessScope.read(context);
       if (active != null) {
         setState(() => _business = active);
         _loadAllInfo();

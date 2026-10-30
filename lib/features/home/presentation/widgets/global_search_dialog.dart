@@ -1,3 +1,4 @@
+import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../products/data/product_repository.dart';
@@ -8,7 +9,6 @@ import '../../../products/presentation/widgets/catalog_generator_modal.dart';
 import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../../products/presentation/widgets/stock_status_badge.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
-import '../../../business/data/business_repository.dart';
 
 class GlobalSearchDialog extends StatefulWidget {
   final String? businessId;
@@ -69,7 +69,7 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
       return;
     }
 
-    final bizId = widget.businessId ?? BusinessRepository.instance.currentActiveBusiness?.id;
+    final bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
     if (bizId == null) return;
 
     setState(() => _isLoading = true);
@@ -251,7 +251,7 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
             title: 'Registrar Nuevo Producto',
             subtitle: 'Añade un nuevo artículo al catálogo',
             onTap: () async {
-              final biz = BusinessRepository.instance.currentActiveBusiness;
+              final biz = ActiveBusinessScope.read(context);
               if (biz == null) return;
               Navigator.pop(context);
               await Navigator.push(
@@ -277,7 +277,7 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
           title: 'Generar Catálogo en PDF',
           subtitle: 'Exporta tu catálogo comercial para clientes',
           onTap: () {
-            final biz = BusinessRepository.instance.currentActiveBusiness;
+            final biz = ActiveBusinessScope.read(context);
             if (biz == null) return;
             Navigator.pop(context);
             CatalogGeneratorModal.show(context: context, business: biz);

@@ -163,8 +163,8 @@ class CustomerRepository {
 
     final updatedCustomer = customer.copyWith(debtBalance: remainingDebt);
 
-    // Sincronizar actualización de saldo a Supabase
-    SupabaseService.instance.upsertCustomerToCloud(updatedCustomer.toMap());
+    // Restar el abono en la nube por diferencia: no pisa fiados de otros dispositivos
+    SupabaseService.instance.adjustCustomerDebtInCloud(customerId, -(previousDebt - remainingDebt));
 
     return PaymentResult(
       customer: updatedCustomer,

@@ -1,7 +1,7 @@
+import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
-import '../../../business/data/business_repository.dart';
 import '../../../customers/data/customer_repository.dart';
 import '../../../customers/models/customer.dart';
 import '../../../products/data/product_repository.dart';
@@ -84,7 +84,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   List<Customer> _existingCustomers = [];
 
   String _userRole = 'OWNER';
-  bool get _isCashier => _userRole == 'CAJERO';
+  bool get _isCashier => _userRole == 'CASHIER';
 
   @override
   void initState() {
@@ -111,7 +111,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   }
 
   Future<void> _loadUserRole() async {
-    final biz = BusinessRepository.instance.currentActiveBusiness;
+    final biz = ActiveBusinessScope.read(context);
     final user = AuthRepository.instance.currentUser;
     if (biz != null && user != null) {
       final role = await TeamRepository.instance.getUserRoleInBusiness(
@@ -124,7 +124,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   }
 
   Future<void> _loadInitialProducts() async {
-    final biz = BusinessRepository.instance.currentActiveBusiness;
+    final biz = ActiveBusinessScope.read(context);
     if (biz != null) {
       _loadCustomers(biz.id);
       try {
@@ -139,7 +139,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   }
 
   Future<void> _searchProducts(String query) async {
-    final biz = BusinessRepository.instance.currentActiveBusiness;
+    final biz = ActiveBusinessScope.read(context);
     if (biz == null) return;
 
     if (query.trim().isEmpty) {
@@ -209,7 +209,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   Future<void> _showVariantSelector(Product p) async {
     List<ProductVariant> variants = p.variants;
     if (variants.isEmpty) {
-      final biz = BusinessRepository.instance.currentActiveBusiness;
+      final biz = ActiveBusinessScope.read(context);
       if (biz != null) {
         variants = await _productRepo.getVariantsForProduct(p.id);
       }
@@ -348,7 +348,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   }
 
   Future<void> _scanBarcodeToAdd() async {
-    final biz = BusinessRepository.instance.currentActiveBusiness;
+    final biz = ActiveBusinessScope.read(context);
     if (biz == null) return;
 
     final code = await Navigator.push<String>(
@@ -474,7 +474,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
       return;
     }
 
-    final biz = BusinessRepository.instance.currentActiveBusiness;
+    final biz = ActiveBusinessScope.read(context);
     if (biz == null) return;
 
     // Blindaje Anti-Pérdidas: Protección de rentabilidad
@@ -558,7 +558,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   Future<void> _saveAsQuotation() async {
     if (_cartItems.isEmpty) return;
 
-    final biz = BusinessRepository.instance.currentActiveBusiness;
+    final biz = ActiveBusinessScope.read(context);
     if (biz == null) return;
 
     if (_hasLoss && _isCashier) {

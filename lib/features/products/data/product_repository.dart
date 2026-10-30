@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
@@ -50,17 +51,37 @@ class ProductRepository {
       orderBy: 'name ASC',
     );
 
-    final List<Product> result = [];
-    for (final map in maps) {
-      final p = Product.fromMap(map);
-      if (p.hasVariants) {
-        final variants = await getVariantsForProduct(p.id);
-        result.add(p.copyWith(variants: variants));
-      } else {
-        result.add(p);
+    final products = maps.map(Product.fromMap).toList();
+    final variantsByProduct = await _variantsFor(
+      products.where((p) => p.hasVariants).map((p) => p.id).toList(),
+    );
+    return [
+      for (final p in products)
+        p.hasVariants ? p.copyWith(variants: variantsByProduct[p.id] ?? const []) : p,
+    ];
+  }
+
+  /// Variantes de varios productos en una sola consulta (evita una consulta por producto)
+  Future<Map<String, List<ProductVariant>>> _variantsFor(List<String> productIds) async {
+    if (productIds.isEmpty) return {};
+    final db = await _dbProvider.database;
+    final byProduct = <String, List<ProductVariant>>{};
+    // SQLite limita la cantidad de parámetros por consulta; se consulta por lotes
+    const batchSize = 500;
+    for (var i = 0; i < productIds.length; i += batchSize) {
+      final batch = productIds.sublist(i, (i + batchSize).clamp(0, productIds.length));
+      final rows = await db.query(
+        'product_variants',
+        where: 'product_id IN (${List.filled(batch.length, '?').join(', ')})',
+        whereArgs: batch,
+        orderBy: 'created_at ASC',
+      );
+      for (final row in rows) {
+        final variant = ProductVariant.fromMap(row);
+        byProduct.putIfAbsent(variant.productId, () => []).add(variant);
       }
     }
-    return result;
+    return byProduct;
   }
 
   /// Obtener variantes asociadas a un producto
@@ -175,6 +196,8 @@ class ProductRepository {
   /// Actualizar producto (y sincronizar variantes)
   Future<void> updateProduct(Product product) async {
     final db = await _dbProvider.database;
+    final previous = await db.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [product.id]);
+    final previousStock = previous.isNotEmpty ? previous.first['stock'] as int : null;
     await db.transaction((txn) async {
       await txn.update(
         'products',
@@ -191,8 +214,12 @@ class ProductRepository {
       }
     });
 
-    // Sincronizar actualización en tiempo real a Supabase
+    // Sincronizar a Supabase. Editar el producto no envía el stock; si el usuario lo
+    // cambió en el formulario, se fija aparte como un ajuste manual.
     SupabaseService.instance.upsertProductToCloud(product.toMap());
+    if (previousStock != null && previousStock != product.stock) {
+      SupabaseService.instance.updateProductStockInCloud(product.id, product.stock);
+    }
   }
 
   /// Eliminar producto
@@ -328,7 +355,9 @@ class ProductRepository {
           .update({'category': cleanNewName})
           .eq('business_id', businessId)
           .eq('category', oldName);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('No se pudo renombrar la categoría en los productos de la nube: $e');
+    }
   }
 
   /// Eliminar categoría y reasignar productos a 'General'
@@ -364,7 +393,9 @@ class ProductRepository {
           .update({'category': 'General'})
           .eq('business_id', businessId)
           .eq('category', categoryName);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('No se pudo mover los productos a "General" en la nube: $e');
+    }
   }
 
   /// Contar cuántos productos pertenecen a una categoría

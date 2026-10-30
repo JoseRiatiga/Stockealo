@@ -1,11 +1,10 @@
-import 'package:share_plus/share_plus.dart';
-import '../../features/business/data/business_repository.dart';
-import '../../features/customers/data/customer_repository.dart';
-import '../../features/dashboard/data/dashboard_repository.dart';
-import '../../features/products/data/product_repository.dart';
-import '../../features/sales/data/sales_repository.dart';
-import '../../core/utils/currency_formatter.dart';
-import '../database/app_database.dart';
+import '../../business/data/business_repository.dart';
+import '../../customers/data/customer_repository.dart';
+import '../../dashboard/data/dashboard_repository.dart';
+import '../../products/data/product_repository.dart';
+import '../../sales/data/sales_repository.dart';
+import '../../../core/utils/currency_formatter.dart';
+import '../../../core/database/app_database.dart';
 
 enum StockyMessageType {
   text,
@@ -948,6 +947,7 @@ class StockyAssistantService {
             'customerName': topDebtor.name,
             'debtAmount': topDebtor.debtBalance,
             'bizName': bizName,
+            'phone': topDebtor.phone,
           },
         ),
       );
@@ -1327,12 +1327,4 @@ class StockyAssistantService {
   }
 
   /// Método de utilidad para enviar un recordatorio cordial de WhatsApp con un toque
-  static void sendWhatsAppReminder({
-    required String customerName,
-    required double debtAmount,
-    required String bizName,
-  }) {
-    final text = 'Hola $customerName 👋 Te saluda $bizName. Esperamos que te encuentres muy bien. Te compartimos un recordatorio cordial de tu saldo pendiente de ${CurrencyFormatter.formatCOP(debtAmount)} con nosotros. ¡Muchas gracias por tu preferencia y confianza!';
-    Share.share(text, subject: 'Recordatorio cordial - $bizName');
-  }
 }

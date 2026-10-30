@@ -1,3 +1,5 @@
+import '../../../business/presentation/active_business_scope.dart';
+import '../../../../core/services/supabase_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
@@ -34,7 +36,10 @@ class MainNavigationScreen extends StatefulWidget {
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends State<MainNavigationScreen> with ActiveBusinessAware {
+  @override
+  void onActiveBusinessChanged() => _loadNavigationContext();
+
   int _currentIndex = 0;
   final _authRepo = AuthRepository.instance;
   final _businessRepo = BusinessRepository.instance;
@@ -48,14 +53,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     _loadNavigationContext();
-    _businessRepo.activeBusinessNotifier.addListener(_loadNavigationContext);
     _checkAppUpdateSilently();
   }
 
   @override
   void dispose() {
     NotificationService.instance.stopRealtimeSalesListening();
-    _businessRepo.activeBusinessNotifier.removeListener(_loadNavigationContext);
     super.dispose();
   }
 
@@ -74,7 +77,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         // Iniciar escucha de ventas en tiempo real si hay negocio activo
         NotificationService.instance.startRealtimeSalesListening(
           businessId: biz.id,
-          currentUserId: user.id,
+          onRemoteSale: () => SupabaseService.instance.syncFromCloud(user.id, user.email),
         );
       }
       if (mounted) {

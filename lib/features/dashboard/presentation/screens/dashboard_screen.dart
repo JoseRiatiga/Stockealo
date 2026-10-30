@@ -1,3 +1,9 @@
+import '../widgets/quick_actions_customizer.dart';
+import '../widgets/dashboard_desktop_charts.dart';
+import '../widgets/top_products_section.dart';
+import '../widgets/dashboard_metrics_grid.dart';
+import '../widgets/quick_actions_catalog.dart';
+import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../../../core/utils/currency_formatter.dart';
@@ -19,101 +25,11 @@ import '../../../products/presentation/widgets/restock_order_modal.dart';
 import '../../../products/presentation/widgets/catalog_generator_modal.dart';
 import '../../data/dashboard_repository.dart';
 import '../../../../core/services/supabase_service.dart';
-import '../widgets/radial_gauge_card.dart';
 import '../widgets/spline_area_chart.dart';
 import '../widgets/segmented_progress_card.dart';
 import '../widgets/recent_transactions_card.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../home/presentation/widgets/notifications_modal.dart';
-
-class QuickActionDef {
-  final String id;
-  final String label;
-  final String description;
-  final IconData icon;
-  final Color color;
-
-  const QuickActionDef({
-    required this.id,
-    required this.label,
-    required this.description,
-    required this.icon,
-    required this.color,
-  });
-}
-
-const List<QuickActionDef> kAvailableQuickActions = [
-  QuickActionDef(
-    id: 'sell',
-    label: 'Vender',
-    description: 'Escanear código de barras para venta rápida',
-    icon: Icons.qr_code_scanner,
-    color: Color(0xFF059669),
-  ),
-  QuickActionDef(
-    id: 'add_product',
-    label: 'Producto',
-    description: 'Crear un nuevo producto en catálogo',
-    icon: Icons.add_box_outlined,
-    color: Color(0xFF2563EB),
-  ),
-  QuickActionDef(
-    id: 'customers',
-    label: 'Clientes',
-    description: 'Gestionar clientes y cuentas por cobrar (fiados)',
-    icon: Icons.people_outline_rounded,
-    color: Color(0xFFD97706),
-  ),
-  QuickActionDef(
-    id: 'alerts',
-    label: 'Alertas',
-    description: 'Productos agotados o con bajo inventario',
-    icon: Icons.warning_amber_rounded,
-    color: Color(0xFFDC2626),
-  ),
-  QuickActionDef(
-    id: 'inventory',
-    label: 'Inventario',
-    description: 'Ir directo al catálogo completo de stock',
-    icon: Icons.inventory_2_outlined,
-    color: Color(0xFF0284C7),
-  ),
-  QuickActionDef(
-    id: 'sales_history',
-    label: 'Ventas',
-    description: 'Historial detallado y recibos',
-    icon: Icons.receipt_long_outlined,
-    color: Color(0xFF0D9488),
-  ),
-  QuickActionDef(
-    id: 'excel_export',
-    label: 'Excel',
-    description: 'Exportar catálogo, ventas y clientes en .xlsx',
-    icon: Icons.file_download_outlined,
-    color: Color(0xFF16A34A),
-  ),
-  QuickActionDef(
-    id: 'catalog_pdf',
-    label: 'Catálogo',
-    description: 'Generar catálogo PDF de productos en stock',
-    icon: Icons.picture_as_pdf_outlined,
-    color: Color(0xFFDC2626),
-  ),
-  QuickActionDef(
-    id: 'team',
-    label: 'Equipo',
-    description: 'Administrar colaboradores y roles',
-    icon: Icons.group_outlined,
-    color: Color(0xFF7C3AED),
-  ),
-  QuickActionDef(
-    id: 'biz_info',
-    label: 'Mi Negocio',
-    description: 'Información general y métricas del comercio',
-    icon: Icons.storefront_outlined,
-    color: Color(0xFF475569),
-  ),
-];
 
 class DashboardScreen extends StatefulWidget {
   final String userId;
@@ -133,7 +49,10 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAware {
+  @override
+  void onActiveBusinessChanged() => _onBusinessChanged();
+
   final _dashboardRepo = DashboardRepository.instance;
   final _businessRepo = BusinessRepository.instance;
   final _authRepo = AuthRepository.instance;
@@ -151,8 +70,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadData();
-    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
+    NotificationService.instance.remoteSalesVersion.addListener(_onRemoteSales);
     _syncSilently();
+  }
+
+  /// Ventas hechas en otro dispositivo, ya descargadas: solo recargar
+  void _onRemoteSales() {
+    if (mounted) _loadData();
   }
 
   void _onBusinessChanged() {
@@ -192,7 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
-    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
+    NotificationService.instance.remoteSalesVersion.removeListener(_onRemoteSales);
     super.dispose();
   }
 
@@ -296,6 +220,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _openCustomizeQuickActionsModal() async {
+    if (_activeBusiness == null) return;
+    final selectedIds = await QuickActionsCustomizer.show(context, current: _quickActionIds);
+    if (selectedIds != null && _activeBusiness != null) {
+      await _dashboardRepo.saveQuickActions(_activeBusiness!.id, selectedIds);
+      setState(() {
+        _quickActionIds = selectedIds;
+      });
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: 'Acciones rápidas guardadas con éxito',
+          type: ToastType.success,
+        );
+      }
+    }
+  }
+
   Future<void> _executeQuickAction(String actionId) async {
     final int lowStock = _summary['lowStock'] ?? 0;
     final int outOfStock = _summary['outOfStock'] ?? 0;
@@ -380,298 +322,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
         _loadData();
         break;
-    }
-  }
-
-  Future<void> _openCustomizeQuickActionsModal() async {
-    if (_activeBusiness == null) return;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedIds = List<String>.from(_quickActionIds);
-
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (modalCtx, setModalState) {
-            final availableToAdd = kAvailableQuickActions
-                .where((a) => !selectedIds.contains(a.id))
-                .toList();
-
-            return Container(
-              height: MediaQuery.of(ctx).size.height * 0.82,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              padding: EdgeInsets.fromLTRB(
-                20,
-                16,
-                20,
-                MediaQuery.of(ctx).padding.bottom + 20,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Personalizar y Ordenar',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Arrastra con ☰ para fijar el orden que prefieras',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: selectedIds.length >= 2 && selectedIds.length <= 5
-                              ? const Color(0xFFECFDF5)
-                              : const Color(0xFFFEF2F2),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: selectedIds.length >= 2 && selectedIds.length <= 5
-                                ? const Color(0xFF10B981)
-                                : Colors.red,
-                          ),
-                        ),
-                        child: Text(
-                          '${selectedIds.length} / 5',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: selectedIds.length >= 2 && selectedIds.length <= 5
-                                ? const Color(0xFF059669)
-                                : Colors.red,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'ACCIONES ACTIVAS EN TU INICIO (ARRASTRA PARA ORDENAR)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Lista reordenable
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ReorderableListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: selectedIds.length,
-                            onReorder: (oldIndex, newIndex) {
-                              setModalState(() {
-                                if (oldIndex < newIndex) {
-                                  newIndex -= 1;
-                                }
-                                final item = selectedIds.removeAt(oldIndex);
-                                selectedIds.insert(newIndex, item);
-                              });
-                            },
-                            itemBuilder: (context, index) {
-                              final actionId = selectedIds[index];
-                              final action = kAvailableQuickActions.firstWhere(
-                                (a) => a.id == actionId,
-                                orElse: () => kAvailableQuickActions.first,
-                              );
-
-                              return Container(
-                                key: ValueKey(action.id),
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF059669).withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        '#${index + 1}',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF059669),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    CircleAvatar(
-                                      radius: 16,
-                                      backgroundColor: action.color.withOpacity(0.12),
-                                      child: Icon(action.icon, color: action.color, size: 18),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            action.label,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                                          ),
-                                          Text(
-                                            action.description,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
-                                      tooltip: 'Quitar de accesos activos',
-                                      onPressed: () {
-                                        if (selectedIds.length > 2) {
-                                          setModalState(() => selectedIds.removeAt(index));
-                                        } else {
-                                          AppToast.show(
-                                            ctx,
-                                            message: 'Debes mantener al menos 2 accesos activos',
-                                            type: ToastType.warning,
-                                          );
-                                        }
-                                      },
-                                    ),
-                                    ReorderableDragStartListener(
-                                      index: index,
-                                      child: const Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 4),
-                                        child: Icon(Icons.drag_handle_rounded, color: Color(0xFF64748B)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-
-                          if (availableToAdd.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            Text(
-                              'DISPONIBLES PARA AGREGAR (+)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: availableToAdd.map((action) {
-                                return ActionChip(
-                                  avatar: Icon(action.icon, size: 16, color: action.color),
-                                  label: Text(
-                                    '+ ${action.label}',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                  ),
-                                  backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                                  side: BorderSide(
-                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                                  ),
-                                  onPressed: () {
-                                    setModalState(() {
-                                      if (selectedIds.length < 5) {
-                                        selectedIds.add(action.id);
-                                      } else {
-                                        AppToast.show(
-                                          ctx,
-                                          message: 'Máximo 5 acciones para mantener la pantalla ordenada',
-                                          type: ToastType.warning,
-                                        );
-                                      }
-                                    });
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF059669),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(ctx, true);
-                      },
-                      child: const Text('Guardar Orden y Accesos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (saved == true && _activeBusiness != null) {
-      await _dashboardRepo.saveQuickActions(_activeBusiness!.id, selectedIds);
-      setState(() {
-        _quickActionIds = selectedIds;
-      });
-      if (mounted) {
-        AppToast.show(
-          context,
-          message: 'Acciones rápidas guardadas con éxito',
-          type: ToastType.success,
-        );
-      }
     }
   }
 
@@ -873,7 +523,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(height: 14),
 
                       // Tarjetas de Métricas del Periodo (2x2 Grid Enriquecido)
-                      _buildMetricsGrid(),
+                      DashboardMetricsGrid(
+                        summary: _summary,
+                        period: _selectedPeriod,
+                        showProfit: canViewProfits,
+                        onInventoryTap: widget.onNavigateToInventory,
+                      ),
                       const SizedBox(height: 20),
 
                       // Acciones Rápidas Personalizables
@@ -904,7 +559,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       // Gráfico de Rendimiento (Lado a lado en Desktop, Toggle en Móvil)
                       if (isDesktop)
-                        _buildDesktopCharts(isDark)
+                        DashboardDesktopCharts(summary: _summary, period: _selectedPeriod)
                       else
                         _buildSalesPerformanceChart(),
                       const SizedBox(height: 24),
@@ -914,7 +569,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(height: 24),
 
                       // Top 5 Productos Más Vendidos en el Periodo
-                      _buildTopProductsSection(),
+                      TopProductsSection(summary: _summary),
                       const SizedBox(height: 20),
                     ],
                   );
@@ -1068,135 +723,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildMetricsGrid() {
-    final double periodTotal = _summary['periodTotal'] ?? _summary['todayTotal'] ?? 0.0;
-    final double periodProfit = _summary['periodProfit'] ?? _summary['todayProfit'] ?? 0.0;
-    final double profitMargin = _summary['profitMargin'] ?? 0.0;
-    final double averageTicket = _summary['averageTicket'] ?? 0.0;
-    final double totalDebt = _summary['totalDebt'] ?? 0.0;
-    final int periodCount = _summary['periodCount'] ?? _summary['todayCount'] ?? 0;
-
-    String salesTitle = 'Ventas de Hoy';
-    String profitTitle = 'Ganancia de Hoy';
-    if (_selectedPeriod == 'week') {
-      salesTitle = 'Ventas (7 Días)';
-      profitTitle = 'Ganancia (7 Días)';
-    } else if (_selectedPeriod == 'month') {
-      salesTitle = 'Ventas del Mes';
-      profitTitle = 'Ganancia del Mes';
-    } else if (_selectedPeriod == 'all') {
-      salesTitle = 'Ventas Totales';
-      profitTitle = 'Ganancia Total';
-    }
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 900;
-    final int totalProducts = _summary['totalProducts'] ?? 0;
-    final int lowStock = _summary['lowStock'] ?? 0;
-    final int outOfStock = _summary['outOfStock'] ?? 0;
-    final int alertTotal = lowStock + outOfStock;
-    final double? trendPercent = _summary['trendPercent'] as double?;
-
-    // Progreso dinámico para medidores radiales
-    final salesProgress = trendPercent != null
-        ? ((50 + trendPercent / 2) / 100).clamp(0.12, 1.0)
-        : (periodTotal > 0 ? 0.75 : 0.08);
-
-    final profitProgress = canViewProfits
-        ? (profitMargin / 100.0).clamp(0.08, 1.0)
-        : 0.5;
-
-    final stockHealthProgress = totalProducts > 0
-        ? ((totalProducts - alertTotal) / totalProducts).clamp(0.05, 1.0)
-        : 1.0;
-
-    final cardVentas = RadialGaugeCard(
-      title: salesTitle,
-      value: CurrencyFormatter.format(periodTotal),
-      subtitle: '$periodCount ${periodCount == 1 ? "venta" : "ventas"} en periodo',
-      progress: salesProgress,
-      gradientColors: const [Color(0xFF06B6D4), Color(0xFF10B981)],
-      icon: Icons.payments_rounded,
-    );
-
-    final cardGanancia = RadialGaugeCard(
-      title: profitTitle,
-      value: canViewProfits ? CurrencyFormatter.format(periodProfit) : '••••••',
-      subtitle: canViewProfits
-          ? (periodTotal > 0 ? 'Margen neto: ${profitMargin.toStringAsFixed(1)}%' : 'Margen neto estimado')
-          : 'Restringido para cajeros',
-      progress: profitProgress,
-      gradientColors: const [Color(0xFFEC4899), Color(0xFF8B5CF6)],
-      icon: Icons.trending_up_rounded,
-    );
-
-    final cardStock = RadialGaugeCard(
-      title: 'Inventario Activo',
-      value: '$totalProducts Prod.',
-      subtitle: alertTotal > 0 ? '$alertTotal con stock crítico' : 'Existencias 100% al día',
-      progress: stockHealthProgress,
-      gradientColors: alertTotal > 0
-          ? const [Color(0xFFF59E0B), Color(0xFFEF4444)]
-          : const [Color(0xFF84CC16), Color(0xFF10B981)],
-      icon: Icons.inventory_2_rounded,
-      onTap: widget.onNavigateToInventory,
-    );
-
-    final cardCartera = SegmentedProgressCard(
-      title: 'CARTERA Y TICKET',
-      subtitle: 'Comportamiento comercial',
-      items: [
-        SegmentedBarItem(
-          label: 'Ticket Promedio',
-          valueText: CurrencyFormatter.format(averageTicket),
-          percentage: averageTicket > 0 ? (averageTicket / (periodTotal > 0 ? periodTotal : 100000)).clamp(0.2, 0.95) : 0.1,
-          color: const Color(0xFF06B6D4),
-        ),
-        SegmentedBarItem(
-          label: 'Por Cobrar (Fiados)',
-          valueText: CurrencyFormatter.format(totalDebt),
-          percentage: totalDebt > 0 ? 0.65 : 0.05,
-          color: const Color(0xFFF59E0B),
-        ),
-      ],
-    );
-
-    if (isDesktop) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: cardVentas),
-          const SizedBox(width: 14),
-          Expanded(child: cardGanancia),
-          const SizedBox(width: 14),
-          Expanded(child: cardStock),
-          const SizedBox(width: 14),
-          Expanded(child: cardCartera),
-        ],
-      );
-    }
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(child: cardVentas),
-            const SizedBox(width: 12),
-            Expanded(child: cardGanancia),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: cardStock),
-            const SizedBox(width: 12),
-            Expanded(child: cardCartera),
-          ],
-        ),
-      ],
     );
   }
 
@@ -1381,80 +907,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildDesktopCharts(bool isDark) {
-    final List<dynamic> timelineSales = _summary['periodTimelineSales'] ?? _summary['weeklySales'] ?? [];
-    final List<dynamic> categorySales = _summary['categorySales'] ?? [];
-
-    String timelineTitle = 'Ventas de la Semana (7 días)';
-    if (_selectedPeriod == 'today') {
-      timelineTitle = 'Ventas de Hoy por Horario';
-    } else if (_selectedPeriod == 'month') {
-      timelineTitle = 'Ventas del Mes por Semanas';
-    } else if (_selectedPeriod == 'all') {
-      timelineTitle = 'Ventas Históricas por Meses';
-    }
-
-    final splineData = timelineSales.map((item) {
-      return {
-        'label': item['day'] as String,
-        'value': (item['total'] as num).toDouble(),
-      };
-    }).toList();
-
-    final categoryItems = categorySales.take(5).map((cat) {
-      final colors = [
-        const Color(0xFF06B6D4),
-        const Color(0xFFEC4899),
-        const Color(0xFF10B981),
-        const Color(0xFFF59E0B),
-        const Color(0xFF8B5CF6),
-      ];
-      final idx = categorySales.indexOf(cat) % colors.length;
-      final pct = (cat['percentage'] as num?)?.toDouble() ?? 0.0;
-      return SegmentedBarItem(
-        label: cat['name'] as String,
-        valueText: '${pct.toStringAsFixed(1)}%',
-        percentage: pct / 100.0,
-        color: colors[idx],
-      );
-    }).toList();
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 6,
-          child: SplineAreaChart(
-            title: timelineTitle,
-            subtitle: 'Curva continua de rendimiento operativo',
-            data: splineData,
-            height: 190,
-            primaryColor: const Color(0xFF06B6D4),
-            secondaryColor: const Color(0xFFEC4899),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          flex: 4,
-          child: SegmentedProgressCard(
-            title: 'PARTICIPACIÓN POR CATEGORÍA',
-            subtitle: 'Distribución porcentual en el periodo',
-            items: categoryItems.isNotEmpty
-                ? categoryItems
-                : [
-                    const SegmentedBarItem(
-                      label: 'General',
-                      valueText: '100%',
-                      percentage: 1.0,
-                      color: Color(0xFF10B981),
-                    )
-                  ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildRecentTransactionsSection() {
     final List<dynamic> rawTxs = _summary['recentTransactions'] ?? [];
     final List<TransactionItem> items = rawTxs.map((t) {
@@ -1480,161 +932,5 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildTopProductsSection() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final List<dynamic> topProducts = _summary['topProducts'] ?? [];
-
-    if (topProducts.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-        ),
-        child: const Center(
-          child: Text(
-            'Aún no hay ventas registradas para generar el Top de productos.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Top 5 Productos Más Vendidos',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                ),
-              ),
-              Text(
-                'Ventas & Ingresos',
-                style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ...topProducts.asMap().entries.map((entry) {
-            final idx = entry.key;
-            final item = entry.value;
-            final share = (item['share'] as num?)?.toDouble() ?? 0.0;
-            final revenue = (item['revenue'] as num?)?.toDouble() ?? 0.0;
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      _buildRankingBadge(idx, isDark),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          item['name'] as String,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${item['qty']} un.',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '(${CurrencyFormatter.format(revenue)})',
-                        style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: share.clamp(0.05, 1.0),
-                      minHeight: 5,
-                      backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF059669)),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRankingBadge(int rank, bool isDark) {
-    Color badgeColor;
-    Widget child;
-
-    switch (rank) {
-      case 0: // 1er Lugar - Oro
-        badgeColor = const Color(0xFFF59E0B);
-        child = const Icon(Icons.emoji_events_rounded, size: 13, color: Colors.white);
-        break;
-      case 1: // 2do Lugar - Plata
-        badgeColor = const Color(0xFF94A3B8);
-        child = const Icon(Icons.military_tech_rounded, size: 14, color: Colors.white);
-        break;
-      case 2: // 3er Lugar - Bronce
-        badgeColor = const Color(0xFFD97706);
-        child = const Icon(Icons.military_tech_outlined, size: 14, color: Colors.white);
-        break;
-      default: // 4to y 5to
-        badgeColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-        final textColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-        child = Text(
-          '#${rank + 1}',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
-        );
-    }
-
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        color: badgeColor,
-        shape: BoxShape.circle,
-        boxShadow: rank < 3
-            ? [
-                BoxShadow(
-                  color: badgeColor.withOpacity(0.35),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                )
-              ]
-            : null,
-      ),
-      alignment: Alignment.center,
-      child: child,
-    );
-  }
 }
 

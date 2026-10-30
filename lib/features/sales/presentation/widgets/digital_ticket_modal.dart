@@ -1,10 +1,10 @@
+import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../business/data/business_repository.dart';
 import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../models/sale.dart';
 
@@ -125,7 +125,7 @@ class DigitalTicketModal extends StatelessWidget {
     final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
     final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-    final activeBiz = BusinessRepository.instance.currentActiveBusiness;
+    final activeBiz = ActiveBusinessScope.read(context);
     final storeName = businessName ?? activeBiz?.name ?? 'Mi Negocio';
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 

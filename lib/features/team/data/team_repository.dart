@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
@@ -94,17 +95,19 @@ class TeamRepository {
       try {
         final client = SupabaseService.instance.client;
         if (client != null) {
-          final cloudUser = await client
-              .from('users')
-              .select('id, name')
-              .eq('email', cleanEmail)
-              .maybeSingle();
+          final List<dynamic> found = await client.rpc(
+            'find_user_by_email',
+            params: {'p_email': cleanEmail},
+          );
+          final cloudUser = found.isNotEmpty ? found.first as Map<String, dynamic> : null;
           if (cloudUser != null) {
             linkedUserId = cloudUser['id'] as String?;
             linkedUserName = cloudUser['name'] as String?;
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('No se pudo buscar el usuario invitado en la nube: $e');
+      }
     }
 
     final memberName = linkedUserName ?? cleanEmail.split('@').first;
@@ -210,7 +213,9 @@ class TeamRepository {
           );
           return cloudRole;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('No se pudo consultar el rol en la nube: $e');
+      }
     }
 
     // 3. Verificar si existe algún dueño ya registrado en miembros para evitar usurpación accidental
@@ -285,111 +290,54 @@ class TeamRepository {
       throw Exception('No hay conexión con la nube. Verifica tu conexión a internet.');
     }
 
-    // 1. Buscar la empresa en Supabase por ID completo o prefijo de ID
-    Map<String, dynamic>? cloudBiz;
-    if (cleanInput.length >= 32) {
-      try {
-        final allBiz = await client.from('businesses').select().eq('is_deleted', 0);
-        for (final b in allBiz) {
-          final idNoDash = (b['id'] as String).replaceAll('-', '').toLowerCase();
-          if (idNoDash == cleanInput) {
-            cloudBiz = b;
-            break;
-          }
-        }
-      } catch (e) {
-        debugPrint('Error buscando por UUID completo: $e');
+    // 1. El servidor busca la empresa por código y registra la membresía
+    //    (las cuentas no pueden leer la lista completa de empresas)
+    final Map<String, dynamic> joined;
+    try {
+      final result = await client.rpc('join_business_by_code', params: {'p_code': cleanInput});
+      joined = Map<String, dynamic>.from(result as Map);
+    } on PostgrestException catch (e) {
+      if (e.message.contains('code_not_found') || e.message.contains('invalid_code')) {
+        throw Exception('Código no encontrado. Verifica con el dueño o administrador de la empresa.');
       }
+      throw Exception('No se pudo unir a la empresa. Inténtalo de nuevo.');
     }
 
-    if (cloudBiz == null) {
-      try {
-        final List<dynamic> results = await client
-            .from('businesses')
-            .select()
-            .ilike('id', '$cleanInput%')
-            .eq('is_deleted', 0)
-            .limit(1);
-        if (results.isNotEmpty) {
-          cloudBiz = results.first as Map<String, dynamic>;
-        }
-      } catch (e) {
-        debugPrint('Error buscando negocio por prefijo: $e');
-      }
-    }
-
-    if (cloudBiz == null) {
-      throw Exception('Código no encontrado. Verifica con el dueño o administrador de la empresa.');
-    }
-
+    final cloudBiz = Map<String, dynamic>.from(joined['business'] as Map);
+    final cloudMember = Map<String, dynamic>.from(joined['member'] as Map);
     final bizId = cloudBiz['id'] as String;
-    final bizName = cloudBiz['name'] as String;
-    final bizCurrency = (cloudBiz['currency'] as String?) ?? 'COP';
 
     final db = await _dbProvider.database;
 
     // 2. Guardar o actualizar la empresa en la base local SQLite
     // Al unirse a una empresa existente, el creador NO es el usuario que se une
-    final existingBiz = await db.query('businesses', where: 'id = ?', whereArgs: [bizId], limit: 1);
-    final ownerUserId = (cloudBiz['user_id'] as String?) ??
-        (existingBiz.isNotEmpty ? existingBiz.first['user_id'] as String? : null) ??
-        'remote_owner';
-
     final business = Business(
       id: bizId,
-      userId: ownerUserId,
-      name: bizName,
-      currency: bizCurrency,
-      createdAt: cloudBiz['created_at'] != null
-          ? DateTime.tryParse(cloudBiz['created_at'] as String) ?? DateTime.now()
-          : DateTime.now(),
+      userId: (joined['owner_user_id'] as String?) ?? 'remote_owner',
+      name: cloudBiz['name'] as String,
+      currency: (cloudBiz['currency'] as String?) ?? 'COP',
+      createdAt: DateTime.tryParse((cloudBiz['created_at'] as String?) ?? '') ?? DateTime.now(),
     );
     await db.insert('businesses', business.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
 
-    // 3. Crear o actualizar membresía en SQLite local
+    // 3. Guardar localmente la misma membresía que creó el servidor (mismo id)
     final cleanEmail = userEmail.trim().toLowerCase();
-    final existingMember = await db.query(
+    await db.delete(
       'business_members',
-      where: 'business_id = ? AND (user_id = ? OR LOWER(email) = ?)',
-      whereArgs: [bizId, userId, cleanEmail],
-      limit: 1,
+      where: 'business_id = ? AND (user_id = ? OR LOWER(email) = ?) AND id != ?',
+      whereArgs: [bizId, userId, cleanEmail, cloudMember['id']],
     );
-
-    final resolvedUserName = userName ?? cleanEmail.split('@').first;
-    if (existingMember.isEmpty) {
-      final member = BusinessMember(
-        id: const Uuid().v4(),
-        businessId: bizId,
-        userId: userId,
-        email: cleanEmail,
-        name: resolvedUserName,
-        role: 'CASHIER',
-        status: 'ACTIVE',
-        createdAt: DateTime.now(),
-      );
-      await db.insert('business_members', member.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-
-      // Sincronizar membresía a Supabase Cloud
-      await SupabaseService.instance.upsertBusinessMemberToCloud(member.toMap());
-    } else {
-      await db.update(
-        'business_members',
-        {
-          'user_id': userId,
-          'status': 'ACTIVE',
-          if (userName != null) 'name': userName,
-        },
-        where: 'id = ?',
-        whereArgs: [existingMember.first['id']],
-      );
-      final updatedMap = {
-        ...existingMember.first,
-        'user_id': userId,
-        'status': 'ACTIVE',
-        if (userName != null) 'name': userName,
-      };
-      await SupabaseService.instance.upsertBusinessMemberToCloud(updatedMap);
-    }
+    final member = BusinessMember(
+      id: cloudMember['id'] as String,
+      businessId: bizId,
+      userId: cloudMember['user_id'] as String?,
+      email: cleanEmail,
+      name: (cloudMember['user_name'] as String?) ?? userName ?? cleanEmail.split('@').first,
+      role: (cloudMember['role'] as String?) ?? 'CASHIER',
+      status: 'ACTIVE',
+      createdAt: DateTime.tryParse((cloudMember['created_at'] as String?) ?? '') ?? DateTime.now(),
+    );
+    await db.insert('business_members', member.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
 
     // 4. Activar obligatoriamente la sincronización en la nube para colaboradores
     await SupabaseService.instance.setCloudSyncEnabled(true);

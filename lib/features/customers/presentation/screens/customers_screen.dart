@@ -1,9 +1,9 @@
+import '../../../business/presentation/active_business_scope.dart';
+import '../../data/debt_reminder.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../business/data/business_repository.dart';
 import '../../data/customer_repository.dart';
 import '../../models/customer.dart';
 import '../widgets/record_payment_modal.dart';
@@ -205,9 +205,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   void _sendFriendlyReminderWhatsApp(Customer customer) {
-    final storeName = BusinessRepository.instance.currentActiveBusiness?.name ?? 'Mi Negocio';
-    final text = 'Hola ${customer.name} 👋 Te saluda $storeName. Esperamos que te encuentres muy bien. Te compartimos un recordatorio cordial de tu saldo pendiente de ${CurrencyFormatter.formatCOP(customer.debtBalance)} con nosotros. ¡Muchas gracias por tu preferencia!';
-    Share.share(text, subject: 'Recordatorio cordial - $storeName');
+    DebtReminder.send(
+      customerName: customer.name,
+      debtAmount: customer.debtBalance,
+      businessName: ActiveBusinessScope.read(context)?.name ?? 'Mi Negocio',
+      phone: customer.phone,
+    );
   }
 
   @override

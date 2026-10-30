@@ -6,6 +6,7 @@ import 'features/auth/models/app_user.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/business/data/business_repository.dart';
 import 'features/business/models/business.dart';
+import 'features/business/presentation/active_business_scope.dart';
 import 'features/business/presentation/screens/create_initial_business_screen.dart';
 import 'features/home/presentation/screens/main_navigation_screen.dart';
 
@@ -22,8 +23,8 @@ void main() async {
   }
   await SupabaseService.instance.initialize();
   await ThemeController.instance.initialize();
-  // Sincronización automática silenciosa en segundo plano al arrancar la app
-  SupabaseService.instance.syncToCloud();
+  // La sincronización empieza al restaurar o iniciar la sesión (syncFromCloud sube
+  // primero los cambios pendientes); subir todo aquí pisaba datos más nuevos.
   runApp(const StockealoApp());
 }
 
@@ -41,6 +42,8 @@ class StockealoApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeController.instance.themeMode,
+          // Negocio activo disponible para toda la app, incluidos diálogos y rutas
+          builder: (context, child) => ActiveBusinessScope(child: child!),
           home: const AuthWrapper(),
         );
       },
@@ -55,7 +58,7 @@ class AuthWrapper extends StatefulWidget {
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends State<AuthWrapper> {
+class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   final _authRepo = AuthRepository.instance;
   final _businessRepo = BusinessRepository.instance;
   late Future<AppUser?> _sessionFuture;
@@ -63,7 +66,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _sessionFuture = _authRepo.restoreSession();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Al volver a la app, reintentar los cambios que quedaron sin enviar
+    if (state == AppLifecycleState.resumed && _authRepo.currentUser != null) {
+      SupabaseService.instance.flushPendingSync();
+    }
   }
 
   void _refresh() {

@@ -42,3 +42,12 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 *.apk
+
+# Bases de datos locales de prueba
+*.db
+
+# Respaldos de Supabase (contienen datos personales y hashes)
+/supabase/backups/
+
+# Salida de graphify
+/graphify-out/

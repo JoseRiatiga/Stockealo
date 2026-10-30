@@ -1,21 +1,23 @@
+import '../widgets/sales_summary_card.dart';
+import '../widgets/sales_quick_modules_bar.dart';
+import '../widgets/sale_card.dart';
+import '../../../business/presentation/active_business_scope.dart';
+import '../../../../core/services/notification_service.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../data/sales_repository.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../models/sale.dart';
-import '../widgets/digital_ticket_modal.dart';
 import '../widgets/quick_sale_dialog.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../reports/data/excel_export_service.dart';
 import '../../../../core/services/supabase_service.dart';
-import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
-import '../widgets/quotations_list_modal.dart';
+import '../../../cash/presentation/screens/cash_register_screen.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -27,7 +29,10 @@ class SalesHistoryScreen extends StatefulWidget {
   State<SalesHistoryScreen> createState() => _SalesHistoryScreenState();
 }
 
-class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
+class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusinessAware {
+  @override
+  void onActiveBusinessChanged() => _onBusinessChanged();
+
   final _salesRepo = SalesRepository();
   final _businessRepo = BusinessRepository.instance;
 
@@ -50,9 +55,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
+    NotificationService.instance.remoteSalesVersion.addListener(_onRemoteSales);
     _loadSales();
     _syncSilently();
+  }
+
+  /// Ventas hechas en otro dispositivo, ya descargadas: solo recargar
+  void _onRemoteSales() {
+    if (mounted) _loadSales();
   }
 
   void _onBusinessChanged() {
@@ -92,13 +102,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   @override
   void dispose() {
-    _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
+    NotificationService.instance.remoteSalesVersion.removeListener(_onRemoteSales);
     super.dispose();
   }
 
   Future<void> _loadSales() async {
     setState(() => _isLoading = true);
-    var bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+    var bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
     if (bizId == null) {
       final user = AuthRepository.instance.currentUser;
       if (user != null) {
@@ -171,7 +181,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Future<void> _navigateToCustomers() async {
-    var bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
+    var bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
     if (bizId == null) {
       final user = AuthRepository.instance.currentUser;
       if (user != null) {
@@ -190,7 +200,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Future<void> _exportToExcel() async {
-    final biz = _businessRepo.currentActiveBusiness;
+    final biz = ActiveBusinessScope.read(context);
     if (biz == null) {
       AppToast.showWarning(context, 'No hay una empresa activa seleccionada.');
       return;
@@ -259,6 +269,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         AppToast.showError(context, errorMsg);
       }
     }
+  }
+
+  Future<void> _openCashRegister() async {
+    final bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
+    if (bizId == null) return;
+    final user = AuthRepository.instance.currentUser;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CashRegisterScreen(
+          businessId: bizId,
+          userName: user?.displayName ?? 'Vendedor',
+        ),
+      ),
+    );
   }
 
   Future<void> _openQuickSale() async {
@@ -377,6 +402,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               title: const Text('Historial de Ventas'),
               actions: [
                 IconButton(
+                  onPressed: _openCashRegister,
+                  icon: const Icon(Icons.point_of_sale_rounded, color: Colors.white),
+                  tooltip: 'Arqueo de caja',
+                ),
+                IconButton(
                   onPressed: _openQuickSale,
                   icon: const Icon(Icons.add_shopping_cart_rounded, color: Color(0xFF8B5CF6)),
                   tooltip: 'Registrar Venta',
@@ -421,6 +451,18 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                               ),
                             ],
                           ),
+                          const Spacer(),
+                          OutlinedButton.icon(
+                            onPressed: _openCashRegister,
+                            icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+                            label: const Text('Arqueo de caja'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF059669),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
                           ElevatedButton.icon(
                             onPressed: _openQuickSale,
                             icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
@@ -445,7 +487,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 SliverPadding(
                   padding: EdgeInsets.symmetric(horizontal: hPadding),
                   sliver: SliverToBoxAdapter(
-                    child: _buildSummaryCard(),
+                    child: SalesSummaryCard(summary: _summary, sales: _sales, showProfit: canViewCosts),
                   ),
                 ),
 
@@ -453,7 +495,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 SliverPadding(
                   padding: EdgeInsets.symmetric(horizontal: hPadding),
                   sliver: SliverToBoxAdapter(
-                    child: _buildQuickModulesBar(),
+                    child: SalesQuickModulesBar(
+                      businessId: widget.businessId,
+                      onCustomers: _navigateToCustomers,
+                      onExportExcel: _exportToExcel,
+                    ),
                   ),
                 ),
 
@@ -585,7 +631,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final sale = pagedSales[index];
-                          return _buildSaleCard(sale);
+                          return SaleCard(
+                            sale: sale,
+                            showProfit: canViewCosts,
+                            onCancel: canCancelSale ? () => _cancelSale(sale) : null,
+                          );
                         },
                         childCount: pagedSales.length,
                       ),
@@ -923,672 +973,4 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  Widget _buildQuickModulesBar() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-      child: Row(
-        children: [
-          // Tarjeta Clientes y Fiados
-          Expanded(
-            child: InkWell(
-              onTap: _navigateToCustomers,
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF131127) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFDBEAFE),
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1F1C3B) : const Color(0xFFEFF6FF),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.people_alt_rounded, size: 15, color: Color(0xFF38BDF8)),
-                    ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Clientes',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
-                          ),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Fiados',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-
-          // Tarjeta Cotizaciones / Proformas
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                final bizId = widget.businessId ?? _businessRepo.currentActiveBusiness?.id;
-                if (bizId != null) {
-                  QuotationsListModal.show(context, businessId: bizId);
-                }
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF131127) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFDDD6FE),
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF26214A) : const Color(0xFFF5F3FF),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.description_outlined, size: 15, color: Color(0xFF8B5CF6)),
-                    ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Cotizar',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
-                          ),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Proformas',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-
-          // Tarjeta Exportar Excel
-          Expanded(
-            child: InkWell(
-              onTap: _exportToExcel,
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF131127) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFA7F3D0),
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF064E3B).withOpacity(0.4) : const Color(0xFFECFDF5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.table_chart_rounded, size: 15, color: Color(0xFF059669)),
-                    ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Excel',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
-                          ),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              '.xlsx',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final total = _summary['totalAmount'] ?? 0.0;
-    final profit = _summary['netProfit'] ?? 0.0;
-    final efectivo = _summary['byEfectivo'] ?? 0.0;
-    final transf = _summary['byTransferencia'] ?? 0.0;
-    final fiado = _summary['byFiado'] ?? 0.0;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131127) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Total e ingresos de hoy
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ventas de Hoy',
-                    style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    CurrencyFormatter.format(total),
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                    ),
-                  ),
-                ],
-              ),
-              if (canViewCosts)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Ganancia Real',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
-                        ),
-                      ),
-                      Text(
-                        CurrencyFormatter.format(profit),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF059669),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Ventas Hoy',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
-                        ),
-                      ),
-                      Text(
-                        '${_summary['salesCount'] ?? _sales.where((s) {
-                          final n = DateTime.now();
-                          return s.date.year == n.year && s.date.month == n.month && s.date.day == n.day;
-                        }).length} reg.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          Divider(height: 24, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-
-          // Desglose por Método de Pago
-          Row(
-            children: [
-              _buildPaymentPill(Icons.payments_outlined, 'Efectivo', CurrencyFormatter.format(efectivo), const Color(0xFF059669)),
-              const SizedBox(width: 8),
-              _buildPaymentPill(Icons.account_balance_outlined, 'Transf.', CurrencyFormatter.format(transf), const Color(0xFF2563EB)),
-              const SizedBox(width: 8),
-              _buildPaymentPill(Icons.assignment_outlined, 'Fiado', CurrencyFormatter.format(fiado), const Color(0xFFD97706)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentPill(IconData icon, String title, String amount, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 11, color: color),
-                const SizedBox(width: 3),
-                Text(
-                  title,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
-                ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Text(
-              amount,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSaleCard(Sale sale) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isToday = sale.date.year == DateTime.now().year &&
-        sale.date.month == DateTime.now().month &&
-        sale.date.day == DateTime.now().day;
-    final timeStr = isToday
-        ? 'Hoy, ${DateFormat('hh:mm a').format(sale.date)}'
-        : DateFormat('dd/MM/yyyy • hh:mm a').format(sale.date);
-
-    Color methodColor;
-    String methodLabel;
-    IconData methodIcon;
-
-    switch (sale.paymentMethod) {
-      case 'TRANSFERENCIA':
-        methodColor = const Color(0xFF2563EB);
-        methodLabel = 'Transferencia';
-        methodIcon = Icons.account_balance_outlined;
-        break;
-      case 'FIADO':
-        methodColor = const Color(0xFFD97706);
-        methodLabel = 'Venta a Fiado';
-        methodIcon = Icons.assignment_late_outlined;
-        break;
-      default:
-        methodColor = const Color(0xFF059669);
-        methodLabel = 'Efectivo';
-        methodIcon = Icons.payments_outlined;
-    }
-
-    final unitPrice = sale.quantity > 0 ? sale.totalAmount / sale.quantity : sale.totalAmount;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      elevation: 0,
-      color: isDark ? const Color(0xFF131127) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-          width: 1,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. Cabecera: Fecha/Hora y Badge de Método de Pago
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.schedule_rounded,
-                      size: 14,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      timeStr,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: methodColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: methodColor.withOpacity(0.25)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(methodIcon, size: 13, color: methodColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        methodLabel,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: methodColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // 2. Bloque del Producto: Foto + Nombre Multilínea + Cliente si es fiado
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Foto del producto
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(11),
-                    child: ProductImageView(
-                      imagePath: sale.productPhotoPath,
-                      width: 56,
-                      height: 56,
-                      iconSize: 26,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Información textual completa del producto
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        sale.productName,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                          height: 1.25,
-                        ),
-                        softWrap: true,
-                      ),
-                      if (sale.paymentMethod == 'FIADO' || (sale.customerName != null && sale.customerName!.trim().isNotEmpty)) ...[
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD97706).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFD97706).withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.person_rounded, size: 13, color: Color(0xFFD97706)),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  'Cliente: ${sale.customerName ?? "Sin registrar"}',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFFD97706),
-                                  ),
-                                  softWrap: true,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // 3. Ficha de Métricas Comerciales (Bloque en grilla / celdas)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-                ),
-              ),
-              child: Row(
-                children: [
-                  _buildMetricCell(
-                    label: 'Cantidad',
-                    value: 'x${sale.quantity} und.',
-                    isDark: isDark,
-                  ),
-                  _buildMetricDivider(isDark),
-                  _buildMetricCell(
-                    label: 'Unitario',
-                    value: CurrencyFormatter.format(unitPrice),
-                    isDark: isDark,
-                  ),
-                  if (canViewCosts) ...[
-                    _buildMetricDivider(isDark),
-                    _buildMetricCell(
-                      label: 'Ganancia',
-                      value: '+${CurrencyFormatter.format(sale.netProfit)}',
-                      isDark: isDark,
-                      valueColor: const Color(0xFF059669),
-                    ),
-                  ],
-                  _buildMetricDivider(isDark),
-                  _buildMetricCell(
-                    label: 'Total',
-                    value: CurrencyFormatter.format(sale.totalAmount),
-                    isDark: isDark,
-                    isBold: true,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // 4. Barra Inferior de Acciones Directas
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => DigitalTicketModal.show(context, sale: sale),
-                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                    label: const Text(
-                      'Comprobante',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF059669),
-                      side: BorderSide(
-                        color: isDark ? const Color(0xFF065F46) : const Color(0xFFA7F3D0),
-                      ),
-                      backgroundColor: isDark
-                          ? const Color(0xFF064E3B).withOpacity(0.2)
-                          : const Color(0xFFECFDF5),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ),
-                if (canCancelSale) ...[
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: () => _cancelSale(sale),
-                    icon: const Icon(Icons.undo_rounded, size: 15),
-                    label: const Text(
-                      'Anular',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricCell({
-    required String label,
-    required String value,
-    required bool isDark,
-    Color? valueColor,
-    bool isBold = false,
-  }) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-                color: valueColor ??
-                    (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricDivider(bool isDark) {
-    return Container(
-      height: 24,
-      width: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-    );
-  }
 }

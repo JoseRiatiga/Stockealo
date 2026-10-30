@@ -1,10 +1,10 @@
+import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../business/data/business_repository.dart';
 import '../../data/customer_repository.dart';
 import '../../models/customer.dart';
 
@@ -107,7 +107,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
   }
 
   void _showPaymentReceiptDialog(BuildContext context, PaymentResult result) {
-    final storeName = BusinessRepository.instance.currentActiveBusiness?.name ?? 'Mi Negocio';
+    final storeName = ActiveBusinessScope.read(context)?.name ?? 'Mi Negocio';
     final dateFormat = DateFormat('dd/MM/yyyy hh:mm a');
     final formattedDate = dateFormat.format(result.payment.date);
 

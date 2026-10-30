@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -38,6 +40,11 @@ class NotificationService extends ChangeNotifier {
 
   final List<AppNotification> _notifications = [];
   RealtimeChannel? _salesChannel;
+  Timer? _remoteRefreshTimer;
+
+  /// Aumenta cada vez que llegan ventas de otro dispositivo y ya se descargaron;
+  /// las pantallas de ventas lo escuchan para recargarse.
+  final ValueNotifier<int> remoteSalesVersion = ValueNotifier<int>(0);
   String? _subscribedBusinessId;
 
   List<AppNotification> get notifications => List.unmodifiable(_notifications);
@@ -97,9 +104,11 @@ class NotificationService extends ChangeNotifier {
   }
 
   /// Inicia la escucha en tiempo real de nuevas ventas desde Supabase Realtime
+  ///
+  /// [onRemoteSale] descarga los datos nuevos; se llama una vez por ráfaga de ventas.
   void startRealtimeSalesListening({
     required String businessId,
-    required String currentUserId,
+    required Future<void> Function() onRemoteSale,
   }) {
     if (_subscribedBusinessId == businessId && _salesChannel != null) {
       return;
@@ -125,10 +134,9 @@ class NotificationService extends ChangeNotifier {
           ),
           callback: (payload) {
             final newRecord = payload.newRecord;
+            // created_by lo llena la nube con el id de Supabase Auth de quien vendió
             final createdBy = newRecord['created_by'] as String?;
-
-            // Evitar auto-notificarse si la venta la hizo el mismo usuario
-            if (createdBy == currentUserId) return;
+            if (createdBy != null && createdBy == client.auth.currentUser?.id) return;
 
             final productName = newRecord['product_name'] ?? 'Producto';
             final qty = newRecord['quantity'] ?? 1;
@@ -141,6 +149,7 @@ class NotificationService extends ChangeNotifier {
               type: NotificationType.sale,
               data: newRecord,
             );
+            _scheduleRemoteRefresh(onRemoteSale);
           },
         )
         ..subscribe();
@@ -151,8 +160,22 @@ class NotificationService extends ChangeNotifier {
     }
   }
 
+  /// Agrupa varias ventas seguidas en una sola descarga
+  void _scheduleRemoteRefresh(Future<void> Function() onRemoteSale) {
+    _remoteRefreshTimer?.cancel();
+    _remoteRefreshTimer = Timer(const Duration(seconds: 3), () async {
+      try {
+        await onRemoteSale();
+        remoteSalesVersion.value++;
+      } catch (e) {
+        debugPrint('Error descargando ventas de otro dispositivo: $e');
+      }
+    });
+  }
+
   /// Detiene la escucha de ventas en tiempo real
   void stopRealtimeSalesListening() {
+    _remoteRefreshTimer?.cancel();
     if (_salesChannel != null) {
       final client = SupabaseService.instance.client;
       if (client != null) {

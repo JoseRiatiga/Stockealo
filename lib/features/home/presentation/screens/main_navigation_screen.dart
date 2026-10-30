@@ -1,3 +1,4 @@
+import '../../../../core/services/supabase_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
@@ -74,7 +75,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         // Iniciar escucha de ventas en tiempo real si hay negocio activo
         NotificationService.instance.startRealtimeSalesListening(
           businessId: biz.id,
-          currentUserId: user.id,
+          onRemoteSale: () => SupabaseService.instance.syncFromCloud(user.id, user.email),
         );
       }
       if (mounted) {

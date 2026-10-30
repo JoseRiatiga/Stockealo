@@ -152,7 +152,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _loadData();
     _businessRepo.activeBusinessNotifier.addListener(_onBusinessChanged);
+    NotificationService.instance.remoteSalesVersion.addListener(_onRemoteSales);
     _syncSilently();
+  }
+
+  /// Ventas hechas en otro dispositivo, ya descargadas: solo recargar
+  void _onRemoteSales() {
+    if (mounted) _loadData();
   }
 
   void _onBusinessChanged() {
@@ -193,6 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _businessRepo.activeBusinessNotifier.removeListener(_onBusinessChanged);
+    NotificationService.instance.remoteSalesVersion.removeListener(_onRemoteSales);
     super.dispose();
   }
 

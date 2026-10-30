@@ -56,4 +56,23 @@ void main() {
       );
     });
   });
+
+  group('isUnknownAccountError', () {
+    test('reconoce el correo sin cuenta al pedir código', () {
+      expect(
+        AuthRepository.isUnknownAccountError(
+            const AuthException('Signups not allowed for otp', code: 'otp_disabled')),
+        isTrue,
+      );
+    });
+
+    test('no oculta otros errores', () {
+      expect(
+        AuthRepository.isUnknownAccountError(
+            const AuthException('For security purposes...', code: 'over_email_send_rate_limit')),
+        isFalse,
+      );
+      expect(AuthRepository.isUnknownAccountError(Exception('otp_disabled')), isFalse);
+    });
+  });
 }

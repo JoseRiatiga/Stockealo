@@ -254,15 +254,39 @@ class AuthRepository {
   }
 
   /// Solicita el código OTP de 6 dígitos para restablecer contraseña.
-  /// No revela si el correo tiene cuenta: eso se comprueba al verificar el código.
+  /// No revela si el correo tiene cuenta ni crea cuentas nuevas: a un correo sin
+  /// cuenta simplemente no le llega el código.
   Future<void> requestPasswordResetOtp(String email) async {
     final cleanEmail = _validateEmail(email);
     final auth = await _requireAuth();
+
+    // Las cuentas anteriores a la Fase 1 pueden no tener usuario de Auth todavía;
+    // el servidor lo crea solo si el correo ya tiene perfil en Stockealo.
     try {
-      await auth.signInWithOtp(email: cleanEmail, shouldCreateUser: true);
+      await SupabaseService.instance.client!.functions.invoke(
+        'prepare-password-reset',
+        body: {'email': cleanEmail},
+      );
     } catch (e) {
+      debugPrint('No se pudo preparar la recuperación: $e');
+    }
+
+    try {
+      await auth.signInWithOtp(email: cleanEmail, shouldCreateUser: false);
+    } catch (e) {
+      if (isUnknownAccountError(e)) return;
       throw Exception(_translateAuthError(e));
     }
+  }
+
+  /// Error de Supabase al pedir un código para un correo sin cuenta (con shouldCreateUser: false)
+  @visibleForTesting
+  static bool isUnknownAccountError(Object e) {
+    if (e is! AuthException) return false;
+    final msg = '${e.code} ${e.message}'.toLowerCase();
+    return msg.contains('otp_disabled') ||
+        msg.contains('user_not_found') ||
+        msg.contains('signups not allowed for otp');
   }
 
   /// Verifica el código OTP y actualiza la contraseña del usuario

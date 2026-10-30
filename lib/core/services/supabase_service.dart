@@ -223,6 +223,11 @@ class SupabaseService {
           'created_at': b['created_at'],
         }).toList();
 
+        // Con RLS un negocio nuevo no puede crearse con upsert: primero se asegura
+        // en el servidor que exista con su dueño (no hace nada si ya existe)
+        for (final b in localBusinesses.where((b) => ownedIds.contains(b['id']))) {
+          await _createBusinessWithOwner(client!, b);
+        }
         await client!.from('businesses').upsert(
           formattedBusinesses,
           onConflict: 'id',
@@ -873,15 +878,18 @@ class SupabaseService {
       case 'delete_sale':
         await db.from('sales').delete().eq('id', p['id'] as String);
       case 'upsert_business':
-        await db.from('businesses').upsert({
-          'id': p['id'],
-          'name': p['name'],
-          'type': (p['type'] ?? 'Comercio General').toString(),
-          'currency': p['currency'] ?? 'COP',
-          'is_deleted': (p['is_deleted'] as int?) ?? 0,
-          'created_at': p['created_at'],
-          if (editedAt != null) 'updated_at': editedAt,
-        }, onConflict: 'id');
+        final updated = await db
+            .from('businesses')
+            .update({
+              'name': p['name'],
+              'type': (p['type'] ?? 'Comercio General').toString(),
+              'currency': p['currency'] ?? 'COP',
+              'is_deleted': (p['is_deleted'] as int?) ?? 0,
+              if (editedAt != null) 'updated_at': editedAt,
+            })
+            .eq('id', p['id'] as String)
+            .select('id');
+        if (updated.isEmpty) await _createBusinessWithOwner(db, p);
       case 'update_business_deleted':
         await db.from('businesses').update({
           'is_deleted': p['is_deleted'],
@@ -919,7 +927,7 @@ class SupabaseService {
       case 'upsert_member':
         final userEmail = (p['email'] ?? p['user_email'] ?? '').toString();
         final rawUserId = p['user_id'] as String?;
-        await db.from('business_members').upsert({
+        final row = {
           'id': p['id'],
           'business_id': p['business_id'],
           'user_id': (rawUserId != null && rawUserId.trim().isNotEmpty) ? rawUserId.trim() : '',
@@ -929,12 +937,52 @@ class SupabaseService {
               .toString(),
           'role': p['role'] ?? 'CASHIER',
           'created_at': p['created_at'] ?? DateTime.now().toIso8601String(),
-        }, onConflict: 'id');
+        };
+        try {
+          await db.from('business_members').upsert(row, onConflict: 'id');
+        } on PostgrestException catch (e) {
+          // El dueño de un negocio que aún no existe en la nube (creado sin conexión o
+          // cuya creación se perdió): crearlo con su dueño en el servidor y reintentar
+          final isOwnBusinessOwner = row['role'] == 'OWNER' &&
+              userEmail.toLowerCase() == db.auth.currentUser?.email?.toLowerCase();
+          if (e.code != '42501' || !isOwnBusinessOwner) rethrow;
+          final local = await AppDatabase.instance.database;
+          final business = await local.query('businesses', where: 'id = ?', whereArgs: [p['business_id']], limit: 1);
+          if (business.isEmpty) rethrow;
+          await _createBusinessWithOwner(db, business.first);
+          await db.from('business_members').upsert(row, onConflict: 'id');
+        }
       case 'delete_member':
         await db.from('business_members').delete().eq('id', p['id'] as String);
       default:
         throw ArgumentError('Operación de sincronización desconocida: $operation');
     }
+  }
+
+  /// Crea el negocio y registra a esta cuenta como dueña en un solo paso del
+  /// servidor. Usa el id de membresía que ya existe en el teléfono para que la
+  /// membresía encolada después no quede duplicada.
+  Future<void> _createBusinessWithOwner(SupabaseClient db, Map<String, dynamic> business) async {
+    final email = db.auth.currentUser?.email?.toLowerCase();
+    final local = await AppDatabase.instance.database;
+    final owner = email == null
+        ? <Map<String, dynamic>>[]
+        : await local.query(
+            'business_members',
+            where: "business_id = ? AND LOWER(email) = ? AND role = 'OWNER'",
+            whereArgs: [business['id'], email],
+            limit: 1,
+          );
+    await db.rpc('create_business_with_owner', params: {
+      'p_id': business['id'],
+      'p_name': business['name'],
+      'p_type': business['type'],
+      'p_currency': business['currency'],
+      'p_created_at': business['created_at'],
+      'p_member_id': owner.isNotEmpty ? owner.first['id'] : null,
+      'p_user_id': owner.isNotEmpty ? owner.first['user_id'] : null,
+      'p_user_name': owner.isNotEmpty ? owner.first['name'] : null,
+    });
   }
 
   Future<void> _sendProduct(SupabaseClient db, Map<String, dynamic> p) async {

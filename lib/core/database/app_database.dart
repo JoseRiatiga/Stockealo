@@ -26,7 +26,9 @@ class AppDatabase {
   AppDatabase._init();
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
+    // Puede quedar cerrada por fuera (deleteDatabase, restaurar un respaldo): se reabre
+    final db = _database;
+    if (db != null && db.isOpen) return db;
     _database = await _initDB(_openFile);
     return _database!;
   }
@@ -36,7 +38,7 @@ class AppDatabase {
   /// [authUserId] null vuelve al archivo compartido (sin sesión).
   Future<void> useAccount(String? authUserId, [String? email]) async {
     final file = authUserId == null ? _legacyDbFile : await _fileForAccount(authUserId, email);
-    if (file == _openFile && _database != null) return;
+    if (file == _openFile && _database?.isOpen == true) return;
 
     final previous = _database;
     _database = null;

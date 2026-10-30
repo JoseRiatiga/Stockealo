@@ -67,23 +67,25 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Stockealo ${{ github.ref_name }}
           body: |
-            ## 🚀 Novedades de la versión ${{ github.ref_name }}
-            - 🤖 **Stocky Asistente Flotante**: Reubicado estratégicamente en la esquina inferior derecha justo encima de la barra de módulos para acceso con una sola mano en Inicio, Inventario y Ventas.
-            - 💥 **Bocadillos con Tips Proactivos y Animación de Explosión**: Consejos comerciales esporádicos con estallido visual de partículas/chispas que asesoran en ventas por impulso en caja, combos para rotar mercancía estancada, regla 80/20 y cobro de fiados.
-            - 🪟 **Apertura Suave Blossom y Modal Compacto**: Apertura con escala suave desde el botón flotante y altura compacta (~60%) para mantener siempre visible el contexto del negocio.
-            - 💾 **Persistencia de Conversación en Sesión**: Mantiene la conversación local activa entre aperturas del modal hasta cerrar sesión o refrescar manualmente.
-            - 🏷️ **Header Limpio e Identidad Renovada**: Identidad unificada como "asistente", título "Stocky", subtítulo "• En línea" y retiro del banner redundante en el Dashboard.
-            - 🖼️ **Miniaturas y Fotos de Producto Optimizadas**: Soporte integral de fotos en el carrito POS, selector de tallas/variantes, solicitudes de reposición a proveedores y comprobantes digitales de venta.
-            - 💬 **Cobro Rápido por WhatsApp con 1 Toque**: Stocky redacta y prepara recordatorios de pago cordiales para clientes con saldos pendientes listos para enviar por WhatsApp.
-            - 📱 **Optimizaciones Responsivas 360px**: Ajuste milimétrico para pantallas compactas en tarjetas de equipo de trabajo, historial de ventas, chips de periodo y diálogo de recuperación de contraseña.
-            - 🔑 **Recuperación de Contraseña por Correo (OTP 6 Dígitos)**: Autoservicio para usuarios con código de verificación enviado directamente desde la cuenta oficial de soporte (`soporte.stockealo@gmail.com`) y cifrado seguro SHA-256 + Pepper.
-            - 🔐 **Firma Oficial Permanente (Keystore Unificada)**: Todas las versiones ahora comparten la misma firma criptográfica oficial para permitir actualizaciones fluidas con 1 solo toque sin conflicto de paquetes.
-            - 👗 **Variantes de Producto (Tallas, Colores y Modelos)**: Creación opcional de variantes con stock independiente por talla/color (presets rápidos de ropa y calzado, códigos de barras por talla y selector visual en el punto de venta).
-            - 🛒 **Terminal POS & Carrito Multi-Producto**: Facturación unificada para múltiples productos en una sola compra, buscador integrado, lector de código de barras y preservación de la venta rápida de 1 producto en 3 segundos.
-            - 🏷️ **Motor de Descuentos por Mayor & Blindaje Anti-Pérdidas**: Descuentos en porcentaje (%) o monto fijo ($) con validación matemática en vivo para proteger la rentabilidad y bloquear ventas a pérdida en cajeros.
-            - 📄 **Gestor de Cotizaciones / Proformas**: Creación de presupuestos con validez de 15 días, compartibles por WhatsApp y convertibles a venta final en 1 solo clic con validación automática de inventario.
-            - 📱 **Catálogo para Redes Sociales & Historias**: Exportación dual en PDF y tarjetas PNG 9:16 en Ultra-HD para WhatsApp e Instagram Stories, con selector de densidad (1, 2, 4 o 6 productos) y pedidos directos a WhatsApp.
-            - 🔔 **Notificaciones Push / Realtime en Vivo**: Alertas instantáneas y campanita con badge cuando cajeros registran ventas en tiempo real, sin requerir configuración manual.
-            - 🛡️ **Seguridad y Blindaje de Roles**: Protección total para cajeros (costos de compra y márgenes ocultos; acceso restringido para crear o modificar catálogo).
+            ## Novedades de la versión ${{ github.ref_name }}
+
+            **Importante:** las versiones anteriores ya no sincronizan con la nube. Actualiza para que tus datos se suban de nuevo; lo que tengas guardado en el teléfono no se pierde.
+
+            ### Seguridad
+            - **Inicio de sesión más seguro.** La primera vez entra con tu correo y tu contraseña de siempre; la app actualiza tu cuenta sola.
+            - **Cada negocio solo lo ven sus miembros**, y cada rol (dueño, administrador, cajero) solo puede hacer lo que le corresponde, también en la nube.
+            - **Cada cuenta tiene sus propios datos** en el teléfono: si otra persona inicia sesión en el mismo celular, no ve tu inventario.
+            - **Recuperar la contraseña es más fácil:** el código se verifica una vez y puedes intentar la contraseña nueva las veces que necesites.
+
+            ### Sincronización
+            - **Funciona sin internet:** los cambios se guardan y se suben solos cuando vuelve la conexión.
+            - **El stock y los fiados ya no se pisan** cuando se usa la app en varios teléfonos a la vez.
+            - **Ventas en tiempo real** entre los teléfonos del mismo negocio.
+            - Los negocios nuevos y la papelera de negocios se sincronizan correctamente.
+
+            ### Funciones nuevas
+            - **Arqueo de caja:** abre la caja con una base, registra el día y al cerrar ves si sobra o falta dinero.
+            - **Recordatorio de fiados por WhatsApp** con el saldo del cliente.
+            - **Respaldo:** guarda una copia de tus datos en un archivo y restáurala cuando la necesites.
           draft: false
           prerelease: false

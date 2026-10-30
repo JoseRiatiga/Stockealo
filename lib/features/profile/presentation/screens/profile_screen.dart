@@ -1,3 +1,6 @@
+import '../widgets/change_password_dialog.dart';
+import '../widgets/up_to_date_dialog.dart';
+import '../widgets/settings_cards.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'dart:io';
 import 'dart:math' as math;
@@ -99,109 +102,8 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
         ),
       );
     } else {
-      _showUpToDateDialog(updateInfo.currentVersion);
+      UpToDateDialog.show(context, updateInfo.currentVersion);
     }
-  }
-
-  void _showUpToDateDialog(String currentVersion) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF131126) : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: BorderSide(
-            color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-            width: 1.5,
-          ),
-        ),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF059669).withOpacity(0.15),
-                  border: Border.all(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
-                    width: 2,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.verified_rounded,
-                  color: Color(0xFF10B981),
-                  size: 38,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '¡Estás al día!',
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
-                  ),
-                ),
-                child: Text(
-                  'Versión v$currentVersion',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Tu aplicación cuenta con las últimas optimizaciones, correcciones y funciones disponibles.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.4,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF059669),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text(
-                    'Entendido',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Future<void> _loadCloudSyncStatus() async {
@@ -382,113 +284,6 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Future<void> _showChangePasswordDialog() async {
-    final currentPassController = TextEditingController();
-    final newPassController = TextEditingController();
-    final confirmPassController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return ModernDialog(
-          icon: Icons.lock_reset_rounded,
-          iconColor: const Color(0xFF059669),
-          title: 'Cambiar Contraseña',
-          subtitle: 'Actualiza tu clave de acceso de manera segura',
-          maxWidth: 440,
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentPassController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Contraseña Actual',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: newPassController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Nueva Contraseña',
-                  prefixIcon: Icon(Icons.lock_reset),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: confirmPassController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Confirmar Nueva Contraseña',
-                  prefixIcon: Icon(Icons.check_circle_outline),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                side: BorderSide(
-                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              onPressed: () async {
-                if (newPassController.text != confirmPassController.text) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Las contraseñas no coinciden'), backgroundColor: Colors.orange),
-                  );
-                  return;
-                }
-                try {
-                  await _authRepo.changePassword(
-                    userId: _user!.id,
-                    currentPassword: currentPassController.text,
-                    newPassword: newPassController.text,
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Contraseña actualizada correctamente'), backgroundColor: Color(0xFF059669)),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red),
-                    );
-                  }
-                }
-              },
-              child: const Text('Guardar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<void> _exportBackup() async {
@@ -779,7 +574,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
             ),
             children: [
           // 1. Tarjeta: Perfil Comercial y Cuenta
-          _buildCard(
+          SettingsCards.card(context, 
             child: Column(
               children: [
                 Row(
@@ -884,7 +679,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           const SizedBox(height: 12),
 
           // 2. Tarjeta Unificada: Información de tu Negocio
-          _buildCard(
+          SettingsCards.card(context, 
             child: _activeBusiness != null
                 ? InkWell(
                     borderRadius: BorderRadius.circular(12),
@@ -980,7 +775,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           const SizedBox(height: 12),
 
           // 3. Tarjeta: Datos, Respaldo y Nube (Colapsable)
-          _buildCollapsibleCard(
+          SettingsCards.collapsible(context, 
             title: 'Datos, Respaldo y Nube',
             subtitle: _isCloudSyncEnabled
                 ? 'Respaldo automático en Nube activo'
@@ -1128,7 +923,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           ),
 
           // 4. Tarjeta: Seguridad (Colapsable)
-          _buildCollapsibleCard(
+          SettingsCards.collapsible(context, 
             title: 'Seguridad',
             subtitle: 'Contraseña y términos del servicio',
             icon: Icons.shield_outlined,
@@ -1149,7 +944,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                   title: const Text('Cambiar Contraseña', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                   subtitle: const Text('Actualiza tu clave de acceso seguro', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                   trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-                  onTap: _showChangePasswordDialog,
+                  onTap: _user == null ? null : () => ChangePasswordDialog.show(context, userId: _user!.id),
                 ),
                 const Divider(height: 12),
                 ListTile(
@@ -1171,7 +966,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           ),
 
           // 5. Tarjeta: Zona de Privacidad y Borrado de Datos (Colapsable por defecto)
-          _buildCollapsibleCard(
+          SettingsCards.collapsible(context, 
             title: 'Zona de Privacidad y Borrado',
             subtitle: 'Purgar datos de nube o eliminar cuenta',
             icon: Icons.delete_forever_outlined,
@@ -1425,177 +1220,4 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     );
   }
 
-  Widget _buildCard({
-    String? title,
-    IconData? icon,
-    Color? titleColor,
-    Color? borderColor,
-    Color? backgroundColor,
-    required Widget child,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final defaultBg = isDark ? const Color(0xFF131127) : Colors.white;
-    final defaultBorder = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
-    final defaultTitleColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: backgroundColor ?? defaultBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor ?? defaultBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (title != null) ...[
-            Row(
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 18, color: titleColor ?? const Color(0xFF8B5CF6)),
-                  const SizedBox(width: 8),
-                ],
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: titleColor ?? defaultTitleColor,
-                  ),
-                ),
-              ],
-            ),
-            Divider(height: 20, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-          ],
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCollapsibleCard({
-    required String title,
-    required IconData icon,
-    required String subtitle,
-    required bool isExpanded,
-    required VoidCallback onToggle,
-    required Widget child,
-    Color? iconColor,
-    Color? titleColor,
-    Color? borderColor,
-    Color? backgroundColor,
-    Widget? trailingBadge,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final defaultBg = isDark ? const Color(0xFF131126) : Colors.white;
-    final defaultBorder = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
-    final defaultTitleColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-    final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: backgroundColor ?? defaultBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor ?? defaultBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: onToggle,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: (iconColor ?? const Color(0xFF059669)).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, size: 20, color: iconColor ?? const Color(0xFF059669)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              title,
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.bold,
-                                color: titleColor ?? defaultTitleColor,
-                              ),
-                            ),
-                            if (trailingBadge != null) ...[
-                              const SizedBox(width: 8),
-                              trailingBadge,
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: secondaryTextColor,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  AnimatedRotation(
-                    turns: isExpanded ? 0.5 : 0.0,
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      size: 24,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                children: [
-                  Divider(
-                    height: 16,
-                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-                  ),
-                  child,
-                ],
-              ),
-            ),
-            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
-          ),
-        ],
-      ),
-    );
-  }
 }

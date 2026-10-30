@@ -1,3 +1,5 @@
+import '../widgets/quick_stock_dialog.dart';
+import '../widgets/product_sort_filter_sheet.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -232,94 +234,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     }
   }
 
-  Future<void> _showQuickStockDialog(Product product) async {
-    final controller = TextEditingController(text: product.stock.toString());
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF10B981), size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Ajustar Stock', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold)),
-                  Text(
-                    product.name,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Ingresa el número total de unidades disponibles:',
-              style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Nuevo Stock',
-                prefixIcon: Icon(Icons.pin_outlined),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF059669),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            ),
-            onPressed: () {
-              final val = int.tryParse(controller.text.trim());
-              if (val != null && val >= 0) {
-                Navigator.pop(ctx, true);
-              }
-            },
-            child: const Text('Actualizar'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      final newStock = int.parse(controller.text.trim());
-      await _repository.adjustStock(
-        product.id,
-        product.businessId,
-        newStock,
-        'Ajuste rápido desde catálogo',
-      );
-      _loadData();
-    }
-  }
-
   Future<void> _exportToExcel() async {
     if (_activeBusiness == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -420,200 +334,15 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   }
 
   Future<void> _openSortFilterModal() async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    String tempSort = _sortOption;
-    String tempStockFilter = _stockFilterOption;
-
-    final applied = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (modalCtx, setModalState) {
-            final cardBg = isDark ? const Color(0xFF131126) : Colors.white;
-            final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-            final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-            final borderColor = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
-
-            Widget buildSortItem(String value, String label, IconData icon) {
-              final isSelected = tempSort == value;
-              return InkWell(
-                onTap: () => setModalState(() => tempSort = value),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  margin: const EdgeInsets.only(bottom: 6),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? (const Color(0xFF8B5CF6).withOpacity(0.12))
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected ? const Color(0xFF8B5CF6) : borderColor,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        icon,
-                        size: 18,
-                        color: isSelected ? const Color(0xFF8B5CF6) : textMuted,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: isSelected ? const Color(0xFF8B5CF6) : textMain,
-                          ),
-                        ),
-                      ),
-                      if (isSelected)
-                        const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF8B5CF6)),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            Widget buildStockFilterChip(String value, String label, Color color) {
-              final isSelected = tempStockFilter == value;
-              return Expanded(
-                child: InkWell(
-                  onTap: () => setModalState(() => tempStockFilter = value),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isSelected ? color.withOpacity(0.15) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected ? color : borderColor,
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? color : textMuted,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }
-
-            return Container(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                16,
-                20,
-                MediaQuery.of(ctx).padding.bottom + 20,
-              ),
-              decoration: BoxDecoration(
-                color: cardBg,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Filtros y Ordenamiento',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: textMain,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setModalState(() {
-                              tempSort = 'name_asc';
-                              tempStockFilter = 'all';
-                            });
-                          },
-                          child: const Text('Restablecer', style: TextStyle(fontSize: 12.5)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'ESTADO DEL STOCK',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textMuted),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        buildStockFilterChip('all', 'Todos', const Color(0xFF8B5CF6)),
-                        const SizedBox(width: 8),
-                        buildStockFilterChip('low_stock', 'Bajo Stock', const Color(0xFFD97706)),
-                        const SizedBox(width: 8),
-                        buildStockFilterChip('out_of_stock', 'Agotados', const Color(0xFFDC2626)),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'ORDENAR POR',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textMuted),
-                    ),
-                    const SizedBox(height: 8),
-                    buildSortItem('name_asc', 'Alfabético (A - Z) • Predeterminado', Icons.sort_by_alpha_rounded),
-                    buildSortItem('name_desc', 'Alfabético (Z - A)', Icons.sort_by_alpha_rounded),
-                    buildSortItem('stock_desc', 'Mayor stock disponible', Icons.inventory_2_rounded),
-                    buildSortItem('stock_asc', 'Menor stock (Por agotarse)', Icons.production_quantity_limits_rounded),
-                    buildSortItem('price_desc', 'Mayor precio de venta', Icons.arrow_upward_rounded),
-                    buildSortItem('price_asc', 'Menor precio de venta', Icons.arrow_downward_rounded),
-                    buildSortItem('margin_desc', 'Mayor margen de ganancia', Icons.trending_up_rounded),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF059669),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Aplicar Filtros', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+    final selection = await ProductSortFilterSheet.show(
+      context,
+      sort: _sortOption,
+      stockFilter: _stockFilterOption,
     );
-
-    if (applied == true) {
+    if (selection != null) {
       setState(() {
-        _sortOption = tempSort;
-        _stockFilterOption = tempStockFilter;
+        _sortOption = selection.sort;
+        _stockFilterOption = selection.stockFilter;
       });
       _loadData();
     }
@@ -1025,7 +754,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                                     );
                                     _loadData();
                                   },
-                                  onAdjustStock: canEditProducts ? () => _showQuickStockDialog(product) : null,
+                                  onAdjustStock: canEditProducts ? () => QuickStockDialog.show(context, product: product, onSaved: _loadData) : null,
                                   onSale: () async {
                                     final sold = await QuickSaleDialog.show(context, product);
                                     if (sold == true) {
@@ -1059,7 +788,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                                   );
                                   _loadData();
                                 },
-                                onAdjustStock: canEditProducts ? () => _showQuickStockDialog(product) : null,
+                                onAdjustStock: canEditProducts ? () => QuickStockDialog.show(context, product: product, onSaved: _loadData) : null,
                                 onSale: () async {
                                   final sold = await QuickSaleDialog.show(context, product);
                                   if (sold == true) {

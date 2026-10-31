@@ -4,14 +4,18 @@
     "start_url": ".",
     "scope": ".",
     "display": "standalone",
-    "background_color": "#0F172A",
-    "theme_color": "#059669",
+    "background_color": "#F6F3EC",
+    "theme_color": "#1E6B4E",
     "description": "Tu negocio bajo control. Gestión inteligente de inventario, ventas, clientes y catálogo comercial.",
     "orientation": "any",
     "prefer_related_applications": false,
     "lang": "es-CO",
     "dir": "ltr",
-    "categories": ["business", "productivity", "utilities"],
+    "categories": [
+        "business",
+        "productivity",
+        "utilities"
+    ],
     "icons": [
         {
             "src": "icons/Icon-192.png",

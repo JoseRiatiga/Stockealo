@@ -9,6 +9,15 @@ import '../../data/customer_repository.dart';
 import '../../models/customer.dart';
 import '../widgets/new_customer_sheet.dart';
 import '../widgets/record_payment_modal.dart';
+import '../../../../core/design/pro_crown.dart';
+import '../../../../core/design/app_time_picker.dart';
+import '../../../../core/services/phone_alerts_service.dart';
+import '../../../../core/widgets/app_toast.dart';
+import '../../../pro/data/pro_service.dart';
+import '../../../pro/presentation/widgets/pro_upsell_sheet.dart';
+import '../../data/account_statement.dart';
+import '../../data/debt_reminder_schedule.dart';
+import '../widgets/debt_reminder_schedule_sheet.dart';
 
 class CustomersScreen extends StatefulWidget {
   final String businessId;
@@ -30,14 +39,28 @@ class _CustomersScreenState extends State<CustomersScreen> {
   bool _isLoading = true;
   String _filter = 'TODOS'; // 'TODOS' | 'DEUDA' | 'AL_DIA'
 
+  /// Recordatorios de cobro programados, por cliente (Stockealo Pro)
+  Map<String, DebtReminderSchedule> _reminders = {};
+  bool _pro = false;
+  String? _sharingId;
+
   @override
   void initState() {
     super.initState();
     _loadCustomers();
+    ProService.instance.status.addListener(_onProChanged);
+    ProService.instance.refresh(widget.businessId);
+    // refresh limpia al instante el estado si era de otro negocio
+    _pro = ProService.instance.status.value.active;
+  }
+
+  void _onProChanged() {
+    if (mounted) setState(() => _pro = ProService.instance.status.value.active);
   }
 
   @override
   void dispose() {
+    ProService.instance.status.removeListener(_onProChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -45,9 +68,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
   Future<void> _loadCustomers() async {
     setState(() => _isLoading = true);
     final list = await _customerRepo.getCustomers(widget.businessId);
+    final reminders = await DebtReminderStore.instance.load();
     if (mounted) {
       setState(() {
         _customers = list;
+        _reminders = reminders;
         _isLoading = false;
       });
     }
@@ -151,6 +176,61 @@ class _CustomersScreenState extends State<CustomersScreen> {
       businessName: ActiveBusinessScope.read(context)?.name ?? 'Mi negocio',
       phone: customer.phone,
     );
+  }
+
+  void _onPaymentRecorded() {
+    _loadCustomers();
+    // El aviso programado lleva la deuda nueva (o se quita si ya quedó al día)
+    PhoneAlertsService.instance.refreshDebtReminders();
+  }
+
+  /// Las funciones de cobro son de Stockealo Pro: sin Pro se abre la ventana de Pro
+  Future<bool> _ensurePro({required String title, required String message}) async {
+    if (_pro) return true;
+    final business = ActiveBusinessScope.read(context);
+    if (business == null) return false;
+    final result = await ProUpsellSheet.show(
+      context,
+      business: business,
+      title: title,
+      message: message,
+      highlight: ProBenefit.debtCollection,
+    );
+    return result == ProUpsellResult.pro;
+  }
+
+  Future<void> _shareStatement(Customer customer) async {
+    final pro = await _ensurePro(
+      title: 'Estado de cuenta en PDF',
+      message: 'Envíale a ${customer.name} un PDF con su saldo, lo que fió y lo que abonó, '
+          'con el logo y el color de tu negocio.',
+    );
+    if (!pro || !mounted) return;
+    final business = ActiveBusinessScope.read(context);
+    if (business == null) return;
+    setState(() => _sharingId = customer.id);
+    try {
+      await AccountStatementService.instance.share(business: business, customer: customer);
+    } catch (e) {
+      if (mounted) AppToast.show(context, message: 'No se pudo crear el estado de cuenta: $e', type: ToastType.error);
+    } finally {
+      if (mounted) setState(() => _sharingId = null);
+    }
+  }
+
+  Future<void> _scheduleReminder(Customer customer) async {
+    if (!PhoneAlertsService.instance.isSupported) {
+      AppToast.show(context, message: 'Los recordatorios llegan al celular Android.', type: ToastType.info);
+      return;
+    }
+    final pro = await _ensurePro(
+      title: 'Recordatorios de cobro',
+      message: 'Tu celular te avisa "Hoy toca cobrarle a ${customer.name}" cada cuánto quieras, '
+          'con el mensaje de WhatsApp listo para enviar.',
+    );
+    if (!pro || !mounted) return;
+    final changed = await DebtReminderScheduleSheet.show(context, customer: customer, current: _reminders[customer.id]);
+    if (changed == true) _loadCustomers();
   }
 
   @override
@@ -386,6 +466,23 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           color: context.colors.ink,
                         ),
                       ),
+                      if (_reminders[customer.id] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Row(
+                            children: [
+                              Icon(Icons.notifications_active_outlined, size: 12, color: context.colors.accent),
+                              const SizedBox(width: AppSpace.xs),
+                              Flexible(
+                                child: Text(
+                                  '${_reminders[customer.id]!.frequencyLabel} · '
+                                  '${formatAppTime(TimeOfDay(hour: _reminders[customer.id]!.hour, minute: _reminders[customer.id]!.minute))}',
+                                  style: TextStyle(fontSize: 12, color: context.colors.accent),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (customer.phone?.isNotEmpty == true)
                         Row(
                           children: [
@@ -464,7 +561,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       RecordPaymentModal.show(
                         context,
                         customer: customer,
-                        onPaymentRecorded: _loadCustomers,
+                        onPaymentRecorded: _onPaymentRecorded,
                       );
                     },
                     icon: const Icon(Icons.attach_money, size: 16),
@@ -478,6 +575,24 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   ),
                   const SizedBox(width: 8),
                 ],
+                _sharingId == customer.id
+                    ? const Padding(
+                        padding: EdgeInsets.all(AppSpace.md),
+                        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                      )
+                    : PopupMenuButton<String>(
+                        tooltip: 'Cobro y estado de cuenta',
+                        icon: Icon(Icons.more_vert_rounded, color: context.colors.inkMuted),
+                        onSelected: (v) => v == 'statement' ? _shareStatement(customer) : _scheduleReminder(customer),
+                        itemBuilder: (_) => [
+                          _proMenuItem('statement', Icons.picture_as_pdf_outlined, 'Estado de cuenta (PDF)'),
+                          _proMenuItem(
+                            'reminder',
+                            Icons.notifications_active_outlined,
+                            _reminders[customer.id] == null ? 'Programar recordatorio' : 'Editar recordatorio',
+                          ),
+                        ],
+                      ),
                 OutlinedButton.icon(
                   onPressed: () => _showCustomerPaymentsHistory(customer),
                   icon: const Icon(Icons.history, size: 16),
@@ -493,6 +608,24 @@ class _CustomersScreenState extends State<CustomersScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _proMenuItem(String value, IconData icon, String label) {
+    final c = context.colors;
+    return PopupMenuItem(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: c.ink),
+          const SizedBox(width: AppSpace.md),
+          Expanded(child: Text(label, style: TextStyle(color: c.ink))),
+          if (!_pro) ...[
+            const SizedBox(width: AppSpace.sm),
+            const ProCrown(),
+          ],
+        ],
       ),
     );
   }

@@ -70,7 +70,7 @@ void main() {
   test('no se agregan colores escritos a mano fuera del tema', () {
     // Las pantallas usan context.colors. Este número solo puede bajar a medida que
     // se rediseñan; si una pantalla agrega un Color(0x...) nuevo, la prueba falla.
-    const baseline = 876;
+    const baseline = 856;
     final count = Directory('lib')
         .listSync(recursive: true)
         .whereType<File>()

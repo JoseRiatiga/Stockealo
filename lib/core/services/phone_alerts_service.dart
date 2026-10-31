@@ -7,6 +7,9 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../../features/business/data/business_repository.dart';
 import '../../features/business/models/business.dart';
+import '../../features/customers/data/customer_repository.dart';
+import '../../features/customers/data/debt_reminder.dart';
+import '../../features/customers/data/debt_reminder_schedule.dart';
 import '../../features/dashboard/data/dashboard_repository.dart';
 import '../../features/products/data/product_repository.dart';
 import '../database/app_database.dart';
@@ -16,6 +19,8 @@ import 'data_events.dart';
 /// Avisos en la barra del celular, aunque la app esté cerrada:
 /// • stock bajo: cuando un producto llega a su mínimo después de una venta
 /// • resumen del día: a la hora elegida, con las ventas del día en este celular
+/// • cobro de fiados (Pro): "Hoy toca cobrarle a X", con un botón que abre WhatsApp
+///   con el mensaje listo (el dueño lo envía; nada sale solo)
 ///
 /// Los dos vienen apagados; al activarlos Android 13+ pide permiso. Todo se calcula
 /// con los datos del celular, sin servidor.
@@ -43,6 +48,19 @@ class PhoneAlertsService {
     channelDescription: 'Cómo te fue en el día, a la hora que elijas',
   );
 
+  static const _openWhatsAppAction = 'open_whatsapp';
+  static const _debtChannel = AndroidNotificationDetails(
+    'debt_reminders',
+    'Cobro de fiados',
+    channelDescription: 'Recordatorios programados para cobrarle a tus clientes',
+    importance: Importance.high,
+    priority: Priority.high,
+    actions: [AndroidNotificationAction(_openWhatsAppAction, 'Abrir WhatsApp', showsUserInterface: true)],
+  );
+
+  /// Avisos que se dejan programados por cliente; se completan al abrir la app
+  static const debtOccurrences = 4;
+
   final _plugin = FlutterLocalNotificationsPlugin();
   bool _ready = false;
 
@@ -58,9 +76,14 @@ class PhoneAlertsService {
       tz_data.initializeTimeZones();
       await _plugin.initialize(
         const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_notification')),
+        onDidReceiveNotificationResponse: _onNotificationResponse,
       );
       _ready = true;
       DataEvents.instance.salesVersion.addListener(_onSalesChanged);
+      // La app se abrió tocando un aviso de cobro
+      final launch = await _plugin.getNotificationAppLaunchDetails();
+      final response = launch?.notificationResponse;
+      if (launch?.didNotificationLaunchApp == true && response != null) _onNotificationResponse(response);
     } catch (e) {
       debugPrint('Avisos: no se pudieron preparar: $e');
     }
@@ -69,6 +92,7 @@ class PhoneAlertsService {
   void _onSalesChanged() {
     checkLowStock();
     refreshDailySummary();
+    refreshDebtReminders();
   }
 
   // ---------------------------------------------------------------------------
@@ -241,6 +265,102 @@ class PhoneAlertsService {
       );
     } catch (e) {
       debugPrint('Resumen del día: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cobro de fiados (Stockealo Pro)
+
+  /// Ids de los avisos de un cliente: uno por cada próxima fecha
+  @visibleForTesting
+  static List<int> debtNotificationIds(String customerId) {
+    final base = 0x10000000 + ((customerId.hashCode & 0x00ffffff) << 2);
+    return [for (var i = 0; i < debtOccurrences; i++) base + i];
+  }
+
+  Future<void> _cancelDebt(String customerId) async {
+    for (final id in debtNotificationIds(customerId)) {
+      await _plugin.cancel(id);
+    }
+  }
+
+  /// Guarda el recordatorio de un cliente y lo programa. false si no hay permiso.
+  Future<bool> setDebtReminder(DebtReminderSchedule schedule) async {
+    if (!await ensurePermission()) return false;
+    await DebtReminderStore.instance.save(schedule);
+    await _scheduleDebt(schedule);
+    return true;
+  }
+
+  Future<void> removeDebtReminder(String customerId) async {
+    await DebtReminderStore.instance.remove(customerId);
+    if (_ready) await _cancelDebt(customerId);
+  }
+
+  /// Vuelve a programar todos los recordatorios con la deuda de hoy. Se llama al
+  /// abrir la app, con cada venta y con cada abono.
+  Future<void> refreshDebtReminders() async {
+    if (!_ready) return;
+    try {
+      final all = await DebtReminderStore.instance.load();
+      for (final schedule in all.values) {
+        await _scheduleDebt(schedule);
+      }
+    } catch (e) {
+      debugPrint('Recordatorios de cobro: $e');
+    }
+  }
+
+  Future<void> _scheduleDebt(DebtReminderSchedule schedule) async {
+    if (!_ready) return;
+    await _cancelDebt(schedule.customerId);
+    final customer = await CustomerRepository.instance.getCustomerById(schedule.customerId);
+    if (customer == null) {
+      // El cliente ya no existe
+      await DebtReminderStore.instance.remove(schedule.customerId);
+      return;
+    }
+    // Sin deuda no hay nada que cobrar; el recordatorio queda guardado por si vuelve a fiar
+    if (!customer.hasDebt) return;
+
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query('businesses', columns: ['currency'], where: 'id = ?', whereArgs: [schedule.businessId]);
+    final currency = rows.isEmpty ? 'COP' : (rows.first['currency'] as String? ?? 'COP');
+    final payload = jsonEncode({'type': 'debt', 'customerId': customer.id, 'businessId': schedule.businessId});
+    final ids = debtNotificationIds(customer.id);
+    final dates = schedule.nextOccurrences(DateTime.now(), count: debtOccurrences);
+    for (var i = 0; i < dates.length; i++) {
+      await _plugin.zonedSchedule(
+        ids[i],
+        DebtReminderSchedule.notificationTitle(customer.name),
+        DebtReminderSchedule.notificationBody(customer.debtBalance, currency),
+        tz.TZDateTime.from(dates[i].toUtc(), tz.UTC),
+        const NotificationDetails(android: _debtChannel),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: payload,
+      );
+    }
+  }
+
+  /// Al tocar el aviso (o su botón) se abre WhatsApp con el recordatorio escrito
+  Future<void> _onNotificationResponse(NotificationResponse response) async {
+    try {
+      final raw = response.payload;
+      if (raw == null || raw.isEmpty) return;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      if (data['type'] != 'debt') return;
+      final customer = await CustomerRepository.instance.getCustomerById(data['customerId'] as String);
+      if (customer == null || !customer.hasDebt) return;
+      final db = await AppDatabase.instance.database;
+      final rows = await db.query('businesses', columns: ['name'], where: 'id = ?', whereArgs: [customer.businessId]);
+      await DebtReminder.send(
+        customerName: customer.name,
+        debtAmount: customer.debtBalance,
+        businessName: rows.isEmpty ? (_business?.name ?? 'Mi negocio') : rows.first['name'] as String,
+        phone: customer.phone,
+      );
+    } catch (e) {
+      debugPrint('Aviso de cobro: $e');
     }
   }
 }

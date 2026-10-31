@@ -17,8 +17,8 @@ class CatalogPdfService {
   static final CatalogPdfService instance = CatalogPdfService._internal();
   CatalogPdfService._internal();
 
-  /// Descarga o lee bytes de la imagen del producto
-  Future<Uint8List?> _loadProductImage(String? photoPath) async {
+  /// Descarga o lee los bytes de una imagen (foto de producto o logo)
+  Future<Uint8List?> loadImageBytes(String? photoPath) async {
     if (photoPath == null || photoPath.trim().isEmpty) return null;
     final path = photoPath.trim();
 
@@ -50,7 +50,7 @@ class CatalogPdfService {
 
   /// Letra Inter (la misma de la app): la Helvetica del PDF no tiene tildes raras,
   /// símbolos ni emojis
-  Future<pw.ThemeData> _theme() async {
+  Future<pw.ThemeData> pdfTheme() async {
     if (_cachedTheme != null) return _cachedTheme!;
     try {
       final regular = await rootBundle.load('assets/fonts/inter/Inter-Regular.ttf');
@@ -98,11 +98,11 @@ class CatalogPdfService {
     final colors = _CatalogColors.of(style, business.color);
     onProgress?.call(0.1, 'Preparando fotos…');
 
-    final logo = await _loadProductImage(business.logoUrl);
+    final logo = await loadImageBytes(business.logoUrl);
     final Map<String, Uint8List?> imageMap = {};
     for (var i = 0; i < targetProducts.length; i++) {
       final prod = targetProducts[i];
-      imageMap[prod.id] = await _loadProductImage(prod.photoPath);
+      imageMap[prod.id] = await loadImageBytes(prod.photoPath);
       onProgress?.call(0.1 + 0.5 * ((i + 1) / targetProducts.length), 'Preparando ${prod.name}…');
     }
 
@@ -110,11 +110,13 @@ class CatalogPdfService {
     final pdf = pw.Document(
       title: 'Catálogo · ${business.name}',
       author: business.name,
-      theme: await _theme(),
+      theme: await pdfTheme(),
     );
 
-    final perPage = style.itemsPerPage;
-    final columns = perPage >= 4 ? 2 : 1;
+    // La lista de precios va en renglones; las demás, en tarjetas
+    final isList = style.template == 'lista';
+    final perPage = isList ? listRowsPerPage : style.itemsPerPage;
+    final columns = isList ? 1 : (perPage >= 4 ? 2 : 1);
     final totalPages = (targetProducts.length / perPage).ceil();
     final title = style.title.trim().isNotEmpty
         ? style.title.trim()
@@ -138,6 +140,8 @@ class CatalogPdfService {
             children: [
               _buildHeader(business: business, title: title, logo: logo, colors: colors, compact: page > 0, style: style),
               pw.SizedBox(height: 12),
+              if (isList) _buildPriceList(pageProducts, imageMap, style, colors),
+              if (!isList)
               for (final row in rows)
                 pw.Padding(
                   padding: const pw.EdgeInsets.only(bottom: 10),
@@ -148,7 +152,9 @@ class CatalogPdfService {
                         if (i > 0) pw.SizedBox(width: 10),
                         pw.Expanded(
                           child: i < row.length
-                              ? _buildProductCard(row[i], imageMap[row[i].id], style, colors, perPage)
+                              ? (style.template == 'vitrina'
+                                  ? _buildShowcaseCard(row[i], imageMap[row[i].id], style, colors, perPage)
+                                  : _buildProductCard(row[i], imageMap[row[i].id], style, colors, perPage))
                               : pw.SizedBox(),
                         ),
                       ],
@@ -285,7 +291,20 @@ class CatalogPdfService {
                   business.name,
                   style: pw.TextStyle(fontSize: compact ? 13 : 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
                 ),
-                if (!compact) ...[
+                if (!compact && style.template == 'promo') ...[
+                  pw.SizedBox(height: 6),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.white,
+                      borderRadius: pw.BorderRadius.all(pw.Radius.circular(8)),
+                    ),
+                    child: pw.Text(
+                      title.toUpperCase(),
+                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: colors.band),
+                    ),
+                  ),
+                ] else if (!compact) ...[
                   pw.SizedBox(height: 2),
                   pw.Text(title, style: const pw.TextStyle(fontSize: 11, color: PdfColors.white)),
                 ],
@@ -336,18 +355,28 @@ class CatalogPdfService {
               color: colors.imageBg,
               borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(12)),
             ),
-            child: image != null
-                ? pw.ClipRRect(
-                    horizontalRadius: 12,
-                    verticalRadius: 12,
-                    child: pw.Image(pw.MemoryImage(image), fit: perPage == 1 ? pw.BoxFit.contain : pw.BoxFit.cover),
-                  )
-                : pw.Center(
-                    child: pw.Text(
-                      product.name.trim().isNotEmpty ? product.name.trim()[0].toUpperCase() : 'P',
-                      style: pw.TextStyle(fontSize: imageHeight / 4, fontWeight: pw.FontWeight.bold, color: colors.muted),
+            child: pw.Stack(
+              fit: pw.StackFit.expand,
+              children: [
+                _productImage(product, image, colors, imageHeight, perPage == 1 ? pw.BoxFit.contain : pw.BoxFit.cover),
+                if (style.template == 'promo')
+                  pw.Positioned(
+                    top: 8,
+                    left: 8,
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: pw.BoxDecoration(
+                        color: colors.band,
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                      ),
+                      child: pw.Text(
+                        'OFERTA',
+                        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                      ),
                     ),
                   ),
+              ],
+            ),
           ),
           pw.Padding(
             padding: pw.EdgeInsets.all(perPage >= 4 ? 8 : 14),
@@ -400,6 +429,146 @@ class CatalogPdfService {
       ),
     );
   }
+
+  /// Renglones de la plantilla "Lista de precios"
+  static const listRowsPerPage = 12;
+
+  /// Foto del producto o su inicial cuando no tiene
+  pw.Widget _productImage(Product product, Uint8List? image, _CatalogColors colors, double height, pw.BoxFit fit) {
+    if (image != null) {
+      return pw.ClipRRect(
+        horizontalRadius: 12,
+        verticalRadius: 12,
+        child: pw.Image(pw.MemoryImage(image), fit: fit),
+      );
+    }
+    return pw.Center(
+      child: pw.Text(
+        product.name.trim().isNotEmpty ? product.name.trim()[0].toUpperCase() : 'P',
+        style: pw.TextStyle(fontSize: height / 4, fontWeight: pw.FontWeight.bold, color: colors.muted),
+      ),
+    );
+  }
+
+  /// Plantilla "Vitrina": la foto manda, el nombre y el precio van centrados
+  pw.Widget _buildShowcaseCard(Product product, Uint8List? image, CatalogStyle style, _CatalogColors colors, int perPage) {
+    final imageHeight = switch (perPage) { 1 => 420.0, 2 => 250.0, 4 => 180.0, _ => 120.0 };
+    final nameSize = switch (perPage) { 1 => 22.0, 2 => 16.0, 4 => 12.0, _ => 10.0 };
+    final priceSize = switch (perPage) { 1 => 22.0, 2 => 16.0, 4 => 12.0, _ => 10.5 };
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Container(
+          height: imageHeight,
+          decoration: pw.BoxDecoration(
+            color: colors.imageBg,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(16)),
+          ),
+          child: _productImage(product, image, colors, imageHeight, pw.BoxFit.cover),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Text(
+          product.name,
+          maxLines: 2,
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(fontSize: nameSize, fontWeight: pw.FontWeight.bold, color: colors.ink),
+        ),
+        if (style.showCategory && product.category.trim().isNotEmpty)
+          pw.Text(
+            product.category,
+            maxLines: 1,
+            textAlign: pw.TextAlign.center,
+            style: pw.TextStyle(fontSize: perPage >= 4 ? 7 : 9, color: colors.muted),
+          ),
+        if (style.showPrice) ...[
+          pw.SizedBox(height: 4),
+          pw.Center(
+            child: pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: pw.BoxDecoration(
+                color: colors.band,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+              ),
+              child: pw.Text(
+                CurrencyFormatter.format(product.salePrice),
+                style: pw.TextStyle(fontSize: priceSize, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+              ),
+            ),
+          ),
+        ],
+        if (style.showExactStock)
+          pw.Text(
+            '${product.stock} disponibles',
+            textAlign: pw.TextAlign.center,
+            style: pw.TextStyle(fontSize: 7, color: colors.muted),
+          ),
+      ],
+    );
+  }
+
+  /// Plantilla "Lista de precios": un renglón por producto, con foto pequeña
+  pw.Widget _buildPriceList(
+      List<Product> products, Map<String, Uint8List?> images, CatalogStyle style, _CatalogColors colors) {
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        color: colors.card,
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(12)),
+        border: pw.Border.all(color: colors.line, width: 0.8),
+      ),
+      child: pw.Column(
+        children: [
+          for (var i = 0; i < products.length; i++)
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: i == 0
+                  ? null
+                  : pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: colors.line, width: 0.6))),
+              child: pw.Row(
+                children: [
+                  pw.Container(
+                    width: 34,
+                    height: 34,
+                    decoration: pw.BoxDecoration(
+                      color: colors.imageBg,
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                    ),
+                    child: _productImage(products[i], images[products[i].id], colors, 34, pw.BoxFit.cover),
+                  ),
+                  pw.SizedBox(width: 10),
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          products[i].name,
+                          maxLines: 1,
+                          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: colors.ink),
+                        ),
+                        if (listMeta(products[i], style).isNotEmpty)
+                          pw.Text(listMeta(products[i], style),
+                              maxLines: 1, style: pw.TextStyle(fontSize: 8, color: colors.muted)),
+                      ],
+                    ),
+                  ),
+                  if (style.showPrice)
+                    pw.Text(
+                      CurrencyFormatter.format(products[i].salePrice),
+                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: colors.accent),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Detalle bajo el nombre en la lista de precios
+  static String listMeta(Product product, CatalogStyle style) => [
+        if (style.showCategory && product.category.trim().isNotEmpty) product.category,
+        if (style.showCode && product.code.isNotEmpty) 'Ref. ${product.code}',
+        if (style.showExactStock) '${product.stock} disponibles',
+      ].join(' · ');
 
   /// Pie: contacto del negocio, número de página y "Hecho con Stockealo"
   pw.Widget _buildFooter(int pageIndex, int totalPages, CatalogStyle style, _CatalogColors colors) {

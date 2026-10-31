@@ -168,6 +168,55 @@ class AppTheme {
         titleTextStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 18, fontWeight: FontWeight.w700, color: c.ink),
         contentTextStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, height: 1.4, color: c.inkMuted),
       ),
+      // Reloj para elegir la hora: papel, tarjetas y el acento, sin el celeste de Material
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: c.surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sheet),
+          side: BorderSide(color: c.line),
+        ),
+        helpTextStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 15, fontWeight: FontWeight.w700, color: c.ink),
+        hourMinuteShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
+        hourMinuteColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? Color.alphaBlend(accent.withOpacity(0.14), c.surface) : c.surfaceMuted,
+        ),
+        hourMinuteTextColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? accent : c.ink,
+        ),
+        hourMinuteTextStyle: const TextStyle(fontFamily: AppText.fontFamily, fontSize: 52, fontWeight: FontWeight.w600),
+        dayPeriodShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
+        dayPeriodBorderSide: BorderSide(color: c.lineStrong),
+        dayPeriodColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? accent : c.surface,
+        ),
+        dayPeriodTextColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? c.onAccent : c.inkMuted,
+        ),
+        dayPeriodTextStyle: const TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, fontWeight: FontWeight.w600),
+        dialBackgroundColor: c.surfaceMuted,
+        dialHandColor: accent,
+        dialTextColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? c.onAccent : c.ink,
+        ),
+        dialTextStyle: const TextStyle(fontFamily: AppText.fontFamily, fontSize: 15, fontWeight: FontWeight.w500),
+        entryModeIconColor: c.inkMuted,
+        cancelButtonStyle: TextButton.styleFrom(foregroundColor: c.inkMuted),
+        confirmButtonStyle: TextButton.styleFrom(
+          foregroundColor: accent,
+          textStyle: const TextStyle(fontFamily: AppText.fontFamily, fontWeight: FontWeight.w700),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: c.surfaceMuted,
+          contentPadding: EdgeInsets.zero,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.card), borderSide: BorderSide.none),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            borderSide: BorderSide(color: accent, width: 2),
+          ),
+        ),
+      ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: c.surface,
         surfaceTintColor: Colors.transparent,

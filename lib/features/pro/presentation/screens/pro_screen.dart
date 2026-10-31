@@ -9,8 +9,8 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
 import '../../data/pro_service.dart';
 
-/// Lo que suma Pro. Todo lo demás sigue gratis.
-const _benefits = [
+/// Lo que suma Pro (también lo muestra la ventana de Pro). Todo lo demás sigue gratis.
+const proBenefits = [
   (Icons.storefront_outlined, 'Tienda en línea', 'Tu catálogo con carrito; los pedidos te llegan por WhatsApp.'),
   (Icons.notifications_active_outlined, 'Cobro automático de fiados', 'Recordatorios programados y estado de cuenta en PDF.'),
   (Icons.auto_awesome_mosaic_outlined, 'Catálogos personalizados', 'Más plantillas y colores, sin el pie "Hecho con Stockealo".'),
@@ -21,10 +21,13 @@ const _benefits = [
 class ProScreen extends StatefulWidget {
   final Business business;
 
-  const ProScreen({super.key, required this.business});
+  /// Abre bajando hasta el canje de código (para "Ya tengo un código")
+  final bool focusCode;
 
-  static Future<void> open(BuildContext context, Business business) =>
-      Navigator.push(context, MaterialPageRoute(builder: (_) => ProScreen(business: business)));
+  const ProScreen({super.key, required this.business, this.focusCode = false});
+
+  static Future<void> open(BuildContext context, Business business, {bool focusCode = false}) => Navigator.push(
+      context, MaterialPageRoute(builder: (_) => ProScreen(business: business, focusCode: focusCode)));
 
   @override
   State<ProScreen> createState() => _ProScreenState();
@@ -32,6 +35,8 @@ class ProScreen extends StatefulWidget {
 
 class _ProScreenState extends State<ProScreen> {
   final _codeController = TextEditingController();
+  final _codeFocus = FocusNode();
+  final _scroll = ScrollController();
   late final Future<(List<ProPlan>, Map<String, String>)> _data = _load();
   String _kind = 'business';
   String? _selectedPlanId;
@@ -46,7 +51,25 @@ class _ProScreenState extends State<ProScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.focusCode) _data.whenComplete(_goToCode);
+  }
+
+  /// El canje está al final: baja hasta allá y deja el cursor en el código
+  void _goToCode() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !_scroll.hasClients) return;
+      await _scroll.animateTo(_scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+      if (mounted) _codeFocus.requestFocus();
+    });
+  }
+
+  @override
   void dispose() {
+    _codeFocus.dispose();
+    _scroll.dispose();
     _codeController.dispose();
     super.dispose();
   }
@@ -97,12 +120,13 @@ class _ProScreenState extends State<ProScreen> {
           final settings = snapshot.data?.$2 ?? const <String, String>{};
           final loading = snapshot.connectionState != ConnectionState.done;
           return ListView(
+            controller: _scroll,
             padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
             children: [
               _statusCard(c),
               const SizedBox(height: AppSpace.xl),
               _section(c, 'Lo que suma Pro'),
-              _card(c, Column(children: [for (final b in _benefits) _benefit(c, b.$1, b.$2, b.$3)])),
+              _card(c, Column(children: [for (final b in proBenefits) _benefit(c, b.$1, b.$2, b.$3)])),
               Padding(
                 padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.sm, AppSpace.xs, 0),
                 child: Text(
@@ -386,6 +410,7 @@ class _ProScreenState extends State<ProScreen> {
         children: [
           TextField(
             controller: _codeController,
+            focusNode: _codeFocus,
             textCapitalization: TextCapitalization.characters,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _redeem(),

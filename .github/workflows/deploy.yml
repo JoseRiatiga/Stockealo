@@ -1,4 +1,4 @@
-name: Deploy Flutter Web to GitHub Pages
+name: Deploy Web (stockealo.online) to GitHub Pages
 
 on:
   push:
@@ -35,16 +35,28 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      - name: Build Web
-        run: flutter build web --base-href "/Stockealo/" --release
-
-      - name: Configure GitHub Pages SPA & Nojekyll
+      # stockealo.online/      → página principal (por ahora lleva a /app)
+      # stockealo.online/app    → app web de los negocios
+      # stockealo.online/admin  → panel de administrador (app aparte: lib/main_admin.dart)
+      - name: Build Web (app)
         run: |
-          cp build/web/index.html build/web/404.html
-          touch build/web/.nojekyll
+          flutter build web --base-href "/app/" --release
+          mkdir -p build/site
+          mv build/web build/site/app
+
+      - name: Build Web (admin)
+        run: |
+          flutter build web -t lib/main_admin.dart --base-href "/admin/" --release
+          mv build/web build/site/admin
+
+      - name: Assemble site
+        run: |
+          cp web_site/index.html web_site/404.html web_site/CNAME build/site/
+          touch build/site/.nojekyll
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build/web
+          publish_dir: ./build/site
+          cname: stockealo.online

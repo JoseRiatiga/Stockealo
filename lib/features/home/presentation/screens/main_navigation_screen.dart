@@ -75,6 +75,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     final alerts = PhoneAlertsService.instance;
     await alerts.init();
     await alerts.refreshDailySummary();
+    await alerts.refreshDebtReminders();
   }
 
   @override

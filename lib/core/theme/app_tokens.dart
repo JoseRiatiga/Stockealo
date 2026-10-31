@@ -47,6 +47,9 @@ class AppPalette {
   static const Color dangerSoftDark = Color(0xFF3A201D);
   static const Color infoSoftDark = Color(0xFF1C2A3A);
 
+  /// Dorado de Stockealo Pro (la corona de las opciones Pro)
+  static const Color proGold = Color(0xFFF2B21B);
+
   /// Colores que un negocio puede elegir. Todos llevan texto blanco encima con
   /// contraste AA (lo comprueba test/core/theme/app_tokens_test.dart).
   static const Map<String, Color> businessColors = {

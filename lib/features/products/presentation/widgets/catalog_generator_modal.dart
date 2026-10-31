@@ -6,11 +6,14 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/database/app_database.dart';
 import '../../../../core/design/primary_action_button.dart';
+import '../../../../core/design/pro_crown.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
+import '../../../pro/data/pro_service.dart';
+import '../../../pro/presentation/widgets/pro_upsell_sheet.dart';
 import '../../../reports/data/catalog_pdf_service.dart';
 import '../../../reports/models/catalog_style.dart';
 import '../../models/product.dart';
@@ -66,14 +69,56 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
   bool _isPublicDownload = false;
   bool _isSavingToDownloads = false;
 
+  /// Stockealo Pro activo en este negocio: abre plantillas, colores, fondo y pie
+  bool _pro = false;
+
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+    ProService.instance.status.addListener(_onProChanged);
+    ProService.instance.refresh(widget.business.id);
+    // refresh limpia al instante el estado si era de otro negocio
+    _pro = ProService.instance.status.value.active;
   }
+
+  void _onProChanged() {
+    if (mounted) setState(() => _pro = ProService.instance.status.value.active);
+  }
+
+  /// Las opciones Pro se pueden probar en la vista previa; Pro se pide al
+  /// descargar o compartir. true si se puede seguir con la exportación.
+  Future<bool> _confirmExport() async {
+    if (_pro || !_chosenStyle.usesProFeatures) return true;
+    FocusScope.of(context).unfocus();
+    final result = await ProUpsellSheet.show(
+      context,
+      business: widget.business,
+      title: '¿Te gusta cómo quedó?',
+      message: 'Tu catálogo usa ${_joinNames(_chosenStyle.proFeatureNames)}. '
+          'Descárgalo así con Stockealo Pro.',
+      highlight: ProBenefit.catalogs,
+      alternativeLabel: 'Descargar la versión gratis',
+    );
+    if (!mounted) return false;
+    switch (result) {
+      case ProUpsellResult.pro:
+        return true;
+      case ProUpsellResult.alternative:
+        _update(_chosenStyle.effective(pro: false));
+        return true;
+      case ProUpsellResult.dismissed:
+        return false;
+    }
+  }
+
+  static String _joinNames(List<String> names) => names.length <= 1
+      ? names.join()
+      : '${names.take(names.length - 1).join(', ')} y ${names.last}';
 
   @override
   void dispose() {
+    ProService.instance.status.removeListener(_onProChanged);
     _titleController.dispose();
     _whatsappController.dispose();
     _addressController.dispose();
@@ -129,14 +174,18 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
     }
   }
 
-  /// Estilo con lo que hay escrito en los campos de texto
-  CatalogStyle get _currentStyle => _style.copyWith(
+  /// Estilo elegido con lo que hay escrito en los campos de texto (se guarda así)
+  CatalogStyle get _chosenStyle => _style.copyWith(
         title: _titleController.text.trim(),
         whatsapp: _whatsappController.text.trim(),
         address: _addressController.text.trim(),
         hours: _hoursController.text.trim(),
         social: _socialController.text.trim(),
       );
+
+  /// Lo que de verdad se exporta: sin Pro, las opciones Pro vuelven a lo gratis.
+  /// La vista previa y las opciones muestran [_chosenStyle] (se puede probar).
+  CatalogStyle get _currentStyle => _chosenStyle.effective(pro: _pro);
 
   List<Product> get _targetProducts =>
       CatalogPdfService.selectProducts(_allInStockProducts, _currentStyle, categoryFilter: _selectedCategory);
@@ -145,7 +194,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
 
   Future<void> _saveStyle() async {
     try {
-      await AppDatabase.instance.setSetting(CatalogStyle.settingsKey(widget.business.id), _currentStyle.encode());
+      await AppDatabase.instance.setSetting(CatalogStyle.settingsKey(widget.business.id), _chosenStyle.encode());
     } catch (e) {
       debugPrint('No se pudo guardar el estilo del catálogo: $e');
     }
@@ -157,6 +206,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
       return;
     }
     FocusScope.of(context).unfocus();
+    if (!await _confirmExport() || !mounted) return;
     await _saveStyle();
 
     setState(() {
@@ -205,6 +255,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
       return;
     }
     FocusScope.of(context).unfocus();
+    if (!await _confirmExport() || !mounted) return;
     await _saveStyle();
     if (!mounted) return;
     StoryCatalogModal.show(
@@ -265,7 +316,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
   }
 
   Color get _accent =>
-      AppPalette.fromHex(_style.colorHex) ?? AppPalette.fromHex(widget.business.color) ?? AppPalette.brand;
+      AppPalette.fromHex(_chosenStyle.colorHex) ?? AppPalette.fromHex(widget.business.color) ?? AppPalette.brand;
 
   // ---------------------------------------------------------------------------
 
@@ -450,10 +501,13 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
             children: [
               _CatalogPreview(
                 business: widget.business,
-                style: _currentStyle,
+                style: _chosenStyle,
                 accent: _accent,
-                products: _targetProducts.take(_style.itemsPerPage >= 4 ? 4 : _style.itemsPerPage).toList(),
+                products: _targetProducts
+                    .take(_style.template == 'lista' ? 5 : (_style.itemsPerPage >= 4 ? 4 : _style.itemsPerPage))
+                    .toList(),
               ),
+              if (!_pro && _chosenStyle.usesProFeatures) _trialBanner(c),
               const SizedBox(height: AppSpace.lg),
               _productsSection(c),
               const SizedBox(height: AppSpace.md),
@@ -489,6 +543,32 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Aviso bajo la vista previa mientras se prueban opciones Pro sin tenerlo
+  Widget _trialBanner(StockealoColors c) {
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpace.md),
+      padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.xs, AppSpace.xs, AppSpace.xs),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        border: Border.all(color: c.line),
+      ),
+      child: Row(
+        children: [
+          const ProCrown(size: 18),
+          const SizedBox(width: AppSpace.sm),
+          Expanded(
+            child: Text('Probando opciones Pro', style: TextStyle(fontSize: 13, color: c.ink)),
+          ),
+          TextButton(
+            onPressed: () => _update(_chosenStyle.effective(pro: false)),
+            child: const Text('Volver a lo gratis'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -581,17 +661,36 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
   Widget _designSection(StockealoColors c) {
     // Color del negocio (o el verde de Stockealo si no tiene); no se repite en la lista
     final businessHex = AppPalette.toHex(AppPalette.fromHex(widget.business.color) ?? AppPalette.brand);
+    final freeHexes = CatalogStyle.paletteHexes(pro: false);
     final colors = <String?>[
       null,
-      for (final color in AppPalette.businessColors.values)
-        if (AppPalette.toHex(color) != businessHex) AppPalette.toHex(color),
+      for (final hex in CatalogStyle.paletteHexes(pro: true))
+        if (hex != businessHex) hex,
     ];
+    final current = _chosenStyle;
+    final stockealo = AppPalette.toHex(AppPalette.brand);
     return _section(
       c,
       title: 'Diseño',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text('Plantilla', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          const SizedBox(height: AppSpace.sm),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final t in CatalogStyle.templates.entries)
+                _ProChip(
+                  label: t.value,
+                  selected: current.template == t.key,
+                  locked: !_pro && t.key != 'clasica',
+                  onTap: () => _update(_style.copyWith(template: t.key)),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.lg),
           Text('Color', style: TextStyle(fontSize: 13, color: c.inkMuted)),
           const SizedBox(height: AppSpace.sm),
           Wrap(
@@ -601,9 +700,12 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
               for (final hex in colors)
                 _ColorDot(
                   color: AppPalette.fromHex(hex ?? businessHex) ?? AppPalette.brand,
-                  selected: _style.colorHex == hex,
-                  tooltip: hex == null ? 'Color del negocio' : 'Color ${_colorName(hex)}',
+                  selected: current.colorHex == hex,
+                  tooltip: hex == null
+                      ? 'Color del negocio'
+                      : (hex == stockealo ? 'Verde Stockealo' : 'Color ${_colorName(hex)}'),
                   isBusiness: hex == null,
+                  locked: !_pro && hex != null && !freeHexes.contains(hex),
                   onTap: () => _update(hex == null
                       ? CatalogStyle.fromJson({..._style.toJson(), 'colorHex': null})
                       : _style.copyWith(colorHex: hex)),
@@ -614,13 +716,19 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           Text('Fondo', style: TextStyle(fontSize: 13, color: c.inkMuted)),
           const SizedBox(height: AppSpace.sm),
           SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Text('Claro'), icon: Icon(Icons.light_mode_outlined)),
-              ButtonSegment(value: true, label: Text('Oscuro'), icon: Icon(Icons.dark_mode_outlined)),
+            segments: [
+              const ButtonSegment(value: false, label: Text('Claro'), icon: Icon(Icons.light_mode_outlined)),
+              ButtonSegment(
+                value: true,
+                label: const Text('Oscuro'),
+                icon: _pro ? const Icon(Icons.dark_mode_outlined) : const ProCrown(size: 18),
+                tooltip: _pro ? null : 'Con Stockealo Pro',
+              ),
             ],
-            selected: {_style.darkBackground},
+            selected: {current.darkBackground},
             onSelectionChanged: (v) => _update(_style.copyWith(darkBackground: v.first)),
           ),
+          if (_style.template != 'lista') ...[
           const SizedBox(height: AppSpace.lg),
           Text('Productos por página', style: TextStyle(fontSize: 13, color: c.inkMuted)),
           const SizedBox(height: AppSpace.sm),
@@ -635,6 +743,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
             selected: {_style.itemsPerPage},
             onSelectionChanged: (v) => _update(_style.copyWith(itemsPerPage: v.first)),
           ),
+          ],
           const SizedBox(height: AppSpace.lg),
           _field(c, _titleController, 'Título de la portada', 'Ej.: Colección de temporada', Icons.title_rounded),
         ],
@@ -694,18 +803,21 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           toggle('Descripción', _style.showDescription, (v) => _style.copyWith(showDescription: v)),
           toggle('Categoría', _style.showCategory, (v) => _style.copyWith(showCategory: v)),
           toggle('Código o referencia', _style.showCode, (v) => _style.copyWith(showCode: v)),
-          const SizedBox(height: AppSpace.sm),
-          Row(
-            children: [
-              Icon(Icons.info_outline_rounded, size: 16, color: c.inkFaint),
-              const SizedBox(width: AppSpace.sm),
-              Expanded(
-                child: Text(
-                  'El pie lleva "Hecho con Stockealo". Más plantillas llegarán con Stockealo Pro.',
-                  style: TextStyle(fontSize: 12, color: c.inkMuted),
-                ),
-              ),
-            ],
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Row(
+              children: [
+                Flexible(child: Text('Pie "Hecho con Stockealo"', style: TextStyle(color: c.ink, fontSize: 15))),
+                if (!_pro) ...[
+                  const SizedBox(width: AppSpace.xs),
+                  const ProCrown(),
+                ],
+              ],
+            ),
+            subtitle: _pro ? null : Text('Quitarlo es de Stockealo Pro', style: TextStyle(color: c.inkMuted)),
+            value: _chosenStyle.showBranding,
+            onChanged: (v) => _update(_style.copyWith(showBranding: v)),
           ),
         ],
       ),
@@ -718,6 +830,7 @@ class _ColorDot extends StatelessWidget {
   final Color color;
   final bool selected;
   final bool isBusiness;
+  final bool locked;
   final String tooltip;
   final VoidCallback onTap;
 
@@ -727,17 +840,18 @@ class _ColorDot extends StatelessWidget {
     required this.isBusiness,
     required this.tooltip,
     required this.onTap,
+    this.locked = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     return Tooltip(
-      message: tooltip,
+      message: locked ? '$tooltip · Stockealo Pro' : tooltip,
       child: Semantics(
         button: true,
         selected: selected,
-        label: tooltip,
+        label: locked ? '$tooltip, con Stockealo Pro' : tooltip,
         child: InkResponse(
           onTap: onTap,
           radius: 24,
@@ -753,10 +867,35 @@ class _ColorDot extends StatelessWidget {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               child: selected
                   ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
-                  : (isBusiness ? const Icon(Icons.storefront_rounded, size: 16, color: Colors.white) : null),
+                  : locked
+                      ? const Center(child: ProCrown(size: 16))
+                      : (isBusiness ? const Icon(Icons.storefront_rounded, size: 16, color: Colors.white) : null),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Opción que puede ser de Stockealo Pro: sin Pro lleva candado
+class _ProChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool locked;
+  final VoidCallback onTap;
+
+  const _ProChip({required this.label, required this.selected, required this.locked, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: locked ? '$label, con Stockealo Pro' : null,
+      child: ChoiceChip(
+        label: Text(label),
+        avatar: locked ? const ProCrown(size: 18) : null,
+        selected: selected,
+        onSelected: (_) => onTap(),
       ),
     );
   }
@@ -813,10 +952,22 @@ class _CatalogPreview extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-                          Text(title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 8)),
+                          if (style.template == 'promo')
+                            Container(
+                              margin: const EdgeInsets.only(top: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                  color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                              child: Text(title.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: accent, fontSize: 7, fontWeight: FontWeight.w700)),
+                            )
+                          else
+                            Text(title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontSize: 8)),
                         ],
                       ),
                     ),
@@ -824,6 +975,9 @@ class _CatalogPreview extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
+              if (style.template == 'lista')
+                _priceList(card, ink, muted, line, imageBg, price)
+              else
               GridView.count(
                 crossAxisCount: columns,
                 shrinkWrap: true,
@@ -834,6 +988,9 @@ class _CatalogPreview extends StatelessWidget {
                 childAspectRatio: columns == 2 ? 0.95 : (style.itemsPerPage == 1 ? 1.1 : 2.2),
                 children: [
                   for (final prod in products)
+                    if (style.template == 'vitrina')
+                      _showcaseItem(prod, ink, muted, imageBg)
+                    else
                     Container(
                       decoration: BoxDecoration(
                         color: card,
@@ -849,7 +1006,14 @@ class _CatalogPreview extends StatelessWidget {
                                 color: imageBg,
                                 borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
                               ),
-                              child: _thumb(prod, muted),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  _thumb(prod, muted),
+                                  if (style.template == 'promo')
+                                    Positioned(top: 3, left: 3, child: _badge('OFERTA')),
+                                ],
+                              ),
                             ),
                           ),
                           Padding(
@@ -885,6 +1049,75 @@ class _CatalogPreview extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _badge(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+        decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(4)),
+        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 5, fontWeight: FontWeight.w700)),
+      );
+
+  /// Plantilla "Vitrina": foto grande y precio en una píldora
+  Widget _showcaseItem(Product prod, Color ink, Color muted, Color imageBg) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(color: imageBg, borderRadius: BorderRadius.circular(8)),
+            child: ClipRRect(borderRadius: BorderRadius.circular(8), child: _thumb(prod, muted)),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(prod.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: ink, fontSize: 8, fontWeight: FontWeight.w700)),
+        if (style.showPrice)
+          Center(child: _badge(CurrencyFormatter.format(prod.salePrice))),
+      ],
+    );
+  }
+
+  /// Plantilla "Lista de precios": renglones con foto pequeña
+  Widget _priceList(Color card, Color ink, Color muted, Color line, Color imageBg, Color price) {
+    return Container(
+      decoration: BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: line, width: 0.6),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < products.length; i++)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+              decoration: BoxDecoration(border: i == 0 ? null : Border(top: BorderSide(color: line, width: 0.6))),
+              child: Row(
+                children: [
+                  Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(color: imageBg, borderRadius: BorderRadius.circular(4)),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(4), child: _thumb(products[i], muted)),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(products[i].name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: ink, fontSize: 8, fontWeight: FontWeight.w700)),
+                  ),
+                  if (style.showPrice)
+                    Text(CurrencyFormatter.format(products[i].salePrice),
+                        style: TextStyle(color: price, fontSize: 8, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

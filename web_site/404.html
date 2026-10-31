@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Stockealo</title>
+  <script>
+    // GitHub Pages solo tiene un 404 para todo el sitio: cada ruta vuelve a su app
+    var p = location.pathname;
+    location.replace(p.indexOf('/admin') === 0 ? '/admin/' : '/app/');
+  </script>
+</head>
+<body></body>
+</html>

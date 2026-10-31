@@ -16,7 +16,7 @@ class DebtReminder {
     required double debtAmount,
     required String businessName,
   }) =>
-      'Hola $customerName 👋 Te saluda $businessName. Esperamos que te encuentres muy bien. '
+      'Hola $customerName, te saluda $businessName. Esperamos que te encuentres muy bien. '
       'Te compartimos un recordatorio cordial de tu saldo pendiente de '
       '${CurrencyFormatter.format(debtAmount)} con nosotros. ¡Muchas gracias por tu preferencia!';
 

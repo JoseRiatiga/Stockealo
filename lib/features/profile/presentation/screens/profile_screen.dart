@@ -10,6 +10,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/design/app_time_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/image_helper.dart';
@@ -127,11 +128,10 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
   }
 
   Future<void> _pickSummaryHour() async {
-    final picked = await showTimePicker(
-      context: context,
+    final picked = await showAppTimePicker(
+      context,
       initialTime: TimeOfDay(hour: _summaryHour, minute: 0),
       helpText: 'Hora del resumen',
-      initialEntryMode: TimePickerEntryMode.dialOnly,
     );
     if (picked == null || !mounted) return;
     await PhoneAlertsService.instance.setSummaryHour(picked.hour);

@@ -70,7 +70,8 @@ void main() {
 
     test('el pie "Hecho con Stockealo" va siempre en el plan gratis', () {
       expect(const CatalogStyle().showBranding, isTrue);
-      expect(CatalogStyle.decode('{"showBranding": false}').showBranding, isTrue);
+      // Quitarlo es de Pro: sin Pro el estilo que se usa lo vuelve a poner
+      expect(CatalogStyle.decode('{"showBranding": false}').effective(pro: false).showBranding, isTrue);
     });
 
     test('la clave es por negocio', () {

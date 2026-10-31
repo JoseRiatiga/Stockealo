@@ -35,4 +35,9 @@ void main() {
     expect(text, contains('Miselanea'));
     expect(text, contains(r'$25.000'));
   });
+
+  test('el mensaje no lleva emojis (por wa.me llegaban como "�")', () {
+    final text = DebtReminder.message(customerName: 'Ana', debtAmount: 25000, businessName: 'Miselanea');
+    expect(text.runes.every((r) => r <= 0xFFFF), isTrue);
+  });
 }

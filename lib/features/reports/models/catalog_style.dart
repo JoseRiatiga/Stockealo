@@ -1,9 +1,28 @@
 import 'dart:convert';
 
+import '../../../core/theme/app_tokens.dart';
+
 /// Cómo se ve un catálogo (PDF e historias). Se guarda por negocio para que la
 /// próxima vez salga igual con un solo toque.
 class CatalogStyle {
-  /// Plantilla: por ahora solo 'clasica' (las demás serán de Stockealo Pro)
+  /// Plantillas: la clásica es gratis; las demás son de Stockealo Pro
+  static const templates = <String, String>{
+    'clasica': 'Clásica',
+    'vitrina': 'Vitrina',
+    'lista': 'Lista de precios',
+    'promo': 'Promoción',
+  };
+
+  /// Colores de la paleta corta (gratis); la paleta completa es de Pro
+  static const freeColorKeys = ['verde', 'azul', 'rojo', 'grafito'];
+
+  /// Colores que se pueden elegir con o sin Pro, en "#RRGGBB"
+  static List<String> paletteHexes({required bool pro}) => [
+        for (final e in AppPalette.businessColors.entries)
+          if (pro || freeColorKeys.contains(e.key)) AppPalette.toHex(e.value),
+      ];
+
+  /// 'clasica', 'vitrina', 'lista' o 'promo'
   final String template;
 
   /// Color principal "#RRGGBB"; null usa el color del negocio
@@ -75,6 +94,7 @@ class CatalogStyle {
     bool? showCategory,
     bool? onlyWithPhoto,
     Set<String>? selectedProductIds,
+    bool? showBranding,
   }) {
     return CatalogStyle(
       template: template ?? this.template,
@@ -93,7 +113,7 @@ class CatalogStyle {
       showCategory: showCategory ?? this.showCategory,
       onlyWithPhoto: onlyWithPhoto ?? this.onlyWithPhoto,
       selectedProductIds: selectedProductIds ?? this.selectedProductIds,
-      showBranding: showBranding,
+      showBranding: showBranding ?? this.showBranding,
     );
   }
 
@@ -114,12 +134,13 @@ class CatalogStyle {
         'showCategory': showCategory,
         'onlyWithPhoto': onlyWithPhoto,
         'selectedProductIds': selectedProductIds.toList(),
+        'showBranding': showBranding,
       };
 
   factory CatalogStyle.fromJson(Map<String, dynamic> j) {
     final perPage = j['itemsPerPage'] as int? ?? 4;
     return CatalogStyle(
-      template: j['template'] as String? ?? 'clasica',
+      template: templates.containsKey(j['template']) ? j['template'] as String : 'clasica',
       colorHex: j['colorHex'] as String?,
       darkBackground: j['darkBackground'] as bool? ?? false,
       itemsPerPage: const [1, 2, 4, 6].contains(perPage) ? perPage : 4,
@@ -135,7 +156,38 @@ class CatalogStyle {
       showCategory: j['showCategory'] as bool? ?? true,
       onlyWithPhoto: j['onlyWithPhoto'] as bool? ?? false,
       selectedProductIds: {...(j['selectedProductIds'] as List? ?? const []).cast<String>()},
+      showBranding: j['showBranding'] as bool? ?? true,
     );
+  }
+
+  /// Plantilla, color, fondo o pie que solo se pueden usar con Pro
+  bool get usesProFeatures =>
+      template != 'clasica' ||
+      darkBackground ||
+      !showBranding ||
+      (colorHex != null && !paletteHexes(pro: false).contains(colorHex));
+
+  /// Nombres de las opciones Pro que usa este estilo, para explicarlas al dueño
+  List<String> get proFeatureNames => [
+        if (template != 'clasica') 'la plantilla ${templates[template]}',
+        if (colorHex != null && !paletteHexes(pro: false).contains(colorHex)) 'un color de la paleta completa',
+        if (darkBackground) 'fondo oscuro',
+        if (!showBranding) 'el catálogo sin el pie de Stockealo',
+      ];
+
+  /// El estilo que de verdad se puede usar: sin Pro vuelve a lo gratis
+  /// (clásica, fondo claro, paleta corta y pie de Stockealo). Lo elegido se
+  /// guarda tal cual, para que vuelva si el negocio activa Pro.
+  CatalogStyle effective({required bool pro}) {
+    if (pro || !usesProFeatures) return this;
+    final freeColor = colorHex == null || paletteHexes(pro: false).contains(colorHex);
+    return CatalogStyle.fromJson({
+      ...toJson(),
+      'template': 'clasica',
+      'darkBackground': false,
+      'showBranding': true,
+      'colorHex': freeColor ? colorHex : null,
+    });
   }
 
   String encode() => jsonEncode(toJson());

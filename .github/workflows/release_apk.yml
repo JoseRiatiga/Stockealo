@@ -69,23 +69,16 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            **Importante:** las versiones anteriores ya no sincronizan con la nube. Actualiza para que tus datos se suban de nuevo; lo que tengas guardado en el teléfono no se pierde.
+            ### Stockealo Pro
+            - **Catálogos personalizados:** plantillas Vitrina, Lista de precios y Promoción, todos los colores, fondo oscuro y sin el pie de Stockealo. Pruébalas en la vista previa antes de activar Pro.
+            - **Cobro de fiados:** estado de cuenta en PDF para enviar por WhatsApp y recordatorios que te avisan "Hoy toca cobrarle a..." con el mensaje listo. Tú decides cuándo enviarlo.
+            - Activa Pro con un código en Ajustes › Stockealo Pro.
 
-            ### Seguridad
-            - **Inicio de sesión más seguro.** La primera vez entra con tu correo y tu contraseña de siempre; la app actualiza tu cuenta sola.
-            - **Cada negocio solo lo ven sus miembros**, y cada rol (dueño, administrador, cajero) solo puede hacer lo que le corresponde, también en la nube.
-            - **Cada cuenta tiene sus propios datos** en el teléfono: si otra persona inicia sesión en el mismo celular, no ve tu inventario.
-            - **Recuperar la contraseña es más fácil:** el código se verifica una vez y puedes intentar la contraseña nueva las veces que necesites.
+            Todo lo que era gratis sigue gratis.
 
-            ### Sincronización
-            - **Funciona sin internet:** los cambios se guardan y se suben solos cuando vuelve la conexión.
-            - **El stock y los fiados ya no se pisan** cuando se usa la app en varios teléfonos a la vez.
-            - **Ventas en tiempo real** entre los teléfonos del mismo negocio.
-            - Los negocios nuevos y la papelera de negocios se sincronizan correctamente.
-
-            ### Funciones nuevas
-            - **Arqueo de caja:** abre la caja con una base, registra el día y al cerrar ves si sobra o falta dinero.
-            - **Recordatorio de fiados por WhatsApp** con el saldo del cliente.
-            - **Respaldo:** guarda una copia de tus datos en un archivo y restáurala cuando la necesites.
+            ### Mejoras
+            - Información legal actualizada.
+            - Elegir la hora de los avisos es más fácil.
+            - Los recordatorios por WhatsApp ya no muestran un símbolo raro.
           draft: false
           prerelease: false

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_tokens.dart';
+
 /// Acciones que el usuario puede fijar en "Acciones Rápidas" del panel.
 class QuickActionDef {
   final String id;
@@ -66,6 +68,13 @@ const List<QuickActionDef> kAvailableQuickActions = [
     description: 'Exportar catálogo, ventas y clientes en .xlsx',
     icon: Icons.file_download_outlined,
     color: Color(0xFF16A34A),
+  ),
+  QuickActionDef(
+    id: 'profit_report',
+    label: 'Reportes',
+    description: 'Ganancias y pérdidas por periodo',
+    icon: Icons.insights_rounded,
+    color: AppPalette.brand,
   ),
   QuickActionDef(
     id: 'catalog_pdf',

@@ -1,3 +1,7 @@
+import '../../../../core/design/skeleton.dart';
+import '../../../reports/presentation/screens/profit_report_screen.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../business/presentation/business_identity.dart';
 import '../widgets/quick_actions_customizer.dart';
 import '../widgets/dashboard_desktop_charts.dart';
 import '../widgets/top_products_section.dart';
@@ -6,7 +10,6 @@ import '../widgets/quick_actions_catalog.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/data/business_repository.dart';
@@ -28,6 +31,7 @@ import '../../../../core/services/supabase_service.dart';
 import '../widgets/spline_area_chart.dart';
 import '../widgets/segmented_progress_card.dart';
 import '../widgets/recent_transactions_card.dart';
+import '../../../../core/services/data_events.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../home/presentation/widgets/notifications_modal.dart';
 
@@ -71,6 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     super.initState();
     _loadData();
     NotificationService.instance.remoteSalesVersion.addListener(_onRemoteSales);
+    DataEvents.instance.salesVersion.addListener(_onRemoteSales);
     _syncSilently();
   }
 
@@ -117,6 +122,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
   @override
   void dispose() {
     NotificationService.instance.remoteSalesVersion.removeListener(_onRemoteSales);
+    DataEvents.instance.salesVersion.removeListener(_onRemoteSales);
     super.dispose();
   }
 
@@ -291,6 +297,14 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
       case 'excel_export':
         _exportExcelDirectly();
         break;
+      case 'profit_report':
+        // Muestra costos y márgenes: el cajero no lo ve
+        if (!canViewProfits) {
+          AppToast.showPermission(context, 'Los reportes de ganancias solo los ven el dueño y los administradores.');
+        } else if (_activeBusiness != null) {
+          ProfitReportScreen.open(context, _activeBusiness!);
+        }
+        break;
       case 'catalog_pdf':
         if (_activeBusiness != null) {
           CatalogGeneratorModal.show(
@@ -358,486 +372,261 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final user = _authRepo.currentUser;
     final userName = user?.displayName ?? 'Comerciante';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 850;
+    final isDesktop = MediaQuery.of(context).size.width >= 850;
 
     return Scaffold(
       appBar: isDesktop
           ? null
           : AppBar(
-        title: InkWell(
-          onTap: () async {
-            final changed = await BusinessSelectorModal.show(
-              context,
-              userId: widget.userId,
-              onLogout: widget.onLogout,
-            );
-            if (changed == true) {
-              _loadData();
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.storefront, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    _activeBusiness?.name ?? 'Stockealo',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              title: InkWell(
+                onTap: () async {
+                  final changed = await BusinessSelectorModal.show(
+                    context,
+                    userId: widget.userId,
+                    onLogout: widget.onLogout,
+                  );
+                  if (changed == true) _loadData();
+                },
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: AppSpace.xs),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_activeBusiness != null) ...[
+                        BusinessAvatar(business: _activeBusiness!, size: 26),
+                        const SizedBox(width: AppSpace.sm),
+                      ],
+                      Flexible(
+                        child: Text(
+                          _activeBusiness?.name ?? 'Stockealo',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                        ),
+                      ),
+                      const Icon(Icons.expand_more_rounded),
+                    ],
                   ),
                 ),
-                const Icon(Icons.arrow_drop_down, color: Colors.white),
+              ),
+              actions: [
+                AnimatedBuilder(
+                  animation: NotificationService.instance,
+                  builder: (context, _) {
+                    final unread = NotificationService.instance.unreadCount;
+                    return IconButton(
+                      tooltip: 'Notificaciones',
+                      onPressed: () => NotificationsModal.show(
+                        context: context,
+                        onNavigateToTab: (index) {
+                          if (index == 1) widget.onNavigateToInventory();
+                          if (index == 2) widget.onNavigateToSales();
+                        },
+                      ),
+                      icon: Badge(
+                        isLabelVisible: unread > 0,
+                        label: Text('$unread'),
+                        backgroundColor: c.danger,
+                        child: const Icon(Icons.notifications_none_rounded),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: AppSpace.xs),
               ],
             ),
-          ),
-        ),
-        actions: [
-          AnimatedBuilder(
-            animation: NotificationService.instance,
-            builder: (context, _) {
-              final unread = NotificationService.instance.unreadCount;
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                    tooltip: 'Notificaciones',
-                    onPressed: () => NotificationsModal.show(
-                      context: context,
-                      onNavigateToTab: (index) {
-                        if (index == 1) widget.onNavigateToInventory();
-                        if (index == 2) widget.onNavigateToSales();
-                      },
-                    ),
-                  ),
-                  if (unread > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFEF4444),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$unread',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
-        color: const Color(0xFF059669),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final isDesktop = constraints.maxWidth >= 900;
-                  final double hPadding = math.max(16.0, (constraints.maxWidth - 1200) / 2);
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 900;
+            final double hPadding = math.max(AppSpace.lg, (constraints.maxWidth - 1200) / 2);
 
-                  return ListView(
-                    padding: EdgeInsets.fromLTRB(
-                      hPadding,
-                      16,
-                      hPadding,
-                      MediaQuery.of(context).padding.bottom + 28,
-                    ),
-                    children: [
-                      // Saludo al comerciante
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '¡Hola, $userName!',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Resumen operativo ${_selectedPeriod == "today" ? "de hoy" : (_selectedPeriod == "week" ? "de 7 días" : (_selectedPeriod == "month" ? "del mes" : "histórico"))}',
-                                style: TextStyle(fontSize: 13, color: textSecondary),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.circle, color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669), size: 8),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _userRole == 'OWNER' ? 'Dueño' : (_userRole == 'ADMIN' ? 'Admin' : 'Cajero'),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
+            if (_isLoading) {
+              return ListView(
+                padding: EdgeInsets.fromLTRB(hPadding, AppSpace.lg, hPadding, 0),
+                children: const [
+                  SkeletonBox(width: 180, height: 22),
+                  SizedBox(height: AppSpace.lg),
+                  SkeletonBox(height: 40, radius: 20),
+                  SizedBox(height: AppSpace.lg),
+                  SkeletonBox(height: 120, radius: 16),
+                  SizedBox(height: AppSpace.md),
+                  SkeletonBox(height: 120, radius: 16),
+                ],
+              );
+            }
 
-                      // Selector horizontal de Periodo (Hoy, 7 Días, Este Mes, Histórico)
-                      _buildPeriodSelector(),
-                      const SizedBox(height: 14),
-
-                      // Banner de Tendencia y Comparativa del Periodo
-                      _buildFinancialTrendBanner(),
-                      const SizedBox(height: 14),
-
-                      // Tarjetas de Métricas del Periodo (2x2 Grid Enriquecido)
-                      DashboardMetricsGrid(
-                        summary: _summary,
-                        period: _selectedPeriod,
-                        showProfit: canViewProfits,
-                        onInventoryTap: widget.onNavigateToInventory,
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Acciones Rápidas Personalizables
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Acciones Rápidas',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
-                          ),
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            onPressed: _openCustomizeQuickActionsModal,
-                            icon: const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF059669)),
-                            label: const Text(
-                              'Personalizar',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      _buildQuickActions(),
-                      const SizedBox(height: 24),
-
-                      // Gráfico de Rendimiento (Lado a lado en Desktop, Toggle en Móvil)
-                      if (isDesktop)
-                        DashboardDesktopCharts(summary: _summary, period: _selectedPeriod)
-                      else
-                        _buildSalesPerformanceChart(),
-                      const SizedBox(height: 24),
-
-                      // Feed de Últimas Transacciones (Nuxt Style)
-                      _buildRecentTransactionsSection(),
-                      const SizedBox(height: 24),
-
-                      // Top 5 Productos Más Vendidos en el Periodo
-                      TopProductsSection(summary: _summary),
-                      const SizedBox(height: 20),
-                    ],
-                  );
-                },
-              ),
-      ),
-    );
-  }
-
-  Widget _buildPeriodSelector() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final periods = [
-      {'id': 'today', 'label': 'Hoy', 'icon': Icons.wb_sunny_outlined},
-      {'id': 'week', 'label': '7 Días', 'icon': Icons.calendar_view_week_rounded},
-      {'id': 'month', 'label': 'Este Mes', 'icon': Icons.calendar_month_rounded},
-      {'id': 'all', 'label': 'Histórico', 'icon': Icons.all_inclusive_rounded},
-    ];
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: periods.map((p) {
-          final isSelected = _selectedPeriod == p['id'];
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: InkWell(
-              onTap: () {
-                if (_selectedPeriod != p['id']) {
-                  setState(() => _selectedPeriod = p['id'] as String);
-                  _loadData();
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFF059669)
-                      : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF059669)
-                        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                    width: isSelected ? 1.5 : 1,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFF059669).withOpacity(0.25),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
+            return ListView(
+              padding: EdgeInsets.fromLTRB(hPadding, AppSpace.lg, hPadding, MediaQuery.of(context).padding.bottom + 120),
+              children: [
+                // Saludo
+                Row(
                   children: [
-                    Icon(
-                      p['icon'] as IconData,
-                      size: 14,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Hola, $userName', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: c.ink)),
+                          const SizedBox(height: 2),
+                          Text(_trendText(), style: TextStyle(fontSize: 13.5, color: _trendColor())),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 5),
-                    Text(
-                      p['label'] as String,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected
-                            ? Colors.white
-                            : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF334155)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                      child: Text(
+                        _userRole == 'OWNER' ? 'Dueño' : (_userRole == 'ADMIN' ? 'Administrador' : 'Cajero'),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.inkMuted),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          );
-        }).toList(),
+                const SizedBox(height: AppSpace.lg),
+
+                _buildPeriodSelector(),
+                const SizedBox(height: AppSpace.lg),
+
+                DashboardMetricsGrid(
+                  summary: _summary,
+                  period: _selectedPeriod,
+                  showProfit: canViewProfits,
+                  onInventoryTap: widget.onNavigateToInventory,
+                  onDebtsTap: () => _executeQuickAction('customers'),
+                ),
+                const SizedBox(height: AppSpace.xl),
+
+                // Acciones rápidas personalizables
+                Row(
+                  children: [
+                    Expanded(child: Text('Acciones rápidas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink))),
+                    TextButton.icon(
+                      onPressed: _openCustomizeQuickActionsModal,
+                      icon: const Icon(Icons.tune_rounded, size: 18),
+                      label: const Text('Personalizar'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpace.sm),
+                _buildQuickActions(),
+                const SizedBox(height: AppSpace.xl),
+
+                if (isWide)
+                  DashboardDesktopCharts(summary: _summary, period: _selectedPeriod)
+                else
+                  _buildSalesPerformanceChart(),
+                const SizedBox(height: AppSpace.xl),
+
+                _buildRecentTransactionsSection(),
+                const SizedBox(height: AppSpace.xl),
+
+                TopProductsSection(summary: _summary),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildFinancialTrendBanner() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  /// Comparación con el periodo anterior, en una frase
+  String _trendText() {
     final double periodTotal = _summary['periodTotal'] ?? _summary['todayTotal'] ?? 0.0;
     final double? trendPercent = _summary['trendPercent'] as double?;
-    final bool trendIsPositive = _summary['trendIsPositive'] == true;
     final String trendLabel = _summary['trendLabel'] ?? 'vs anterior';
-    final double compareTotal = (_summary['compareTotal'] as num?)?.toDouble() ?? 0.0;
-
-    String trendText;
-    Color trendColor;
-    IconData trendIcon;
-
     if (trendPercent != null) {
-      if (trendIsPositive) {
-        trendText = '+${trendPercent.toStringAsFixed(1)}% de ventas $trendLabel';
-        trendColor = const Color(0xFF059669);
-        trendIcon = Icons.trending_up_rounded;
-      } else {
-        trendText = '${trendPercent.toStringAsFixed(1)}% de ventas $trendLabel';
-        trendColor = const Color(0xFFD97706);
-        trendIcon = Icons.trending_down_rounded;
-      }
-    } else if (periodTotal > 0) {
-      trendText = 'Actividad comercial registrada en este periodo';
-      trendColor = const Color(0xFF059669);
-      trendIcon = Icons.local_fire_department_rounded;
-    } else {
-      trendText = 'Sin ventas registradas en el periodo seleccionado';
-      trendColor = const Color(0xFF64748B);
-      trendIcon = Icons.storefront_outlined;
+      final sign = trendPercent > 0 ? '+' : '';
+      return '$sign${trendPercent.toStringAsFixed(0)}% en ventas $trendLabel';
     }
+    return periodTotal > 0 ? 'Así va tu negocio' : 'Aún no hay ventas en este periodo';
+  }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
+  Color _trendColor() {
+    final c = context.colors;
+    final double? trendPercent = _summary['trendPercent'] as double?;
+    if (trendPercent == null) return c.inkMuted;
+    return _summary['trendIsPositive'] == true ? c.success : c.warning;
+  }
+
+  Widget _buildPeriodSelector() {
+    final c = context.colors;
+    const periods = {'today': 'Hoy', 'week': '7 días', 'month': 'Este mes', 'all': 'Todo'};
+    return SegmentedButton<String>(
+      showSelectedIcon: false,
+      style: SegmentedButton.styleFrom(
+        selectedBackgroundColor: c.accent,
+        selectedForegroundColor: c.onAccent,
+        backgroundColor: c.surface,
+        foregroundColor: c.ink,
+        side: BorderSide(color: c.line),
       ),
-      child: Row(
-        children: [
-          Icon(trendIcon, size: 18, color: trendColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              trendText,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: trendColor,
-              ),
-            ),
-          ),
-          if (compareTotal > 0)
-            Text(
-              'Previo: ${CurrencyFormatter.format(compareTotal)}',
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              ),
-            ),
-        ],
-      ),
+      segments: [
+        for (final entry in periods.entries) ButtonSegment(value: entry.key, label: Text(entry.value)),
+      ],
+      selected: {_selectedPeriod},
+      onSelectionChanged: (s) {
+        if (s.first == _selectedPeriod) return;
+        setState(() => _selectedPeriod = s.first);
+        _loadData();
+      },
     );
   }
 
   Widget _buildQuickActions() {
-    final int lowStock = _summary['lowStock'] ?? 0;
-    final int outOfStock = _summary['outOfStock'] ?? 0;
-    final int alertTotal = lowStock + outOfStock;
+    final c = context.colors;
+    final int alertTotal = (_summary['lowStock'] ?? 0) + (_summary['outOfStock'] ?? 0);
 
-    // Filtra las definiciones que el usuario eligió y están activas en _quickActionIds
     final List<QuickActionDef> activeDefs = [];
     for (final id in _quickActionIds) {
-      final found = kAvailableQuickActions.firstWhere(
-        (a) => a.id == id,
-        orElse: () => kAvailableQuickActions.first,
-      );
-      if (!activeDefs.any((a) => a.id == found.id)) {
-        activeDefs.add(found);
-      }
+      final found = kAvailableQuickActions.firstWhere((a) => a.id == id, orElse: () => kAvailableQuickActions.first);
+      if (!activeDefs.any((a) => a.id == found.id)) activeDefs.add(found);
     }
-
-    if (activeDefs.isEmpty) {
-      activeDefs.addAll(kAvailableQuickActions.take(4));
-    }
+    if (activeDefs.isEmpty) activeDefs.addAll(kAvailableQuickActions.take(4));
 
     return Row(
-      children: activeDefs.map((action) {
-        String? badge;
-        if (action.id == 'alerts' && alertTotal > 0) {
-          badge = '$alertTotal';
-        }
-
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: _buildActionBtn(
-              label: action.label,
-              icon: action.icon,
-              color: action.color,
-              badge: badge,
-              onTap: () => _executeQuickAction(action.id),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildActionBtn({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    String? badge,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? color.withOpacity(0.2)
-                : const Color(0xFFE2E8F0),
-            width: 1.1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.15 : 0.02),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(icon, color: color, size: 24),
-                if (badge != null)
-                  Positioned(
-                    right: -8,
-                    top: -6,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        badge,
-                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                      ),
+      children: [
+        for (final action in activeDefs)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Material(
+                color: c.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  side: BorderSide(color: c.line),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  onTap: () => _executeQuickAction(action.id),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpace.md, horizontal: AppSpace.xs),
+                    child: Column(
+                      children: [
+                        Badge(
+                          isLabelVisible: action.id == 'alerts' && alertTotal > 0,
+                          label: Text('$alertTotal'),
+                          backgroundColor: c.danger,
+                          child: Icon(action.icon, color: c.accent, size: 24),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          action.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.ink),
+                        ),
+                      ],
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF334155),
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 
@@ -845,13 +634,13 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     final List<dynamic> timelineSales = _summary['periodTimelineSales'] ?? _summary['weeklySales'] ?? [];
     final List<dynamic> categorySales = _summary['categorySales'] ?? [];
 
-    String timelineTitle = 'Ventas de la Semana (7 días)';
+    String timelineTitle = 'Ventas de los últimos 7 días';
     if (_selectedPeriod == 'today') {
-      timelineTitle = 'Ventas de Hoy por Horario';
+      timelineTitle = 'Ventas de hoy por hora';
     } else if (_selectedPeriod == 'month') {
-      timelineTitle = 'Ventas del Mes por Semanas';
+      timelineTitle = 'Ventas del mes por semana';
     } else if (_selectedPeriod == 'all') {
-      timelineTitle = 'Ventas Históricas por Meses';
+      timelineTitle = 'Ventas por mes';
     }
 
     final splineData = timelineSales.map((item) {
@@ -882,16 +671,16 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
       children: [
         SplineAreaChart(
           title: timelineTitle,
-          subtitle: 'Curva continua de rendimiento operativo',
+          subtitle: 'Cómo se reparten tus ventas en el tiempo',
           data: splineData,
           height: 160,
-          primaryColor: const Color(0xFF06B6D4),
-          secondaryColor: const Color(0xFFEC4899),
+          primaryColor: context.colors.accent,
+          secondaryColor: context.colors.info,
         ),
         const SizedBox(height: 16),
         SegmentedProgressCard(
-          title: 'PARTICIPACIÓN POR CATEGORÍA',
-          subtitle: 'Distribución en el periodo',
+          title: 'Ventas por categoría',
+          subtitle: 'Qué categorías venden más',
           items: categoryItems.isNotEmpty
               ? categoryItems
               : [

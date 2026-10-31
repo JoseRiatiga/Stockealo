@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/notification_service.dart';
@@ -13,6 +14,7 @@ class NotificationsModal extends StatelessWidget {
     Function(int tabIndex)? onNavigateToTab,
   }) {
     return showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -33,11 +35,11 @@ class NotificationsModal extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final service = NotificationService.instance;
 
-    final bgColor = isDark ? const Color(0xFF131126) : Colors.white;
-    final cardBg = isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
-    final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final bgColor = context.colors.surface;
+    final cardBg = context.colors.surfaceMuted;
+    final borderColor = context.colors.line;
+    final textMain = context.colors.ink;
+    final textMuted = context.colors.inkMuted;
 
     return AnimatedBuilder(
       animation: service,
@@ -67,7 +69,7 @@ class NotificationsModal extends StatelessWidget {
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                      color: context.colors.lineStrong,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -82,10 +84,10 @@ class NotificationsModal extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(9),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF8B5CF6).withOpacity(0.12),
+                            color: context.colors.accent.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.notifications_active_rounded, color: Color(0xFF8B5CF6), size: 20),
+                          child: Icon(Icons.notifications_active_rounded, color: context.colors.accent, size: 20),
                         ),
                         const SizedBox(width: 10),
                         Column(
@@ -109,7 +111,7 @@ class NotificationsModal extends StatelessWidget {
                         icon: const Icon(Icons.done_all_rounded, size: 16),
                         label: const Text('Leídas', style: TextStyle(fontSize: 12)),
                         style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF8B5CF6),
+                          foregroundColor: context.colors.accent,
                         ),
                       ),
                   ],
@@ -168,11 +170,11 @@ class NotificationsModal extends StatelessWidget {
 
     switch (notif.type) {
       case NotificationType.sale:
-        iconColor = const Color(0xFF10B981);
+        iconColor = context.colors.accent;
         icon = Icons.shopping_bag_rounded;
         break;
       case NotificationType.stockAlert:
-        iconColor = const Color(0xFFF59E0B);
+        iconColor = context.colors.warning;
         icon = Icons.warning_amber_rounded;
         break;
       case NotificationType.team:
@@ -181,7 +183,7 @@ class NotificationsModal extends StatelessWidget {
         break;
       case NotificationType.system:
       default:
-        iconColor = const Color(0xFF8B5CF6);
+        iconColor = context.colors.accent;
         icon = Icons.auto_awesome_rounded;
     }
 
@@ -204,7 +206,7 @@ class NotificationsModal extends StatelessWidget {
           color: notif.isRead ? cardBg : (isDark ? const Color(0xFF221B42) : const Color(0xFFF3E8FF)),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: notif.isRead ? borderColor : const Color(0xFF8B5CF6).withOpacity(0.4),
+            color: notif.isRead ? borderColor : context.colors.accent.withOpacity(0.4),
             width: notif.isRead ? 1 : 1.5,
           ),
         ),
@@ -250,7 +252,7 @@ class NotificationsModal extends StatelessWidget {
                     notif.message,
                     style: TextStyle(
                       fontSize: 12,
-                      color: notif.isRead ? textMuted : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                      color: notif.isRead ? textMuted : (context.colors.ink),
                       height: 1.25,
                     ),
                   ),
@@ -263,8 +265,8 @@ class NotificationsModal extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 6),
                 width: 7,
                 height: 7,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF8B5CF6),
+                decoration: BoxDecoration(
+                  color: context.colors.accent,
                   shape: BoxShape.circle,
                 ),
               ),

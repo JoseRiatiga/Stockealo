@@ -468,6 +468,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     final qrData = 'stockealo://join?biz=${widget.business.id}&code=$inviteCode';
 
     showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

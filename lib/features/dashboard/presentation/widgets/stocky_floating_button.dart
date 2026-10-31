@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/theme/stocky_palette.dart';
 import '../../../auth/presentation/widgets/stocky_mascot.dart';
 import 'stocky_assistant_modal.dart';
 
@@ -122,6 +124,16 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
   Timer? _tipTimer;
   Timer? _autoDismissTimer;
   int _currentTipIndex = 0;
+
+  // Los consejos tapaban la lista y se llevaban los toques: salen pocas veces,
+  // duran poco y se cierran al tocar en cualquier otra parte
+  static const _firstTipDelay = Duration(seconds: 45);
+  static const _tipVisibleFor = Duration(seconds: 8);
+  static const _maxTipsPerSession = 3;
+  static int _tipsShownThisSession = 0;
+
+  /// Entre 3 y 5 minutos hasta el siguiente consejo
+  Duration get _nextTipDelay => Duration(seconds: 180 + math.Random().nextInt(121));
   bool _isTipVisible = false;
   bool _isExploding = false;
 
@@ -169,7 +181,7 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
     );
 
     // Iniciar programación esporádica de tips
-    _scheduleNextTip(delay: const Duration(seconds: 4));
+    _scheduleNextTip(delay: _firstTipDelay);
   }
 
   @override
@@ -185,6 +197,7 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
 
   void _scheduleNextTip({required Duration delay}) {
     _tipTimer?.cancel();
+    if (_tipsShownThisSession >= _maxTipsPerSession) return;
     _tipTimer = Timer(delay, () {
       if (!mounted) return;
       _showNextTip();
@@ -194,6 +207,7 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
   void _showNextTip() {
     if (!mounted || _isTipVisible || _isExploding) return;
 
+    _tipsShownThisSession++;
     setState(() {
       _isTipVisible = true;
       _currentTipIndex = (_currentTipIndex + 1) % _kStockyTips.length;
@@ -201,9 +215,9 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
 
     _tipAnimController.forward(from: 0.0);
 
-    // Auto-ocultar después de 14 segundos si no se interactúa
+    // Auto-ocultar si no se interactúa
     _autoDismissTimer?.cancel();
-    _autoDismissTimer = Timer(const Duration(seconds: 14), () {
+    _autoDismissTimer = Timer(_tipVisibleFor, () {
       _dismissTip();
     });
   }
@@ -219,20 +233,18 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
       _isTipVisible = false;
     });
 
-    // Programar la reaparición esporádica (entre 25 y 35 segundos)
-    final nextDelaySeconds = 25 + math.Random().nextInt(11);
-    _scheduleNextTip(delay: Duration(seconds: nextDelaySeconds));
+    _scheduleNextTip(delay: _nextTipDelay);
   }
 
   void _generateParticles() {
     final random = math.Random();
-    final colors = [
-      const Color(0xFFFBBF24), // Gold
-      const Color(0xFFA855F7), // Purple
-      const Color(0xFF10B981), // Emerald
-      const Color(0xFF06B6D4), // Cyan
-      const Color(0xFFF43F5E), // Coral Pink
-      Colors.white,
+    // Los colores de Stocky: dorado, verdes del delantal, canela y rubor
+    const colors = [
+      StockyPalette.sparkleGold,
+      StockyPalette.sparkleGreen,
+      StockyPalette.printShade,
+      StockyPalette.fur,
+      StockyPalette.blush,
     ];
 
     _particles = List.generate(28, (i) {
@@ -274,8 +286,7 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
         onNavigateToTab: widget.onNavigateToTab,
         initialPrompt: tip.prompt,
       ).then((_) {
-        // Al cerrar el chat, pausar por 35-45s antes del siguiente tip
-        _scheduleNextTip(delay: const Duration(seconds: 40));
+        _scheduleNextTip(delay: _nextTipDelay);
       });
     });
 
@@ -306,34 +317,33 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
       businessId: widget.businessId,
       onNavigateToTab: widget.onNavigateToTab,
     ).then((_) {
-      _scheduleNextTip(delay: const Duration(seconds: 35));
+      _scheduleNextTip(delay: _nextTipDelay);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
     final currentTip = _kStockyTips[_currentTipIndex];
 
-    return Row(
+    return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        // Bocadillo / Cápsula del Tip o Animación de Explosión
+        // Consejo de Stocky (o la explosión al tocarlo), encima de la pastilla
         if (_isExploding)
           SizedBox(
             width: 220,
             height: 52,
             child: AnimatedBuilder(
               animation: _explosionController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: _ExplosionPainter(
-                    progress: _explosionController.value,
-                    particles: _particles,
-                  ),
-                );
-              },
+              builder: (context, _) => CustomPaint(
+                painter: _ExplosionPainter(
+                  progress: _explosionController.value,
+                  particles: _particles,
+                  glow: c.accent,
+                ),
+              ),
             ),
           )
         else if (_isTipVisible)
@@ -343,227 +353,99 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
               opacity: _tipFadeAnimation,
               child: ScaleTransition(
                 scale: _tipScaleAnimation,
-                alignment: Alignment.centerRight,
+                alignment: Alignment.bottomRight,
                 child: AnimatedBuilder(
                   animation: _floatController,
-                  builder: (context, child) {
-                    final floatOffset = math.sin(_floatController.value * math.pi) * 2.0;
-                    return Transform.translate(
-                      offset: Offset(0, floatOffset),
-                      child: child,
-                    );
-                  },
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _handleTipExplosion(currentTip),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          constraints: const BoxConstraints(maxWidth: 225),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: isDark
-                                  ? const [Color(0xFF282050), Color(0xFF1B163B)]
-                                  : const [Colors.white, Color(0xFFF8FAFC)],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF8B5CF6).withOpacity(0.55)
-                                  : const Color(0xFFDDD6FE),
-                              width: 1.4,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF8B5CF6).withOpacity(0.25),
-                                blurRadius: 14,
-                                offset: const Offset(0, 3),
-                                spreadRadius: 0.5,
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Badge de Emoji con brillo
-                              Container(
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF8B5CF6).withOpacity(0.18),
-                                  shape: BoxShape.circle,
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  currentTip.emoji,
-                                  style: const TextStyle(fontSize: 15),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-
-                              // Textos: Titular y pregunta
-                              Flexible(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'TIP DE STOCKY',
-                                          style: TextStyle(
-                                            fontSize: 8.5,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.4,
-                                            color: isDark
-                                                ? const Color(0xFFA78BFA)
-                                                : const Color(0xFF7C3AED),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '• Toca aquí',
-                                          style: TextStyle(
-                                            fontSize: 8,
-                                            fontWeight: FontWeight.w500,
-                                            color: isDark ? Colors.white54 : Colors.black45,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 1),
-                                    Text(
-                                      currentTip.title,
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark ? Colors.white : const Color(0xFF1E293B),
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 2),
-
-                              // Botón de descartar 'x'
-                              GestureDetector(
-                                onTap: _dismissTip,
-                                behavior: HitTestBehavior.opaque,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(4.0),
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 13,
-                                    color: isDark ? Colors.white38 : Colors.black38,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                  builder: (context, child) => Transform.translate(
+                    offset: Offset(0, math.sin(_floatController.value * math.pi) * 2.0),
+                    child: child,
+                  ),
+                  // Tocar o deslizar fuera del consejo lo cierra; el toque sigue a su destino
+                  child: TapRegion(
+                    onTapOutside: (_) => _dismissTip(),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _handleTipExplosion(currentTip),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 250),
+                        margin: const EdgeInsets.only(bottom: AppSpace.sm),
+                        padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.sm, AppSpace.xs, AppSpace.sm),
+                        decoration: BoxDecoration(
+                          color: c.surface,
+                          borderRadius: BorderRadius.circular(AppRadius.card),
+                          border: Border.all(color: c.line),
                         ),
-                      // Pequeña flecha/puntero del bocadillo apuntando a la cara de Stocky
-                      CustomPaint(
-                        size: const Size(6, 10),
-                        painter: _SpeechArrowPainter(
-                          color: isDark ? const Color(0xFF282050) : Colors.white,
-                          borderColor: isDark
-                              ? const Color(0xFF8B5CF6).withOpacity(0.55)
-                              : const Color(0xFFDDD6FE),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(currentTip.emoji, style: const TextStyle(fontSize: 18)),
+                            const SizedBox(width: AppSpace.sm),
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Consejo de Stocky · toca para verlo',
+                                    style: TextStyle(fontSize: 11, color: c.inkMuted),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    currentTip.title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.ink),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Cerrar consejo',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _dismissTip,
+                              icon: Icon(Icons.close_rounded, size: 16, color: c.inkFaint),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-          ),
 
-        const SizedBox(width: 6),
-
-        // Botón Circular Principal con la Cara de Stocky
+        // Pastilla "Pregúntale a Stocky": dice qué hace, con el estilo de las tarjetas
         ScaleTransition(
           scale: _buttonScaleAnimation,
-          child: Tooltip(
-            message: 'Stocky',
+          child: Semantics(
+            button: true,
+            label: 'Pregúntale a Stocky',
             child: Material(
-              color: Colors.transparent,
+              color: c.surface,
+              shape: StadiumBorder(side: BorderSide(color: c.line)),
+              clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: _handleButtonTap,
-                customBorder: const CircleBorder(),
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? const [Color(0xFF2E2660), Color(0xFF1B163B)]
-                          : const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-                    ),
-                    border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF8B5CF6).withOpacity(0.6)
-                          : Colors.white.withOpacity(0.9),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF8B5CF6).withOpacity(0.45),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: Stack(
-                    clipBehavior: Clip.none,
+                child: Padding(
+                  // Texto a la izquierda y Stocky a la derecha, pegado al borde de la pantalla
+                  padding: const EdgeInsets.fromLTRB(AppSpace.lg, 4, 4, 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Center(
-                        child: ClipOval(
-                          child: SizedBox(
-                            width: 44,
-                            height: 44,
-                            child: StockyMascot(
-                              size: 40,
-                              state: _isExploding
-                                  ? StockyState.success
-                                  : StockyState.idle,
-                            ),
-                          ),
-                        ),
+                      Text(
+                        'Pregúntale a Stocky',
+                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.ink),
                       ),
-                      // Indicador luminoso "En línea"
-                      Positioned(
-                        right: 2,
-                        bottom: 2,
-                        child: Container(
-                          width: 13,
-                          height: 13,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: isDark ? const Color(0xFF1B163B) : Colors.white,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF10B981).withOpacity(0.8),
-                                blurRadius: 6,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
+                      const SizedBox(width: AppSpace.sm),
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: const BoxDecoration(color: StockyPalette.halo, shape: BoxShape.circle),
+                        alignment: Alignment.center,
+                        child: StockyMascot(
+                          size: 34,
+                          state: _isExploding ? StockyState.success : StockyState.idle,
                         ),
                       ),
                     ],
@@ -578,44 +460,13 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
   }
 }
 
-/// Painter para la pequeña flecha del bocadillo
-class _SpeechArrowPainter extends CustomPainter {
-  final Color color;
-  final Color borderColor;
-
-  _SpeechArrowPainter({required this.color, required this.borderColor});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, size.height / 2)
-      ..lineTo(0, size.height)
-      ..close();
-
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(path, fillPaint);
-
-    final borderPaint = Paint()
-      ..color = borderColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    canvas.drawPath(path, borderPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SpeechArrowPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.borderColor != borderColor;
-}
-
 /// Painter para la animación de explosión con partículas, estrellas y onda expansiva
 class _ExplosionPainter extends CustomPainter {
   final double progress;
   final List<_ExplosionParticle> particles;
+  final Color glow;
 
-  _ExplosionPainter({required this.progress, required this.particles});
+  _ExplosionPainter({required this.progress, required this.particles, required this.glow});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -626,7 +477,7 @@ class _ExplosionPainter extends CustomPainter {
 
     // 1. Onda expansiva exterior
     final ringPaint = Paint()
-      ..color = const Color(0xFF8B5CF6).withOpacity(opacity * 0.75)
+      ..color = glow.withOpacity(opacity * 0.75)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.2 * (1.0 - progress);
     canvas.drawCircle(
@@ -637,7 +488,7 @@ class _ExplosionPainter extends CustomPainter {
 
     // 2. Onda expansiva interior dorada/verde
     final innerRingPaint = Paint()
-      ..color = const Color(0xFF10B981).withOpacity(opacity * 0.55)
+      ..color = StockyPalette.sparkleGold.withOpacity(opacity * 0.55)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0 * (1.0 - progress);
     canvas.drawCircle(

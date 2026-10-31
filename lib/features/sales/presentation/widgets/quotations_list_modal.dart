@@ -1,6 +1,5 @@
+import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -10,7 +9,9 @@ import '../../../products/models/product_variant.dart';
 import '../../data/sales_repository.dart';
 import '../../models/cart_item.dart';
 import '../../models/quotation.dart';
+import '../../../business/presentation/active_business_scope.dart';
 import 'digital_ticket_modal.dart';
+import 'sale_document.dart';
 
 class QuotationsListModal extends StatefulWidget {
   final String businessId;
@@ -19,6 +20,7 @@ class QuotationsListModal extends StatefulWidget {
 
   static Future<void> show(BuildContext context, {required String businessId}) {
     return showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -58,39 +60,35 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
     }
   }
 
-  void _shareQuotationViaWhatsApp(Quotation q) {
-    final dateFormat = DateFormat('dd/MM/yyyy');
-    final buffer = StringBuffer();
-    buffer.writeln('📄 *COTIZACIÓN / PRESUPUESTO COMERCIAL*');
-    buffer.writeln('🔢 N°: ${q.quotationNumber}');
-    buffer.writeln('📅 Fecha: ${dateFormat.format(q.createdAt)}');
-    if (q.validUntil != null) {
-      buffer.writeln('⏳ Validez: hasta el ${dateFormat.format(q.validUntil!)}');
-    }
-    if (q.customerName?.isNotEmpty == true) {
-      buffer.writeln('👤 Para: ${q.customerName}');
-    }
-    buffer.writeln('--------------------------------');
-    buffer.writeln('🛒 *Productos Cotizados:*');
-    for (final item in q.items) {
-      buffer.writeln('• ${item.quantity}x ${item.productName}');
-      buffer.writeln('  Precio: ${CurrencyFormatter.formatCOP(item.unitPrice)} c/u | Subtotal: ${CurrencyFormatter.formatCOP(item.subtotal)}');
-    }
-    buffer.writeln('--------------------------------');
-    if (q.discountAmount > 0) {
-      buffer.writeln('Subtotal: ${CurrencyFormatter.formatCOP(q.totalAmount + q.discountAmount)}');
-      buffer.writeln('🏷️ Descuento especial: -${CurrencyFormatter.formatCOP(q.discountAmount)}');
-      buffer.writeln('--------------------------------');
-    }
-    buffer.writeln('💰 *TOTAL ESTIMADO:* ${CurrencyFormatter.formatCOP(q.totalAmount)}');
-    if (q.notes?.isNotEmpty == true) {
-      buffer.writeln('📝 Notas: ${q.notes}');
-    }
-    buffer.writeln('--------------------------------');
-    buffer.writeln('Para confirmar y preparar tu pedido, responde a este mensaje.');
-    buffer.writeln('Emitido con Stockealo Pro 📦');
-
-    Share.share(buffer.toString(), subject: 'Cotización ${q.quotationNumber}');
+  /// Abre la cotización con el logo del negocio para compartirla
+  void _shareQuotation(Quotation q) {
+    final business = ActiveBusinessScope.read(context);
+    SaleDocumentSheet.show(
+      context,
+      business: business,
+      businessName: business?.name ?? 'Mi negocio',
+      doc: SaleDocument(
+        title: 'Cotización',
+        number: q.quotationNumber,
+        date: q.createdAt,
+        validUntil: q.validUntil,
+        lines: [
+          for (final i in q.items)
+            SaleDocumentLine(
+              quantity: i.quantity,
+              name: i.variantName?.isNotEmpty == true ? '${i.productName} (${i.variantName})' : i.productName,
+              unitPrice: i.unitPrice,
+              total: i.subtotal,
+            ),
+        ],
+        discount: q.discountAmount,
+        total: q.totalAmount,
+        customerName: q.customerName,
+        sellerName: q.sellerName,
+        notes: q.notes,
+        closing: 'Para confirmar tu pedido, responde a este mensaje.',
+      ),
+    );
   }
 
   Future<void> _convertQuotationToSale(Quotation q) async {
@@ -109,7 +107,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            style: ElevatedButton.styleFrom(backgroundColor: context.colors.accent),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Confirmar y Facturar', style: TextStyle(color: Colors.white)),
           ),
@@ -206,12 +204,11 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF131126) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
-    final cardBg = isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC);
-    final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final bgColor = context.colors.surface;
+    final borderColor = context.colors.line;
+    final cardBg = context.colors.surfaceMuted;
+    final textMain = context.colors.ink;
+    final textMuted = context.colors.inkMuted;
 
     return Container(
       constraints: BoxConstraints(
@@ -232,7 +229,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                color: context.colors.lineStrong,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -245,10 +242,10 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8B5CF6).withOpacity(0.12),
+                      color: context.colors.accent.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.description_outlined, color: Color(0xFF8B5CF6), size: 20),
+                    child: Icon(Icons.description_outlined, color: context.colors.accent, size: 20),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -276,7 +273,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
 
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B5CF6)))
+                ? Center(child: CircularProgressIndicator(color: context.colors.accent))
                 : _quotations.isEmpty
                     ? const StockyEmptyState(
                         title: 'No hay cotizaciones pendientes',
@@ -297,7 +294,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: isBilled
-                                    ? const Color(0xFF10B981).withOpacity(0.3)
+                                    ? context.colors.accent.withOpacity(0.3)
                                     : borderColor,
                               ),
                             ),
@@ -318,8 +315,8 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                           decoration: BoxDecoration(
                                             color: isBilled
-                                                ? const Color(0xFF10B981).withOpacity(0.15)
-                                                : const Color(0xFFF59E0B).withOpacity(0.15),
+                                                ? context.colors.accent.withOpacity(0.15)
+                                                : context.colors.warning.withOpacity(0.15),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
@@ -327,7 +324,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                             style: TextStyle(
                                               fontSize: 9.5,
                                               fontWeight: FontWeight.bold,
-                                              color: isBilled ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                              color: isBilled ? context.colors.accent : context.colors.warning,
                                             ),
                                           ),
                                         ),
@@ -338,7 +335,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                       style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
-                                        color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                                        color: context.colors.accent,
                                       ),
                                     ),
                                   ],
@@ -366,7 +363,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     IconButton(
-                                      icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
+                                      icon: Icon(Icons.delete_outline, size: 18, color: context.colors.danger),
                                       tooltip: 'Eliminar',
                                       onPressed: () => _deleteQuotation(q),
                                     ),
@@ -375,12 +372,12 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                       icon: const Icon(Icons.share, size: 14),
                                       label: const Text('WhatsApp', style: TextStyle(fontSize: 11.5)),
                                       style: OutlinedButton.styleFrom(
-                                        foregroundColor: const Color(0xFF10B981),
-                                        side: const BorderSide(color: Color(0xFF10B981)),
+                                        foregroundColor: context.colors.accent,
+                                        side: BorderSide(color: context.colors.accent),
                                         visualDensity: VisualDensity.compact,
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       ),
-                                      onPressed: () => _shareQuotationViaWhatsApp(q),
+                                      onPressed: () => _shareQuotation(q),
                                     ),
                                     if (!isBilled) ...[
                                       const SizedBox(width: 8),
@@ -388,7 +385,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                         icon: const Icon(Icons.point_of_sale_rounded, size: 14),
                                         label: const Text('Facturar', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF8B5CF6),
+                                          backgroundColor: context.colors.accent,
                                           foregroundColor: Colors.white,
                                           visualDensity: VisualDensity.compact,
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

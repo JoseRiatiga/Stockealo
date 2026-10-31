@@ -11,6 +11,7 @@ class BarcodeModal extends StatefulWidget {
 
   static void show(BuildContext context, Product product) {
     showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

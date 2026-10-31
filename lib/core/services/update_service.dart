@@ -111,7 +111,7 @@ class UpdateService {
         }
       }
 
-      final isGreater = _isVersionGreater(tagName, currentVer);
+      final isGreater = isVersionGreater(tagName, currentVer);
 
       return AppUpdateInfo(
         currentVersion: currentVer,
@@ -134,11 +134,15 @@ class UpdateService {
   }
 
   /// Compara dos versiones semánticas (ej: "1.0.1" con "1.0.0")
-  bool _isVersionGreater(String remote, String current) {
+  @visibleForTesting
+  bool isVersionGreater(String remote, String current) {
     if (remote.isEmpty) return false;
     try {
-      final remoteParts = remote.split('.').map((p) => int.tryParse(p) ?? 0).toList();
-      final currentParts = current.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+      // "0.9.0-beta" → números 0.9.0 y marca de versión previa
+      final remoteIsPreview = remote.contains('-');
+      final currentIsPreview = current.contains('-');
+      final remoteParts = remote.split('-').first.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+      final currentParts = current.split('-').first.split('.').map((p) => int.tryParse(p) ?? 0).toList();
 
       while (remoteParts.length < 3) {
         remoteParts.add(0);
@@ -157,7 +161,8 @@ class UpdateService {
         if (remoteParts[i] > currentParts[i]) return true;
         if (remoteParts[i] < currentParts[i]) return false;
       }
-      return false;
+      // Mismos números: la final (0.9.0) es más nueva que su versión previa (0.9.0-beta)
+      return currentIsPreview && !remoteIsPreview;
     } catch (_) {
       return false;
     }

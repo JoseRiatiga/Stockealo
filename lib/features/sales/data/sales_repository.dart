@@ -1,8 +1,11 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/data_events.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../team/data/activity_repository.dart';
 import '../../products/models/product.dart';
 import '../models/sale.dart';
 import '../models/cart_item.dart';
@@ -154,6 +157,16 @@ class SalesRepository {
     SupabaseService.instance.insertSaleToCloud(sale.toMap());
     SupabaseService.instance.adjustProductStockInCloud(product.id, -quantity);
 
+    final who = customerName?.trim().isNotEmpty == true ? ' a ${customerName!.trim()}' : '';
+    ActivityRepository.instance.log(
+      businessId: businessId,
+      action: ActivityAction.sale,
+      summary: 'Vendió $quantity × ${product.name} por ${CurrencyFormatter.format(total)} '
+          '(${activityPaymentLabel(paymentMethod)}$who)',
+      data: {'sale_id': saleId, 'total': total},
+    );
+
+    DataEvents.instance.salesChanged();
     return sale;
   }
 
@@ -357,6 +370,20 @@ class SalesRepository {
       SupabaseService.instance.insertSaleToCloud(sale.toMap());
     }
     stockDeltas.forEach(SupabaseService.instance.adjustProductStockInCloud);
+
+    final units = items.fold<int>(0, (sum, i) => sum + i.quantity);
+    final who = customerName?.trim().isNotEmpty == true ? ' a ${customerName!.trim()}' : '';
+    final what = items.length == 1 ? '${items.first.quantity} × ${items.first.displayName}' : '$units productos';
+    ActivityRepository.instance.log(
+      businessId: businessId,
+      action: ActivityAction.sale,
+      summary: 'Vendió $what por ${CurrencyFormatter.format(finalTotal)} '
+          '(${activityPaymentLabel(paymentMethod)}$who)'
+          '${finalDiscount > 0 ? ' con ${CurrencyFormatter.format(finalDiscount)} de descuento' : ''}',
+      data: {'invoice': invoiceNumber, 'total': finalTotal, 'discount': finalDiscount},
+    );
+
+    DataEvents.instance.salesChanged();
     return createdSales;
   }
 
@@ -546,9 +573,21 @@ class SalesRepository {
   }
 
   /// Obtiene el resumen de ventas del día actual de la empresa
-  Future<Map<String, dynamic>> getTodaySummary(String businessId) async {
-    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
-    final sales = await getSales(businessId: businessId, dateFilter: todayStr);
+  Future<Map<String, dynamic>> getTodaySummary(String businessId) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return getSalesSummary(businessId, from: today, to: today.add(const Duration(days: 1)));
+  }
+
+  /// Resumen de ventas entre [from] (incluido) y [to] (excluido), en hora local
+  Future<Map<String, dynamic>> getSalesSummary(
+    String businessId, {
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final sales = (await getSales(businessId: businessId))
+        .where((s) => !s.date.isBefore(from) && s.date.isBefore(to))
+        .toList();
 
     double totalAmount = 0.0;
     double netProfit = 0.0;
@@ -639,6 +678,14 @@ class SalesRepository {
         whereArgs: [sale.id, sale.businessId],
       );
     });
+
+    DataEvents.instance.salesChanged();
+    ActivityRepository.instance.log(
+      businessId: sale.businessId,
+      action: ActivityAction.saleCancel,
+      summary: 'Anuló la venta de ${sale.quantity} × ${sale.productName} por ${CurrencyFormatter.format(sale.totalAmount)}',
+      data: {'sale_id': sale.id, 'total': sale.totalAmount},
+    );
 
     // Reflejar la anulación en la nube; si no, la venta reaparecería al descargar
     final cloud = SupabaseService.instance;

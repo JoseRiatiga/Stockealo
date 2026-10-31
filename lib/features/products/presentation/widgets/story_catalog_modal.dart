@@ -5,44 +5,39 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
+import '../../../business/presentation/business_identity.dart';
+import '../../../reports/models/catalog_style.dart';
 import '../../models/product.dart';
 import 'product_image_view.dart';
 
-/// Modal interactivo para previsualizar y exportar imágenes verticales 9:16
-/// listas para subir a Estados de WhatsApp e Historias de Instagram.
+/// Historias verticales 9:16 para Estados de WhatsApp e Instagram, con el mismo
+/// estilo del catálogo en PDF.
 class StoryCatalogModal extends StatefulWidget {
   final Business business;
   final List<Product> products;
-  final String? contactPhone;
-  final int itemsPerPage;
+  final CatalogStyle style;
 
   const StoryCatalogModal({
     super.key,
     required this.business,
     required this.products,
-    this.contactPhone,
-    this.itemsPerPage = 1,
+    this.style = const CatalogStyle(),
   });
 
   static Future<void> show({
     required BuildContext context,
     required Business business,
     required List<Product> products,
-    String? contactPhone,
-    int itemsPerPage = 1,
+    CatalogStyle style = const CatalogStyle(),
   }) {
     return showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.85),
-      builder: (_) => StoryCatalogModal(
-        business: business,
-        products: products,
-        contactPhone: contactPhone,
-        itemsPerPage: itemsPerPage,
-      ),
+      builder: (_) => StoryCatalogModal(business: business, products: products, style: style),
     );
   }
 
@@ -51,22 +46,15 @@ class StoryCatalogModal extends StatefulWidget {
 }
 
 class _StoryCatalogModalState extends State<StoryCatalogModal> {
-  late PageController _pageController;
+  final _pageController = PageController();
   int _currentPageIndex = 0;
   bool _isExporting = false;
-  late int _density;
+  late int _density = widget.style.itemsPerPage >= 4 ? 4 : widget.style.itemsPerPage;
 
-  // Claves globales para capturar cada historia
+  // Claves para capturar cada historia como imagen
   final Map<int, GlobalKey> _storyKeys = {};
 
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController();
-    _density = (widget.itemsPerPage == 1 || widget.itemsPerPage == 2 || widget.itemsPerPage == 4)
-        ? widget.itemsPerPage
-        : 1;
-  }
+  late final _StoryColors _colors = _StoryColors.of(widget.style, widget.business.color);
 
   @override
   void dispose() {
@@ -74,128 +62,106 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
     super.dispose();
   }
 
-  List<List<Product>> get _storyPages {
-    final List<List<Product>> pages = [];
-    for (int i = 0; i < widget.products.length; i += _density) {
-      final end = (i + _density < widget.products.length) ? i + _density : widget.products.length;
-      pages.add(widget.products.sublist(i, end));
-    }
-    return pages;
-  }
+  List<List<Product>> get _storyPages => [
+        for (var i = 0; i < widget.products.length; i += _density) widget.products.skip(i).take(_density).toList(),
+      ];
 
   Future<void> _shareCurrentStory() async {
     final key = _storyKeys[_currentPageIndex];
     if (key == null) return;
-
     setState(() => _isExporting = true);
 
     try {
       final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) throw Exception('No se pudo renderizar la historia');
+      if (boundary == null) throw Exception('No se pudo dibujar la historia');
 
       final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) throw Exception('Fallo al codificar PNG');
+      if (byteData == null) throw Exception('No se pudo crear la imagen');
 
-      final pngBytes = byteData.buffer.asUint8List();
       final tempDir = await getTemporaryDirectory();
       final cleanBiz = widget.business.name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
       final file = File('${tempDir.path}/Historia_${cleanBiz}_${_currentPageIndex + 1}.png');
-      await file.writeAsBytes(pngBytes, flush: true);
+      await file.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
 
       if (mounted) {
         setState(() => _isExporting = false);
         await Share.shareXFiles(
-          [
-            XFile(
-              file.path,
-              mimeType: 'image/png',
-              name: 'Historia_${widget.business.name}.png',
-            ),
-          ],
-          text: '¡Mira los productos disponibles en ${widget.business.name}!',
+          [XFile(file.path, mimeType: 'image/png', name: 'Historia_${widget.business.name}.png')],
+          text: 'Mira los productos de ${widget.business.name}',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isExporting = false);
-        AppToast.show(context, message: 'Error exportando historia: $e', type: ToastType.error);
+        AppToast.show(context, message: 'No se pudo exportar la historia: $e', type: ToastType.error);
       }
     }
   }
 
+  void _setDensity(int density) {
+    setState(() {
+      _density = density;
+      _currentPageIndex = 0;
+      _storyKeys.clear();
+    });
+    _pageController.jumpToPage(0);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final pages = _storyPages;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(),
+      insetPadding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.xl),
       child: Column(
         children: [
-          // Barra Superior: Controles de Densidad y Cerrar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.xs, AppSpace.sm),
             decoration: BoxDecoration(
-              color: const Color(0xFF131126),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFF26214A)),
+              color: c.surface,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: c.line),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF8B5CF6).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Historias', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+                      Text(
+                        '${_currentPageIndex + 1} de ${pages.length}',
+                        style: TextStyle(fontSize: 12, color: c.inkMuted),
                       ),
-                      child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF8B5CF6), size: 18),
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Historias para Redes',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFF8FAFC),
-                          ),
-                        ),
-                        Text(
-                          '${_currentPageIndex + 1} de ${pages.length} historias',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                // Selector rápido de densidad
-                Row(
-                  children: [
-                    _buildDensityChip(1, '1'),
-                    const SizedBox(width: 4),
-                    _buildDensityChip(2, '2'),
-                    const SizedBox(width: 4),
-                    _buildDensityChip(4, '4'),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 20),
-                    ),
+                SegmentedButton<int>(
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                  segments: const [
+                    ButtonSegment(value: 1, label: Text('1')),
+                    ButtonSegment(value: 2, label: Text('2')),
+                    ButtonSegment(value: 4, label: Text('4')),
                   ],
+                  selected: {_density},
+                  onSelectionChanged: (v) => _setDensity(v.first),
+                ),
+                IconButton(
+                  tooltip: 'Cerrar',
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.close_rounded, color: c.inkMuted),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-
-          // Área Central: Carrusel Vertical 9:16
+          const SizedBox(height: AppSpace.md),
           Expanded(
             child: Center(
               child: AspectRatio(
@@ -204,42 +170,23 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                   controller: _pageController,
                   itemCount: pages.length,
                   onPageChanged: (idx) => setState(() => _currentPageIndex = idx),
-                  itemBuilder: (context, index) {
-                    final storyKey = _storyKeys.putIfAbsent(index, () => GlobalKey());
-                    return RepaintBoundary(
-                      key: storyKey,
-                      child: _buildStoryCard(pages[index]),
-                    );
-                  },
+                  itemBuilder: (context, index) => RepaintBoundary(
+                    key: _storyKeys.putIfAbsent(index, () => GlobalKey()),
+                    child: _buildStoryCard(pages[index]),
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 14),
-
-          // Barra Inferior: Botón Acción Subir / Compartir
+          const SizedBox(height: AppSpace.md),
           SizedBox(
             width: 320,
-            child: ElevatedButton.icon(
+            child: FilledButton.icon(
               onPressed: _isExporting ? null : _shareCurrentStory,
               icon: _isExporting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.share_rounded, size: 18),
-              label: Text(
-                _isExporting ? 'Procesando imagen...' : 'Subir a Estados / Compartir PNG',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 4,
-              ),
+              label: Text(_isExporting ? 'Preparando imagen…' : 'Compartir esta historia'),
             ),
           ),
         ],
@@ -247,169 +194,50 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
     );
   }
 
-  Widget _buildDensityChip(int density, String label) {
-    final isSelected = _density == density;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _density = density;
-          _currentPageIndex = 0;
-          _storyKeys.clear();
-        });
-        _pageController.jumpToPage(0);
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8B5CF6) : const Color(0xFF18152F),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF8B5CF6) : const Color(0xFF26214A),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Construye la tarjeta vertical 9:16 con estética Obsidian Violet Bento
+  /// Historia 9:16: encabezado con el color del catálogo, productos y contacto
   Widget _buildStoryCard(List<Product> products) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0915),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF26214A), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF8B5CF6).withOpacity(0.18),
-            blurRadius: 24,
-            spreadRadius: 2,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Stack(
+    final k = _colors;
+    final style = widget.style;
+    final title = style.title.trim().isNotEmpty ? style.title.trim() : 'Catálogo de productos';
+    final contact = style.whatsapp.trim().isNotEmpty
+        ? 'Pídelo por WhatsApp: ${style.whatsapp.trim()}'
+        : 'Pregunta por tu producto favorito';
+    final extra = [
+      if (style.address.trim().isNotEmpty) style.address.trim(),
+      if (style.hours.trim().isNotEmpty) style.hours.trim(),
+      if (style.social.trim().isNotEmpty) style.social.trim(),
+    ].join(' · ');
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.sheet),
+      child: Container(
+        color: k.page,
+        padding: const EdgeInsets.all(AppSpace.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Resplandor superior sutil
-            Positioned(
-              top: -60,
-              left: 20,
-              right: 20,
-              child: Container(
-                height: 180,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF8B5CF6).withOpacity(0.15),
-                ),
-              ),
-            ),
-
-            // Contenido estructurado de la Historia
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            Container(
+              padding: const EdgeInsets.all(AppSpace.md),
+              decoration: BoxDecoration(color: k.accent, borderRadius: BorderRadius.circular(AppRadius.card)),
+              child: Row(
                 children: [
-                  // 1. Cabecera Comercial
-                  Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF131126),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.4)),
-                        ),
-                        child: Center(
-                          child: Text(
-                            widget.business.name.trim().isNotEmpty
-                                ? widget.business.name.trim()[0].toUpperCase()
-                                : 'S',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF8B5CF6),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    widget.business.name,
-                                    style: const TextStyle(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFFF8FAFC),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF10B981)),
-                              ],
-                            ),
-                            const Text(
-                              'Catálogo Oficial en Tiempo Real',
-                              style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 2. Bloque Central de Productos
+                  CatalogLogo(business: widget.business, color: k.accent, size: 38),
+                  const SizedBox(width: AppSpace.sm),
                   Expanded(
-                    child: _buildProductLayout(products),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 3. Pie de Historia: Call-to-Action WhatsApp
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.35)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.chat_bubble_rounded, size: 15, color: Color(0xFF10B981)),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            widget.contactPhone != null && widget.contactPhone!.trim().isNotEmpty
-                                ? 'Pídelo al WhatsApp: ${widget.contactPhone}'
-                                : 'Pregunta por tu producto favorito',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF10B981),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        Text(
+                          widget.business.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, color: Colors.white),
                         ),
                       ],
                     ),
@@ -417,103 +245,130 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                 ],
               ),
             ),
+            const SizedBox(height: AppSpace.md),
+            Expanded(child: _buildProductLayout(products)),
+            const SizedBox(height: AppSpace.md),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.sm),
+              decoration: BoxDecoration(color: k.accentSoft, borderRadius: BorderRadius.circular(AppRadius.control)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.chat_rounded, size: 15, color: k.price),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      contact,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: k.price),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (extra.isNotEmpty || style.showBranding) ...[
+              const SizedBox(height: 6),
+              Text(
+                [if (extra.isNotEmpty) extra, if (style.showBranding) 'Hecho con Stockealo'].join(' · '),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 9.5, color: k.muted),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  Widget _box({required Widget child, EdgeInsets padding = const EdgeInsets.all(AppSpace.sm)}) => Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: _colors.card,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: _colors.line),
+        ),
+        child: child,
+      );
+
+  Widget _image(Product p, double iconSize) {
+    final hasPhoto = p.photoPath != null && p.photoPath!.trim().isNotEmpty;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.control),
+      child: hasPhoto
+          ? ProductImageView(imagePath: p.photoPath, width: double.infinity, height: double.infinity, iconSize: iconSize)
+          : Container(
+              color: _colors.imageBg,
+              alignment: Alignment.center,
+              child: Icon(Icons.inventory_2_outlined, size: iconSize, color: _colors.muted),
+            ),
+    );
+  }
+
+  String? _meta(Product p) {
+    final parts = [
+      if (widget.style.showCategory && p.category.trim().isNotEmpty) p.category.trim(),
+      if (widget.style.showCode && p.code.isNotEmpty) 'Ref. ${p.code}',
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  Widget _priceRow(Product p, double size) {
+    final style = widget.style;
+    return Row(
+      children: [
+        if (style.showPrice)
+          Expanded(
+            child: Text(
+              CurrencyFormatter.format(p.salePrice),
+              maxLines: 1,
+              style: TextStyle(fontSize: size, fontWeight: FontWeight.w800, color: _colors.price),
+            ),
+          )
+        else
+          const Spacer(),
+        if (style.showExactStock)
+          Text('${p.stock} disp.', style: TextStyle(fontSize: size * 0.55, color: _colors.muted)),
+      ],
+    );
+  }
+
   Widget _buildProductLayout(List<Product> products) {
+    final k = _colors;
+    final style = widget.style;
+
     if (_density == 1) {
       final p = products.first;
-      return Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF131126),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFF26214A)),
-        ),
-        padding: const EdgeInsets.all(14),
+      final meta = _meta(p);
+      final hasDescription = style.showDescription && (p.description?.trim().isNotEmpty ?? false);
+      return _box(
+        padding: const EdgeInsets.all(AppSpace.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen grande Hero
-            Expanded(
-              child: Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: ProductImageView(
-                    imagePath: p.photoPath,
-                    width: double.infinity,
-                    height: double.infinity,
-                    iconSize: 56,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B5CF6).withOpacity(0.15),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                p.category.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF8B5CF6),
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
+            Expanded(child: _image(p, 56)),
+            const SizedBox(height: AppSpace.md),
+            if (meta != null)
+              Text(meta, maxLines: 1, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: k.muted)),
             Text(
               p.name,
-              style: const TextStyle(
-                fontSize: 16.5,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFFF8FAFC),
-                height: 1.2,
-              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: k.ink, height: 1.2),
             ),
-            if (p.description != null && p.description!.trim().isNotEmpty) ...[
+            if (hasDescription) ...[
               const SizedBox(height: 4),
               Text(
-                p.description!,
-                style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                p.description!.trim(),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.5, color: k.muted),
               ),
             ],
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  CurrencyFormatter.format(p.salePrice),
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF10B981),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF18152F),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFF26214A)),
-                  ),
-                  child: Text(
-                    'Ref: ${p.code}',
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(height: AppSpace.sm),
+            _priceRow(p, 22),
           ],
         ),
       );
@@ -521,107 +376,70 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
 
     if (_density == 2) {
       return Column(
-        children: products.map((p) {
-          return Expanded(
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF131126),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF26214A)),
-              ),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: ProductImageView(
-                      imagePath: p.photoPath,
-                      width: 90,
-                      height: double.infinity,
-                      iconSize: 32,
-                    ),
+        children: [
+          for (final p in products)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: AppSpace.sm),
+                child: _box(
+                  child: Row(
+                    children: [
+                      SizedBox(width: 96, child: _image(p, 32)),
+                      const SizedBox(width: AppSpace.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_meta(p) != null)
+                              Text(_meta(p)!, maxLines: 1, style: TextStyle(fontSize: 9.5, color: k.muted)),
+                            Text(
+                              p.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: k.ink),
+                            ),
+                            const SizedBox(height: 6),
+                            _priceRow(p, 16),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          p.category.toUpperCase(),
-                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6)),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          p.name,
-                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFFF8FAFC)),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          CurrencyFormatter.format(p.salePrice),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          );
-        }).toList(),
+          // Si la última historia queda con un solo producto, no se estira
+          if (products.length < 2) const Spacer(),
+        ],
       );
     }
 
-    // Densidad 4: Grilla 2x2
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
       itemCount: products.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        crossAxisSpacing: AppSpace.sm,
+        mainAxisSpacing: AppSpace.sm,
         childAspectRatio: 0.76,
       ),
       itemBuilder: (context, i) {
         final p = products[i];
-        return Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF131126),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF26214A)),
-          ),
+        return _box(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: ProductImageView(
-                      imagePath: p.photoPath,
-                      width: double.infinity,
-                      height: double.infinity,
-                      iconSize: 24,
-                    ),
-                  ),
-                ),
-              ),
+              Expanded(child: _image(p, 24)),
               const SizedBox(height: 6),
               Text(
                 p.name,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF8FAFC)),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: k.ink),
               ),
-              const SizedBox(height: 2),
-              Text(
-                CurrencyFormatter.format(p.salePrice),
-                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
-              ),
+              _priceRow(p, 13),
             ],
           ),
         );
@@ -629,3 +447,57 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
     );
   }
 }
+
+/// Colores de la historia: no siguen el tema de la app sino el estilo del catálogo
+class _StoryColors {
+  final Color accent;
+  final Color accentSoft;
+  final Color price;
+  final Color page;
+  final Color card;
+  final Color imageBg;
+  final Color ink;
+  final Color muted;
+  final Color line;
+
+  const _StoryColors({
+    required this.accent,
+    required this.accentSoft,
+    required this.price,
+    required this.page,
+    required this.card,
+    required this.imageBg,
+    required this.ink,
+    required this.muted,
+    required this.line,
+  });
+
+  factory _StoryColors.of(CatalogStyle style, String? businessColor) {
+    final accent = AppPalette.fromHex(style.colorHex) ?? AppPalette.fromHex(businessColor) ?? AppPalette.brand;
+    if (style.darkBackground) {
+      return _StoryColors(
+        accent: accent,
+        accentSoft: Color.lerp(AppPalette.paperDark, accent, 0.3)!,
+        price: Color.lerp(accent, Colors.white, 0.35)!,
+        page: AppPalette.paperDark,
+        card: AppPalette.surfaceDark,
+        imageBg: AppPalette.surfaceMutedDark,
+        ink: AppPalette.inkDark,
+        muted: AppPalette.inkMutedDark,
+        line: AppPalette.lineDark,
+      );
+    }
+    return _StoryColors(
+      accent: accent,
+      accentSoft: Color.lerp(Colors.white, accent, 0.12)!,
+      price: accent,
+      page: AppPalette.paper,
+      card: AppPalette.surface,
+      imageBg: AppPalette.surfaceMuted,
+      ink: AppPalette.ink,
+      muted: AppPalette.inkMuted,
+      line: AppPalette.line,
+    );
+  }
+}
+

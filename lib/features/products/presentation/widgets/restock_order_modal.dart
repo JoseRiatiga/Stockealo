@@ -36,6 +36,7 @@ class RestockOrderModal extends StatefulWidget {
     String? userName,
   }) {
     return showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

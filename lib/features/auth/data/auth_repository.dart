@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/database/app_database.dart';
 import '../../stocky/data/stocky_assistant_service.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/countries.dart';
 import '../models/app_user.dart';
 
 /// Autenticación sobre Supabase Auth.
@@ -29,6 +30,10 @@ class AuthRepository {
   static AppUser? _currentUser;
 
   AppUser? get currentUser => _currentUser;
+
+  /// Fija la sesión sin pasar por Supabase (solo pruebas)
+  @visibleForTesting
+  static set debugCurrentUser(AppUser? user) => _currentUser = user;
   bool get isAuthenticated => _currentUser != null;
 
   /// Paso 1 del registro: envía un código de 6 dígitos al correo
@@ -63,7 +68,8 @@ class AuthRepository {
 
     await _dbProvider.useAccount(auth.currentUser!.id, cleanEmail);
     final cleanName = name?.trim();
-    final cleanPhone = phone?.trim();
+    // Sin prefijo, el número es del país configurado en el teléfono
+    final cleanPhone = PhoneNumbers.toE164(phone, country: deviceCountry()) ?? phone?.trim();
     final user = await _resolveAppUser(
       auth.currentUser!,
       name: (cleanName != null && cleanName.isNotEmpty) ? cleanName : null,
@@ -161,7 +167,7 @@ class AuthRepository {
     final db = await _dbProvider.database;
     final Map<String, dynamic> values = {};
     if (name != null) values['name'] = name.trim();
-    if (phone != null) values['phone'] = phone.trim();
+    if (phone != null) values['phone'] = PhoneNumbers.toE164(phone, country: deviceCountry()) ?? phone.trim();
     if (avatarPath != null) values['avatar_path'] = avatarPath;
 
     if (values.isNotEmpty) {
@@ -176,7 +182,7 @@ class AuthRepository {
     if (_currentUser != null && _currentUser!.id == userId) {
       _currentUser = _currentUser!.copyWith(
         name: name?.trim() ?? _currentUser!.name,
-        phone: phone?.trim() ?? _currentUser!.phone,
+        phone: values['phone'] as String? ?? _currentUser!.phone,
         avatarPath: avatarPath ?? _currentUser!.avatarPath,
       );
     }

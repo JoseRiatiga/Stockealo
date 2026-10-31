@@ -5,13 +5,21 @@ import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../../core/design/primary_action_button.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
-import '../../models/product.dart';
 import '../../../reports/data/catalog_pdf_service.dart';
+import '../../../reports/models/catalog_style.dart';
+import '../../models/product.dart';
+import '../../../business/presentation/business_identity.dart';
 import 'story_catalog_modal.dart';
 
+/// Arma el catálogo del negocio: qué productos, cómo se ve y qué datos de
+/// contacto lleva. El estilo se recuerda por negocio y sirve para el PDF y las
+/// historias.
 class CatalogGeneratorModal extends StatefulWidget {
   final Business business;
 
@@ -22,6 +30,7 @@ class CatalogGeneratorModal extends StatefulWidget {
     required Business business,
   }) {
     return showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -35,14 +44,17 @@ class CatalogGeneratorModal extends StatefulWidget {
 
 class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
   final _pdfService = CatalogPdfService.instance;
-  final _authRepo = AuthRepository.instance;
-  final _phoneController = TextEditingController();
 
+  final _titleController = TextEditingController();
+  final _whatsappController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _hoursController = TextEditingController();
+  final _socialController = TextEditingController();
+
+  CatalogStyle _style = const CatalogStyle();
   List<Product> _allInStockProducts = [];
   List<String> _categories = ['Todas'];
   String _selectedCategory = 'Todas';
-  bool _showExactStock = false;
-  int _itemsPerPage = 4; // 1, 2, 4, 6
 
   bool _isLoading = true;
   bool _isGenerating = false;
@@ -62,39 +74,48 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _titleController.dispose();
+    _whatsappController.dispose();
+    _addressController.dispose();
+    _hoursController.dispose();
+    _socialController.dispose();
     super.dispose();
   }
 
   Future<void> _loadInitialData() async {
-    setState(() => _isLoading = true);
-
-    // 1. Obtener teléfono del usuario autenticado
-    final currentUser = _authRepo.currentUser;
-    if (currentUser?.phone != null && currentUser!.phone!.trim().isNotEmpty) {
-      _phoneController.text = currentUser.phone!.trim();
-    }
-
-    // 2. Cargar todos los productos con stock > 0
     try {
-      final db = await AppDatabase.instance.database;
-      final maps = await db.query(
+      final db = AppDatabase.instance;
+      var style = CatalogStyle.decode(await db.getSetting(CatalogStyle.settingsKey(widget.business.id)));
+
+      // La primera vez, el WhatsApp sale del teléfono de la cuenta
+      final phone = AuthRepository.instance.currentUser?.phone?.trim() ?? '';
+      if (style.whatsapp.isEmpty && phone.isNotEmpty) style = style.copyWith(whatsapp: phone);
+
+      final maps = await (await db.database).query(
         'products',
         where: 'business_id = ? AND is_active = 1 AND stock > 0',
         whereArgs: [widget.business.id],
         orderBy: 'category ASC, name ASC',
       );
-
       final products = maps.map((m) => Product.fromMap(m)).toList();
       final catSet = <String>{'Todas'};
       for (final p in products) {
-        if (p.category.trim().isNotEmpty) {
-          catSet.add(p.category.trim());
-        }
+        if (p.category.trim().isNotEmpty) catSet.add(p.category.trim());
       }
+
+      // Los elegidos a mano que ya no existen o no tienen stock se descartan
+      final ids = products.map((p) => p.id).toSet();
+      style = style.copyWith(selectedProductIds: style.selectedProductIds.where(ids.contains).toSet());
+
+      _titleController.text = style.title;
+      _whatsappController.text = style.whatsapp;
+      _addressController.text = style.address;
+      _hoursController.text = style.hours;
+      _socialController.text = style.social;
 
       if (mounted) {
         setState(() {
+          _style = style;
           _allInStockProducts = products;
           _categories = catSet.toList();
           _isLoading = false;
@@ -103,41 +124,53 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        AppToast.show(context, message: 'Error cargando inventario: $e', type: ToastType.error);
+        AppToast.show(context, message: 'No se pudo cargar el inventario: $e', type: ToastType.error);
       }
     }
   }
 
-  List<Product> get _filteredProducts {
-    if (_selectedCategory == 'Todas') {
-      return _allInStockProducts;
+  /// Estilo con lo que hay escrito en los campos de texto
+  CatalogStyle get _currentStyle => _style.copyWith(
+        title: _titleController.text.trim(),
+        whatsapp: _whatsappController.text.trim(),
+        address: _addressController.text.trim(),
+        hours: _hoursController.text.trim(),
+        social: _socialController.text.trim(),
+      );
+
+  List<Product> get _targetProducts =>
+      CatalogPdfService.selectProducts(_allInStockProducts, _currentStyle, categoryFilter: _selectedCategory);
+
+  void _update(CatalogStyle style) => setState(() => _style = style);
+
+  Future<void> _saveStyle() async {
+    try {
+      await AppDatabase.instance.setSetting(CatalogStyle.settingsKey(widget.business.id), _currentStyle.encode());
+    } catch (e) {
+      debugPrint('No se pudo guardar el estilo del catálogo: $e');
     }
-    return _allInStockProducts
-        .where((p) => p.category.toLowerCase() == _selectedCategory.toLowerCase())
-        .toList();
   }
 
   Future<void> _generatePdf() async {
-    final targets = _filteredProducts;
-    if (targets.isEmpty) {
-      AppToast.show(context, message: 'No hay productos disponibles en esta categoría.', type: ToastType.warning);
+    if (_targetProducts.isEmpty) {
+      AppToast.show(context, message: 'No hay productos para este catálogo.', type: ToastType.warning);
       return;
     }
+    FocusScope.of(context).unfocus();
+    await _saveStyle();
 
     setState(() {
       _isGenerating = true;
       _progress = 0.05;
-      _statusMessage = 'Iniciando generación de catálogo...';
+      _statusMessage = 'Preparando el catálogo…';
     });
 
     try {
       final file = await _pdfService.generateCatalogPdf(
         business: widget.business,
-        products: targets,
-        contactPhone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
-        showExactStock: _showExactStock,
+        products: _allInStockProducts,
+        style: _currentStyle,
         categoryFilter: _selectedCategory,
-        itemsPerPage: _itemsPerPage,
         onProgress: (p, msg) {
           if (mounted) {
             setState(() {
@@ -148,11 +181,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
         },
       );
 
-      // Guardar automáticamente en el almacenamiento local / Descargas
-      final savedResult = await _pdfService.saveToDownloads(
-        pdfFile: file,
-        businessName: widget.business.name,
-      );
+      final savedResult = await _pdfService.saveToDownloads(pdfFile: file, businessName: widget.business.name);
 
       if (mounted) {
         setState(() {
@@ -165,21 +194,32 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
     } catch (e) {
       if (mounted) {
         setState(() => _isGenerating = false);
-        AppToast.show(context, message: 'Error generando PDF: $e', type: ToastType.error);
+        AppToast.show(context, message: 'No se pudo crear el PDF: $e', type: ToastType.error);
       }
     }
+  }
+
+  Future<void> _openStories() async {
+    if (_targetProducts.isEmpty) {
+      AppToast.show(context, message: 'No hay productos para este catálogo.', type: ToastType.warning);
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    await _saveStyle();
+    if (!mounted) return;
+    StoryCatalogModal.show(
+      context: context,
+      business: widget.business,
+      products: _targetProducts,
+      style: _currentStyle,
+    );
   }
 
   Future<void> _manualSaveToDownloads() async {
     if (_generatedFile == null) return;
     setState(() => _isSavingToDownloads = true);
-
     try {
-      final savedResult = await _pdfService.saveToDownloads(
-        pdfFile: _generatedFile!,
-        businessName: widget.business.name,
-      );
-
+      final savedResult = await _pdfService.saveToDownloads(pdfFile: _generatedFile!, businessName: widget.business.name);
       if (mounted) {
         setState(() {
           _isSavingToDownloads = false;
@@ -187,39 +227,21 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           _savedPathLabel = savedResult.pathLabel;
           _isPublicDownload = savedResult.isPublicDownload;
         });
-
-        AppToast.show(
-          context,
-          message: 'Guardado con éxito en: ${savedResult.pathLabel}',
-          type: ToastType.success,
-        );
+        AppToast.show(context, message: 'Guardado en ${savedResult.pathLabel}', type: ToastType.success);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSavingToDownloads = false);
-        AppToast.show(
-          context,
-          message: 'Error al guardar archivo: $e',
-          type: ToastType.error,
-        );
+        AppToast.show(context, message: 'No se pudo guardar el archivo: $e', type: ToastType.error);
       }
     }
   }
 
   Future<void> _shareFile() async {
     if (_generatedFile == null) return;
-    final fileName = p.basename(_generatedFile!.path);
-
-    // Compartir explícitamente como archivo PDF con mimeType y nombre
     await Share.shareXFiles(
-      [
-        XFile(
-          _generatedFile!.path,
-          mimeType: 'application/pdf',
-          name: fileName,
-        ),
-      ],
-      subject: 'Catálogo de Productos - ${widget.business.name}',
+      [XFile(_generatedFile!.path, mimeType: 'application/pdf', name: p.basename(_generatedFile!.path))],
+      subject: 'Catálogo de ${widget.business.name}',
     );
   }
 
@@ -227,11 +249,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
     if (_generatedFile == null) return;
     final res = await OpenFilex.open(_generatedFile!.path);
     if (res.type != ResultType.done && mounted) {
-      AppToast.show(
-        context,
-        message: 'No se pudo abrir el visor: ${res.message}',
-        type: ToastType.warning,
-      );
+      AppToast.show(context, message: 'No se pudo abrir el visor: ${res.message}', type: ToastType.warning);
     }
   }
 
@@ -246,541 +264,624 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
     }
   }
 
+  Color get _accent =>
+      AppPalette.fromHex(_style.colorHex) ?? AppPalette.fromHex(widget.business.color) ?? AppPalette.brand;
+
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final primaryTextColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
-    final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final cardBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-
+    final c = context.colors;
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        color: c.paper,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
       ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Barra de arrastre superior
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-
-              // Cabecera del Modal
-              Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: AppSpace.sm),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(color: c.lineStrong, borderRadius: BorderRadius.circular(AppRadius.pill)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.sm, AppSpace.sm),
+              child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDC2626).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFDC2626), size: 24),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text('Catálogo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink)),
                         Text(
-                          'Catálogo de Productos en PDF',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: primaryTextColor,
-                          ),
-                        ),
-                        Text(
-                          'Genera un documento profesional para enviar por WhatsApp',
-                          style: TextStyle(fontSize: 12, color: secondaryTextColor),
+                          'Para compartir por WhatsApp o redes',
+                          style: TextStyle(fontSize: 13, color: c.inkMuted),
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Cerrar',
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close_rounded, color: c.inkMuted),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+            ),
+            Flexible(child: _body(c)),
+          ],
+        ),
+      ),
+    );
+  }
 
-              if (_isLoading)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 36),
-                    child: CircularProgressIndicator(color: Color(0xFF059669)),
-                  ),
-                )
-              else if (_allInStockProducts.isEmpty)
+  Widget _body(StockealoColors c) {
+    if (_isLoading) {
+      return const Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator()));
+    }
+    if (_allInStockProducts.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(AppSpace.xl),
+        child: Text(
+          'No tienes productos con stock. Agrega productos al inventario para armar tu catálogo.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: c.inkMuted),
+        ),
+      );
+    }
+    if (_isGenerating) return _generatingView(c);
+    if (_generatedFile != null) return _successView(c);
+    return _configView(c);
+  }
+
+  Widget _generatingView(StockealoColors c) {
+    return Padding(
+      padding: const EdgeInsets.all(AppSpace.xl),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            child: LinearProgressIndicator(
+              value: _progress,
+              minHeight: 8,
+              color: c.accent,
+              backgroundColor: c.surfaceMuted,
+            ),
+          ),
+          const SizedBox(height: AppSpace.md),
+          Text(_statusMessage, style: TextStyle(color: c.inkMuted), textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+
+  Widget _successView(StockealoColors c) {
+    final file = _generatedFile!;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _section(
+            c,
+            child: Row(
+              children: [
                 Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: cardBorder),
-                  ),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.inventory_2_outlined, size: 44, color: Color(0xFF94A3B8)),
-                      const SizedBox(height: 10),
-                      Text(
-                        'No hay productos en stock',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: primaryTextColor),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Actualmente no tienes productos con existencias disponibles en "${widget.business.name}". Registra stock para generar tu catálogo.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: secondaryTextColor),
-                      ),
-                    ],
-                  ),
-                )
-              else if (_isGenerating)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: _progress,
-                          minHeight: 10,
-                          backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF059669)),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        _statusMessage,
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: primaryTextColor),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${(_progress * 100).toInt()}% completado',
-                        style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                      ),
-                    ],
-                  ),
-                )
-              else if (_generatedFile != null)
-                // Vista de Éxito y Acciones de Archivo y Compartir
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ),
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: c.successSoft, borderRadius: BorderRadius.circular(AppRadius.control)),
+                  child: Icon(Icons.picture_as_pdf_rounded, color: c.success),
+                ),
+                const SizedBox(width: AppSpace.md),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Cabecera de éxito
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF059669).withOpacity(0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 28),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '¡Catálogo PDF generado!',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryTextColor,
-                                  ),
-                                ),
-                                Text(
-                                  '${_filteredProducts.length} productos en stock listos',
-                                  style: TextStyle(fontSize: 12, color: secondaryTextColor),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      Text('Catálogo listo', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+                      Text(
+                        '${p.basename(file.path)} · ${_getFileSize(file)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: c.inkMuted),
                       ),
-                      const SizedBox(height: 16),
-
-                      // Tarjeta con información del archivo y ubicación
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: cardBorder),
+                      if (_savedPathLabel != null)
+                        Text(
+                          _isPublicDownload ? 'Guardado en $_savedPathLabel' : 'Copia en $_savedPathLabel',
+                          style: TextStyle(fontSize: 12, color: c.inkMuted),
                         ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFDC2626).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFDC2626), size: 24),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        p.basename(_generatedFile!.path),
-                                        style: TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: primaryTextColor,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Documento PDF • ${_getFileSize(_generatedFile!)}',
-                                        style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              child: Divider(height: 1, color: cardBorder),
-                            ),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(Icons.folder_rounded, color: Color(0xFF059669), size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Guardado localmente en tu teléfono:',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _savedPathLabel ?? p.basename(_generatedFile!.path),
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF059669),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        _isPublicDownload
-                                            ? 'Encuéntralo en tu app de "Archivos" o carpeta "Descargas".'
-                                            : 'Almacenado localmente en el dispositivo.',
-                                        style: TextStyle(fontSize: 10.5, color: secondaryTextColor),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Botón 1: Compartir PDF (WhatsApp / Apps)
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _shareFile,
-                          icon: const Icon(Icons.share_rounded, size: 20),
-                          label: const Text(
-                            'Compartir PDF (WhatsApp / Apps)',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF059669),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Botones 2 y 3: Guardar copia en Descargas y Abrir y Ver PDF
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _isSavingToDownloads ? null : _manualSaveToDownloads,
-                              icon: _isSavingToDownloads
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF059669)),
-                                    )
-                                  : const Icon(Icons.download_rounded, size: 18),
-                              label: Text(_isSavingToDownloads ? 'Guardando...' : 'Guardar Copia'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: primaryTextColor,
-                                side: BorderSide(color: cardBorder),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _openFile,
-                              icon: const Icon(Icons.visibility_rounded, size: 18),
-                              label: const Text('Abrir y Ver'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF059669),
-                                side: const BorderSide(color: Color(0xFF059669)),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Botón para generar otro catálogo con otros filtros
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _generatedFile = null;
-                              _savedPathLabel = null;
-                            });
-                          },
-                          icon: const Icon(Icons.refresh_rounded, size: 16),
-                          label: const Text('Generar otro catálogo', style: TextStyle(fontSize: 12)),
-                          style: TextButton.styleFrom(
-                            foregroundColor: secondaryTextColor,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
-                )
-              else
-                // Formulario de Configuración del Catálogo
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpace.lg),
+          FilledButton.icon(
+            onPressed: _shareFile,
+            icon: const Icon(Icons.share_rounded),
+            label: const Text('Compartir'),
+          ),
+          const SizedBox(height: AppSpace.sm),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _openFile,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('Ver'),
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isSavingToDownloads ? null : _manualSaveToDownloads,
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Descargas'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.sm),
+          TextButton(
+            onPressed: () => setState(() => _generatedFile = null),
+            child: const Text('Cambiar el diseño'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _configView(StockealoColors c) {
+    final count = _targetProducts.length;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
+            children: [
+              _CatalogPreview(
+                business: widget.business,
+                style: _currentStyle,
+                accent: _accent,
+                products: _targetProducts.take(_style.itemsPerPage >= 4 ? 4 : _style.itemsPerPage).toList(),
+              ),
+              const SizedBox(height: AppSpace.lg),
+              _productsSection(c),
+              const SizedBox(height: AppSpace.md),
+              _designSection(c),
+              const SizedBox(height: AppSpace.md),
+              _contactSection(c),
+              const SizedBox(height: AppSpace.md),
+              _showSection(c),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, AppSpace.md),
+          decoration: BoxDecoration(color: c.paper, border: Border(top: BorderSide(color: c.line))),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: count == 0 ? null : _openStories,
+                  icon: const Icon(Icons.amp_stories_outlined),
+                  label: const Text('Historias'),
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: PrimaryActionButton(
+                  label: count == 0 ? 'Sin productos' : 'PDF · $count',
+                  icon: Icons.picture_as_pdf_rounded,
+                  onPressed: count == 0 ? null : _generatePdf,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _section(StockealoColors c, {String? title, required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.lg),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: c.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title != null) ...[
+            Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+            const SizedBox(height: AppSpace.md),
+          ],
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _productsSection(StockealoColors c) {
+    final manual = _style.selectedProductIds.isNotEmpty;
+    return _section(
+      c,
+      title: 'Productos',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!manual) ...[
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final cat in _categories)
+                    Padding(
+                      padding: const EdgeInsets.only(right: AppSpace.sm),
+                      child: ChoiceChip(
+                        label: Text(cat),
+                        selected: _selectedCategory == cat,
+                        onSelected: (_) => setState(() => _selectedCategory = cat),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpace.sm),
+          ],
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.checklist_rounded, color: c.inkMuted),
+            title: Text(
+              manual ? '${_style.selectedProductIds.length} elegidos a mano' : 'Elegir productos a mano',
+              style: TextStyle(color: c.ink, fontWeight: FontWeight.w600),
+            ),
+            subtitle: manual ? null : Text('Ahora: todos los de la categoría', style: TextStyle(color: c.inkMuted)),
+            trailing: manual
+                ? TextButton(
+                    onPressed: () => _update(_style.copyWith(selectedProductIds: {})),
+                    child: const Text('Quitar'),
+                  )
+                : Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+            onTap: _pickProducts,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('Solo productos con foto', style: TextStyle(color: c.ink)),
+            value: _style.onlyWithPhoto,
+            onChanged: (v) => _update(_style.copyWith(onlyWithPhoto: v)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickProducts() async {
+    final picked = await showModalBottomSheet<Set<String>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: false,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ProductPickerSheet(products: _allInStockProducts, initial: _style.selectedProductIds),
+    );
+    if (picked != null) _update(_style.copyWith(selectedProductIds: picked));
+  }
+
+  Widget _designSection(StockealoColors c) {
+    // Color del negocio (o el verde de Stockealo si no tiene); no se repite en la lista
+    final businessHex = AppPalette.toHex(AppPalette.fromHex(widget.business.color) ?? AppPalette.brand);
+    final colors = <String?>[
+      null,
+      for (final color in AppPalette.businessColors.values)
+        if (AppPalette.toHex(color) != businessHex) AppPalette.toHex(color),
+    ];
+    return _section(
+      c,
+      title: 'Diseño',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Color', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          const SizedBox(height: AppSpace.sm),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final hex in colors)
+                _ColorDot(
+                  color: AppPalette.fromHex(hex ?? businessHex) ?? AppPalette.brand,
+                  selected: _style.colorHex == hex,
+                  tooltip: hex == null ? 'Color del negocio' : 'Color ${_colorName(hex)}',
+                  isBusiness: hex == null,
+                  onTap: () => _update(hex == null
+                      ? CatalogStyle.fromJson({..._style.toJson(), 'colorHex': null})
+                      : _style.copyWith(colorHex: hex)),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.lg),
+          Text('Fondo', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          const SizedBox(height: AppSpace.sm),
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('Claro'), icon: Icon(Icons.light_mode_outlined)),
+              ButtonSegment(value: true, label: Text('Oscuro'), icon: Icon(Icons.dark_mode_outlined)),
+            ],
+            selected: {_style.darkBackground},
+            onSelectionChanged: (v) => _update(_style.copyWith(darkBackground: v.first)),
+          ),
+          const SizedBox(height: AppSpace.lg),
+          Text('Productos por página', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          const SizedBox(height: AppSpace.sm),
+          SegmentedButton<int>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: 1, label: Text('1')),
+              ButtonSegment(value: 2, label: Text('2')),
+              ButtonSegment(value: 4, label: Text('4')),
+              ButtonSegment(value: 6, label: Text('6')),
+            ],
+            selected: {_style.itemsPerPage},
+            onSelectionChanged: (v) => _update(_style.copyWith(itemsPerPage: v.first)),
+          ),
+          const SizedBox(height: AppSpace.lg),
+          _field(c, _titleController, 'Título de la portada', 'Ej.: Colección de temporada', Icons.title_rounded),
+        ],
+      ),
+    );
+  }
+
+  String _colorName(String hex) => AppPalette.businessColors.entries
+      .firstWhere((e) => AppPalette.toHex(e.value) == hex, orElse: () => const MapEntry('', Colors.black))
+      .key;
+
+  Widget _contactSection(StockealoColors c) {
+    return _section(
+      c,
+      title: 'Contacto',
+      child: Column(
+        children: [
+          _field(c, _whatsappController, 'WhatsApp', 'Para que te escriban', Icons.chat_outlined,
+              keyboard: TextInputType.phone),
+          const SizedBox(height: AppSpace.md),
+          _field(c, _addressController, 'Dirección', 'Opcional', Icons.place_outlined),
+          const SizedBox(height: AppSpace.md),
+          _field(c, _hoursController, 'Horario', 'Ej.: Lun a Sáb, 8 a. m. – 6 p. m.', Icons.schedule_rounded),
+          const SizedBox(height: AppSpace.md),
+          _field(c, _socialController, 'Redes', 'Ej.: @mitienda', Icons.alternate_email_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(StockealoColors c, TextEditingController controller, String label, String hint, IconData icon,
+      {TextInputType? keyboard}) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboard,
+      textCapitalization: keyboard == null ? TextCapitalization.sentences : TextCapitalization.none,
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(labelText: label, hintText: hint, prefixIcon: Icon(icon)),
+    );
+  }
+
+  Widget _showSection(StockealoColors c) {
+    Widget toggle(String label, bool value, CatalogStyle Function(bool) apply) => SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text(label, style: TextStyle(color: c.ink, fontSize: 15)),
+          value: value,
+          onChanged: (v) => _update(apply(v)),
+        );
+    return _section(
+      c,
+      title: 'Qué mostrar',
+      child: Column(
+        children: [
+          toggle('Precio', _style.showPrice, (v) => _style.copyWith(showPrice: v)),
+          toggle('Unidades disponibles', _style.showExactStock, (v) => _style.copyWith(showExactStock: v)),
+          toggle('Descripción', _style.showDescription, (v) => _style.copyWith(showDescription: v)),
+          toggle('Categoría', _style.showCategory, (v) => _style.copyWith(showCategory: v)),
+          toggle('Código o referencia', _style.showCode, (v) => _style.copyWith(showCode: v)),
+          const SizedBox(height: AppSpace.sm),
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 16, color: c.inkFaint),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: Text(
+                  'El pie lleva "Hecho con Stockealo". Más plantillas llegarán con Stockealo Pro.',
+                  style: TextStyle(fontSize: 12, color: c.inkMuted),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Círculo de color para elegir el color del catálogo
+class _ColorDot extends StatelessWidget {
+  final Color color;
+  final bool selected;
+  final bool isBusiness;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _ColorDot({
+    required this.color,
+    required this.selected,
+    required this.isBusiness,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: tooltip,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 24,
+          child: Container(
+            width: 40,
+            height: 40,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: selected ? c.ink : Colors.transparent, width: 2),
+            ),
+            child: Container(
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              child: selected
+                  ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+                  : (isBusiness ? const Icon(Icons.storefront_rounded, size: 16, color: Colors.white) : null),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Vista previa de la primera página: se actualiza con cada cambio
+class _CatalogPreview extends StatelessWidget {
+  final Business business;
+  final CatalogStyle style;
+  final Color accent;
+  final List<Product> products;
+
+  const _CatalogPreview({required this.business, required this.style, required this.accent, required this.products});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = style.darkBackground;
+    final page = dark ? AppPalette.paperDark : AppPalette.paper;
+    final card = dark ? AppPalette.surfaceDark : AppPalette.surface;
+    final ink = dark ? AppPalette.inkDark : AppPalette.ink;
+    final muted = dark ? AppPalette.inkMutedDark : AppPalette.inkMuted;
+    final line = dark ? AppPalette.lineDark : AppPalette.line;
+    final imageBg = dark ? AppPalette.surfaceMutedDark : AppPalette.surfaceMuted;
+    final price = dark ? Color.lerp(accent, Colors.white, 0.25)! : accent;
+    final columns = style.itemsPerPage >= 4 ? 2 : 1;
+    final title = style.title.isNotEmpty ? style.title : 'Catálogo de productos';
+
+    return Semantics(
+      label: 'Vista previa del catálogo',
+      child: Center(
+        child: Container(
+          width: 240,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: page,
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            border: Border.all(color: context.colors.line),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(8)),
+                child: Row(
                   children: [
-                    // Resumen de productos disponibles
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: cardBorder),
-                      ),
-                      child: Row(
+                    CatalogLogo(business: business, color: accent, size: 24),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.inventory_2, color: Color(0xFF059669), size: 22),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${_filteredProducts.length} productos en stock',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: primaryTextColor),
-                                ),
-                                Text(
-                                  'Solo se incluirán productos con inventario disponible',
-                                  style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                                ),
-                              ],
-                            ),
-                          ),
+                          Text(business.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                          Text(title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 8)),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Selector de Categoría
-                    Text(
-                      'Categoría a Incluir:',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryTextColor),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: cardBorder),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedCategory,
-                          isExpanded: true,
-                          dropdownColor: cardBg,
-                          items: _categories.map((cat) {
-                            final count = cat == 'Todas'
-                                ? _allInStockProducts.length
-                                : _allInStockProducts.where((p) => p.category.toLowerCase() == cat.toLowerCase()).length;
-                            return DropdownMenuItem<String>(
-                              value: cat,
-                              child: Text(
-                                '$cat ($count productos)',
-                                style: TextStyle(fontSize: 13, color: primaryTextColor),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedCategory = val);
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Teléfono de Contacto para Pedidos
-                    Text(
-                      'Teléfono de Contacto (para WhatsApp en el PDF):',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryTextColor),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        hintText: 'Ej: 314 806 7908',
-                        prefixIcon: const Icon(Icons.phone_android_rounded, color: Color(0xFF059669), size: 20),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Switch: Mostrar cantidad de stock o solo "Disponible"
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: cardBorder),
-                      ),
-                      child: SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          'Mostrar unidades exactas de stock',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: primaryTextColor),
-                        ),
-                        subtitle: Text(
-                          _showExactStock
-                              ? 'Mostrará: "Stock: 12 und."'
-                              : 'Mostrará discretamente: "Disponible"',
-                          style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                        ),
-                        value: _showExactStock,
-                        activeColor: const Color(0xFF059669),
-                        onChanged: (val) => setState(() => _showExactStock = val),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Selector de Densidad de Productos por Página
-                    Text(
-                      'Productos por Página:',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryTextColor),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        _buildDensityOption(1, '1 Prod.', 'Hero', isDark, cardBorder, primaryTextColor),
-                        const SizedBox(width: 6),
-                        _buildDensityOption(2, '2 Prod.', 'Dúo', isDark, cardBorder, primaryTextColor),
-                        const SizedBox(width: 6),
-                        _buildDensityOption(4, '4 Prod.', 'Grilla', isDark, cardBorder, primaryTextColor),
-                        const SizedBox(width: 6),
-                        _buildDensityOption(6, '6 Prod.', 'Lista', isDark, cardBorder, primaryTextColor),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-
-                    // Botón Principal de Generación PDF
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _generatePdf,
-                        icon: const Icon(Icons.picture_as_pdf_rounded, size: 20),
-                        label: Text(
-                          'Descargar Catálogo PDF (${_filteredProducts.length} productos)',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF059669),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Botón Especial para Historias de Redes Sociales (PNG 9:16)
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          StoryCatalogModal.show(
-                            context: context,
-                            business: widget.business,
-                            products: _filteredProducts,
-                            contactPhone: _phoneController.text.trim().isNotEmpty
-                                ? _phoneController.text.trim()
-                                : null,
-                            itemsPerPage: _itemsPerPage == 6 ? 4 : _itemsPerPage,
-                          );
-                        },
-                        icon: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF8B5CF6), size: 18),
-                        label: const Text(
-                          'Crear Historias para Redes (PNG 9:16)',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6)),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF8B5CF6), width: 1.3),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
                       ),
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 6),
+              GridView.count(
+                crossAxisCount: columns,
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 5,
+                crossAxisSpacing: 5,
+                childAspectRatio: columns == 2 ? 0.95 : (style.itemsPerPage == 1 ? 1.1 : 2.2),
+                children: [
+                  for (final prod in products)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: card,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: line, width: 0.6),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: imageBg,
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                              ),
+                              child: _thumb(prod, muted),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(prod.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: ink, fontSize: 8, fontWeight: FontWeight.w700)),
+                                if (style.showPrice)
+                                  Text(CurrencyFormatter.format(prod.salePrice),
+                                      style: TextStyle(color: price, fontSize: 8, fontWeight: FontWeight.w700)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                [
+                  if (style.whatsapp.isNotEmpty) 'WhatsApp ${style.whatsapp}',
+                  if (style.showBranding) 'Hecho con Stockealo',
+                ].join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: muted, fontSize: 7),
+              ),
             ],
           ),
         ),
@@ -788,47 +889,116 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
     );
   }
 
-  Widget _buildDensityOption(int count, String label, String sublabel, bool isDark, Color cardBorder, Color primaryTextColor) {
-    final isSelected = _itemsPerPage == count;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _itemsPerPage = count),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? const Color(0xFF059669).withOpacity(0.15)
-                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF059669) : cardBorder,
-              width: isSelected ? 1.5 : 1,
+  Widget _thumb(Product prod, Color muted) {
+    final path = prod.photoPath;
+    if (path != null && path.startsWith('http')) {
+      return ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+        child: Image.network(path, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
+      );
+    }
+    if (path != null && path.isNotEmpty && File(path).existsSync()) {
+      return ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+        child: Image.file(File(path), fit: BoxFit.cover, cacheWidth: 200),
+      );
+    }
+    return Center(child: Icon(Icons.inventory_2_outlined, size: 14, color: muted));
+  }
+}
+
+/// Lista para elegir a mano qué productos entran al catálogo
+class _ProductPickerSheet extends StatefulWidget {
+  final List<Product> products;
+  final Set<String> initial;
+
+  const _ProductPickerSheet({required this.products, required this.initial});
+
+  @override
+  State<_ProductPickerSheet> createState() => _ProductPickerSheetState();
+}
+
+class _ProductPickerSheetState extends State<_ProductPickerSheet> {
+  late final Set<String> _selected = {...widget.initial};
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final q = _query.toLowerCase();
+    final visible = widget.products
+        .where((p) => q.isEmpty || p.name.toLowerCase().contains(q) || p.category.toLowerCase().contains(q))
+        .toList();
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: BoxDecoration(
+        color: c.paper,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.sm, AppSpace.sm),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text('Elegir productos',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      if (_selected.length == widget.products.length) {
+                        _selected.clear();
+                      } else {
+                        _selected.addAll(widget.products.map((p) => p.id));
+                      }
+                    }),
+                    child: Text(_selected.length == widget.products.length ? 'Ninguno' : 'Todos'),
+                  ),
+                ],
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? const Color(0xFF059669) : primaryTextColor,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+              child: TextField(
+                onChanged: (v) => setState(() => _query = v.trim()),
+                decoration: const InputDecoration(hintText: 'Buscar', prefixIcon: Icon(Icons.search_rounded)),
+              ),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            Expanded(
+              child: ListView.builder(
+                itemCount: visible.length,
+                itemBuilder: (_, i) {
+                  final prod = visible[i];
+                  return CheckboxListTile(
+                    value: _selected.contains(prod.id),
+                    onChanged: (v) => setState(() => v == true ? _selected.add(prod.id) : _selected.remove(prod.id)),
+                    title: Text(prod.name, style: TextStyle(color: c.ink)),
+                    subtitle: Text(
+                      [if (prod.category.isNotEmpty) prod.category, CurrencyFormatter.format(prod.salePrice)].join(' · '),
+                      style: TextStyle(color: c.inkMuted),
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppSpace.lg),
+              child: SizedBox(
+                width: double.infinity,
+                child: PrimaryActionButton(
+                  label: _selected.isEmpty ? 'Usar todos' : 'Listo · ${_selected.length}',
+                  icon: Icons.check_rounded,
+                  onPressed: () => Navigator.pop(context, _selected),
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                sublabel,
-                style: TextStyle(
-                  fontSize: 9.5,
-                  color: isSelected ? const Color(0xFF059669) : const Color(0xFF94A3B8),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

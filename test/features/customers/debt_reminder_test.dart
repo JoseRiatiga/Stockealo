@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stockealo/core/utils/countries.dart';
 import 'package:stockealo/features/customers/data/debt_reminder.dart';
 
 void main() {
@@ -11,6 +12,12 @@ void main() {
     test('respeta un número que ya viene con indicativo', () {
       expect(DebtReminder.normalizePhone('+52 55 1234 5678'), '525512345678');
       expect(DebtReminder.normalizePhone('573001234567'), '573001234567');
+    });
+
+    test('un número sin prefijo usa el país del negocio, no siempre Colombia', () {
+      final mexico = countryByCode('MX');
+      expect(DebtReminder.normalizePhone('55 1234 5678', country: mexico), '525512345678');
+      expect(DebtReminder.normalizePhone('+57 300 123 4567', country: mexico), '573001234567');
     });
 
     test('descarta teléfonos vacíos o incompletos', () {

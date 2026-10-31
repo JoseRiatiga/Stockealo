@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import '../../data/debt_reminder.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/customer_repository.dart';
 import '../../models/customer.dart';
+import '../widgets/new_customer_sheet.dart';
 import '../widgets/record_payment_modal.dart';
 
 class CustomersScreen extends StatefulWidget {
@@ -69,70 +71,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
   int get _debtorsCount => _customers.where((c) => c.hasDebt).length;
 
   Future<void> _openCreateCustomerDialog() async {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final addressController = TextEditingController();
-    final debtController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Nuevo Cliente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Nombre del Cliente *', prefixIcon: Icon(Icons.person_outline)),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Teléfono / WhatsApp', prefixIcon: Icon(Icons.phone_outlined)),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: addressController,
-                decoration: const InputDecoration(labelText: 'Dirección (Opcional)', prefixIcon: Icon(Icons.location_on_outlined)),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: debtController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Deuda Inicial (\$) (Opcional)', prefixIcon: Icon(Icons.money_off)),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) return;
-              final initialDebt = double.tryParse(debtController.text.trim()) ?? 0.0;
-
-              await _customerRepo.createCustomer(
-                businessId: widget.businessId,
-                name: name,
-                phone: phoneController.text.trim(),
-                address: addressController.text.trim(),
-                initialDebt: initialDebt,
-              );
-
-              if (ctx.mounted) Navigator.pop(ctx);
-              _loadCustomers();
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
-    );
+    final saved = await NewCustomerSheet.show(context, businessId: widget.businessId);
+    if (saved == true) _loadCustomers();
   }
 
   void _showCustomerPaymentsHistory(Customer customer) async {
@@ -156,8 +96,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Historial de Abonos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF1E293B))),
-                      Text(customer.name, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                      Text('Historial de abonos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: context.colors.ink)),
+                      Text(customer.name, style: TextStyle(fontSize: 13, color: context.colors.inkMuted)),
                     ],
                   ),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
@@ -165,10 +105,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
               ),
               const Divider(height: 20),
               if (payments.isEmpty) ...[
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Center(
-                    child: Text('No hay registros de abonos para este cliente todavía.', style: TextStyle(color: Color(0xFF94A3B8))),
+                    child: Text('No hay registros de abonos para este cliente todavía.', style: TextStyle(color: context.colors.inkMuted)),
                   ),
                 ),
               ] else ...[
@@ -183,15 +123,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: CircleAvatar(
-                          backgroundColor: p.paymentMethod == 'EFECTIVO' ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                          backgroundColor: p.paymentMethod == 'EFECTIVO' ? context.colors.successSoft : context.colors.infoSoft,
                           child: Icon(
                             p.paymentMethod == 'EFECTIVO' ? Icons.payments_outlined : Icons.account_balance_wallet_outlined,
-                            color: p.paymentMethod == 'EFECTIVO' ? const Color(0xFF059669) : const Color(0xFF2563EB),
+                            color: p.paymentMethod == 'EFECTIVO' ? context.colors.accent : context.colors.info,
                             size: 18,
                           ),
                         ),
                         title: Text(CurrencyFormatter.formatCOP(p.amount), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        subtitle: Text('$dateStr • ${p.paymentMethod}${p.notes != null ? " • ${p.notes}" : ""}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        subtitle: Text('$dateStr • ${p.paymentMethod}${p.notes != null ? " • ${p.notes}" : ""}', style: TextStyle(fontSize: 11, color: context.colors.inkMuted)),
                       );
                     },
                   ),
@@ -208,7 +148,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     DebtReminder.send(
       customerName: customer.name,
       debtAmount: customer.debtBalance,
-      businessName: ActiveBusinessScope.read(context)?.name ?? 'Mi Negocio',
+      businessName: ActiveBusinessScope.read(context)?.name ?? 'Mi negocio',
       phone: customer.phone,
     );
   }
@@ -219,12 +159,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final filtered = _filteredCustomers;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: context.colors.surfaceMuted,
       appBar: AppBar(
-        title: const Text('Clientes y Fiados', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text('Clientes y fiados', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         elevation: 0,
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        foregroundColor: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+        backgroundColor: context.colors.surface,
+        foregroundColor: context.colors.ink,
       ),
       body: Center(
         child: ConstrainedBox(
@@ -234,23 +174,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
           // Banner de resumen de cartera/deuda
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7),
+                color: isDark ? const Color(0xFF78350F).withOpacity(0.4) : context.colors.warningSoft,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A)),
+                border: Border.all(color: isDark ? context.colors.warning : const Color(0xFFFDE68A)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withOpacity(0.2),
+                      color: context.colors.warning.withOpacity(0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.receipt_long, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309), size: 24),
+                    child: Icon(Icons.receipt_long, color: isDark ? const Color(0xFFFDE68A) : context.colors.warning, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -258,10 +197,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Total por Cobrar (Fiados)',
+                          'Fiados por cobrar',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                            color: isDark ? const Color(0xFFFDE68A) : context.colors.warning,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -270,7 +209,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309),
+                            color: isDark ? const Color(0xFFFDE68A) : context.colors.warning,
                           ),
                         ),
                       ],
@@ -279,15 +218,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      color: context.colors.surface,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '$_debtorsCount deudores',
+                      _debtorsCount == 1 ? '1 cliente debe' : '$_debtorsCount clientes deben',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309),
+                        color: isDark ? const Color(0xFFFDE68A) : context.colors.warning,
                       ),
                     ),
                   ),
@@ -299,20 +238,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
           // Buscador y Filtros
           Container(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             child: Column(
               children: [
                 TextField(
                   controller: _searchController,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
-                    hintText: 'Buscar cliente por nombre o teléfono...',
-                    prefixIcon: const Icon(Icons.search, color: Color(0xFF94A3B8)),
+                    hintText: 'Buscar por nombre o teléfono',
+                    prefixIcon: Icon(Icons.search, color: context.colors.inkMuted),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => setState(() => _searchController.clear()))
                         : null,
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    fillColor: context.colors.surfaceMuted,
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   ),
@@ -322,9 +260,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   children: [
                     _buildFilterChip('TODOS', 'Todos (${_customers.length})', isDark),
                     const SizedBox(width: 8),
-                    _buildFilterChip('DEUDA', 'Con Deuda ($_debtorsCount)', isDark),
+                    _buildFilterChip('DEUDA', 'Con deuda ($_debtorsCount)', isDark),
                     const SizedBox(width: 8),
-                    _buildFilterChip('AL_DIA', 'Al Día (${_customers.length - _debtorsCount})', isDark),
+                    _buildFilterChip('AL_DIA', 'Al día (${_customers.length - _debtorsCount})', isDark),
                   ],
                 ),
               ],
@@ -334,18 +272,18 @@ class _CustomersScreenState extends State<CustomersScreen> {
           // Lista de Clientes
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
+                ? Center(child: CircularProgressIndicator(color: context.colors.accent))
                 : filtered.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.people_outline, size: 54, color: Color(0xFFCBD5E1)),
+                            Icon(Icons.people_outline, size: 54, color: context.colors.lineStrong),
                             const SizedBox(height: 12),
                             Text(
                               _customers.isEmpty ? 'Aún no tienes clientes registrados' : 'No se encontraron clientes con este filtro',
                               style: TextStyle(
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                color: context.colors.inkMuted,
                                 fontSize: 14,
                               ),
                             ),
@@ -374,10 +312,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
         child: FloatingActionButton.extended(
           onPressed: _openCreateCustomerDialog,
-          backgroundColor: const Color(0xFF059669),
+          backgroundColor: context.colors.accent,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.person_add),
-          label: const Text('Nuevo Cliente'),
+          label: const Text('Nuevo cliente'),
         ),
       ),
     );
@@ -388,14 +326,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+      selectedColor: isDark ? const Color(0xFF064E3B) : context.colors.successSoft,
+      backgroundColor: context.colors.surfaceMuted,
       labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.bold,
         color: selected
-            ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF059669))
-            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ? (isDark ? const Color(0xFFA7F3D0) : context.colors.accent)
+            : (context.colors.inkMuted),
       ),
       onSelected: (_) => setState(() => _filter = key),
     );
@@ -409,11 +347,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           color: customer.hasDebt
-              ? (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A))
-              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ? (isDark ? context.colors.warning : const Color(0xFFFDE68A))
+              : (context.colors.line),
         ),
       ),
-      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      color: context.colors.surface,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -423,15 +361,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
               children: [
                 CircleAvatar(
                   backgroundColor: customer.hasDebt
-                      ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7))
-                      : (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5)),
+                      ? (isDark ? const Color(0xFF78350F) : context.colors.warningSoft)
+                      : (isDark ? const Color(0xFF064E3B) : context.colors.successSoft),
                   child: Text(
                     customer.name.isNotEmpty ? customer.name[0].toUpperCase() : 'C',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: customer.hasDebt
-                          ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
-                          : const Color(0xFF059669),
+                          ? (isDark ? const Color(0xFFFDE68A) : context.colors.warning)
+                          : context.colors.accent,
                     ),
                   ),
                 ),
@@ -445,7 +383,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
-                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                          color: context.colors.ink,
                         ),
                       ),
                       if (customer.phone?.isNotEmpty == true)
@@ -454,14 +392,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             Icon(
                               Icons.phone_outlined,
                               size: 11,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              color: context.colors.inkMuted,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               customer.phone!,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                color: context.colors.inkMuted,
                               ),
                             ),
                           ],
@@ -474,26 +412,26 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: customer.hasDebt
-                        ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7))
-                        : (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5)),
+                        ? (isDark ? const Color(0xFF78350F) : context.colors.warningSoft)
+                        : (isDark ? const Color(0xFF064E3B) : context.colors.successSoft),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: customer.hasDebt
-                          ? (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A))
-                          : (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0)),
+                          ? (isDark ? context.colors.warning : const Color(0xFFFDE68A))
+                          : (isDark ? context.colors.accent : const Color(0xFFA7F3D0)),
                     ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        customer.hasDebt ? 'Deuda' : 'Al Día',
+                        customer.hasDebt ? 'Deuda' : 'Al día',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: customer.hasDebt
-                              ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
-                              : const Color(0xFF059669),
+                              ? (isDark ? const Color(0xFFFDE68A) : context.colors.warning)
+                              : context.colors.accent,
                         ),
                       ),
                       Text(
@@ -502,8 +440,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: customer.hasDebt
-                              ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
-                              : const Color(0xFF059669),
+                              ? (isDark ? const Color(0xFFFDE68A) : context.colors.warning)
+                              : context.colors.accent,
                         ),
                       ),
                     ],
@@ -511,7 +449,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 ),
               ],
             ),
-            Divider(height: 20, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            Divider(height: 20, color: context.colors.line),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -532,7 +470,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     icon: const Icon(Icons.attach_money, size: 16),
                     label: const Text('Abonar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF059669),
+                      backgroundColor: context.colors.accent,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -545,8 +483,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   icon: const Icon(Icons.history, size: 16),
                   label: const Text('Historial', style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                    side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                    foregroundColor: context.colors.ink,
+                    side: BorderSide(color: context.colors.lineStrong),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   ),

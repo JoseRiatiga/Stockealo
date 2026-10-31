@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -17,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 6;
+  static const int _schemaVersion = 8;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -70,8 +71,7 @@ class AppDatabase {
 
   static String _accountFile(String authUserId) => 'stockealo_$authUserId.db';
 
-  /// Archivo SQLite de la cuenta en uso
-  @visibleForTesting
+  /// Archivo SQLite de la cuenta en uso (las copias automáticas se guardan por archivo)
   String get openFile => _openFile;
 
   static Future<String?> _readSetting(Database db, String key) async {
@@ -129,6 +129,24 @@ class AppDatabase {
       FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
     )
   ''';
+
+  /// Registro de actividad del equipo; se sube a la nube (business_activity) con la cola
+  static const String _createActivityLog = '''
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      actor_email TEXT NOT NULL,
+      actor_name TEXT,
+      action TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      data TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  static const String _createActivityIndex =
+      'CREATE INDEX IF NOT EXISTS activity_log_business_created ON activity_log (business_id, created_at)';
 
   static const String _createAppSettings = '''
     CREATE TABLE IF NOT EXISTS app_settings (
@@ -269,12 +287,51 @@ class AppDatabase {
       // Arqueo de caja (turnos con base inicial y conteo al cierre)
       await db.execute(_createCashSessions);
     }
+    if (oldVersion < 7 && newVersion >= 7) {
+      // Identidad del negocio: país, ícono, color, logo y arqueo de caja opcional
+      await _addColumnIfMissing(db, 'businesses', 'country', "TEXT NOT NULL DEFAULT 'CO'");
+      await _addColumnIfMissing(db, 'businesses', 'icon', 'TEXT');
+      await _addColumnIfMissing(db, 'businesses', 'color', 'TEXT');
+      await _addColumnIfMissing(db, 'businesses', 'logo_url', 'TEXT');
+      await _addColumnIfMissing(db, 'businesses', 'cash_register_enabled', 'INTEGER NOT NULL DEFAULT 0');
+      // País según la moneda que ya tenía (igual que la migración de la nube)
+      await db.execute('''
+        UPDATE businesses SET country = CASE currency
+          WHEN 'MXN' THEN 'MX' WHEN 'PEN' THEN 'PE' WHEN 'ARS' THEN 'AR'
+          WHEN 'CLP' THEN 'CL' WHEN 'EUR' THEN 'ES' WHEN 'USD' THEN 'US'
+          ELSE 'CO' END
+      ''');
+      // Quien ya usó el arqueo lo conserva; para los demás queda apagado
+      await db.execute('''
+        UPDATE businesses SET cash_register_enabled = 1
+        WHERE id IN (SELECT DISTINCT business_id FROM cash_sessions)
+      ''');
+      // La nube no sabe de esas cajas (son locales): se encola subir esos negocios,
+      // así la siguiente descarga no vuelve a apagar el arqueo
+      await db.execute(_createPendingSync);
+      final withCash = await db.query('businesses', where: 'cash_register_enabled = 1');
+      for (final row in withCash) {
+        await db.insert('pending_sync', {
+          'operation': 'upsert_business',
+          'payload': jsonEncode({...row, '_edited_at': DateTime.now().toUtc().toIso8601String()}),
+          'attempts': 0,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+    }
+    if (oldVersion < 8 && newVersion >= 8) {
+      // Registro de actividad del equipo
+      await db.execute(_createActivityLog);
+      await db.execute(_createActivityIndex);
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
     await db.execute(_createAppSettings);
     await db.execute(_createPendingSync);
     await db.execute(_createCashSessions);
+    await db.execute(_createActivityLog);
+    await db.execute(_createActivityIndex);
 
     // 1. Tabla de Usuarios (Cuentas)
     await db.execute('''
@@ -296,6 +353,11 @@ class AppDatabase {
         user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         currency TEXT NOT NULL DEFAULT 'COP',
+        country TEXT NOT NULL DEFAULT 'CO',
+        icon TEXT,
+        color TEXT,
+        logo_url TEXT,
+        cash_register_enabled INTEGER NOT NULL DEFAULT 0,
         description TEXT,
         created_at TEXT NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,

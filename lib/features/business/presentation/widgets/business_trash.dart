@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../data/business_repository.dart';
@@ -16,6 +17,7 @@ class BusinessTrash {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     await showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -25,7 +27,7 @@ class BusinessTrash {
             return Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                color: context.colors.surface,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
               ),
               child: Column(
@@ -37,7 +39,7 @@ class BusinessTrash {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF334155) : Colors.grey.shade300,
+                        color: isDark ? context.colors.ink : Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -48,14 +50,14 @@ class BusinessTrash {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                          Icon(Icons.delete_outline, color: context.colors.danger),
                           const SizedBox(width: 8),
                           Text(
                             'Papelera de Empresas',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                              color: context.colors.ink,
                             ),
                           ),
                         ],
@@ -80,17 +82,17 @@ class BusinessTrash {
                     'Las empresas se conservan aquí durante 7 días antes de eliminarse de forma permanente.',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: context.colors.inkMuted,
                     ),
                   ),
                   const SizedBox(height: 16),
                   if (deleted.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 32),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Center(
                         child: Text(
                           'No hay empresas en la papelera',
-                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                          style: TextStyle(color: context.colors.inkMuted, fontSize: 14),
                         ),
                       ),
                     )
@@ -106,7 +108,7 @@ class BusinessTrash {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF450A0A).withOpacity(0.4) : const Color(0xFFFEF2F2),
+                              color: isDark ? const Color(0xFF450A0A).withOpacity(0.4) : context.colors.dangerSoft,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
@@ -115,8 +117,8 @@ class BusinessTrash {
                             child: Row(
                               children: [
                                 CircleAvatar(
-                                  backgroundColor: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
-                                  foregroundColor: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                                  backgroundColor: isDark ? const Color(0xFF7F1D1D) : context.colors.dangerSoft,
+                                  foregroundColor: isDark ? const Color(0xFFFCA5A5) : context.colors.danger,
                                   child: const Icon(Icons.storefront, size: 20),
                                 ),
                                 const SizedBox(width: 12),
@@ -129,7 +131,7 @@ class BusinessTrash {
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
-                                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                                          color: context.colors.ink,
                                         ),
                                       ),
                                       Text(
@@ -137,7 +139,7 @@ class BusinessTrash {
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
-                                          color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                                          color: isDark ? const Color(0xFFFCA5A5) : context.colors.danger,
                                         ),
                                       ),
                                     ],
@@ -149,6 +151,7 @@ class BusinessTrash {
                                     TextButton.icon(
                                       onPressed: () async {
                                         final messenger = ScaffoldMessenger.of(trashCtx);
+                                        final accent = context.colors.accent;
                                         await BusinessRepository.instance.restoreBusiness(biz.id);
                                         setTrashState(() {
                                           deleted.removeWhere((b) => b.id == biz.id);
@@ -156,15 +159,15 @@ class BusinessTrash {
                                         await onChanged();
                                         messenger.showSnackBar(
                                           SnackBar(
-                                            content: Text('Empresa "${biz.name}" restaurada con éxito'),
-                                            backgroundColor: const Color(0xFF059669),
+                                            content: Text('Negocio "${biz.name}" restaurado'),
+                                            backgroundColor: accent,
                                           ),
                                         );
                                       },
                                       icon: const Icon(Icons.restore, size: 15),
                                       label: const Text('Restaurar'),
                                       style: TextButton.styleFrom(
-                                        foregroundColor: const Color(0xFF059669),
+                                        foregroundColor: context.colors.accent,
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
                                       ),
@@ -247,7 +250,7 @@ class BusinessTrash {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF450A0A).withOpacity(0.5) : const Color(0xFFFEF2F2),
+                      color: isDark ? const Color(0xFF450A0A).withOpacity(0.5) : context.colors.dangerSoft,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA)),
                     ),
@@ -255,7 +258,7 @@ class BusinessTrash {
                       'Se destruirán definitivamente todas las empresas en la papelera (${deleted.length} ${deleted.length == 1 ? "empresa" : "empresas"}) y todos sus datos en el teléfono y en la nube. Esta acción NO se puede deshacer.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                        color: isDark ? const Color(0xFFFCA5A5) : context.colors.danger,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -266,7 +269,7 @@ class BusinessTrash {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                      color: context.colors.ink,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -286,7 +289,7 @@ class BusinessTrash {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                      color: context.colors.ink,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -441,7 +444,7 @@ class BusinessTrash {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF450A0A).withOpacity(0.5) : const Color(0xFFFEF2F2),
+                      color: isDark ? const Color(0xFF450A0A).withOpacity(0.5) : context.colors.dangerSoft,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA)),
                     ),
@@ -449,7 +452,7 @@ class BusinessTrash {
                       'Esta acción es IRREVERSIBLE. Se destruirán para siempre los productos, ventas, inventario, clientes y miembros de "${biz.name}" en el teléfono y en la nube.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                        color: isDark ? const Color(0xFFFCA5A5) : context.colors.danger,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -460,7 +463,7 @@ class BusinessTrash {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                      color: context.colors.ink,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -468,9 +471,9 @@ class BusinessTrash {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
+                      color: isDark ? context.colors.ink : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
+                      border: Border.all(color: isDark ? context.colors.ink : Colors.grey.shade300),
                     ),
                     child: SelectableText(
                       biz.name,
@@ -497,7 +500,7 @@ class BusinessTrash {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                      color: context.colors.ink,
                     ),
                   ),
                   const SizedBox(height: 6),

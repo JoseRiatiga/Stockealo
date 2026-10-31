@@ -109,4 +109,50 @@ void main() {
       await expectLater(AppDatabase.upgradeSchema(db, 3, 4), completes);
     });
   });
+
+  group('upgradeSchema v6 -> v7', () {
+    setUp(() async {
+      await db.execute(
+        "CREATE TABLE businesses (id TEXT PRIMARY KEY, user_id TEXT, name TEXT, currency TEXT NOT NULL DEFAULT 'COP', created_at TEXT)",
+      );
+      await db.execute('CREATE TABLE cash_sessions (id TEXT PRIMARY KEY, business_id TEXT NOT NULL)');
+      for (final (id, currency) in [('co', 'COP'), ('mx', 'MXN'), ('pe', 'PEN'), ('us', 'USD')]) {
+        await db.insert('businesses', {'id': id, 'user_id': 'u1', 'name': id, 'currency': currency, 'created_at': '2026-10-01'});
+      }
+      await db.insert('cash_sessions', {'id': 's1', 'business_id': 'mx'});
+    });
+
+    Future<Map<String, Object?>> business(String id) async =>
+        (await db.query('businesses', where: 'id = ?', whereArgs: [id])).single;
+
+    test('deduce el país de la moneda que ya tenía cada negocio', () async {
+      await AppDatabase.upgradeSchema(db, 6, 7);
+
+      expect((await business('co'))['country'], 'CO');
+      expect((await business('mx'))['country'], 'MX');
+      expect((await business('pe'))['country'], 'PE');
+      expect((await business('us'))['country'], 'US');
+    });
+
+    test('el arqueo queda activo solo en los negocios que ya lo usaron', () async {
+      await AppDatabase.upgradeSchema(db, 6, 7);
+
+      expect((await business('mx'))['cash_register_enabled'], 1);
+      expect((await business('co'))['cash_register_enabled'], 0);
+    });
+
+    test('encola subir a la nube los negocios que conservan el arqueo', () async {
+      await AppDatabase.upgradeSchema(db, 6, 7);
+
+      final pending = await db.query('pending_sync');
+      expect(pending, hasLength(1));
+      expect(pending.single['operation'], 'upsert_business');
+      expect(pending.single['payload'] as String, contains('"id":"mx"'));
+    });
+
+    test('se puede ejecutar dos veces sin fallar', () async {
+      await AppDatabase.upgradeSchema(db, 6, 7);
+      await expectLater(AppDatabase.upgradeSchema(db, 6, 7), completes);
+    });
+  });
 }

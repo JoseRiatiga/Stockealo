@@ -216,10 +216,7 @@ class SupabaseService {
       if (localBusinesses.isNotEmpty) {
         final formattedBusinesses = localBusinesses.map((b) => {
           'id': b['id'],
-          'name': b['name'],
-          'type': (b['type'] ?? 'Comercio General').toString(),
-          'currency': b['currency'] ?? 'COP',
-          'is_deleted': (b['is_deleted'] as int?) ?? 0,
+          ..._businessCloudFields(b),
           'created_at': b['created_at'],
         }).toList();
 
@@ -509,6 +506,11 @@ class SupabaseService {
               'user_id': targetUserId,
               'name': b['name'],
               'currency': b['currency'] ?? 'COP',
+              'country': b['country'] ?? 'CO',
+              'icon': b['icon'],
+              'color': b['color'],
+              'logo_url': b['logo_url'],
+              'cash_register_enabled': b['cash_register_enabled'] == true ? 1 : 0,
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
               'deleted_at': b['deleted_at'],
               'created_at': b['created_at'] ?? DateTime.now().toIso8601String(),
@@ -892,18 +894,16 @@ class SupabaseService {
       case 'delete_sale':
         await db.from('sales').delete().eq('id', p['id'] as String);
       case 'upsert_business':
-        final updated = await db
+        Future<List<dynamic>> update() => db
             .from('businesses')
-            .update({
-              'name': p['name'],
-              'type': (p['type'] ?? 'Comercio General').toString(),
-              'currency': p['currency'] ?? 'COP',
-              'is_deleted': (p['is_deleted'] as int?) ?? 0,
-              if (editedAt != null) 'updated_at': editedAt,
-            })
+            .update({..._businessCloudFields(p), if (editedAt != null) 'updated_at': editedAt})
             .eq('id', p['id'] as String)
             .select('id');
-        if (updated.isEmpty) await _createBusinessWithOwner(db, p);
+        if ((await update()).isEmpty) {
+          // Es nuevo: se crea con su dueño y luego se completan país, ícono, color...
+          await _createBusinessWithOwner(db, p);
+          await update();
+        }
       case 'update_business_deleted':
         await db.from('businesses').update({
           'is_deleted': p['is_deleted'],
@@ -968,10 +968,41 @@ class SupabaseService {
         }
       case 'delete_member':
         await db.from('business_members').delete().eq('id', p['id'] as String);
+      case 'insert_activity':
+        // Quién la hizo lo pone el servidor con la sesión (actor_email por defecto)
+        try {
+          await db.from('business_activity').upsert({
+            'id': p['id'],
+            'business_id': p['business_id'],
+            'actor_name': p['actor_name'],
+            'action': p['action'],
+            'summary': p['summary'],
+            'data': p['data'],
+            'created_at': p['created_at'],
+          }, onConflict: 'id', ignoreDuplicates: true);
+        } on PostgrestException catch (e) {
+          // Ya no es miembro o el negocio no existe: la anotación no se puede subir
+          // y no debe frenar el resto de la cola
+          if (e.code != '42501' && e.code != '23503') rethrow;
+          debugPrint('Actividad descartada (${e.code}): ${p['action']}');
+        }
       default:
         throw ArgumentError('Operación de sincronización desconocida: $operation');
     }
   }
+
+  /// Campos del negocio que se guardan en la nube (fila local → columnas de Supabase)
+  static Map<String, dynamic> _businessCloudFields(Map<String, dynamic> b) => {
+        'name': b['name'],
+        'type': (b['type'] ?? 'Comercio General').toString(),
+        'currency': b['currency'] ?? 'COP',
+        'country': b['country'] ?? 'CO',
+        'icon': b['icon'],
+        'color': b['color'],
+        'logo_url': b['logo_url'],
+        'cash_register_enabled': b['cash_register_enabled'] == 1 || b['cash_register_enabled'] == true,
+        'is_deleted': (b['is_deleted'] as int?) ?? 0,
+      };
 
   /// Crea el negocio y registra a esta cuenta como dueña en un solo paso del
   /// servidor. Usa el id de membresía que ya existe en el teléfono para que la
@@ -1136,6 +1167,14 @@ class SupabaseService {
 
   /// Elimina un miembro de equipo de Supabase
   Future<void> deleteBusinessMemberFromCloud(String memberId) => _write('delete_member', {'id': memberId});
+
+  /// Sube una anotación del registro de actividad (ver ActivityRepository)
+  Future<void> insertActivityToCloud(Map<String, dynamic> row) => _write('insert_activity', row);
+
+  /// Sube el logo del negocio a la carpeta del negocio (mismo bucket y permisos que las
+  /// fotos de productos: lo ven los miembros y lo cambian dueño y admin)
+  Future<String?> uploadBusinessLogo({required String businessId, required String localFilePath}) =>
+      uploadProductImage(businessId: businessId, productId: 'logo', localFilePath: localFilePath);
 
   /// Sube la imagen del producto a Supabase Storage (bucket: product-images) y retorna la URL pública
   Future<String?> uploadProductImage({

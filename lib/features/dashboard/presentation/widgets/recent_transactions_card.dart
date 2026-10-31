@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
@@ -36,10 +37,10 @@ class RecentTransactionsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131127) : Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isDark ? const Color(0xFF262046) : const Color(0xFFE2E8F0),
+          color: isDark ? const Color(0xFF262046) : context.colors.line,
           width: 1.2,
         ),
         boxShadow: [
@@ -61,12 +62,12 @@ class RecentTransactionsCard extends StatelessWidget {
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'ÚLTIMAS TRANSACCIONES',
+                    'Últimas ventas',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: context.colors.inkMuted,
                     ),
                   ),
                 ),
@@ -81,18 +82,18 @@ class RecentTransactionsCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Ver todo el historial',
+                        'Ver todas',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                          color: isDark ? const Color(0xFF34D399) : context.colors.accent,
                         ),
                       ),
                       const SizedBox(width: 4),
                       Icon(
                         Icons.arrow_forward_rounded,
                         size: 14,
-                        color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                        color: isDark ? const Color(0xFF34D399) : context.colors.accent,
                       ),
                     ],
                   ),
@@ -110,7 +111,7 @@ class RecentTransactionsCard extends StatelessWidget {
                   'No hay transacciones registradas en este periodo.',
                   style: TextStyle(
                     fontSize: 12.5,
-                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                    color: context.colors.inkFaint,
                   ),
                 ),
               ),
@@ -119,10 +120,11 @@ class RecentTransactionsCard extends StatelessWidget {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
               itemCount: transactions.take(5).length,
               separatorBuilder: (_, __) => Divider(
                 height: 16,
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                color: context.colors.surfaceMuted,
               ),
               itemBuilder: (context, index) {
                 final tx = transactions[index];
@@ -149,7 +151,7 @@ class RecentTransactionsCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                              color: context.colors.ink,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -159,7 +161,7 @@ class RecentTransactionsCard extends StatelessWidget {
                             tx.subtitle,
                             style: TextStyle(
                               fontSize: 11,
-                              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                              color: context.colors.inkFaint,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -177,7 +179,7 @@ class RecentTransactionsCard extends StatelessWidget {
                             fontSize: 13.5,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.3,
-                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                            color: context.colors.ink,
                           ),
                         ),
                         const SizedBox(height: 3),
@@ -212,11 +214,11 @@ class RecentTransactionsCard extends StatelessWidget {
     if (m.contains('nequi') || m.contains('davi') || m.contains('transf')) {
       return const _PaymentBadgeData('Transferencia', Color(0xFF38BDF8), Icons.send_rounded);
     } else if (m.contains('fiad') || m.contains('credit') || m.contains('deuda')) {
-      return const _PaymentBadgeData('Fiado', Color(0xFFF59E0B), Icons.assignment_late_outlined);
+      return const _PaymentBadgeData('Fiado', AppPalette.warning, Icons.assignment_late_outlined);
     } else if (m.contains('tarjet') || m.contains('card')) {
       return const _PaymentBadgeData('Tarjeta', Color(0xFFA855F7), Icons.credit_card_rounded);
     }
-    return const _PaymentBadgeData('Efectivo', Color(0xFF10B981), Icons.payments_outlined);
+    return const _PaymentBadgeData('Efectivo', AppPalette.brand, Icons.payments_outlined);
   }
 }
 

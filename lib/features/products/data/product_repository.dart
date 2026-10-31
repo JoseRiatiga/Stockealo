@@ -4,6 +4,8 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/utils/image_helper.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/currency_formatter.dart';
+import '../../team/data/activity_repository.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 import '../models/product_variant.dart';
@@ -191,13 +193,26 @@ class ProductRepository {
 
     // Sincronizar en tiempo real a Supabase
     SupabaseService.instance.upsertProductToCloud(product.toMap());
+    ActivityRepository.instance.log(
+      businessId: product.businessId,
+      action: ActivityAction.productCreate,
+      summary: 'Creó ${product.name}: ${CurrencyFormatter.format(product.salePrice)}, ${product.stock} en stock',
+      data: {'product_id': product.id},
+    );
   }
 
   /// Actualizar producto (y sincronizar variantes)
   Future<void> updateProduct(Product product) async {
     final db = await _dbProvider.database;
-    final previous = await db.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [product.id]);
+    final previous = await db.query(
+      'products',
+      columns: ['stock', 'sale_price', 'purchase_price'],
+      where: 'id = ?',
+      whereArgs: [product.id],
+    );
     final previousStock = previous.isNotEmpty ? previous.first['stock'] as int : null;
+    final previousPrice = previous.isNotEmpty ? (previous.first['sale_price'] as num?)?.toDouble() : null;
+    final previousCost = previous.isNotEmpty ? (previous.first['purchase_price'] as num?)?.toDouble() : null;
     await db.transaction((txn) async {
       await txn.update(
         'products',
@@ -220,6 +235,22 @@ class ProductRepository {
     if (previousStock != null && previousStock != product.stock) {
       SupabaseService.instance.updateProductStockInCloud(product.id, product.stock);
     }
+
+    // Registro: el cambio de precio se anota aparte porque es lo que más interesa al dueño
+    final changes = <String>[
+      if (previousPrice != null && previousPrice != product.salePrice)
+        'precio ${CurrencyFormatter.format(previousPrice)} → ${CurrencyFormatter.format(product.salePrice)}',
+      if (previousCost != null && previousCost != product.purchasePrice)
+        'costo ${CurrencyFormatter.format(previousCost)} → ${CurrencyFormatter.format(product.purchasePrice)}',
+      if (previousStock != null && previousStock != product.stock) 'stock $previousStock → ${product.stock}',
+    ];
+    final priceChanged = previousPrice != null && previousPrice != product.salePrice;
+    ActivityRepository.instance.log(
+      businessId: product.businessId,
+      action: priceChanged ? ActivityAction.priceChange : ActivityAction.productUpdate,
+      summary: changes.isEmpty ? 'Editó ${product.name}' : 'Cambió ${product.name}: ${changes.join(', ')}',
+      data: {'product_id': product.id},
+    );
   }
 
   /// Eliminar producto
@@ -242,6 +273,12 @@ class ProductRepository {
 
       // Eliminar también de Supabase en tiempo real
       await SupabaseService.instance.deleteProductFromCloud(id);
+      ActivityRepository.instance.log(
+        businessId: businessId,
+        action: ActivityAction.productDelete,
+        summary: 'Eliminó ${product.name} (tenía ${product.stock} en stock)',
+        data: {'product_id': id},
+      );
     }
   }
 
@@ -279,6 +316,15 @@ class ProductRepository {
 
     // Actualizar stock en Supabase en tiempo real
     SupabaseService.instance.updateProductStockInCloud(productId, newStock);
+    final why = reason.trim().isEmpty ? '' : ' · ${reason.trim()}';
+    ActivityRepository.instance.log(
+      businessId: businessId,
+      action: diff < 0 ? ActivityAction.shrinkage : ActivityAction.stockAdjust,
+      summary: diff < 0
+          ? 'Dio de baja ${diff.abs()} × ${product.name} (queda $newStock)$why'
+          : 'Agregó $diff × ${product.name} al stock (queda $newStock)$why',
+      data: {'product_id': productId, 'diff': diff},
+    );
   }
 
   /// Obtener categorías de la empresa

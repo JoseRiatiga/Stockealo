@@ -78,9 +78,13 @@ void main() {
         containsAll(['invoice_number', 'discount_amount', 'variant_id', 'variant_name', 'seller_name']),
       );
       expect(await columnsOf('quotation_items'), containsAll(['variant_id', 'variant_name']));
-      expect(await columnsOf('businesses'), containsAll(['is_deleted', 'deleted_at', 'description']));
+      expect(
+        await columnsOf('businesses'),
+        containsAll(['is_deleted', 'deleted_at', 'description', 'country', 'icon', 'color', 'logo_url', 'cash_register_enabled']),
+      );
       expect(await columnsOf('app_settings'), isNotEmpty);
-      expect(await db.getVersion(), 6);
+      expect(await db.getVersion(), 8);
+      expect(await columnsOf('activity_log'), containsAll(['actor_email', 'action', 'summary']));
       expect(await columnsOf('pending_sync'), isNotEmpty);
     });
 

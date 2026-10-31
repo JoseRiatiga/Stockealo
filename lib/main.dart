@@ -13,6 +13,10 @@ import 'features/home/presentation/screens/main_navigation_screen.dart';
 import 'core/services/supabase_service.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/presentation/widgets/stockealo_splash_screen.dart';
+import 'features/onboarding/presentation/welcome_screen.dart';
+
+/// Bienvenida pendiente en este dispositivo (se decide al arrancar, sin sesión)
+bool _showWelcome = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +27,7 @@ void main() async {
   }
   await SupabaseService.instance.initialize();
   await ThemeController.instance.initialize();
+  _showWelcome = await WelcomeScreen.shouldShow();
   // La sincronización empieza al restaurar o iniciar la sesión (syncFromCloud sube
   // primero los cambios pendientes); subir todo aquí pisaba datos más nuevos.
   runApp(const StockealoApp());
@@ -39,11 +44,19 @@ class StockealoApp extends StatelessWidget {
         return MaterialApp(
           title: 'Stockealo',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
+          theme: AppTheme.build(Brightness.light, accent: ThemeController.instance.accent),
+          darkTheme: AppTheme.build(Brightness.dark, accent: ThemeController.instance.accent),
           themeMode: ThemeController.instance.themeMode,
           // Negocio activo disponible para toda la app, incluidos diálogos y rutas
-          builder: (context, child) => ActiveBusinessScope(child: child!),
+          // y el tamaño de letra elegido en Apariencia, sobre el del teléfono
+          builder: (context, child) {
+            final media = MediaQuery.of(context);
+            final scale = (media.textScaler.scale(1) * ThemeController.instance.textScale).clamp(0.8, 1.8);
+            return MediaQuery(
+              data: media.copyWith(textScaler: TextScaler.linear(scale)),
+              child: ActiveBusinessScope(child: child!),
+            );
+          },
           home: const AuthWrapper(),
         );
       },
@@ -107,7 +120,10 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
         final currentUser = _authRepo.currentUser;
 
-        // 1. Si no hay usuario autenticado -> Pantalla de Login / Registro
+        // 1. Sin sesión: la bienvenida (solo la primera vez en el dispositivo) y luego el login
+        if (currentUser == null && _showWelcome) {
+          return WelcomeScreen(onDone: () => setState(() => _showWelcome = false));
+        }
         if (currentUser == null) {
           return LoginScreen(
             onLoginSuccess: _refresh,
@@ -131,6 +147,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
                 userEmail: currentUser.email,
                 userName: currentUser.name,
                 onBusinessCreated: _refresh,
+                onLogout: _handleLogout,
               );
             }
 

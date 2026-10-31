@@ -1,7 +1,15 @@
 import '../widgets/sales_summary_card.dart';
-import '../widgets/sales_quick_modules_bar.dart';
+import '../widgets/quotations_list_modal.dart';
+import '../../../../core/design/app_pagination.dart';
+import '../../../../core/design/primary_action_button.dart';
+import '../../../../core/design/quick_access_row.dart';
+import '../../../../core/design/skeleton.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../cash/data/cash_register_repository.dart';
+import '../../../cash/models/cash_session.dart';
 import '../widgets/sale_card.dart';
 import '../../../business/presentation/active_business_scope.dart';
+import '../../../../core/services/data_events.dart';
 import '../../../../core/services/notification_service.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -18,6 +26,7 @@ import '../../../../core/services/supabase_service.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
 import '../../../cash/presentation/screens/cash_register_screen.dart';
+import '../../../reports/presentation/screens/profit_report_screen.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -50,12 +59,25 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
   DateTimeRange? _customDateRange;
   String _selectedPaymentMethod = 'ALL'; // 'ALL', 'EFECTIVO', 'TRANSFERENCIA', 'FIADO'
   int _currentPage = 1;
+
+  /// Caja abierta del negocio (si usa el arqueo)
+  CashSession? _openCash;
   static const int _pageSize = 10;
+  final ScrollController _scrollController = ScrollController();
+
+  /// Cambia de página y vuelve al inicio de la pantalla para ver la lista desde arriba
+  void _goToPage(int page) {
+    setState(() => _currentPage = page);
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     NotificationService.instance.remoteSalesVersion.addListener(_onRemoteSales);
+    DataEvents.instance.salesVersion.addListener(_onRemoteSales);
     _loadSales();
     _syncSilently();
   }
@@ -103,6 +125,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
   @override
   void dispose() {
     NotificationService.instance.remoteSalesVersion.removeListener(_onRemoteSales);
+    DataEvents.instance.salesVersion.removeListener(_onRemoteSales);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -122,6 +146,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     }
     final sales = await _salesRepo.getSales(businessId: bizId);
     final summary = await _salesRepo.getTodaySummary(bizId);
+    // Estado de la caja, solo si el negocio usa el arqueo
+    CashSession? openCash;
+    if (mounted && ActiveBusinessScope.read(context)?.cashRegisterEnabled == true) {
+      openCash = await CashRegisterRepository.instance.getOpenSession(bizId);
+    }
 
     if (widget.userRole == null) {
       final user = AuthRepository.instance.currentUser;
@@ -140,6 +169,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
       setState(() {
         _sales = sales;
         _summary = summary;
+        _openCash = openCash;
         _isLoading = false;
       });
     }
@@ -284,6 +314,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
         ),
       ),
     );
+    if (mounted) _loadSales();
   }
 
   Future<void> _openQuickSale() async {
@@ -385,592 +416,353 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final isDesktop = MediaQuery.of(context).size.width >= 850;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final business = ActiveBusinessScope.of(context);
     final filtered = _filteredSales;
     final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
     final currentPageClamped = _currentPage.clamp(1, totalPages);
-    final pagedSales = filtered
-        .skip((currentPageClamped - 1) * _pageSize)
-        .take(_pageSize)
-        .toList();
+    final pagedSales = filtered.skip((currentPageClamped - 1) * _pageSize).take(_pageSize).toList();
 
     return Scaffold(
-      appBar: isDesktop
-          ? null
-          : AppBar(
-              title: const Text('Historial de Ventas'),
-              actions: [
-                IconButton(
-                  onPressed: _openCashRegister,
-                  icon: const Icon(Icons.point_of_sale_rounded, color: Colors.white),
-                  tooltip: 'Arqueo de caja',
-                ),
-                IconButton(
-                  onPressed: _openQuickSale,
-                  icon: const Icon(Icons.add_shopping_cart_rounded, color: Color(0xFF8B5CF6)),
-                  tooltip: 'Registrar Venta',
-                ),
-              ],
-            ),
+      appBar: isDesktop ? null : AppBar(title: const Text('Ventas')),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
-        color: const Color(0xFF8B5CF6),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final double hPadding = math.max(16.0, (constraints.maxWidth - 1000) / 2);
+            final double hPadding = math.max(AppSpace.lg, (constraints.maxWidth - 1000) / 2);
+            final columns = constraints.maxWidth >= 900 ? 2 : 1;
 
             return CustomScrollView(
+              controller: _scrollController,
               slivers: [
-                // Cabecera Pro en Desktop con botón Registrar Venta
                 if (isDesktop)
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(hPadding + 16, 20, hPadding + 16, 4),
-                    sliver: SliverToBoxAdapter(
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.lg, hPadding, 0),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Historial de Transacciones',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Monitoreo de ingresos, arqueo y detalle de ventas',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
+                          Text('Ventas', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: c.ink)),
                           const Spacer(),
-                          OutlinedButton.icon(
-                            onPressed: _openCashRegister,
-                            icon: const Icon(Icons.point_of_sale_rounded, size: 18),
-                            label: const Text('Arqueo de caja'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF059669),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          ElevatedButton.icon(
-                            onPressed: _openQuickSale,
-                            icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
-                            label: const Text(
-                              '+ Registrar Venta',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF8B5CF6),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              elevation: 2,
-                            ),
-                          ),
+                          PrimaryActionButton(label: 'Nueva venta', onPressed: _openQuickSale),
                         ],
                       ),
                     ),
                   ),
 
-                // Resumen de Métricas de Ventas de Hoy
-                SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: hPadding),
-                  sliver: SliverToBoxAdapter(
+                // Resumen de hoy
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
                     child: SalesSummaryCard(summary: _summary, sales: _sales, showProfit: canViewCosts),
                   ),
                 ),
 
-                // Accesos Rápidos Destacados: Clientes / Fiados y Exportación Excel
-                SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: hPadding),
-                  sliver: SliverToBoxAdapter(
-                    child: SalesQuickModulesBar(
-                      businessId: widget.businessId,
-                      onCustomers: _navigateToCustomers,
-                      onExportExcel: _exportToExcel,
+                // Arqueo de caja: solo si el negocio lo activó
+                if (business?.cashRegisterEnabled == true)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.sm, hPadding, 0),
+                      child: _buildCashStrip(),
                     ),
                   ),
-                ),
 
-                // Barra de Filtros interactiva (Fecha y Método de Pago)
-                SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: hPadding),
-                  sliver: SliverToBoxAdapter(
-                    child: _buildFiltersBar(isDark),
-                  ),
-                ),
-
-                // Encabezado de la lista con métrica filtrada
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(hPadding + 20, 14, hPadding + 20, 8),
-                  sliver: SliverToBoxAdapter(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              'Ventas Registradas',
-                              style: TextStyle(
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-                                ),
-                              ),
-                              child: Text(
-                                '${filtered.length}',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
-                                ),
-                              ),
-                            ),
-                          ],
+                // Accesos rápidos
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
+                    child: QuickAccessRow(
+                      items: [
+                        QuickAccessItem(
+                          icon: Icons.people_alt_outlined,
+                          label: 'Clientes',
+                          caption: 'Fiados y abonos',
+                          onTap: _navigateToCustomers,
                         ),
-                        if (totalPages > 1)
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                                onPressed: currentPageClamped > 1
-                                    ? () => setState(() => _currentPage--)
-                                    : null,
-                                icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                                color: const Color(0xFF8B5CF6),
-                                disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF8B5CF6).withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '$currentPageClamped / $totalPages',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF8B5CF6),
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                                onPressed: currentPageClamped < totalPages
-                                    ? () => setState(() => _currentPage++)
-                                    : null,
-                                icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                                color: const Color(0xFF8B5CF6),
-                                disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
-                              ),
-                            ],
+                        QuickAccessItem(
+                          icon: Icons.request_quote_outlined,
+                          label: 'Cotizaciones',
+                          caption: 'Proformas',
+                          onTap: _openQuotations,
+                        ),
+                        // Muestra costos y márgenes: solo dueño y administrador
+                        if (canViewCosts && business != null)
+                          QuickAccessItem(
+                            icon: Icons.insights_rounded,
+                            label: 'Reportes',
+                            caption: 'Ganancias',
+                            onTap: () => ProfitReportScreen.open(context, business),
                           ),
+                        QuickAccessItem(
+                          icon: Icons.table_chart_outlined,
+                          label: 'Excel',
+                          caption: 'Exportar',
+                          onTap: _exportToExcel,
+                        ),
                       ],
                     ),
                   ),
                 ),
 
-                // Lista de ventas paginada
+                // Filtros
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.lg, hPadding, 0),
+                    child: _buildFiltersBar(),
+                  ),
+                ),
+
+                // Encabezado de la lista con la paginación compacta
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding + AppSpace.xs, AppSpace.md, hPadding, AppSpace.xs),
+                    child: Row(
+                      children: [
+                        Text('Ventas registradas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                        const SizedBox(width: AppSpace.sm),
+                        Text('${filtered.length}', style: AppText.amount(context, size: 14, weight: FontWeight.w500, color: c.inkMuted)),
+                        const Spacer(),
+                        AppPagination(
+                          currentPage: currentPageClamped,
+                          totalPages: totalPages,
+                          onPageChanged: _goToPage,
+                          compact: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
                 if (_isLoading)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator(color: Color(0xFF8B5CF6))),
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.sm, hPadding, 0),
+                    sliver: SliverList.separated(
+                      itemCount: 5,
+                      separatorBuilder: (_, __) => const SizedBox(height: AppSpace.sm),
+                      itemBuilder: (_, __) => const SkeletonListTile(),
+                    ),
                   )
                 else if (filtered.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: StockyEmptyState(
-                      title: _sales.isEmpty ? 'Aún no hay ventas registradas' : 'Sin ventas con estos filtros',
+                      title: _sales.isEmpty ? 'Aún no hay ventas' : 'Sin ventas con estos filtros',
                       message: _sales.isEmpty
-                          ? 'Cuando descuentes productos de stock por venta, aparecerán detallados aquí en tiempo real.'
-                          : 'Prueba cambiando el rango de fechas o el método de pago seleccionado.',
-                      actionLabel: _sales.isNotEmpty ? 'Limpiar Filtros' : null,
-                      onAction: _sales.isNotEmpty
-                          ? () {
-                              setState(() {
-                                _selectedDateFilter = 'all';
-                                _selectedPaymentMethod = 'ALL';
-                                _customDateRange = null;
-                                _currentPage = 1;
-                              });
-                            }
-                          : null,
+                          ? 'Tus ventas aparecerán aquí apenas registres la primera.'
+                          : 'Prueba con otras fechas u otro método de pago.',
+                      actionLabel: _sales.isNotEmpty ? 'Quitar filtros' : null,
+                      onAction: _sales.isNotEmpty ? _clearFilters : null,
                     ),
                   )
-                else ...[
+                else if (columns == 1)
                   SliverPadding(
                     padding: EdgeInsets.symmetric(horizontal: hPadding),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final sale = pagedSales[index];
-                          return SaleCard(
-                            sale: sale,
-                            showProfit: canViewCosts,
-                            onCancel: canCancelSale ? () => _cancelSale(sale) : null,
-                          );
-                        },
-                        childCount: pagedSales.length,
+                    sliver: SliverList.separated(
+                      itemCount: pagedSales.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: AppSpace.sm),
+                      itemBuilder: (_, i) => _saleCard(pagedSales[i]),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: hPadding),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: AppSpace.sm,
+                        mainAxisSpacing: AppSpace.sm,
+                        mainAxisExtent: 70,
                       ),
+                      delegate: SliverChildBuilderDelegate((_, i) => _saleCard(pagedSales[i]), childCount: pagedSales.length),
                     ),
                   ),
 
-                  // Controles de Paginación
-                  if (totalPages > 1)
-                    SliverPadding(
-                      padding: EdgeInsets.fromLTRB(hPadding + 16, 16, hPadding + 16, 8),
-                      sliver: SliverToBoxAdapter(
-                        child: _buildPaginationBar(
-                          isDark: isDark,
-                          currentPage: currentPageClamped,
-                          totalPages: totalPages,
-                          totalItems: filtered.length,
-                        ),
-                      ),
-                    ),
-                ],
-
+                // Paginación completa abajo; espacio para el botón principal y Stocky
                 SliverToBoxAdapter(
-                  child: SizedBox(height: MediaQuery.of(context).padding.bottom + 30),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, MediaQuery.of(context).padding.bottom + 150),
+                    child: _isLoading
+                        ? const SizedBox.shrink()
+                        : AppPagination(currentPage: currentPageClamped, totalPages: totalPages, onPageChanged: _goToPage),
+                  ),
                 ),
               ],
             );
           },
         ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+      floatingActionButton: isDesktop
+          ? null
+          : Padding(
+              // A la altura de la pastilla de Stocky en Inicio, justo encima de la barra
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+              child: PrimaryActionButton(label: 'Nueva venta', onPressed: _openQuickSale),
+            ),
     );
   }
 
-  Widget _buildFiltersBar(bool isDark) {
-    final bool hasActiveFilter = _selectedDateFilter != 'all' || _selectedPaymentMethod != 'ALL';
+  SaleCard _saleCard(Sale sale) => SaleCard(
+        sale: sale,
+        showProfit: canViewCosts,
+        onCancel: canCancelSale ? () => _cancelSale(sale) : null,
+      );
 
-    String dateLabel;
-    switch (_selectedDateFilter) {
-      case 'today':
-        dateLabel = 'Hoy';
-        break;
-      case '7days':
-        dateLabel = '7 Días';
-        break;
-      case 'month':
-        dateLabel = 'Este Mes';
-        break;
-      case 'custom':
-        dateLabel = _customDateRange != null
-            ? '${DateFormat('dd/MM').format(_customDateRange!.start)} - ${DateFormat('dd/MM').format(_customDateRange!.end)}'
-            : 'Rango';
-        break;
-      case 'all':
-      default:
-        dateLabel = 'Todas las fechas';
-    }
-
-    String methodLabel;
-    switch (_selectedPaymentMethod) {
-      case 'EFECTIVO':
-        methodLabel = '💵 Efectivo';
-        break;
-      case 'TRANSFERENCIA':
-        methodLabel = '🏦 Transferencia';
-        break;
-      case 'FIADO':
-        methodLabel = '📝 Fiado';
-        break;
-      case 'ALL':
-      default:
-        methodLabel = 'Todos los métodos';
-    }
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Filtro de Fecha Popup
-          Expanded(
-            child: PopupMenuButton<String>(
-              tooltip: 'Filtrar por fecha',
-              initialValue: _selectedDateFilter,
-              onSelected: (val) {
-                if (val == 'custom') {
-                  _pickCustomDateRange();
-                } else {
-                  setState(() {
-                    _selectedDateFilter = val;
-                    _currentPage = 1;
-                  });
-                }
-              },
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              color: isDark ? const Color(0xFF18152F) : Colors.white,
-              itemBuilder: (ctx) => [
-                _buildPopupItem('all', '📅 Todas las fechas', _selectedDateFilter == 'all', isDark),
-                _buildPopupItem('today', '☀️ Hoy', _selectedDateFilter == 'today', isDark),
-                _buildPopupItem('7days', '⏱️ Últimos 7 días', _selectedDateFilter == '7days', isDark),
-                _buildPopupItem('month', '📆 Este mes', _selectedDateFilter == 'month', isDark),
-                _buildPopupItem('custom', '🗓️ Rango personalizado...', _selectedDateFilter == 'custom', isDark),
-              ],
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _selectedDateFilter != 'all'
-                      ? const Color(0xFF8B5CF6).withOpacity(0.12)
-                      : (isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9)),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: _selectedDateFilter != 'all'
-                        ? const Color(0xFF8B5CF6)
-                        : (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_today_rounded,
-                      size: 14,
-                      color: _selectedDateFilter != 'all'
-                          ? const Color(0xFF8B5CF6)
-                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          dateLabel,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: _selectedDateFilter != 'all' ? FontWeight.bold : FontWeight.w500,
-                            color: _selectedDateFilter != 'all'
-                                ? const Color(0xFF8B5CF6)
-                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
-                          ),
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.arrow_drop_down_rounded,
-                      size: 18,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Filtro de Método de Pago Popup
-          Expanded(
-            child: PopupMenuButton<String>(
-              tooltip: 'Filtrar por método',
-              initialValue: _selectedPaymentMethod,
-              onSelected: (val) {
-                setState(() {
-                  _selectedPaymentMethod = val;
-                  _currentPage = 1;
-                });
-              },
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              color: isDark ? const Color(0xFF18152F) : Colors.white,
-              itemBuilder: (ctx) => [
-                _buildPopupItem('ALL', '💳 Todos los métodos', _selectedPaymentMethod == 'ALL', isDark),
-                _buildPopupItem('EFECTIVO', '💵 Efectivo', _selectedPaymentMethod == 'EFECTIVO', isDark),
-                _buildPopupItem('TRANSFERENCIA', '🏦 Transferencia', _selectedPaymentMethod == 'TRANSFERENCIA', isDark),
-                _buildPopupItem('FIADO', '📝 Venta a Fiado', _selectedPaymentMethod == 'FIADO', isDark),
-              ],
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _selectedPaymentMethod != 'ALL'
-                      ? const Color(0xFF059669).withOpacity(0.12)
-                      : (isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9)),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: _selectedPaymentMethod != 'ALL'
-                        ? const Color(0xFF059669)
-                        : (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.payments_outlined,
-                      size: 14,
-                      color: _selectedPaymentMethod != 'ALL'
-                          ? const Color(0xFF059669)
-                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          methodLabel,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: _selectedPaymentMethod != 'ALL' ? FontWeight.bold : FontWeight.w500,
-                            color: _selectedPaymentMethod != 'ALL'
-                                ? const Color(0xFF059669)
-                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
-                          ),
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.arrow_drop_down_rounded,
-                      size: 18,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Botón limpiar filtros si hay alguno activo
-          if (hasActiveFilter) ...[
-            const SizedBox(width: 6),
-            InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedDateFilter = 'all';
-                  _selectedPaymentMethod = 'ALL';
-                  _customDateRange = null;
-                  _currentPage = 1;
-                });
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
+  void _clearFilters() {
+    setState(() {
+      _selectedDateFilter = 'all';
+      _selectedPaymentMethod = 'ALL';
+      _customDateRange = null;
+      _currentPage = 1;
+    });
   }
 
-  PopupMenuItem<String> _buildPopupItem(String value, String text, bool isSelected, bool isDark) {
-    return PopupMenuItem<String>(
-      value: value,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected
-                    ? const Color(0xFF8B5CF6)
-                    : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
-              ),
-            ),
-          ),
-          if (isSelected)
-            const Icon(Icons.check_rounded, size: 16, color: Color(0xFF8B5CF6)),
-        ],
-      ),
-    );
+  Future<void> _openQuotations() async {
+    final bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
+    if (bizId == null) return;
+    await QuotationsListModal.show(context, businessId: bizId);
+    if (mounted) _loadSales();
   }
 
-  Widget _buildPaginationBar({
-    required bool isDark,
-    required int currentPage,
-    required int totalPages,
-    required int totalItems,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-        ),
+  /// Franja del arqueo de caja: estado de la caja y acceso a abrirla o cerrarla
+  Widget _buildCashStrip() {
+    final c = context.colors;
+    final open = _openCash;
+    final text = open == null
+        ? 'Caja cerrada'
+        : 'Caja abierta desde ${DateFormat('h:mm a', 'es_CO').format(open.openedAt)}';
+    return Material(
+      color: open == null ? c.surface : c.successSoft,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        side: BorderSide(color: open == null ? c.line : Colors.transparent),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Página $currentPage de $totalPages ($totalItems transacciones)',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            ),
-          ),
-          Row(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        onTap: _openCashRegister,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.md),
+          child: Row(
             children: [
-              IconButton(
-                onPressed: currentPage > 1
-                    ? () => setState(() => _currentPage--)
-                    : null,
-                icon: const Icon(Icons.chevron_left_rounded),
-                iconSize: 22,
-                tooltip: 'Página anterior',
-                color: const Color(0xFF8B5CF6),
-                disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
+              Icon(Icons.point_of_sale_rounded, size: 20, color: open == null ? c.inkMuted : c.success),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: Text(text, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: open == null ? c.ink : c.success)),
               ),
-              const SizedBox(width: 4),
-              IconButton(
-                onPressed: currentPage < totalPages
-                    ? () => setState(() => _currentPage++)
-                    : null,
-                icon: const Icon(Icons.chevron_right_rounded),
-                iconSize: 22,
-                tooltip: 'Página siguiente',
-                color: const Color(0xFF8B5CF6),
-                disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
-              ),
+              Text(open == null ? 'Abrir caja' : 'Cerrar caja', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.accent)),
+              Icon(Icons.chevron_right_rounded, color: c.accent),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
+  String get _dateLabel => switch (_selectedDateFilter) {
+        'today' => 'Hoy',
+        '7days' => 'Últimos 7 días',
+        'month' => 'Este mes',
+        'custom' => _customDateRange != null
+            ? '${DateFormat('dd/MM').format(_customDateRange!.start)} – ${DateFormat('dd/MM').format(_customDateRange!.end)}'
+            : 'Rango',
+        _ => 'Todas las fechas',
+      };
+
+  String get _methodLabel => _selectedPaymentMethod == 'ALL' ? 'Todos los pagos' : paymentMethodLabel(_selectedPaymentMethod);
+
+  /// Lista de opciones en una hoja inferior; devuelve la clave elegida
+  Future<String?> _pickOption(String title, Map<String, String> options, String selected) {
+    return showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.xl, 0, AppSpace.xl, AppSpace.sm),
+              child: Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: ctx.colors.ink)),
+            ),
+            for (final entry in options.entries)
+              ListTile(
+                title: Text(entry.value),
+                trailing: entry.key == selected ? Icon(Icons.check_rounded, color: ctx.colors.accent) : null,
+                onTap: () => Navigator.pop(ctx, entry.key),
+              ),
+            const SizedBox(height: AppSpace.sm),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFiltersBar() {
+    final c = context.colors;
+    Widget button(String label, bool active, VoidCallback onTap) => Expanded(
+          child: OutlinedButton(
+            onPressed: onTap,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 12),
+              side: BorderSide(color: active ? c.accent : c.line),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13.5, color: active ? c.accent : c.ink),
+                  ),
+                ),
+                Icon(Icons.expand_more_rounded, size: 20, color: active ? c.accent : c.inkMuted),
+              ],
+            ),
+          ),
+        );
+
+    return Row(
+      children: [
+        button(_dateLabel, _selectedDateFilter != 'all', () async {
+          final picked = await _pickOption(
+            'Fechas',
+            const {
+              'all': 'Todas las fechas',
+              'today': 'Hoy',
+              '7days': 'Últimos 7 días',
+              'month': 'Este mes',
+              'custom': 'Elegir rango…',
+            },
+            _selectedDateFilter,
+          );
+          if (picked == null) return;
+          if (picked == 'custom') {
+            await _pickCustomDateRange();
+          } else {
+            setState(() {
+              _selectedDateFilter = picked;
+              _currentPage = 1;
+            });
+          }
+        }),
+        const SizedBox(width: AppSpace.sm),
+        button(_methodLabel, _selectedPaymentMethod != 'ALL', () async {
+          final picked = await _pickOption(
+            'Método de pago',
+            const {
+              'ALL': 'Todos los pagos',
+              'EFECTIVO': 'Efectivo',
+              'TRANSFERENCIA': 'Transferencia',
+              'FIADO': 'Fiado',
+            },
+            _selectedPaymentMethod,
+          );
+          if (picked == null) return;
+          setState(() {
+            _selectedPaymentMethod = picked;
+            _currentPage = 1;
+          });
+        }),
+      ],
+    );
+  }
 }

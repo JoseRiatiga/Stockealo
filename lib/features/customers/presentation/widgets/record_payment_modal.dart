@@ -1,9 +1,11 @@
+import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/utils/countries.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/customer_repository.dart';
 import '../../models/customer.dart';
@@ -24,6 +26,7 @@ class RecordPaymentModal extends StatefulWidget {
     required VoidCallback onPaymentRecorded,
   }) {
     return showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -135,11 +138,11 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.check_circle, color: Color(0xFF059669), size: 24),
-            SizedBox(width: 10),
-            Text('Abono Registrado', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Icon(Icons.check_circle, color: context.colors.accent, size: 24),
+            const SizedBox(width: 10),
+            const Text('Abono Registrado', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
         content: Column(
@@ -150,17 +153,17 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
               'Se descontaron ${CurrencyFormatter.formatCOP(result.payment.amount)} de la cuenta de ${result.customer.name}.',
               style: TextStyle(
                 fontSize: 13,
-                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                color: Theme.of(context).brightness == Brightness.dark ? context.colors.lineStrong : context.colors.ink,
               ),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                color: Theme.of(context).brightness == Brightness.dark ? context.colors.ink : context.colors.surfaceMuted,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: Theme.of(context).brightness == Brightness.dark ? context.colors.ink : context.colors.line,
                 ),
               ),
               child: Row(
@@ -170,7 +173,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                     'Nuevo saldo deudor:',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: Theme.of(context).brightness == Brightness.dark ? context.colors.inkMuted : context.colors.inkMuted,
                     ),
                   ),
                   Text(
@@ -178,7 +181,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: result.remainingDebt > 0 ? const Color(0xFFD97706) : const Color(0xFF059669),
+                      color: result.remainingDebt > 0 ? context.colors.warning : context.colors.accent,
                     ),
                   ),
                 ],
@@ -213,9 +216,9 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
   Widget build(BuildContext context) {
     final customer = widget.customer;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final cardBg = context.colors.surface;
+    final textMain = context.colors.ink;
+    final textMuted = context.colors.inkMuted;
 
     return Container(
       padding: EdgeInsets.only(
@@ -263,10 +266,10 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7),
+                  color: isDark ? const Color(0xFF78350F).withOpacity(0.4) : context.colors.warningSoft,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF92400E) : const Color(0xFFFDE68A),
+                    color: isDark ? context.colors.warning : const Color(0xFFFDE68A),
                   ),
                 ),
                 child: Row(
@@ -277,11 +280,11 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                       children: [
                         Text(
                           'Deuda Pendiente Actual',
-                          style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E)),
+                          style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFFDE68A) : context.colors.warning),
                         ),
                         Text(
                           'Saldo por cobrar',
-                          style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309)),
+                          style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFFFCD34D) : context.colors.warning),
                         ),
                       ],
                     ),
@@ -290,7 +293,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
+                        color: isDark ? const Color(0xFFFCD34D) : context.colors.warning,
                       ),
                     ),
                   ],
@@ -303,15 +306,15 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                   padding: const EdgeInsets.all(10),
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEF2F2),
+                    color: isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : context.colors.dangerSoft,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: isDark ? const Color(0xFFB91C1C) : const Color(0xFFFECACA),
+                      color: isDark ? context.colors.danger : const Color(0xFFFECACA),
                     ),
                   ),
                   child: Text(
                     _errorMessage!,
-                    style: TextStyle(color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626), fontSize: 12),
+                    style: TextStyle(color: isDark ? const Color(0xFFFCA5A5) : context.colors.danger, fontSize: 12),
                   ),
                 ),
               ],
@@ -322,10 +325,10 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                 keyboardType: TextInputType.number,
                 autofocus: true,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Monto a Abonar (\$)',
                   hintText: 'Ej. 20000',
-                  prefixIcon: Icon(Icons.attach_money, color: Color(0xFF059669)),
+                  prefixIcon: Icon(Icons.attach_money, color: context.colors.accent),
                 ),
               ),
               const SizedBox(height: 10),
@@ -335,7 +338,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                 spacing: 8,
                 children: [
                   ActionChip(
-                    avatar: const Icon(Icons.done_all, size: 16, color: Color(0xFF059669)),
+                    avatar: Icon(Icons.done_all, size: 16, color: context.colors.accent),
                     label: const Text('Pagar Todo', style: TextStyle(fontSize: 12)),
                     onPressed: () => _setAmount(customer.debtBalance),
                   ),
@@ -371,17 +374,17 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                           Icon(
                             Icons.payments_outlined,
                             size: 14,
-                            color: _paymentMethod == 'EFECTIVO' ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)) : textMuted,
+                            color: _paymentMethod == 'EFECTIVO' ? (isDark ? const Color(0xFF34D399) : context.colors.accent) : textMuted,
                           ),
                           const SizedBox(width: 4),
                           const Text('Efectivo'),
                         ],
                       ),
                       selected: _paymentMethod == 'EFECTIVO',
-                      selectedColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                      selectedColor: isDark ? const Color(0xFF064E3B) : context.colors.successSoft,
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: _paymentMethod == 'EFECTIVO' ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)) : textMuted,
+                        color: _paymentMethod == 'EFECTIVO' ? (isDark ? const Color(0xFF34D399) : context.colors.accent) : textMuted,
                       ),
                       onSelected: (val) {
                         if (val) setState(() => _paymentMethod = 'EFECTIVO');
@@ -397,17 +400,17 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                           Icon(
                             Icons.account_balance_outlined,
                             size: 14,
-                            color: _paymentMethod == 'TRANSFERENCIA' ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)) : textMuted,
+                            color: _paymentMethod == 'TRANSFERENCIA' ? (isDark ? const Color(0xFF60A5FA) : context.colors.info) : textMuted,
                           ),
                           const SizedBox(width: 4),
                           const Text('Transferencia'),
                         ],
                       ),
                       selected: _paymentMethod == 'TRANSFERENCIA',
-                      selectedColor: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
+                      selectedColor: isDark ? const Color(0xFF1E3A8A) : context.colors.infoSoft,
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: _paymentMethod == 'TRANSFERENCIA' ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)) : textMuted,
+                        color: _paymentMethod == 'TRANSFERENCIA' ? (isDark ? const Color(0xFF60A5FA) : context.colors.info) : textMuted,
                       ),
                       onSelected: (val) {
                         if (val) setState(() => _paymentMethod = 'TRANSFERENCIA');
@@ -421,10 +424,10 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
               // Notas opcionales
               TextField(
                 controller: _notesController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Notas / Observaciones (Opcional)',
-                  hintText: 'Ej. Pagó por Nequi / Dejó abono en efectivo',
-                  prefixIcon: Icon(Icons.note_alt_outlined),
+                  hintText: 'Ej. Pagó por ${_firstPaymentApp(context)} / Dejó abono en efectivo',
+                  prefixIcon: const Icon(Icons.note_alt_outlined),
                 ),
               ),
               const SizedBox(height: 20),
@@ -439,7 +442,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                       : const Icon(Icons.check_circle_outline, size: 20),
                   label: const Text('Registrar Abono y Generar Recibo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF059669),
+                    backgroundColor: context.colors.accent,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -452,3 +455,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
     );
   }
 }
+
+/// Primera app de pago del país del negocio activo, para el ejemplo de las notas
+String _firstPaymentApp(BuildContext context) =>
+    countryByCode(ActiveBusinessScope.read(context)?.country).paymentApps.split(' o ').first;

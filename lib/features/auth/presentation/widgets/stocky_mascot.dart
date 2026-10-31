@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/stocky_palette.dart';
+
 enum StockyState {
   idle,
   trackingEmail,
@@ -11,6 +13,11 @@ enum StockyState {
   success,
 }
 
+/// Stocky, la ardilla tendera con el delantal de Stockealo.
+///
+/// Estados: normal, siguiendo el correo con los ojos, tapándose los ojos con la cola
+/// (contraseña), pensando, preocupada (error) y celebrando. En reposo respira, parpadea
+/// y mueve la cola; con "reducir animaciones" solo cambia de cara.
 class StockyMascot extends StatefulWidget {
   final StockyState state;
   final double lookProgress; // -1.0 a 1.0 para seguir la posición del texto
@@ -28,78 +35,59 @@ class StockyMascot extends StatefulWidget {
 }
 
 class _StockyMascotState extends State<StockyMascot> with TickerProviderStateMixin {
-  late AnimationController _idleController;
-  late AnimationController _blinkController;
-  late AnimationController _handsController;
-  late AnimationController _celebrateController;
+  late final AnimationController _idleController =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+  late final AnimationController _blinkController =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 160));
+  late final AnimationController _tailController =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 280));
+  late final AnimationController _celebrateController =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 520));
   Timer? _blinkTimer;
+  bool _reduceMotion = false;
 
   @override
-  void initState() {
-    super.initState();
-
-    // Respiración y balanceo flotante suave
-    _idleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-
-    // Parpadeo intermitente natural
-    _blinkController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 180),
-    );
-    _scheduleBlink();
-
-    // Animación de taparse los ojos
-    _handsController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 260),
-    );
-
-    // Animación de celebración (éxito)
-    _celebrateController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (_reduceMotion) {
+      _idleController.stop();
+      _blinkTimer?.cancel();
+    } else if (!_idleController.isAnimating) {
+      _idleController.repeat(reverse: true);
+      _scheduleBlink();
+    }
     _updateStateAnimations();
   }
 
   void _scheduleBlink() {
     _blinkTimer?.cancel();
-    if (!mounted) return;
-    _blinkTimer = Timer(Duration(milliseconds: 2800 + math.Random().nextInt(2500)), () async {
-      if (!mounted) return;
-      if (widget.state != StockyState.coveringEyes) {
+    _blinkTimer = Timer(Duration(milliseconds: 2600 + math.Random().nextInt(2600)), () async {
+      if (!mounted || _reduceMotion) return;
+      if (widget.state != StockyState.coveringEyes && widget.state != StockyState.success) {
         try {
           await _blinkController.forward();
-          if (mounted) {
-            await _blinkController.reverse();
-          }
+          if (mounted) await _blinkController.reverse();
         } catch (_) {}
       }
-      if (mounted) {
-        _scheduleBlink();
-      }
+      if (mounted) _scheduleBlink();
     });
   }
 
   @override
   void didUpdateWidget(covariant StockyMascot oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.state != widget.state) {
-      _updateStateAnimations();
-    }
+    if (oldWidget.state != widget.state) _updateStateAnimations();
   }
 
   void _updateStateAnimations() {
-    if (widget.state == StockyState.coveringEyes) {
-      _handsController.forward();
-    } else {
-      _handsController.reverse();
+    final covering = widget.state == StockyState.coveringEyes;
+    if (_reduceMotion) {
+      _tailController.value = covering ? 1 : 0;
+      _celebrateController.value = 0;
+      return;
     }
-
+    covering ? _tailController.forward() : _tailController.reverse();
     if (widget.state == StockyState.success) {
       _celebrateController.repeat(reverse: true);
     } else {
@@ -112,42 +100,30 @@ class _StockyMascotState extends State<StockyMascot> with TickerProviderStateMix
     _blinkTimer?.cancel();
     _idleController.dispose();
     _blinkController.dispose();
-    _handsController.dispose();
+    _tailController.dispose();
     _celebrateController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return AnimatedBuilder(
-      animation: Listenable.merge([
-        _idleController,
-        _blinkController,
-        _handsController,
-        _celebrateController,
-      ]),
+      animation: Listenable.merge([_idleController, _blinkController, _tailController, _celebrateController]),
       builder: (context, _) {
-        final floatOffset = math.sin(_idleController.value * math.pi) * 3.5;
-        final jumpOffset = widget.state == StockyState.success
-            ? math.sin(_celebrateController.value * math.pi) * 8.0
-            : 0.0;
-
+        final hop = widget.state == StockyState.success ? math.sin(_celebrateController.value * math.pi) * 0.06 : 0.0;
         return Transform.translate(
-          offset: Offset(0, -floatOffset - jumpOffset),
+          offset: Offset(0, -hop * widget.size),
           child: SizedBox(
             width: widget.size,
             height: widget.size,
             child: CustomPaint(
-              painter: _StockyPainter(
+              painter: _SquirrelPainter(
                 state: widget.state,
-                lookProgress: widget.lookProgress.clamp(-1.0, 1.0),
-                blinkValue: _blinkController.value,
-                handsValue: _handsController.value,
-                celebrateValue: _celebrateController.value,
-                idleValue: _idleController.value,
-                isDark: isDark,
+                look: widget.lookProgress.clamp(-1.0, 1.0),
+                breath: _idleController.value,
+                blink: _blinkController.value,
+                tailCover: _tailController.value,
+                celebrate: _celebrateController.value,
               ),
             ),
           ),
@@ -157,355 +133,260 @@ class _StockyMascotState extends State<StockyMascot> with TickerProviderStateMix
   }
 }
 
-class _StockyPainter extends CustomPainter {
+/// Dibuja la ardilla en una grilla de 120 × 112 (la misma de los bocetos) escalada al tamaño
+class _SquirrelPainter extends CustomPainter {
   final StockyState state;
-  final double lookProgress;
-  final double blinkValue;
-  final double handsValue;
-  final double celebrateValue;
-  final double idleValue;
-  final bool isDark;
+  final double look;
+  final double breath;
+  final double blink;
+  final double tailCover;
+  final double celebrate;
 
-  _StockyPainter({
+  _SquirrelPainter({
     required this.state,
-    required this.lookProgress,
-    required this.blinkValue,
-    required this.handsValue,
-    required this.celebrateValue,
-    required this.idleValue,
-    required this.isDark,
+    required this.look,
+    required this.breath,
+    required this.blink,
+    required this.tailCover,
+    required this.celebrate,
   });
+
+  static Paint _fill(Color color, [double opacity = 1]) => Paint()..color = color.withOpacity(opacity);
+
+  static Paint _stroke(Color color, double width, [double opacity = 1]) => Paint()
+    ..color = color.withOpacity(opacity)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = width
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final scale = size.width / 120;
     canvas.save();
-    canvas.scale(size.width / 100.0, size.height / 100.0);
-    const w = 100.0;
-    const h = 100.0;
-    const center = Offset(50.0, 50.0);
+    canvas.translate(0, (size.height - 112 * scale) / 2);
+    canvas.scale(scale);
 
-    // Sombra en el suelo interactiva
-    final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(isDark ? 0.38 : 0.10)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
-    final shadowRect = Rect.fromCenter(
-      center: Offset(center.dx, h - 3),
-      width: w * 0.76,
-      height: 9,
+    final thinking = state == StockyState.loading;
+    final happy = state == StockyState.success;
+    final worried = state == StockyState.error;
+
+    if (happy) _sparkles(canvas);
+    if (thinking) _thoughts(canvas);
+    if (worried) _sweat(canvas);
+
+    _tail(canvas);
+
+    // Cuerpo y delantal; al respirar el cuerpo sube y baja un poquito
+    final lift = math.sin(breath * math.pi) * 1.2;
+    canvas.save();
+    canvas.translate(0, -lift * 0.5);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(56, 88), width: 56, height: 48), _fill(StockyPalette.body));
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(35, 73, 42, 35), const Radius.circular(11)),
+      _fill(StockyPalette.apron),
     );
-    canvas.drawOval(shadowRect, shadowPaint);
+    _apronLogo(canvas, const Offset(55, 91), 19);
+    canvas.restore();
 
-    // 1. Cuerpo de Stocky: Caja amigable con esquinas redondeadas
-    final boxRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(center.dx, center.dy + 2), width: w * 0.82, height: h * 0.74),
-      const Radius.circular(20),
-    );
-
-    // Toberas y propulsores de levitación magnética / iones en la base
-    final leftPodX = center.dx - w * 0.22;
-    final rightPodX = center.dx + w * 0.22;
-    final podY = boxRect.bottom - 1;
-
-    final podPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: isDark
-            ? [const Color(0xFF2E2A54), const Color(0xFF131126)]
-            : [const Color(0xFF475569), const Color(0xFF1E293B)],
-      ).createShader(const Rect.fromLTWH(0, 0, 100, 100));
-
-    // Toberas metálicas cilíndricas
-    final podLeft = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(leftPodX, podY), width: w * 0.16, height: 6),
-      const Radius.circular(3),
-    );
-    final podRight = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(rightPodX, podY), width: w * 0.16, height: 6),
-      const Radius.circular(3),
-    );
-    canvas.drawRRect(podLeft, podPaint);
-    canvas.drawRRect(podRight, podPaint);
-
-    // Flamas de plasma/ion pulsantes en reposo
-    final ionPulse = 0.75 + 0.25 * math.sin(idleValue * 2 * math.pi);
-    final ionPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFF38BDF8).withOpacity(0.85 * ionPulse),
-          const Color(0xFF10B981).withOpacity(0.40 * ionPulse),
-          Colors.transparent,
-        ],
-      ).createShader(Rect.fromCircle(center: Offset(leftPodX, podY + 3), radius: 8));
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(leftPodX, podY + 4), width: w * 0.12 * ionPulse, height: 6 * ionPulse),
-      ionPaint,
-    );
-    final ionPaintRight = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFF38BDF8).withOpacity(0.85 * ionPulse),
-          const Color(0xFF10B981).withOpacity(0.40 * ionPulse),
-          Colors.transparent,
-        ],
-      ).createShader(Rect.fromCircle(center: Offset(rightPodX, podY + 3), radius: 8));
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(rightPodX, podY + 4), width: w * 0.12 * ionPulse, height: 6 * ionPulse),
-      ionPaintRight,
-    );
-
-    // Gradiente esmeralda premium cyber-bot
-    final bodyPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: isDark
-            ? [const Color(0xFF059669), const Color(0xFF047857), const Color(0xFF064E3B)]
-            : [const Color(0xFF10B981), const Color(0xFF059669), const Color(0xFF047857)],
-      ).createShader(boxRect.outerRect);
-
-    // Dibujar cuerpo
-    canvas.drawRRect(boxRect, bodyPaint);
-
-    // Arco de Visor de Vidrio Cibernético (Sheen specularity)
-    final visorPath = Path()
-      ..moveTo(boxRect.left + 8, boxRect.top + 7)
-      ..lineTo(boxRect.right - 8, boxRect.top + 7)
-      ..lineTo(boxRect.right - 14, boxRect.top + boxRect.height * 0.32)
-      ..lineTo(boxRect.left + 14, boxRect.top + boxRect.height * 0.32)
-      ..close();
-    final visorPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.white.withOpacity(0.24),
-          Colors.white.withOpacity(0.03),
-        ],
-      ).createShader(boxRect.outerRect);
-    canvas.drawPath(visorPath, visorPaint);
-
-    // Borde brillante superior
-    final borderPaint = Paint()
-      ..color = Colors.white.withOpacity(0.25)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
-    canvas.drawRRect(boxRect, borderPaint);
-
-    // Cinta / Tapa superior de la caja (característica de paquete de stock)
-    final tapeRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(center.dx - 12, boxRect.top, 24, boxRect.height * 0.35),
-      const Radius.circular(5),
-    );
-    final tapePaint = Paint()..color = const Color(0xFF34D399).withOpacity(0.35);
-    canvas.drawRRect(tapeRect, tapePaint);
-
-    // Mini Antena Cibernética con LED de estado en la parte superior
-    final antennaBaseY = boxRect.top;
-    final antennaTipY = boxRect.top - 8;
-    final antennaPaint = Paint()
-      ..color = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(center.dx, antennaBaseY), Offset(center.dx, antennaTipY), antennaPaint);
-
-    Color ledColor = const Color(0xFF10B981);
-    if (state == StockyState.error) {
-      ledColor = const Color(0xFFEF4444);
-    } else if (state == StockyState.loading) {
-      ledColor = const Color(0xFFF59E0B);
-    } else if (state == StockyState.success) {
-      ledColor = const Color(0xFF8B5CF6);
+    if (happy) {
+      // Brazos arriba
+      final arms = _stroke(StockyPalette.fur, 8);
+      canvas.drawPath(Path()..moveTo(34, 86)..quadraticBezierTo(22, 78, 24, 62), arms);
+      canvas.drawPath(Path()..moveTo(78, 86)..quadraticBezierTo(90, 78, 88, 62), arms);
+    } else if (thinking) {
+      // Pata en la barbilla
+      canvas.drawPath(Path()..moveTo(70, 96)..quadraticBezierTo(82, 90, 74, 70), _stroke(StockyPalette.fur, 8));
     }
 
-    final ledGlow = Paint()
-      ..color = ledColor.withOpacity(0.5 + 0.35 * math.sin(idleValue * 2 * math.pi))
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    canvas.drawCircle(Offset(center.dx, antennaTipY - 1), 4.5, ledGlow);
+    // Cabeza
+    canvas.save();
+    canvas.translate(0, -lift);
+    canvas.drawCircle(const Offset(56, 50), 30, _fill(StockyPalette.fur));
+    final ears = _fill(StockyPalette.furDark);
+    canvas.drawPath(Path()..moveTo(30, 34)..lineTo(26, 16)..lineTo(42, 26)..close(), ears);
+    canvas.drawPath(Path()..moveTo(82, 34)..lineTo(86, 16)..lineTo(70, 26)..close(), ears);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(56, 62), width: 36, height: 26), _fill(StockyPalette.muzzle));
 
-    canvas.drawCircle(Offset(center.dx, antennaTipY - 1), 2.2, Paint()..color = ledColor);
-    canvas.drawCircle(Offset(center.dx - 0.6, antennaTipY - 1.6), 0.8, Paint()..color = Colors.white);
+    _face(canvas, thinking: thinking, happy: happy, worried: worried);
 
-    // Pequeño broche / estrella en el centro de la cinta
-    final pinPaint = Paint()..color = const Color(0xFFA7F3D0);
-    canvas.drawCircle(Offset(center.dx, boxRect.top + 8), 3.5, pinPaint);
+    final blush = _fill(StockyPalette.blush, 0.45);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(38, 60), width: 11, height: 6.8), blush);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(74, 60), width: 11, height: 6.8), blush);
 
-    // 2. Mejillas sonrosadas suaves (Blush)
-    final blushPaint = Paint()..color = const Color(0xFFFDA4AF).withOpacity(0.45);
-    canvas.drawCircle(Offset(center.dx - w * 0.26, center.dy + 12), 7.5, blushPaint);
-    canvas.drawCircle(Offset(center.dx + w * 0.26, center.dy + 12), 7.5, blushPaint);
+    if (tailCover > 0) _tailOverEyes(canvas);
+    canvas.restore();
 
-    // 3. Ojos interactivos
-    final eyeCenterY = center.dy - 2;
-    final leftEyeCenterX = center.dx - w * 0.16;
-    final rightEyeCenterX = center.dx + w * 0.16;
+    canvas.restore();
+  }
 
-    if (state == StockyState.success) {
-      // Ojos de felicidad cerrada en media luna (^ ^)
-      final happyEyePaint = Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = 3.5;
+  void _tail(Canvas canvas) {
+    // La cola se mece un poco con la respiración
+    canvas.save();
+    canvas.translate(80, 92);
+    canvas.rotate(math.sin(breath * math.pi) * 0.05 - tailCover * 0.08);
+    canvas.translate(-80, -92);
+    canvas.drawPath(
+      Path()
+        ..moveTo(88, 96)
+        ..quadraticBezierTo(118, 86, 110, 48)
+        ..quadraticBezierTo(104, 24, 84, 30)
+        ..quadraticBezierTo(98, 40, 90, 64)
+        ..quadraticBezierTo(84, 82, 68, 86)
+        ..close(),
+      _fill(StockyPalette.furDark),
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(92, 90)
+        ..quadraticBezierTo(110, 78, 106, 52)
+        ..quadraticBezierTo(103, 40, 94, 40)
+        ..quadraticBezierTo(102, 52, 96, 70)
+        ..quadraticBezierTo(91, 84, 82, 88)
+        ..close(),
+      _fill(StockyPalette.fur),
+    );
+    canvas.restore();
+  }
 
-      final leftPath = Path()
-        ..moveTo(leftEyeCenterX - 9, eyeCenterY + 2)
-        ..quadraticBezierTo(leftEyeCenterX, eyeCenterY - 7, leftEyeCenterX + 9, eyeCenterY + 2);
-      final rightPath = Path()
-        ..moveTo(rightEyeCenterX - 9, eyeCenterY + 2)
-        ..quadraticBezierTo(rightEyeCenterX, eyeCenterY - 7, rightEyeCenterX + 9, eyeCenterY + 2);
+  void _face(Canvas canvas, {required bool thinking, required bool happy, required bool worried}) {
+    const ink = StockyPalette.ink;
+    final hideEyes = tailCover > 0.5;
 
-      canvas.drawPath(leftPath, happyEyePaint);
-      canvas.drawPath(rightPath, happyEyePaint);
-    } else if (state == StockyState.error) {
-      // Ojos de mareo / error (> <)
-      final errorPaint = Paint()
-        ..color = const Color(0xFFFEF08A)
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = 3.0;
-
-      // Ojo izquierdo 'X'
-      canvas.drawLine(Offset(leftEyeCenterX - 6, eyeCenterY - 6), Offset(leftEyeCenterX + 6, eyeCenterY + 6), errorPaint);
-      canvas.drawLine(Offset(leftEyeCenterX + 6, eyeCenterY - 6), Offset(leftEyeCenterX - 6, eyeCenterY + 6), errorPaint);
-
-      // Ojo derecho 'X'
-      canvas.drawLine(Offset(rightEyeCenterX - 6, eyeCenterY - 6), Offset(rightEyeCenterX + 6, eyeCenterY + 6), errorPaint);
-      canvas.drawLine(Offset(rightEyeCenterX + 6, eyeCenterY - 6), Offset(rightEyeCenterX - 6, eyeCenterY + 6), errorPaint);
-    } else {
-      // Ojos normales con seguimiento de cursor y parpadeo
-      final eyeHeight = 16.0 * (1.0 - blinkValue).clamp(0.1, 1.0);
-      const eyeWidth = 14.0;
-
-      final whitePaint = Paint()..color = Colors.white;
-      final pupilPaint = Paint()..color = const Color(0xFF064E3B);
-      final shinePaint = Paint()..color = Colors.white;
-
-      // Desplazamiento pupilar según lookProgress (-1.0 a 1.0)
-      final pupilOffsetX = lookProgress * 4.0;
-      const pupilOffsetY = 1.0;
-
-      for (final eyeX in [leftEyeCenterX, rightEyeCenterX]) {
-        // Esclerótica blanca
-        canvas.drawOval(
-          Rect.fromCenter(center: Offset(eyeX, eyeCenterY), width: eyeWidth, height: eyeHeight),
-          whitePaint,
-        );
-
-        if (blinkValue < 0.7) {
-          // Pupila oscura
-          const pupilRadius = 4.5;
-          canvas.drawCircle(
-            Offset(eyeX + pupilOffsetX, eyeCenterY + pupilOffsetY),
-            pupilRadius,
-            pupilPaint,
-          );
-
-          // Brillo de luz en el ojo
-          canvas.drawCircle(
-            Offset(eyeX + pupilOffsetX - 1.5, eyeCenterY + pupilOffsetY - 1.5),
-            1.8,
-            shinePaint,
-          );
+    if (!hideEyes) {
+      if (happy) {
+        final arc = _stroke(ink, 3.2);
+        canvas.drawPath(Path()..moveTo(39, 49)..quadraticBezierTo(45, 42, 51, 49), arc);
+        canvas.drawPath(Path()..moveTo(61, 49)..quadraticBezierTo(67, 42, 73, 49), arc);
+      } else {
+        var dx = 0.0, dy = 0.0, r = 5.0;
+        if (state == StockyState.trackingEmail) {
+          dx = look * 3.5;
+          dy = 2;
+        } else if (thinking) {
+          dx = -2;
+          dy = -3;
+          r = 4.6;
+        } else if (worried) {
+          dy = 2;
+          r = 4.6;
+        }
+        _eye(canvas, Offset(45 + dx, 48 + dy), r);
+        _eye(canvas, Offset(67 + dx, 48 + dy), r);
+        if (worried) {
+          final brow = _stroke(StockyPalette.furDark, 2.2);
+          // Cejas que suben hacia el centro: preocupación (al revés se ve enojada)
+          canvas.drawLine(const Offset(38, 43), const Offset(48, 39), brow);
+          canvas.drawLine(const Offset(74, 43), const Offset(64, 39), brow);
         }
       }
     }
 
-    // 4. Boca expresiva
-    final mouthPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 2.8;
+    canvas.drawOval(Rect.fromCenter(center: const Offset(56, 58), width: 8, height: 6), _fill(ink));
 
-    if (state == StockyState.success) {
-      // Sonrisa amplia abierta con lengua
-      final mouthPath = Path()
-        ..moveTo(center.dx - 12, center.dy + 14)
-        ..quadraticBezierTo(center.dx, center.dy + 26, center.dx + 12, center.dy + 14);
-      canvas.drawPath(mouthPath, mouthPaint);
-
-      // Lengua
-      final tonguePaint = Paint()..color = const Color(0xFFF43F5E);
-      final tonguePath = Path()
-        ..moveTo(center.dx - 6, center.dy + 18)
-        ..quadraticBezierTo(center.dx, center.dy + 24, center.dx + 6, center.dy + 18);
-      canvas.drawPath(tonguePath, tonguePaint);
-    } else if (state == StockyState.error) {
-      // Boca ondulada confundida
-      final wavyPath = Path()
-        ..moveTo(center.dx - 8, center.dy + 17)
-        ..quadraticBezierTo(center.dx - 4, center.dy + 13, center.dx, center.dy + 17)
-        ..quadraticBezierTo(center.dx + 4, center.dy + 21, center.dx + 8, center.dy + 17);
-      canvas.drawPath(wavyPath, mouthPaint);
+    if (happy) {
+      canvas.drawPath(
+        Path()..moveTo(49, 62)..quadraticBezierTo(56, 72, 63, 62)..close(),
+        _fill(StockyPalette.mouth),
+      );
+    } else if (thinking) {
+      canvas.drawLine(const Offset(52, 65), const Offset(60, 65), _stroke(ink, 2.8));
+    } else if (worried) {
+      canvas.drawPath(Path()..moveTo(51, 67)..quadraticBezierTo(56, 63, 61, 67), _stroke(ink, 2.8));
     } else {
-      // Sonrisa tierna sutil
-      final smilePath = Path()
-        ..moveTo(center.dx - 7, center.dy + 15)
-        ..quadraticBezierTo(center.dx, center.dy + 21, center.dx + 7, center.dy + 15);
-      canvas.drawPath(smilePath, mouthPaint);
+      canvas.drawPath(Path()..moveTo(51, 64)..quadraticBezierTo(56, 69, 61, 64), _stroke(ink, 3));
     }
+  }
 
-    // 5. Manitas de Stocky (Se mueven para taparse los ojos cuando handsValue > 0)
-    final handPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFF34D399), Color(0xFF059669)],
-      ).createShader(const Rect.fromLTWH(0, 0, 100, 100));
-
-    final handStroke = Paint()
-      ..color = Colors.white.withOpacity(0.3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
-    // Posición de reposo vs posición sobre los ojos
-    final restLeftHand = Offset(boxRect.left + 2, center.dy + 18);
-    final restRightHand = Offset(boxRect.right - 2, center.dy + 18);
-
-    final coverLeftHand = Offset(leftEyeCenterX - 2, eyeCenterY + 2);
-    final coverRightHand = Offset(rightEyeCenterX + 2, eyeCenterY + 2);
-
-    final curLeftHand = Offset.lerp(restLeftHand, coverLeftHand, handsValue)!;
-    final curRightHand = Offset.lerp(restRightHand, coverRightHand, handsValue)!;
-
-    const handRadius = 11.0;
-
-    // Dibujar manitas con aros magnéticos
-    for (final handPos in [curLeftHand, curRightHand]) {
-      // Anillo de campo magnético levitante
-      final magPulse = 1.0 + 0.18 * math.sin(idleValue * 2 * math.pi);
-      final magPaint = Paint()
-        ..color = const Color(0xFF34D399).withOpacity(0.22)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2;
-      canvas.drawCircle(handPos, (handRadius + 3) * magPulse, magPaint);
-
-      canvas.drawCircle(handPos, handRadius, handPaint);
-      canvas.drawCircle(handPos, handRadius, handStroke);
-
-      // Detalles de deditos cuando se tapa los ojos
-      if (handsValue > 0.4) {
-        final fingerPaint = Paint()
-          ..color = Colors.white.withOpacity(0.4)
-          ..strokeCap = StrokeCap.round
-          ..strokeWidth = 1.2;
-        canvas.drawLine(Offset(handPos.dx - 3, handPos.dy - 4), Offset(handPos.dx - 3, handPos.dy + 3), fingerPaint);
-        canvas.drawLine(Offset(handPos.dx, handPos.dy - 5), Offset(handPos.dx, handPos.dy + 4), fingerPaint);
-        canvas.drawLine(Offset(handPos.dx + 3, handPos.dy - 4), Offset(handPos.dx + 3, handPos.dy + 3), fingerPaint);
-      }
+  void _eye(Canvas canvas, Offset c, double r) {
+    // Al parpadear el ojo se aplasta hasta una línea
+    final open = 1 - blink * 0.9;
+    canvas.drawOval(Rect.fromCenter(center: c, width: r * 2, height: r * 2 * open), _fill(StockyPalette.ink));
+    if (open > 0.5) {
+      canvas.drawCircle(c + Offset(r * 0.35, -r * 0.4 * open), r * 0.32, _fill(Colors.white));
     }
+  }
+
+  void _tailOverEyes(Canvas canvas) {
+    // La cola sube desde abajo y le cubre los ojos
+    canvas.save();
+    canvas.translate(0, (1 - tailCover) * 24);
+    final opacity = tailCover.clamp(0.0, 1.0);
+    canvas.drawPath(
+      Path()
+        ..moveTo(26, 46)
+        ..quadraticBezierTo(56, 32, 86, 46)
+        ..quadraticBezierTo(88, 53, 82, 55)
+        ..quadraticBezierTo(56, 46, 30, 55)
+        ..quadraticBezierTo(24, 53, 26, 46)
+        ..close(),
+      _fill(StockyPalette.fur, opacity),
+    );
+    canvas.drawPath(
+      Path()..moveTo(30, 46)..quadraticBezierTo(56, 38, 82, 46),
+      _stroke(StockyPalette.furDark, 2.2, 0.5 * opacity),
+    );
     canvas.restore();
   }
 
-  @override
-  bool shouldRepaint(covariant _StockyPainter oldDelegate) {
-    return oldDelegate.state != state ||
-        oldDelegate.lookProgress != lookProgress ||
-        oldDelegate.blinkValue != blinkValue ||
-        oldDelegate.handsValue != handsValue ||
-        oldDelegate.celebrateValue != celebrateValue ||
-        oldDelegate.idleValue != idleValue ||
-        oldDelegate.isDark != isDark;
+  /// El logo de Stockealo estampado en un color: caja, código de barras y ✓
+  void _apronLogo(Canvas canvas, Offset center, double size) {
+    final k = size / 40;
+    Offset p(double x, double y) => center + Offset(x * k, y * k);
+    Path poly(List<Offset> pts) => Path()..addPolygon(pts, true);
+
+    canvas.drawPath(poly([p(-19, -11), p(0, -20), p(19, -11), p(0, -2)]), _fill(StockyPalette.printLight));
+    const bars = [-17.0, -13.0, -10.0, -7.0, -4.0];
+    for (var i = 0; i < bars.length; i++) {
+      final bar = Paint()
+        ..color = StockyPalette.printLight
+        ..strokeWidth = (i.isOdd ? 1.4 : 2.4) * k;
+      canvas.drawLine(p(bars[i], -6 + i * 1.3), p(bars[i], 11 + i * 1.3), bar);
+    }
+    canvas.drawPath(poly([p(1, 0), p(19, -9), p(19, 11), p(1, 20)]), _fill(StockyPalette.printShade));
+    canvas.drawPath(
+      Path()
+        ..moveTo(p(4, 8).dx, p(4, 8).dy)
+        ..lineTo(p(9, 13).dx, p(9, 13).dy)
+        ..lineTo(p(24, -6).dx, p(24, -6).dy),
+      _stroke(StockyPalette.apron, 3.6 * k),
+    );
   }
+
+  void _sparkles(Canvas canvas) {
+    final o = 0.4 + celebrate * 0.6;
+    final gold = _stroke(StockyPalette.sparkleGold, 2.4, o);
+    canvas.drawLine(const Offset(8, 18), const Offset(12, 24), gold);
+    canvas.drawLine(const Offset(16, 12), const Offset(16, 20), gold);
+    canvas.drawLine(const Offset(2, 26), const Offset(10, 26), gold);
+    final green = _stroke(StockyPalette.sparkleGreen, 2.4, o);
+    canvas.drawLine(const Offset(104, 8), const Offset(107, 14), green);
+    canvas.drawLine(const Offset(110, 16), const Offset(103, 16), green);
+  }
+
+  void _thoughts(Canvas canvas) {
+    final bubble = _fill(StockyPalette.thought);
+    canvas.drawCircle(Offset(96, 20 - breath), 3.2, bubble);
+    canvas.drawCircle(Offset(103, 10 - breath * 1.5), 4.6, bubble);
+  }
+
+  void _sweat(Canvas canvas) {
+    canvas.drawPath(
+      Path()
+        ..moveTo(84, 30)
+        ..quadraticBezierTo(87, 36, 84, 40)
+        ..quadraticBezierTo(81, 36, 84, 30)
+        ..close(),
+      _fill(StockyPalette.sweat),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SquirrelPainter old) =>
+      old.state != state ||
+      old.look != look ||
+      old.breath != breath ||
+      old.blink != blink ||
+      old.tailCover != tailCover ||
+      old.celebrate != celebrate;
 }

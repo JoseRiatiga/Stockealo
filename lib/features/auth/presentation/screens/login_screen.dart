@@ -1,4 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+
+import '../../../../core/design/phone_field.dart';
+import '../../../../core/design/primary_action_button.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/utils/countries.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../data/auth_repository.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../widgets/forgot_password_dialog.dart';
@@ -19,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  bool _phoneValid = true;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -35,6 +43,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _acceptTerms = false;
   String? _errorMessage;
+
+  late final _termsTap = TapGestureRecognizer()
+    ..onTap = () => LegalDocumentScreen.show(context, initialTabIndex: 0);
+  late final _privacyTap = TapGestureRecognizer()
+    ..onTap = () => LegalDocumentScreen.show(context, initialTabIndex: 1);
 
   @override
   void initState() {
@@ -82,6 +95,8 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _termsTap.dispose();
+    _privacyTap.dispose();
     super.dispose();
   }
 
@@ -100,13 +115,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (_isRegisterMode && !_acceptTerms) {
       setState(() {
-        _errorMessage = 'Debes aceptar los Términos y Condiciones y la Política de Privacidad.';
+        _errorMessage = 'Para crear la cuenta acepta los términos y la política de privacidad.';
       });
       return;
     }
 
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+
+    if (_isRegisterMode && !_phoneValid) {
+      setState(() => _errorMessage = 'Revisa el número de teléfono o déjalo vacío.');
+      return;
+    }
 
     if (_isRegisterMode && password != _confirmPasswordController.text.trim()) {
       setState(() {
@@ -166,13 +186,12 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Pide el código de 6 dígitos enviado al correo para confirmar el registro
   Future<String?> _askVerificationCode(String email) {
     final codeController = TextEditingController();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        backgroundColor: context.colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Confirma tu correo', style: TextStyle(fontWeight: FontWeight.w800)),
         content: Column(
@@ -181,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             Text(
               'Enviamos un código de 6 dígitos a $email. Escríbelo para crear tu cuenta.',
-              style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              style: TextStyle(color: context.colors.inkMuted),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -206,12 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF059669),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+          FilledButton(
             onPressed: () {
               final code = codeController.text.trim();
               if (code.length == 6) Navigator.pop(ctx, code);
@@ -223,521 +237,361 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _setMode(bool register) {
+    if (_isLoading || register == _isRegisterMode) return;
+    setState(() {
+      _isRegisterMode = register;
+      _errorMessage = null;
+      _formKey.currentState?.reset();
+    });
+  }
+
+  void _openForgotPassword() {
+    ForgotPasswordDialog.show(
+      context,
+      initialEmail: _emailController.text.trim(),
+      onPasswordResetSuccess: (email) {
+        setState(() {
+          _emailController.text = email;
+          _passwordController.clear();
+          _errorMessage = null;
+        });
+        _passwordFocus.requestFocus();
+        AppToast.showSuccess(context, 'Contraseña lista. Ya puedes ingresar.');
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isWide = screenWidth >= 600;
+    final c = context.colors;
+    final isWide = MediaQuery.sizeOf(context).width >= 600;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : (isWide ? const Color(0xFFF1F5F9) : Colors.white),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: isWide ? 24 : 28,
-              vertical: isWide ? 40 : 24,
+    final form = Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Stocky reacciona a lo que pasa en el formulario
+          Center(
+            child: Container(
+              width: 112,
+              height: 112,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: c.accent.withOpacity(0.10)),
+              child: Center(
+                child: StockyMascot(size: 92, state: _mascotState, lookProgress: _mascotLookProgress),
+              ),
             ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Container(
-                  padding: isWide ? const EdgeInsets.all(32) : EdgeInsets.zero,
-                  decoration: isWide
-                      ? BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        )
-                      : null,
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                  // Mascota Interactiva Stocky
-                  StockyMascot(
-                    size: 96,
-                    state: _mascotState,
-                    lookProgress: _mascotLookProgress,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Stockealo',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Control de inventario y ventas para tu negocio',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
+          ),
+          const SizedBox(height: AppSpace.lg),
+          Text(
+            _isRegisterMode ? 'Crea tu cuenta' : 'Hola de nuevo',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: c.ink),
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            _isRegisterMode
+                ? 'Es gratis. Tu inventario queda guardado en la nube.'
+                : 'Entra para ver tu inventario y tus ventas.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, height: 1.4, color: c.inkMuted),
+          ),
+          const SizedBox(height: AppSpace.xl),
+          _AuthModeSwitch(register: _isRegisterMode, onChanged: _setMode),
+          const SizedBox(height: AppSpace.xl),
 
-                  // Selector de Iniciar Sesión / Crear cuenta
-                  Container(
-                    padding: const EdgeInsets.all(4),
+          // Aviso de error
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: _errorMessage == null
+                ? const SizedBox(width: double.infinity)
+                : Container(
+                    margin: const EdgeInsets.only(bottom: AppSpace.lg),
+                    padding: const EdgeInsets.fromLTRB(AppSpace.md + 2, AppSpace.sm, AppSpace.xs, AppSpace.sm),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF334155) : Colors.transparent,
-                      ),
+                      color: c.dangerSoft,
+                      borderRadius: BorderRadius.circular(AppRadius.control),
+                      border: Border.all(color: c.danger.withOpacity(0.35)),
                     ),
                     child: Row(
                       children: [
+                        Icon(Icons.error_outline_rounded, color: c.danger, size: 20),
+                        const SizedBox(width: AppSpace.sm + 2),
                         Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              setState(() {
-                                _isRegisterMode = false;
-                                _errorMessage = null;
-                                _formKey.currentState?.reset();
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: !_isRegisterMode
-                                    ? (isDark ? const Color(0xFF334155) : Colors.white)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: !_isRegisterMode
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                                          blurRadius: 4,
-                                        )
-                                      ]
-                                    : null,
-                              ),
-                              child: Text(
-                                'Iniciar Sesión',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: !_isRegisterMode
-                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                                ),
-                              ),
-                            ),
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(color: c.ink, fontSize: 13.5, height: 1.35),
                           ),
                         ),
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              setState(() {
-                                _isRegisterMode = true;
-                                _errorMessage = null;
-                                _formKey.currentState?.reset();
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: _isRegisterMode
-                                    ? (isDark ? const Color(0xFF334155) : Colors.white)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: _isRegisterMode
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                                          blurRadius: 4,
-                                        )
-                                      ]
-                                    : null,
-                              ),
-                              child: Text(
-                                'Crear cuenta',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: _isRegisterMode
-                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Banner animado de Error
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeInOut,
-                    child: _errorMessage != null
-                        ? AnimatedOpacity(
-                            duration: const Duration(milliseconds: 200),
-                            opacity: _errorMessage != null ? 1.0 : 0.0,
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEF2F2),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFCA5A5),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFDC2626).withOpacity(0.06),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.error_outline_rounded,
-                                    color: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      _errorMessage!,
-                                      style: TextStyle(
-                                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  InkWell(
-                                    onTap: () => setState(() => _errorMessage = null),
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(4),
-                                      child: Icon(
-                                        Icons.close,
-                                        size: 16,
-                                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-
-                  // Campos exclusivos de Registro
-                  if (_isRegisterMode) ...[
-                    TextFormField(
-                      controller: _nameController,
-                      textCapitalization: TextCapitalization.words,
-                      onChanged: (_) => _clearError(),
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre Completo o Comercial *',
-                        hintText: 'Ej. José Martínez o Don José',
-                        prefixIcon: Icon(Icons.person_outline, color: Color(0xFF64748B)),
-                      ),
-                      validator: (v) {
-                        if (!_isRegisterMode) return null;
-                        if (v == null || v.trim().isEmpty) return 'Ingresa tu nombre o apodo comercial';
-                        if (v.trim().length < 2) return 'El nombre debe tener al menos 2 letras';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      onChanged: (_) => _clearError(),
-                      decoration: const InputDecoration(
-                        labelText: 'Teléfono / WhatsApp (Opcional)',
-                        hintText: 'Ej. +57 300 123 4567',
-                        prefixIcon: Icon(Icons.phone_outlined, color: Color(0xFF64748B)),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Campo Correo
-                  TextFormField(
-                    controller: _emailController,
-                    focusNode: _emailFocus,
-                    keyboardType: TextInputType.emailAddress,
-                    onChanged: (_) => _clearError(),
-                    decoration: const InputDecoration(
-                      labelText: 'Correo Electrónico',
-                      hintText: 'tu@correo.com',
-                      prefixIcon: Icon(Icons.email_outlined, color: Color(0xFF64748B)),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
-                      if (!v.contains('@')) return 'Correo inválido';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Campo Contraseña
-                  TextFormField(
-                    controller: _passwordController,
-                    focusNode: _passwordFocus,
-                    obscureText: _obscurePassword,
-                    onChanged: (_) => _clearError(),
-                    decoration: InputDecoration(
-                      labelText: 'Contraseña',
-                      prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF64748B)),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                          color: const Color(0xFF94A3B8),
-                        ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      ),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Ingresa tu contraseña';
-                      if (v.length < 6) return 'Mínimo 6 caracteres';
-                      return null;
-                    },
-                  ),
-
-                  // Enlace de Recuperación de Contraseña (Solo en Modo Iniciar Sesión)
-                  if (!_isRegisterMode) ...[
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () {
-                                ForgotPasswordDialog.show(
-                                  context,
-                                  initialEmail: _emailController.text.trim(),
-                                  onPasswordResetSuccess: (email) {
-                                    setState(() {
-                                      _emailController.text = email;
-                                      _passwordController.clear();
-                                      _errorMessage = null;
-                                    });
-                                    _passwordFocus.requestFocus();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Contraseña restablecida con éxito. Ya puedes ingresar.'),
-                                        backgroundColor: Color(0xFF059669),
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        IconButton(
+                          tooltip: 'Cerrar aviso',
                           visualDensity: VisualDensity.compact,
-                          foregroundColor: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                        ),
-                        child: const Text(
-                          '¿Olvidaste tu contraseña?',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // Confirmar contraseña en registro
-                  if (_isRegisterMode) ...[
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      focusNode: _confirmPasswordFocus,
-                      obscureText: _obscurePassword,
-                      onChanged: (_) => _clearError(),
-                      decoration: const InputDecoration(
-                        labelText: 'Confirmar Contraseña',
-                        prefixIcon: Icon(Icons.lock_reset, color: Color(0xFF64748B)),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Confirma tu contraseña';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    // Checkbox de Términos y Privacidad
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: Checkbox(
-                            value: _acceptTerms,
-                            activeColor: const Color(0xFF059669),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                            onChanged: (val) {
-                              setState(() {
-                                _acceptTerms = val ?? false;
-                                _clearError();
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              Text(
-                                'Acepto los ',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () => LegalDocumentScreen.show(context, initialTabIndex: 0),
-                                child: Text(
-                                  'Términos de Uso',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                ' y la ',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () => LegalDocumentScreen.show(context, initialTabIndex: 1),
-                                child: Text(
-                                  'Política de Privacidad',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                          icon: Icon(Icons.close_rounded, size: 18, color: c.inkMuted),
+                          onPressed: () => setState(() => _errorMessage = null),
                         ),
                       ],
                     ),
-                  ],
-                  const SizedBox(height: 24),
-
-                  // Botón Principal
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF059669),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : Text(
-                              _isRegisterMode ? 'Crear cuenta' : 'Ingresar',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                    ),
                   ),
-                  const SizedBox(height: 20),
+          ),
 
-                  // Enlaces Legales al pie
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      InkWell(
-                        onTap: () => LegalDocumentScreen.show(context, initialTabIndex: 0),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                          child: Text(
-                            'Términos y Condiciones',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
+          // Campos exclusivos del registro
+          if (_isRegisterMode) ...[
+            TextFormField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              onChanged: (_) => _clearError(),
+              decoration: InputDecoration(
+                labelText: 'Tu nombre',
+                hintText: 'José Martínez',
+                prefixIcon: Icon(Icons.person_outline_rounded, color: c.inkMuted),
+              ),
+              validator: (v) {
+                if (!_isRegisterMode) return null;
+                if (v == null || v.trim().isEmpty) return 'Ingresa tu nombre o apodo comercial';
+                if (v.trim().length < 2) return 'El nombre debe tener al menos 2 letras';
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpace.lg),
+            PhoneField(
+              defaultCountry: deviceCountry(),
+              label: 'WhatsApp (opcional)',
+              onChanged: (value) {
+                _phoneController.text = value.e164 ?? '';
+                _phoneValid = value.isValid;
+                _clearError();
+              },
+            ),
+            const SizedBox(height: AppSpace.lg),
+          ],
+
+          TextFormField(
+            controller: _emailController,
+            focusNode: _emailFocus,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.email],
+            onChanged: (_) => _clearError(),
+            decoration: InputDecoration(
+              labelText: 'Correo',
+              hintText: 'tu@correo.com',
+              prefixIcon: Icon(Icons.mail_outline_rounded, color: c.inkMuted),
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
+              if (!v.contains('@')) return 'Correo inválido';
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpace.lg),
+          TextFormField(
+            controller: _passwordController,
+            focusNode: _passwordFocus,
+            obscureText: _obscurePassword,
+            textInputAction: _isRegisterMode ? TextInputAction.next : TextInputAction.done,
+            autofillHints: [_isRegisterMode ? AutofillHints.newPassword : AutofillHints.password],
+            onChanged: (_) => _clearError(),
+            onFieldSubmitted: _isRegisterMode ? null : (_) => _submit(),
+            decoration: InputDecoration(
+              labelText: 'Contraseña',
+              prefixIcon: Icon(Icons.lock_outline_rounded, color: c.inkMuted),
+              suffixIcon: IconButton(
+                tooltip: _obscurePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: c.inkMuted,
+                ),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Ingresa tu contraseña';
+              if (v.length < 6) return 'Mínimo 6 caracteres';
+              return null;
+            },
+          ),
+
+          if (!_isRegisterMode)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _isLoading ? null : _openForgotPassword,
+                style: TextButton.styleFrom(foregroundColor: _linkColor(c)),
+                child: const Text('¿Olvidaste tu contraseña?', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+
+          if (_isRegisterMode) ...[
+            const SizedBox(height: AppSpace.lg),
+            TextFormField(
+              controller: _confirmPasswordController,
+              focusNode: _confirmPasswordFocus,
+              obscureText: _obscurePassword,
+              textInputAction: TextInputAction.done,
+              onChanged: (_) => _clearError(),
+              decoration: InputDecoration(
+                labelText: 'Repite la contraseña',
+                prefixIcon: Icon(Icons.lock_reset_rounded, color: c.inkMuted),
+              ),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Confirma tu contraseña';
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpace.md),
+            _termsRow(c),
+          ],
+          const SizedBox(height: AppSpace.xl),
+          PrimaryActionButton(
+            label: _isLoading
+                ? (_isRegisterMode ? 'Creando cuenta…' : 'Ingresando…')
+                : (_isRegisterMode ? 'Crear cuenta' : 'Ingresar'),
+            icon: _isRegisterMode ? Icons.person_add_alt_1_rounded : Icons.arrow_forward_rounded,
+            onPressed: _isLoading ? null : _submit,
+          ),
+          const SizedBox(height: AppSpace.lg),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () => LegalDocumentScreen.show(context, initialTabIndex: 0),
+                style: TextButton.styleFrom(foregroundColor: c.inkMuted, visualDensity: VisualDensity.compact),
+                child: const Text('Términos', style: TextStyle(fontSize: 12.5)),
+              ),
+              Text('·', style: TextStyle(color: c.inkFaint)),
+              TextButton(
+                onPressed: () => LegalDocumentScreen.show(context, initialTabIndex: 1),
+                style: TextButton.styleFrom(foregroundColor: c.inkMuted, visualDensity: VisualDensity.compact),
+                child: const Text('Privacidad', style: TextStyle(fontSize: 12.5)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: AppSpace.xl, vertical: isWide ? AppSpace.xxl : AppSpace.lg),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              // En pantallas anchas el formulario va en una tarjeta; en el celular, directo sobre el fondo
+              child: isWide
+                  ? Container(
+                      padding: const EdgeInsets.all(AppSpace.xxl),
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        borderRadius: BorderRadius.circular(AppRadius.sheet),
+                        border: Border.all(color: c.line),
                       ),
-                      Text(
-                        '•',
-                        style: TextStyle(
-                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                          fontSize: 12,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => LegalDocumentScreen.show(context, initialTabIndex: 1),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                          child: Text(
-                            'Política de Privacidad',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                      child: AutofillGroup(child: form),
+                    )
+                  : AutofillGroup(child: form),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// En oscuro el verde de marca se aclara para que los enlaces se lean sobre el fondo
+  Color _linkColor(StockealoColors c) =>
+      Theme.of(context).brightness == Brightness.dark ? Color.lerp(c.accent, Colors.white, 0.4)! : c.accent;
+
+  Widget _termsRow(StockealoColors c) {
+    final linkStyle = TextStyle(fontWeight: FontWeight.w700, color: _linkColor(c), decoration: TextDecoration.underline);
+    return Row(
+      children: [
+        Checkbox(
+          value: _acceptTerms,
+          onChanged: (val) {
+            setState(() => _acceptTerms = val ?? false);
+            _clearError();
+          },
+        ),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              style: TextStyle(fontSize: 13, height: 1.4, color: c.ink),
+              children: [
+                const TextSpan(text: 'Acepto los '),
+                TextSpan(
+                  text: 'términos de uso',
+                  style: linkStyle,
+                  recognizer: _termsTap,
+                ),
+                const TextSpan(text: ' y la '),
+                TextSpan(
+                  text: 'política de privacidad',
+                  style: linkStyle,
+                  recognizer: _privacyTap,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Selector "Iniciar sesión" / "Crear cuenta"
+class _AuthModeSwitch extends StatelessWidget {
+  final bool register;
+  final ValueChanged<bool> onChanged;
+
+  const _AuthModeSwitch({required this.register, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    Widget option(bool value, String label) {
+      final selected = register == value;
+      return Expanded(
+        child: Semantics(
+          button: true,
+          selected: selected,
+          child: GestureDetector(
+            onTap: () => onChanged(value),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(vertical: AppSpace.sm + 2),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: selected ? c.surface : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppRadius.control - 2),
+                border: Border.all(color: selected ? c.line : Colors.transparent),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: selected ? c.ink : c.inkMuted),
               ),
             ),
           ),
         ),
-        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: c.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.control + 2),
       ),
-    ),
-  ),
-);
+      child: Row(
+        children: [
+          option(false, 'Iniciar sesión'),
+          option(true, 'Crear cuenta'),
+        ],
+      ),
+    );
   }
 }

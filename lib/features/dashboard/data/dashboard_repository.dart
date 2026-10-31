@@ -96,6 +96,34 @@ class DashboardRepository {
       }
     }
 
+    // Referencia para el medidor de ventas: hoy se compara con el promedio diario de los
+    // 7 días anteriores (un solo "ayer" puede ser atípico); los demás, con el periodo anterior
+    double? salesReference;
+    String? salesReferenceLabel;
+    if (period == 'today') {
+      final today0 = DateTime(now.year, now.month, now.day);
+      final weekRes = await db.rawQuery('''
+        SELECT COALESCE(SUM(total), 0.0) AS total_amount FROM sales
+        WHERE business_id = ? AND date >= ? AND date < ?
+      ''', [businessId, today0.subtract(const Duration(days: 7)).toIso8601String(), today0.toIso8601String()]);
+      final weekTotal = (weekRes.first['total_amount'] as num?)?.toDouble() ?? 0.0;
+      if (weekTotal > 0) {
+        salesReference = weekTotal / 7;
+        salesReferenceLabel = 'de tu día normal';
+      }
+    } else if (compareTotal > 0) {
+      salesReference = compareTotal;
+      salesReferenceLabel = period == 'week' ? 'de los 7 días previos' : 'del mes anterior';
+    }
+
+    // Abonos de fiados recibidos este mes (medidor de fiados)
+    final monthStart = DateTime(now.year, now.month);
+    final collectedRes = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount), 0.0) AS amount FROM customer_payments
+      WHERE business_id = ? AND date >= ?
+    ''', [businessId, monthStart.toIso8601String()]);
+    final double debtCollectedMonth = (collectedRes.first['amount'] as num?)?.toDouble() ?? 0.0;
+
     double? trendPercent;
     bool trendIsPositive = true;
     if (compareTotal > 0) {
@@ -313,7 +341,7 @@ class DashboardRepository {
       SELECT 
         s.id,
         s.product_name,
-        COALESCE(s.customer_name, 'Consumidor Final') as customer_name,
+        COALESCE(s.customer_name, 'Cliente sin registrar') as customer_name,
         s.quantity,
         s.total,
         s.payment_method,
@@ -353,6 +381,9 @@ class DashboardRepository {
       'trendLabel': trendLabel,
       'yesterdayTotal': yesterdayTotal,
       'totalDebt': totalDebt,
+      'debtCollectedMonth': debtCollectedMonth,
+      'salesReference': salesReference,
+      'salesReferenceLabel': salesReferenceLabel,
       'outOfStock': outOfStock,
       'lowStock': lowStock,
       'totalProducts': totalProducts,

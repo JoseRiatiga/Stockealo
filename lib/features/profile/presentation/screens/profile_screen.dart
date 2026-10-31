@@ -1,3 +1,7 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/design/phone_field.dart';
+import '../../../../core/utils/countries.dart';
+import '../../../business/presentation/business_identity.dart';
 import '../widgets/change_password_dialog.dart';
 import '../widgets/up_to_date_dialog.dart';
 import '../widgets/settings_cards.dart';
@@ -24,7 +28,12 @@ import '../../../../core/services/update_service.dart';
 import '../../../../core/widgets/update_dialog.dart';
 import '../../../../core/widgets/modern_dialog.dart';
 import '../../../../core/widgets/image_source_picker_modal.dart';
+import '../../../backup/data/auto_backup_service.dart';
+import '../../../pro/data/pro_service.dart';
+import '../../../pro/presentation/screens/pro_screen.dart';
+import '../../../../core/services/phone_alerts_service.dart';
 import '../../../backup/data/backup_service.dart';
+import '../../../../core/widgets/app_toast.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -57,9 +66,15 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
   bool _isCheckingUpdate = false;
   String _currentAppVersion = '1.0.0';
 
-  bool _isCloudSectionExpanded = false;
-  bool _isSecuritySectionExpanded = false;
-  bool _isPrivacySectionExpanded = false;
+  // Copias automáticas en el celular
+  bool _autoBackupEnabled = true;
+  bool _isBackingUp = false;
+  List<AutoBackup> _autoBackups = const [];
+
+  // Avisos en el celular
+  bool _stockAlerts = false;
+  bool _summaryAlerts = false;
+  int _summaryHour = PhoneAlertsService.defaultSummaryHour;
 
   @override
   void initState() {
@@ -71,6 +86,238 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     _loadActiveBusiness();
     _loadCloudSyncStatus();
     _loadAppVersion();
+    _loadAutoBackups();
+    _loadAlerts();
+  }
+
+  Future<void> _loadAlerts() async {
+    final alerts = PhoneAlertsService.instance;
+    if (!alerts.isSupported) return;
+    try {
+      final stock = await alerts.stockAlertsEnabled();
+      final summary = await alerts.summaryEnabled();
+      final hour = await alerts.summaryHour();
+      if (mounted) {
+        setState(() {
+          _stockAlerts = stock;
+          _summaryAlerts = summary;
+          _summaryHour = hour;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _setAlert(bool stock, bool value) async {
+    final alerts = PhoneAlertsService.instance;
+    final ok = stock ? await alerts.setStockAlerts(value) : await alerts.setSummary(value);
+    if (!mounted) return;
+    if (!ok) {
+      AppToast.showWarning(
+        context,
+        'Android no dio permiso para mostrar avisos. Puedes activarlo en Ajustes del celular › Apps › Stockealo › Notificaciones.',
+      );
+      return;
+    }
+    setState(() => stock ? _stockAlerts = value : _summaryAlerts = value);
+  }
+
+  static String _hourLabel(int hour) {
+    final h = hour % 12 == 0 ? 12 : hour % 12;
+    return '$h:00 ${hour < 12 ? 'a. m.' : 'p. m.'}';
+  }
+
+  Future<void> _pickSummaryHour() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: _summaryHour, minute: 0),
+      helpText: 'Hora del resumen',
+      initialEntryMode: TimePickerEntryMode.dialOnly,
+    );
+    if (picked == null || !mounted) return;
+    await PhoneAlertsService.instance.setSummaryHour(picked.hour);
+    setState(() => _summaryHour = picked.hour);
+  }
+
+  void _openAlerts() {
+    SettingsSubpage.open(context, title: 'Avisos', refresh: _refresh, children: () {
+      final c = context.colors;
+      return [
+        SettingsGroup(label: 'En la barra del celular', children: [
+          SettingsRow.toggle(
+            icon: Icons.inventory_2_outlined,
+            title: 'Stock bajo',
+            subtitle: 'Cuando un producto llega a su mínimo o se agota',
+            value: _stockAlerts,
+            onChanged: (v) => _setAlert(true, v),
+          ),
+          SettingsRow.toggle(
+            icon: Icons.summarize_outlined,
+            title: 'Resumen del día',
+            subtitle: 'Ventas, ganancia y lo que falta reponer',
+            value: _summaryAlerts,
+            onChanged: (v) => _setAlert(false, v),
+          ),
+          if (_summaryAlerts)
+            SettingsRow(
+              icon: Icons.schedule_rounded,
+              title: 'Hora del resumen',
+              subtitle: _hourLabel(_summaryHour),
+              onTap: _pickSummaryHour,
+            ),
+        ]),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+          child: Text(
+            'Se calculan con lo registrado en este celular. Cada persona del equipo elige sus avisos en su propio celular.',
+            style: TextStyle(fontSize: 12.5, height: 1.4, color: c.inkMuted),
+          ),
+        ),
+      ];
+    });
+  }
+
+  Future<void> _loadAutoBackups() async {
+    final auto = AutoBackupService.instance;
+    if (!auto.isSupported) return;
+    try {
+      final enabled = await auto.isEnabled();
+      final copies = await auto.list();
+      if (mounted) {
+        setState(() {
+          _autoBackupEnabled = enabled;
+          _autoBackups = copies;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleAutoBackup(bool value) async {
+    await AutoBackupService.instance.setEnabled(value);
+    setState(() => _autoBackupEnabled = value);
+    if (value) {
+      await AutoBackupService.instance.runIfDue();
+      await _loadAutoBackups();
+    }
+  }
+
+  Future<void> _backupNow() async {
+    setState(() => _isBackingUp = true);
+    try {
+      await AutoBackupService.instance.backupNow();
+      await _loadAutoBackups();
+      if (mounted) AppToast.showSuccess(context, 'Copia guardada en este celular');
+    } catch (e) {
+      if (mounted) AppToast.showError(context, 'No se pudo hacer la copia: $e');
+    } finally {
+      if (mounted) setState(() => _isBackingUp = false);
+    }
+  }
+
+  /// "hoy 8:15 a. m.", "ayer 7:02 p. m." o "28/10 9:30 a. m."
+  static String _backupWhen(DateTime date) {
+    final now = DateTime.now();
+    final day = DateTime(date.year, date.month, date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final time = '$hour:${date.minute.toString().padLeft(2, '0')} ${date.hour < 12 ? 'a. m.' : 'p. m.'}';
+    if (day == today) return 'hoy $time';
+    if (day == today.subtract(const Duration(days: 1))) return 'ayer $time';
+    return '${date.day}/${date.month} $time';
+  }
+
+  String get _autoBackupSummary {
+    if (!_autoBackupEnabled) return 'Apagada: no se guardan copias nuevas';
+    if (_autoBackups.isEmpty) return 'Una copia al día, sin internet. Guarda la última semana';
+    return 'Última copia: ${_backupWhen(_autoBackups.first.date)} · Guarda la última semana';
+  }
+
+  Future<void> _pickAutoBackup() async {
+    await _loadAutoBackups();
+    if (!mounted) return;
+    if (_autoBackups.isEmpty) {
+      AppToast.showInfo(context, 'Todavía no hay copias. Toca "Hacer una copia ahora".');
+      return;
+    }
+    final chosen = await showModalBottomSheet<AutoBackup>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final c = ctx.colors;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpace.xl, 0, AppSpace.xl, AppSpace.sm),
+                child: Text('Volver a una copia', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.ink)),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpace.xl, 0, AppSpace.xl, AppSpace.md),
+                child: Text(
+                  'Elige cómo estaban tus datos. Lo que hayas hecho después de esa copia se pierde.',
+                  style: TextStyle(fontSize: 13.5, color: c.inkMuted),
+                ),
+              ),
+              for (final copy in _autoBackups)
+                ListTile(
+                  leading: Icon(Icons.history_rounded, color: c.accent),
+                  title: Text(_backupWhen(copy.date), style: TextStyle(fontWeight: FontWeight.w600, color: c.ink)),
+                  subtitle: Text('${(copy.bytes / 1024).ceil()} KB', style: TextStyle(color: c.inkMuted)),
+                  trailing: Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                  onTap: () => Navigator.pop(ctx, copy),
+                ),
+              const SizedBox(height: AppSpace.md),
+            ],
+          ),
+        );
+      },
+    );
+    if (chosen == null || !mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final c = ctx.colors;
+        return AlertDialog(
+          title: const Text('¿Volver a esta copia?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Tus datos en este celular quedarán como estaban ${_backupWhen(chosen.date)}.'),
+              if (_isCloudSyncEnabled) ...[
+                const SizedBox(height: AppSpace.md),
+                Container(
+                  padding: const EdgeInsets.all(AppSpace.md),
+                  decoration: BoxDecoration(
+                    color: c.warning.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.control),
+                  ),
+                  child: Text(
+                    'Con la nube activa, lo que ya está en la nube volverá a aparecer al sincronizar.',
+                    style: TextStyle(fontSize: 13, height: 1.35, color: c.ink),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Volver a esta copia')),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await AutoBackupService.instance.restore(chosen);
+      await _loadAutoBackups();
+      if (mounted) AppToast.showSuccess(context, 'Listo: tus datos volvieron a esa copia');
+    } catch (e) {
+      if (mounted) AppToast.showError(context, e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   void _onBusinessChanged() {
@@ -119,6 +366,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     if (biz == null && _user != null) {
       biz = await _businessRepo.getActiveBusiness(_user!.id, _user!.email);
     }
+    if (biz != null) ProService.instance.refresh(biz.id);
     String role = 'OWNER';
     if (biz != null && _user != null) {
       role = await TeamRepository.instance.getUserRoleInBusiness(
@@ -151,6 +399,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _refresh.dispose();
     super.dispose();
   }
 
@@ -300,9 +549,32 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Restaurar un respaldo?'),
-        content: const Text(
-          'Los datos de esta cuenta en este teléfono se reemplazarán por los del archivo. '
-          'Lo que no esté en el respaldo se perderá. Te recomendamos exportar un respaldo antes.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Los datos de esta cuenta en este teléfono se reemplazarán por los del archivo. '
+              'Lo que no esté en el respaldo se perderá. Te recomendamos exportar un respaldo antes.',
+            ),
+            // Con la nube activa, la siguiente sincronización vuelve a traer lo que está allá
+            if (_isCloudSyncEnabled) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD97706).withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'Tienes la sincronización en la nube activa: lo que ya está en la nube volverá '
+                  'a aparecer al sincronizar. El respaldo sirve para recuperar datos perdidos, '
+                  'no para borrar los que están en la nube.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFFB45309), height: 1.35),
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
@@ -539,685 +811,596 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     );
   }
 
+  /// Avisa a las subpantallas abiertas que el estado cambió (nube, sincronización…)
+  final _refresh = ValueNotifier<int>(0);
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _refresh.value++;
+  }
+
+  String get _roleLabel => switch (_currentBusinessRole.toUpperCase()) {
+        'OWNER' => 'Dueño',
+        'ADMIN' => 'Admin',
+        _ => 'Cajero',
+      };
+
   @override
   Widget build(BuildContext context) {
-    final user = _user;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryTextColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-    final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final isDesktop = MediaQuery.of(context).size.width >= 850;
+    final c = context.colors;
+    final theme = ThemeController.instance;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: isDesktop
-          ? null
-          : AppBar(
-              title: const Text(
-                'Ajustes',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              elevation: 0,
-              actions: [
-                _buildCompactThemeToggle(isDark),
-              ],
-            ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final double hPadding = math.max(16.0, (constraints.maxWidth - 820) / 2);
-
-          return ListView(
-            padding: EdgeInsets.fromLTRB(
-              hPadding,
-              14,
-              hPadding,
-              MediaQuery.of(context).padding.bottom + 28,
-            ),
-            children: [
-          // 1. Tarjeta: Perfil Comercial y Cuenta
-          SettingsCards.card(context, 
-            child: Column(
-              children: [
-                Row(
+      backgroundColor: c.paper,
+      body: Stack(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final double hPadding = math.max(AppSpace.lg, (constraints.maxWidth - 720) / 2);
+              return ListenableBuilder(
+                listenable: theme,
+                builder: (context, _) => ListView(
+                  padding: EdgeInsets.fromLTRB(
+                    hPadding,
+                    MediaQuery.of(context).padding.top + AppSpace.lg,
+                    hPadding,
+                    MediaQuery.of(context).padding.bottom + 96,
+                  ),
                   children: [
-                    Stack(
+                    // En escritorio el encabezado de la app ya lo muestra
+                    if (MediaQuery.sizeOf(context).width < 850)
+                      Padding(
+                        padding: const EdgeInsets.only(left: AppSpace.xs, bottom: AppSpace.xl),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Ajustes', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: c.ink)),
+                            Text('Haz que la app sea tuya.', style: TextStyle(fontSize: 15, color: c.inkMuted)),
+                          ],
+                        ),
+                      ),
+                    _profileGroup(c),
+                    SettingsGroup(children: [
+                      SettingsRow.toggle(
+                        icon: Theme.of(context).brightness == Brightness.dark
+                            ? Icons.dark_mode_outlined
+                            : Icons.light_mode_outlined,
+                        title: 'Modo oscuro',
+                        subtitle: 'Toca para cambiar el ambiente',
+                        value: Theme.of(context).brightness == Brightness.dark,
+                        onChanged: (v) => theme.setThemeMode(v ? ThemeMode.dark : ThemeMode.light),
+                      ),
+                    ]),
+                    if (_activeBusiness != null)
+                      SettingsGroup(children: [
+                        ValueListenableBuilder<ProStatus>(
+                          valueListenable: ProService.instance.status,
+                          builder: (context, pro, _) => SettingsRow(
+                            icon: Icons.workspace_premium_outlined,
+                            title: pro.active ? 'Stockealo Pro · activo' : 'Stockealo Pro',
+                            subtitle: pro.active
+                                ? (pro.lifetime ? '${pro.kindLabel} permanente' : '${pro.kindLabel} hasta el ${pro.endsAt!.day}/${pro.endsAt!.month}/${pro.endsAt!.year}')
+                                : 'Tienda en línea, cobro de fiados y más',
+                            onTap: () => ProScreen.open(context, _activeBusiness!),
+                          ),
+                        ),
+                      ]),
+                    SettingsGroup(label: 'Tu negocio', children: [
+                      if (_activeBusiness != null)
+                        SettingsRow(
+                          leading: BusinessAvatar(business: _activeBusiness!, size: 36),
+                          title: _activeBusiness!.name,
+                          subtitle: '$_roleLabel · Información, equipo y auditoría',
+                          onTap: _openBusinessInfo,
+                        )
+                      else
+                        SettingsRow(
+                          icon: Icons.storefront_outlined,
+                          title: 'Elegir un negocio',
+                          subtitle: 'Selecciona o crea uno para empezar',
+                          onTap: _openBusinessSelector,
+                        ),
+                    ]),
+                    SettingsGroup(label: 'Personalización', children: [
+                      SettingsRow(
+                        icon: Icons.palette_outlined,
+                        title: 'Apariencia',
+                        subtitle: [
+                          ThemeController.accentLabel(theme.accentChoice),
+                          ThemeController.textScales[theme.textScale]!,
+                          if (theme.reduceTransparency) 'Sin transparencias',
+                        ].join(' · '),
+                        onTap: _openAppearance,
+                      ),
+                      if (PhoneAlertsService.instance.isSupported)
+                        SettingsRow(
+                          icon: Icons.notifications_none_rounded,
+                          title: 'Avisos',
+                          subtitle: [
+                            if (_stockAlerts) 'Stock bajo',
+                            if (_summaryAlerts) 'Resumen a las ${_hourLabel(_summaryHour)}',
+                          ].join(' · ').ifEmpty('Apagados'),
+                          onTap: _openAlerts,
+                        ),
+                    ]),
+                    SettingsGroup(label: 'Datos', children: [
+                      SettingsRow(
+                        icon: _isCloudSyncEnabled ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                        title: 'Nube y respaldo',
+                        subtitle: _isCloudSyncEnabled ? 'Respaldo automático en la nube' : 'Solo en este equipo',
+                        onTap: _openData,
+                      ),
+                    ]),
+                    SettingsGroup(label: 'Privacidad y seguridad', children: [
+                      SettingsRow(
+                        icon: Icons.lock_outline_rounded,
+                        title: 'Cambiar contraseña',
+                        subtitle: 'Tu clave de acceso',
+                        onTap: _user == null ? null : () => ChangePasswordDialog.show(context, userId: _user!.id),
+                      ),
+                      SettingsRow(
+                        icon: Icons.shield_outlined,
+                        title: 'Términos y privacidad',
+                        subtitle: 'Cómo cuidamos tus datos',
+                        onTap: () => LegalDocumentScreen.show(context),
+                      ),
+                      SettingsRow(
+                        icon: Icons.delete_outline_rounded,
+                        title: 'Borrar datos',
+                        subtitle: 'Purgar la nube o eliminar la cuenta',
+                        danger: true,
+                        onTap: _openDeletion,
+                      ),
+                    ]),
+                    SettingsGroup(label: 'Acerca de', children: [
+                      if (!kIsWeb)
+                        SettingsRow(
+                          icon: Icons.system_update_outlined,
+                          title: 'Stockealo $_currentAppVersion',
+                          subtitle: 'Buscar actualizaciones',
+                          onTap: _isCheckingUpdate ? null : _handleCheckForUpdates,
+                          trailing: _isCheckingUpdate
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                              : null,
+                        ),
+                      SettingsRow(
+                        icon: Icons.logout_rounded,
+                        title: 'Cerrar sesión',
+                        danger: true,
+                        onTap: widget.onLogout,
+                      ),
+                    ]),
+                    Center(
+                      child: Text(
+                        'Stockealo $_currentAppVersion · Control de inventario',
+                        style: TextStyle(fontSize: 12, color: c.inkFaint),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          // Barra de cambios sin guardar, sobre la barra de pestañas
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: MediaQuery.of(context).padding.bottom,
+            child: const PendingChangesBar(useSafeArea: false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileGroup(StockealoColors c) {
+    final user = _user;
+    final avatar = _getAvatarImageProvider(_avatarPath);
+    final initial = (user?.displayName.isNotEmpty == true ? user!.displayName[0] : 'U').toUpperCase();
+    return SettingsGroup(children: [
+      Padding(
+        padding: const EdgeInsets.all(AppSpace.lg),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Semantics(
+                  button: true,
+                  label: 'Cambiar foto',
+                  child: InkWell(
+                    onTap: _showAvatarPickerModal,
+                    customBorder: const CircleBorder(),
+                    child: Stack(
                       children: [
                         CircleAvatar(
-                          radius: 32,
-                          backgroundColor: const Color(0xFFECFDF5),
-                          backgroundImage: _getAvatarImageProvider(_avatarPath),
-                          child: _getAvatarImageProvider(_avatarPath) == null
-                              ? Text(
-                                  (user?.displayName.isNotEmpty == true ? user!.displayName[0] : 'U').toUpperCase(),
-                                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                                )
+                          radius: 28,
+                          backgroundColor: c.successSoft,
+                          backgroundImage: avatar,
+                          child: avatar == null
+                              ? Text(initial,
+                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: c.accent))
                               : null,
                         ),
                         Positioned(
                           bottom: 0,
                           right: 0,
-                          child: InkWell(
-                            onTap: _showAvatarPickerModal,
-                            child: const CircleAvatar(
-                              radius: 11,
-                              backgroundColor: Color(0xFF059669),
-                              child: Icon(Icons.camera_alt, color: Colors.white, size: 12),
-                            ),
+                          child: CircleAvatar(
+                            radius: 10,
+                            backgroundColor: c.accent,
+                            child: Icon(Icons.camera_alt_rounded, color: c.onAccent, size: 11),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user?.displayName ?? 'Comerciante',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryTextColor),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            user?.email ?? '',
-                            style: TextStyle(fontSize: 12, color: secondaryTextColor),
-                          ),
-                          if (user?.phone?.isNotEmpty == true) ...[
-                            const SizedBox(height: 3),
-                            Row(
-                              children: [
-                                Icon(Icons.phone_outlined, size: 12, color: secondaryTextColor),
-                                const SizedBox(width: 4),
-                                Text(
-                                  user!.phone!,
-                                  style: TextStyle(fontSize: 12, color: secondaryTextColor),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(_isEditingProfile ? Icons.close : Icons.edit_outlined, color: const Color(0xFF059669), size: 22),
-                      onPressed: () => setState(() => _isEditingProfile = !_isEditingProfile),
-                      tooltip: 'Editar datos personales',
-                    ),
-                  ],
-                ),
-                if (_isEditingProfile) ...[
-                  const Divider(height: 20),
-                  TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre o Apodo Comercial',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Teléfono / WhatsApp',
-                      prefixIcon: Icon(Icons.phone_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _saveProfile,
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
-                      child: _isLoading
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Guardar Cambios'),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 2. Tarjeta Unificada: Información de tu Negocio
-          SettingsCards.card(context, 
-            child: _activeBusiness != null
-                ? InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BusinessInfoScreen(
-                            business: _activeBusiness!,
-                            onLogout: widget.onLogout,
-                          ),
-                        ),
-                      );
-                      _loadActiveBusiness();
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF059669).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0xFF10B981).withOpacity(0.3),
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                _activeBusiness!.name.isNotEmpty
-                                    ? _activeBusiness!.name[0].toUpperCase()
-                                    : 'B',
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _activeBusiness!.name,
-                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: primaryTextColor),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    _buildCompactRoleBadge(_currentBusinessRole),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Información de tu negocio, equipo y auditoría',
-                                  style: TextStyle(fontSize: 12, color: secondaryTextColor),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(Icons.chevron_right_rounded, size: 22, color: Color(0xFF94A3B8)),
-                        ],
-                      ),
-                    ),
-                  )
-                : ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      backgroundColor: Color(0xFFF1F5F9),
-                      child: Icon(Icons.storefront_outlined, color: Color(0xFF64748B)),
-                    ),
-                    title: const Text('Sin empresa activa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: const Text('Selecciona o crea una empresa para comenzar', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                    trailing: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF059669),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        visualDensity: VisualDensity.compact,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: _openBusinessSelector,
-                      child: const Text('Seleccionar', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-          ),
-          const SizedBox(height: 12),
-
-          // 3. Tarjeta: Datos, Respaldo y Nube (Colapsable)
-          SettingsCards.collapsible(context, 
-            title: 'Datos, Respaldo y Nube',
-            subtitle: _isCloudSyncEnabled
-                ? 'Respaldo automático en Nube activo'
-                : 'Modo Local Privado (en este equipo)',
-            icon: Icons.cloud_sync_outlined,
-            isExpanded: _isCloudSectionExpanded,
-            onToggle: () => setState(() => _isCloudSectionExpanded = !_isCloudSectionExpanded),
-            trailingBadge: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: _isCloudSyncEnabled
-                    ? const Color(0xFF059669).withOpacity(0.12)
-                    : (isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9)),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isCloudSyncEnabled ? Icons.cloud_done_rounded : Icons.lock_outline_rounded,
-                    size: 11,
-                    color: _isCloudSyncEnabled
-                        ? const Color(0xFF059669)
-                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _isCloudSyncEnabled ? 'Nube' : 'Local',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      color: _isCloudSyncEnabled
-                          ? const Color(0xFF059669)
-                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: const Color(0xFF059669),
-                  value: _isCloudSyncEnabled,
-                  onChanged: _toggleCloudSync,
-                  title: const Text(
-                    'Sincronización en la Nube',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  subtitle: Text(
-                    _isCloudSyncEnabled
-                        ? 'Activo: Respaldo automático multidispositivo y para equipo.'
-                        : 'Modo Local Privado: Los datos residen solo en este teléfono.',
-                    style: TextStyle(fontSize: 12, color: _isCloudSyncEnabled ? const Color(0xFF059669) : const Color(0xFF64748B)),
                   ),
                 ),
-                if (_isCloudSyncEnabled) ...[
-                  const SizedBox(height: 6),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _isManualSyncing ? null : _runManualSync,
-                      icon: _isManualSyncing
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF059669)))
-                          : const Icon(Icons.sync, size: 18),
-                      label: Text(_isManualSyncing ? 'Sincronizando...' : 'Sincronizar ahora con la Nube'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF059669),
-                        side: const BorderSide(color: Color(0xFF059669)),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                    ),
-                  ),
-                ],
-                const Divider(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _openExcelImport,
-                        icon: const Icon(Icons.file_upload_outlined, size: 17),
-                        label: const Text('Importar Excel', style: TextStyle(fontSize: 12)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: primaryTextColor,
-                          side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _exportToExcel,
-                        icon: const Icon(Icons.file_download_outlined, size: 17),
-                        label: const Text('Exportar Excel', style: TextStyle(fontSize: 12)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF059669),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (BackupService.instance.isSupported) ...[
-                  const SizedBox(height: 10),
-                  Row(
+                const SizedBox(width: AppSpace.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _restoreBackup,
-                          icon: const Icon(Icons.settings_backup_restore_rounded, size: 17),
-                          label: const Text('Restaurar respaldo', style: TextStyle(fontSize: 12)),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: primaryTextColor,
-                            side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _exportBackup,
-                          icon: const Icon(Icons.backup_outlined, size: 17),
-                          label: const Text('Exportar respaldo', style: TextStyle(fontSize: 12)),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF059669),
-                            side: const BorderSide(color: Color(0xFF059669)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
+                      Text(user?.displayName ?? 'Comerciante',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.ink)),
+                      Text(
+                        [
+                          if (user?.email.isNotEmpty == true) user!.email,
+                          if (user?.phone?.isNotEmpty == true) user!.phone!
+                        ].join(' · '),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, color: c.inkMuted),
                       ),
                     ],
                   ),
-                ],
-              ],
-            ),
-          ),
-
-          // 4. Tarjeta: Seguridad (Colapsable)
-          SettingsCards.collapsible(context, 
-            title: 'Seguridad',
-            subtitle: 'Contraseña y términos del servicio',
-            icon: Icons.shield_outlined,
-            iconColor: const Color(0xFF2563EB),
-            isExpanded: _isSecuritySectionExpanded,
-            onToggle: () => setState(() => _isSecuritySectionExpanded = !_isSecuritySectionExpanded),
-            child: Column(
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
-                    child: Icon(
-                      Icons.lock_reset,
-                      color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
-                    ),
-                  ),
-                  title: const Text('Cambiar Contraseña', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  subtitle: const Text('Actualiza tu clave de acceso seguro', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-                  onTap: _user == null ? null : () => ChangePasswordDialog.show(context, userId: _user!.id),
                 ),
-                const Divider(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
-                    child: Icon(
-                      Icons.description_outlined,
-                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                    ),
-                  ),
-                  title: const Text('Términos y Privacidad', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  subtitle: const Text('Protección de datos y condiciones del servicio', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-                  onTap: () => LegalDocumentScreen.show(context),
+                IconButton(
+                  tooltip: _isEditingProfile ? 'Cancelar' : 'Editar tus datos',
+                  icon: Icon(_isEditingProfile ? Icons.close_rounded : Icons.edit_outlined, color: c.inkMuted),
+                  onPressed: () => setState(() => _isEditingProfile = !_isEditingProfile),
                 ),
               ],
             ),
-          ),
-
-          // 5. Tarjeta: Zona de Privacidad y Borrado de Datos (Colapsable por defecto)
-          SettingsCards.collapsible(context, 
-            title: 'Zona de Privacidad y Borrado',
-            subtitle: 'Purgar datos de nube o eliminar cuenta',
-            icon: Icons.delete_forever_outlined,
-            iconColor: const Color(0xFFDC2626),
-            titleColor: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
-            borderColor: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
-            backgroundColor: isDark ? const Color(0xFF450A0A).withOpacity(0.3) : const Color(0xFFFEF2F2),
-            isExpanded: _isPrivacySectionExpanded,
-            onToggle: () => setState(() => _isPrivacySectionExpanded = !_isPrivacySectionExpanded),
-            child: Column(
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: isDark ? const Color(0xFF7C2D12) : const Color(0xFFFFEDD5),
-                    child: Icon(Icons.cloud_off_outlined, color: isDark ? const Color(0xFFFDBA74) : Colors.orange),
-                  ),
-                  title: Text(
-                    'Purgar datos de la Nube',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF9A3412)),
-                  ),
-                  subtitle: Text(
-                    'Borrar registros en la nube y conservar los datos en este dispositivo',
-                    style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFED7AA) : const Color(0xFF7C2D12)),
-                  ),
-                  onTap: _showPurgeCloudDialog,
-                ),
-                Divider(height: 10, color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFED7AA)),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: isDark ? const Color(0xFF991B1B) : const Color(0xFFFEE2E2),
-                    child: Icon(Icons.delete_forever, color: isDark ? const Color(0xFFFCA5A5) : Colors.red),
-                  ),
-                  title: Text(
-                    'Eliminar cuenta y datos definitivamente',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? const Color(0xFFF87171) : Colors.red),
-                  ),
-                  subtitle: Text(
-                    'Borra todo de forma permanente (Nube y dispositivo)',
-                    style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFECACA) : const Color(0xFF991B1B)),
-                  ),
-                  onTap: _showDeleteAccountDialog,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // 6. Tarjeta de Versión y Actualizaciones (Solo en apps móviles nativas)
-          if (!kIsWeb) ...[
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: BorderSide(
-                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-                ),
+            if (_isEditingProfile) ...[
+              const SizedBox(height: AppSpace.lg),
+              TextField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Nombre', prefixIcon: Icon(Icons.person_outline)),
               ),
-              elevation: 0,
-              color: isDark ? const Color(0xFF131126) : Colors.white,
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: const Color(0xFF059669).withOpacity(0.15),
-                  child: const Icon(Icons.system_update_rounded, color: Color(0xFF10B981), size: 22),
+              const SizedBox(height: AppSpace.md),
+              PhoneField(
+                initialValue: _phoneController.text,
+                defaultCountry: deviceCountry(),
+                label: 'WhatsApp',
+                onChanged: (value) => _phoneController.text = value.e164 ?? '',
+              ),
+              const SizedBox(height: AppSpace.md),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _isLoading ? null : _saveProfile,
+                  child: _isLoading
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Guardar'),
                 ),
-                title: Text(
-                  'Stockealo v$_currentAppVersion',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                  ),
-                ),
-                subtitle: Text(
-                  'Buscar actualizaciones',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                ),
-                trailing: _isCheckingUpdate
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)),
-                      )
-                    : Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 16,
-                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                      ),
-                onTap: _isCheckingUpdate ? null : _handleCheckForUpdates,
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // 7. Botón Cerrar Sesión
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(
-                color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-              ),
-            ),
-            elevation: 0,
-            color: isDark ? const Color(0xFF131126) : Colors.white,
-            child: ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14)),
-              onTap: widget.onLogout,
-            ),
-          ),
-
-          const SizedBox(height: 18),
-          Center(
-            child: Text(
-              'Stockealo v$_currentAppVersion • Control de Inventario y Stock',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-      );
-    },
-  ),
-);
-}
-
-  Widget _buildCompactThemeToggle(bool isDark) {
-    return AnimatedBuilder(
-      animation: ThemeController.instance,
-      builder: (context, _) {
-        final mode = ThemeController.instance.themeMode;
-        return Container(
-          margin: const EdgeInsets.only(right: 14),
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildThemeIconItem(
-                icon: Icons.wb_sunny_rounded,
-                tooltip: 'Tema Claro',
-                isSelected: mode == ThemeMode.light,
-                onTap: () => ThemeController.instance.setThemeMode(ThemeMode.light),
-                isDark: isDark,
-              ),
-              _buildThemeIconItem(
-                icon: Icons.nightlight_round,
-                tooltip: 'Tema Oscuro',
-                isSelected: mode == ThemeMode.dark,
-                onTap: () => ThemeController.instance.setThemeMode(ThemeMode.dark),
-                isDark: isDark,
-              ),
-              _buildThemeIconItem(
-                icon: Icons.brightness_auto_rounded,
-                tooltip: 'Automático (Sistema)',
-                isSelected: mode == ThemeMode.system,
-                onTap: () => ThemeController.instance.setThemeMode(ThemeMode.system),
-                isDark: isDark,
               ),
             ],
-          ),
-        );
-      },
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  Future<void> _openBusinessInfo() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => BusinessInfoScreen(business: _activeBusiness!, onLogout: widget.onLogout)),
+    );
+    _loadActiveBusiness();
+  }
+
+  void _openAppearance() {
+    SettingsSubpage.open(
+      context,
+      title: 'Apariencia',
+      refresh: Listenable.merge([ThemeController.instance, _refresh]),
+      children: _appearanceChildren,
     );
   }
 
-  Widget _buildThemeIconItem({
-    required IconData icon,
-    required String tooltip,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required bool isDark,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? (isDark ? const Color(0xFF059669) : Colors.white)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    )
-                  ]
-                : null,
+  List<Widget> _appearanceChildren() {
+    final theme = ThemeController.instance;
+    final business = _activeBusiness;
+    final choices = <String>[
+      'brand',
+      if (AppPalette.fromHex(business?.color) != null && AppPalette.fromHex(business?.color) != AppPalette.brand)
+        'business',
+      for (final color in AppPalette.businessColors.values)
+        if (color != AppPalette.brand) AppPalette.toHex(color),
+    ];
+    return [
+      SettingsGroup(children: [
+        SettingsRow.toggle(
+          icon: Icons.brightness_auto_outlined,
+          title: 'Como el teléfono',
+          subtitle: 'Claro u oscuro según el ajuste del sistema',
+          value: theme.themeMode == ThemeMode.system,
+          onChanged: (v) => theme.setThemeMode(v
+              ? ThemeMode.system
+              : (MediaQuery.platformBrightnessOf(context) == Brightness.dark ? ThemeMode.dark : ThemeMode.light)),
+        ),
+      ]),
+      SettingsPanel(
+        label: 'Color del tema',
+        value: ThemeController.accentLabel(theme.accentChoice),
+        child: Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          children: [
+            for (final choice in choices)
+              _AccentDot(
+                color: theme.accentFor(choice),
+                selected: theme.accentChoice == choice,
+                label: ThemeController.accentLabel(choice),
+                icon: choice == 'business' ? Icons.storefront_rounded : null,
+                onTap: () => theme.setAccentChoice(choice),
+              ),
+          ],
+        ),
+      ),
+      SettingsPanel(
+        label: 'Tamaño de letra',
+        value: ThemeController.textScales[theme.textScale],
+        child: Row(
+          children: [
+            for (final entry in ThemeController.textScales.entries) ...[
+              if (entry.key != ThemeController.textScales.keys.first) const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: _TextSizeOption(
+                  scale: entry.key,
+                  label: entry.value,
+                  selected: theme.textScale == entry.key,
+                  onTap: () => theme.setTextScale(entry.key),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      SettingsGroup(label: 'Accesibilidad', children: [
+        SettingsRow.toggle(
+          icon: Icons.blur_off_rounded,
+          title: 'Reducir transparencias',
+          subtitle: 'Barras sólidas; útil en celulares lentos',
+          value: theme.reduceTransparency,
+          onChanged: theme.setReduceTransparency,
+        ),
+      ]),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+        child: Text(
+          'Los cambios se ven al instante. Guárdalos con "Revisar" o vuelve atrás con "Descartar".',
+          style: TextStyle(fontSize: 12.5, color: context.colors.inkMuted),
+        ),
+      ),
+    ];
+  }
+
+  void _openData() {
+    // La copia del día puede haber terminado después de cargar Ajustes
+    _loadAutoBackups();
+    SettingsSubpage.open(context, title: 'Nube y respaldo', refresh: _refresh, children: () {
+      final c = context.colors;
+      return [
+        SettingsGroup(children: [
+          SettingsRow.toggle(
+            icon: Icons.cloud_sync_outlined,
+            title: 'Sincronización en la nube',
+            subtitle: _isCloudSyncEnabled
+                ? 'Respaldo automático y datos compartidos con tu equipo'
+                : 'Tus datos se guardan solo en este equipo',
+            value: _isCloudSyncEnabled,
+            onChanged: _toggleCloudSync,
           ),
-          child: Icon(
-            icon,
-            size: 15,
-            color: isSelected
-                ? (isDark ? Colors.white : const Color(0xFF059669))
-                : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+          if (_isCloudSyncEnabled)
+            SettingsRow(
+              icon: Icons.sync_rounded,
+              title: _isManualSyncing ? 'Sincronizando…' : 'Sincronizar ahora',
+              subtitle: 'Sube y baja los últimos cambios',
+              onTap: _isManualSyncing ? null : _runManualSync,
+              trailing: _isManualSyncing
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : null,
+            ),
+        ]),
+        SettingsGroup(label: 'Excel', children: [
+          SettingsRow(
+            icon: Icons.file_upload_outlined,
+            title: 'Importar inventario',
+            subtitle: 'Carga productos desde un archivo de Excel',
+            onTap: _openExcelImport,
+          ),
+          SettingsRow(
+            icon: Icons.file_download_outlined,
+            title: 'Exportar a Excel',
+            subtitle: 'Inventario, ventas y clientes',
+            onTap: _exportToExcel,
+          ),
+        ]),
+        if (AutoBackupService.instance.isSupported)
+          SettingsGroup(label: 'Copias automáticas', children: [
+            SettingsRow.toggle(
+              icon: Icons.history_rounded,
+              title: 'Copia diaria en este celular',
+              subtitle: _autoBackupSummary,
+              value: _autoBackupEnabled,
+              onChanged: _toggleAutoBackup,
+            ),
+            SettingsRow(
+              icon: Icons.save_outlined,
+              title: _isBackingUp ? 'Guardando copia…' : 'Hacer una copia ahora',
+              subtitle: 'Guarda tus datos tal como están en este momento',
+              onTap: _isBackingUp ? null : _backupNow,
+              trailing: _isBackingUp
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : null,
+            ),
+            SettingsRow(
+              icon: Icons.restore_rounded,
+              title: 'Volver a una copia',
+              subtitle: 'Deshace un error, como borrar productos sin querer',
+              onTap: _pickAutoBackup,
+            ),
+          ]),
+        if (BackupService.instance.isSupported)
+          SettingsGroup(label: 'Respaldo en archivo', children: [
+            SettingsRow(
+              icon: Icons.backup_outlined,
+              title: 'Exportar respaldo',
+              subtitle: 'Guarda una copia completa en un archivo',
+              onTap: _exportBackup,
+            ),
+            SettingsRow(
+              icon: Icons.settings_backup_restore_rounded,
+              title: 'Restaurar respaldo',
+              subtitle: 'Recupera los datos desde un archivo',
+              onTap: _restoreBackup,
+            ),
+          ]),
+        if (!_isCloudSyncEnabled)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+            child: Text(
+              'Las copias diarias viven en este celular: si lo pierdes, se pierden con él. '
+              'Activa la nube o exporta un respaldo en archivo de vez en cuando.',
+              style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+            ),
+          ),
+      ];
+    });
+  }
+
+  void _openDeletion() {
+    SettingsSubpage.open(context, title: 'Borrar datos', children: () {
+      return [
+        SettingsGroup(children: [
+          SettingsRow(
+            icon: Icons.cloud_off_outlined,
+            title: 'Purgar datos de la nube',
+            subtitle: 'Borra la copia en la nube y conserva la de este equipo',
+            danger: true,
+            onTap: _showPurgeCloudDialog,
+          ),
+          SettingsRow(
+            icon: Icons.delete_forever_outlined,
+            title: 'Eliminar cuenta y datos',
+            subtitle: 'Borra todo para siempre, en la nube y en este equipo',
+            danger: true,
+            onTap: _showDeleteAccountDialog,
+          ),
+        ]),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+          child: Text(
+            'Antes de borrar te pediremos confirmarlo. Eliminar la cuenta no se puede deshacer.',
+            style: TextStyle(fontSize: 12.5, color: context.colors.inkMuted),
+          ),
+        ),
+      ];
+    });
+  }
+}
+
+/// Círculo para elegir el color de la app
+class _AccentDot extends StatelessWidget {
+  final Color color;
+  final bool selected;
+  final String label;
+  final IconData? icon;
+  final VoidCallback onTap;
+
+  const _AccentDot({required this.color, required this.selected, required this.label, this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: 'Color $label',
+        child: InkResponse(
+          onTap: onTap,
+          radius: 28,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 48,
+            height: 48,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: selected ? color : Colors.transparent, width: 2.5),
+            ),
+            child: Container(
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              child: selected
+                  ? Icon(Icons.check_rounded, color: c.onAccent, size: 20)
+                  : (icon != null ? Icon(icon, color: Colors.white, size: 18) : null),
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildCompactRoleBadge(String role) {
-    Color bg;
-    Color fg;
-    String label;
+/// Opción "Aa" de tamaño de letra
+class _TextSizeOption extends StatelessWidget {
+  final double scale;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
-    switch (role.toUpperCase()) {
-      case 'OWNER':
-        bg = const Color(0xFFFEF3C7);
-        fg = const Color(0xFFB45309);
-        label = 'Dueño';
-        break;
-      case 'ADMIN':
-        bg = const Color(0xFFEFF6FF);
-        fg = const Color(0xFF1D4ED8);
-        label = 'Admin';
-        break;
-      default:
-        bg = const Color(0xFFF1F5F9);
-        fg = const Color(0xFF475569);
-        label = 'Cajero';
-    }
+  const _TextSizeOption({required this.scale, required this.label, required this.selected, required this.onTap});
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Letra $label',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? c.accent.withOpacity(0.12) : c.surfaceMuted,
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            border: Border.all(color: selected ? c.accent : Colors.transparent, width: 1.5),
+          ),
+          // Sin escalar: cada opción muestra su tamaño real, no el elegido
+          child: MediaQuery.withNoTextScaling(
+            child: Text(
+              'Aa',
+              style: TextStyle(
+                fontSize: 16 * scale,
+                fontWeight: FontWeight.w700,
+                color: selected ? c.accent : c.ink,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
+}
 
+extension on String {
+  String ifEmpty(String fallback) => isEmpty ? fallback : this;
 }

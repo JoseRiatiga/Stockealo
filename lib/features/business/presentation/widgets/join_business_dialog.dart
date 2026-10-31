@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../products/presentation/screens/barcode_scanner_screen.dart';
@@ -16,11 +17,11 @@ class JoinBusinessDialog {
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.group_add_outlined, color: Color(0xFF059669)),
-              SizedBox(width: 10),
-              Text('Unirse a Empresa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Icon(Icons.group_add_outlined, color: context.colors.accent),
+              const SizedBox(width: 10),
+              const Text('Unirse a Empresa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ],
           ),
           content: SingleChildScrollView(
@@ -28,9 +29,9 @@ class JoinBusinessDialog {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Ingresa como colaborador escaneando el código QR o escribiendo el código de invitación.',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 13, color: context.colors.inkMuted),
                 ),
                 const SizedBox(height: 18),
 
@@ -40,7 +41,7 @@ class JoinBusinessDialog {
                   height: 48,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF059669),
+                      backgroundColor: context.colors.accent,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -72,8 +73,8 @@ class JoinBusinessDialog {
                         style: TextStyle(
                           fontSize: 12,
                           color: Theme.of(context).brightness == Brightness.dark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
+                              ? context.colors.inkMuted
+                              : context.colors.inkMuted,
                         ),
                       ),
                     ),
@@ -87,18 +88,18 @@ class JoinBusinessDialog {
                   controller: codeController,
                   textCapitalization: TextCapitalization.characters,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2.0,
-                    color: Color(0xFF059669),
+                    color: context.colors.accent,
                   ),
                   decoration: InputDecoration(
                     labelText: 'Código de Invitación',
                     hintText: 'Ej. 6CC1-4831',
                     errorText: errorText,
                     errorMaxLines: 3,
-                    prefixIcon: const Icon(Icons.pin, color: Color(0xFF64748B)),
+                    prefixIcon: Icon(Icons.pin, color: context.colors.inkMuted),
                     suffixIcon: codeController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear, size: 18),
@@ -121,7 +122,7 @@ class JoinBusinessDialog {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
+                backgroundColor: context.colors.accent,
                 foregroundColor: Colors.white,
               ),
               onPressed: isSubmitting || codeController.text.trim().isEmpty
@@ -150,7 +151,7 @@ class JoinBusinessDialog {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('¡Te has unido exitosamente a "${joinedBiz.name}"!'),
-                            backgroundColor: const Color(0xFF059669),
+                            backgroundColor: context.colors.accent,
                           ),
                         );
                         Navigator.pop(context, true);

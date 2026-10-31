@@ -1,5 +1,7 @@
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/currency_formatter.dart';
+import '../../team/data/activity_repository.dart';
 import '../models/cash_session.dart';
 
 /// Arqueo de caja por negocio. Solo cuenta el efectivo: las ventas y abonos en
@@ -42,6 +44,12 @@ class CashRegisterRepository {
       openingAmount: openingAmount,
     );
     await (await _dbProvider.database).insert('cash_sessions', session.toMap());
+    ActivityRepository.instance.log(
+      businessId: businessId,
+      action: ActivityAction.cashOpen,
+      summary: 'Abrió la caja con ${CurrencyFormatter.format(openingAmount)} de base',
+      data: {'session_id': session.id},
+    );
     return session;
   }
 
@@ -101,6 +109,15 @@ class CashRegisterRepository {
       closed.toMap(),
       where: 'id = ?',
       whereArgs: [session.id],
+    );
+    final difference = countedAmount - summary.expected;
+    ActivityRepository.instance.log(
+      businessId: session.businessId,
+      action: ActivityAction.cashClose,
+      summary: 'Cerró la caja: contó ${CurrencyFormatter.format(countedAmount)} y se esperaban '
+          '${CurrencyFormatter.format(summary.expected)}'
+          '${difference == 0 ? ' (cuadró)' : difference > 0 ? ' (sobran ${CurrencyFormatter.format(difference)})' : ' (faltan ${CurrencyFormatter.format(-difference)})'}',
+      data: {'session_id': session.id, 'difference': difference},
     );
     return closed;
   }

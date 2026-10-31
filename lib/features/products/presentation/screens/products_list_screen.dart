@@ -1,3 +1,11 @@
+import '../../../../core/database/app_database.dart';
+import '../../../../core/design/app_card.dart';
+import '../../../../core/design/app_pagination.dart';
+import '../../../../core/design/primary_action_button.dart';
+import '../../../../core/design/quick_access_row.dart';
+import '../../../../core/design/skeleton.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../business/presentation/business_identity.dart';
 import '../widgets/quick_stock_dialog.dart';
 import '../widgets/product_sort_filter_sheet.dart';
 import '../../../business/presentation/active_business_scope.dart';
@@ -22,6 +30,8 @@ import '../../../reports/data/excel_export_service.dart';
 import '../widgets/restock_order_modal.dart';
 import '../widgets/catalog_generator_modal.dart';
 import '../../../team/data/team_repository.dart';
+import '../../../../core/services/data_events.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
 
@@ -66,6 +76,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   int _currentPage = 1;
   static const int _pageSize = 12;
 
+  /// Lista o cuadrícula; se recuerda en este dispositivo
+  ProductLayout _layout = ProductLayout.list;
+  static const _layoutKey = 'inventory_layout';
+
   List<Product> get _pagedProducts {
     if (_products.isEmpty) return [];
     final startIndex = (_currentPage - 1) * _pageSize;
@@ -79,8 +93,18 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   @override
   void initState() {
     super.initState();
+    AppDatabase.instance.getSetting(_layoutKey).then((value) {
+      if (mounted && value == ProductLayout.grid.name) setState(() => _layout = ProductLayout.grid);
+    });
     _loadData();
     _syncSilently();
+    DataEvents.instance.salesVersion.addListener(_onSalesChanged);
+    NotificationService.instance.remoteSalesVersion.addListener(_onSalesChanged);
+  }
+
+  /// Una venta (aquí, en otra pestaña o en otro teléfono) cambió el stock
+  void _onSalesChanged() {
+    if (mounted) _loadData(silent: true);
   }
 
   void _onBusinessChanged() {
@@ -116,13 +140,16 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
 
   @override
   void dispose() {
+    DataEvents.instance.salesVersion.removeListener(_onSalesChanged);
+    NotificationService.instance.remoteSalesVersion.removeListener(_onSalesChanged);
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  /// [silent] recarga sin mostrar el indicador de carga, para no mover la lista
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) setState(() => _isLoading = true);
     _activeBusiness = await _businessRepo.getActiveBusiness(widget.userId);
 
     if (_activeBusiness == null) {
@@ -348,344 +375,232 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     }
   }
 
+  Future<void> _openNewProduct() async {
+    if (_activeBusiness == null) return;
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id)),
+    );
+    if (created == true) _loadData();
+  }
+
+  Future<void> _openProduct(Product product) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)));
+    _loadData();
+  }
+
+  Future<void> _sellProduct(Product product) async {
+    final sold = await QuickSaleDialog.show(context, product);
+    if (sold == true) _loadData();
+  }
+
+  void _goToPage(int page) {
+    setState(() => _currentPage = page);
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    }
+  }
+
+  Future<void> _setLayout(ProductLayout layout) async {
+    setState(() => _layout = layout);
+    await AppDatabase.instance.setSetting(_layoutKey, layout.name);
+  }
+
+  bool get _hasActiveFilters => _sortOption != 'name_asc' || _stockFilterOption != 'all';
+
+  ProductCard _card(Product product) => ProductCard(
+        product: product,
+        layout: _layout,
+        showMargin: canViewCosts,
+        canAdjustStock: canEditProducts,
+        onTap: () => _openProduct(product),
+        onAdjustStock: canEditProducts ? () => QuickStockDialog.show(context, product: product, onSaved: _loadData) : null,
+        onSale: () => _sellProduct(product),
+      );
+
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final isDesktop = MediaQuery.of(context).size.width >= 850;
     return Scaffold(
       appBar: isDesktop
           ? null
           : AppBar(
-        title: InkWell(
-          onTap: () async {
-            final changed = await BusinessSelectorModal.show(
-              context,
-              userId: widget.userId,
-              onLogout: widget.onLogout,
-            );
-            if (changed == true) {
-              _loadData();
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.storefront, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    _activeBusiness?.name ?? 'Stockealo',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              title: InkWell(
+                onTap: () async {
+                  final changed = await BusinessSelectorModal.show(
+                    context,
+                    userId: widget.userId,
+                    onLogout: widget.onLogout,
+                  );
+                  if (changed == true) _loadData();
+                },
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: AppSpace.xs),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_activeBusiness != null) ...[
+                        BusinessAvatar(business: _activeBusiness!, size: 26),
+                        const SizedBox(width: AppSpace.sm),
+                      ],
+                      Flexible(
+                        child: Text(
+                          _activeBusiness?.name ?? 'Stockealo',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                        ),
+                      ),
+                      const Icon(Icons.expand_more_rounded),
+                    ],
                   ),
                 ),
-                const Icon(Icons.arrow_drop_down, color: Colors.white),
-              ],
+              ),
             ),
-          ),
-        ),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'Más opciones',
-            onSelected: (val) {
-              if (val == 'catalog') {
-                _openCatalogModal();
-              } else if (val == 'excel') {
-                _exportToExcel();
-              } else if (val == 'categories') {
-                _openManageCategories();
-              } else if (val == 'restock') {
-                _openRestockOrderModal();
-              }
-            },
-            itemBuilder: (ctx) => [
-              const PopupMenuItem(
-                value: 'catalog',
-                child: Row(
-                  children: [
-                    Icon(Icons.picture_as_pdf_outlined, color: Color(0xFFDC2626), size: 20),
-                    SizedBox(width: 8),
-                    Text('Catálogo en PDF'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'restock',
-                child: Row(
-                  children: [
-                    Icon(Icons.local_shipping_outlined, color: Color(0xFFD97706), size: 20),
-                    SizedBox(width: 8),
-                    Text('Pedido a proveedor'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'categories',
-                child: Row(
-                  children: [
-                    Icon(Icons.tune, color: Color(0xFF2563EB), size: 20),
-                    SizedBox(width: 8),
-                    Text('Gestionar categorías'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'excel',
-                child: Row(
-                  children: [
-                    Icon(Icons.table_chart_outlined, color: Color(0xFF059669), size: 20),
-                    SizedBox(width: 8),
-                    Text('Exportar a Excel (.xlsx)'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
-        color: const Color(0xFF059669),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final double hPadding = math.max(16.0, (constraints.maxWidth - 1200) / 2);
+            final double hPadding = math.max(AppSpace.lg, (constraints.maxWidth - 1200) / 2);
             final pagedList = _pagedProducts;
             final totalPages = (_products.length / _pageSize).ceil();
-
-            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final columns = _layout == ProductLayout.grid
+                ? (constraints.maxWidth >= 1100 ? 4 : (constraints.maxWidth >= 700 ? 3 : 2))
+                : (constraints.maxWidth >= 900 ? 2 : 1);
 
             return CustomScrollView(
               controller: _scrollController,
               slivers: [
-                // Barra de Herramientas Destacadas en Desktop
-                if (isDesktop)
+                if (isDesktop && canEditProducts)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.fromLTRB(hPadding, 16, hPadding, 6),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 8,
-                            children: [
-                              _buildDesktopActionButton(
-                                icon: Icons.picture_as_pdf_rounded,
-                                label: 'Catálogo PDF',
-                                color: const Color(0xFFEF4444),
-                                onTap: _openCatalogModal,
-                                isDark: isDark,
-                              ),
-                              if (canEditProducts) ...[
-                                _buildDesktopActionButton(
-                                  icon: Icons.local_shipping_outlined,
-                                  label: 'Pedido Proveedor',
-                                  color: const Color(0xFFD97706),
-                                  onTap: _openRestockOrderModal,
-                                  isDark: isDark,
-                                ),
-                              ],
-                              _buildDesktopActionButton(
-                                icon: Icons.table_chart_rounded,
-                                label: 'Exportar Excel',
-                                color: const Color(0xFF10B981),
-                                onTap: _exportToExcel,
-                                isDark: isDark,
-                              ),
-                              if (canEditProducts) ...[
-                                _buildDesktopActionButton(
-                                  icon: Icons.tune_rounded,
-                                  label: 'Categorías',
-                                  color: const Color(0xFF8B5CF6),
-                                  onTap: _openManageCategories,
-                                  isDark: isDark,
-                                ),
-                              ],
-                            ],
-                          ),
-                          if (canEditProducts)
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                if (_activeBusiness == null) return;
-                                final created = await Navigator.push<bool>(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
-                                  ),
-                                );
-                                if (created == true) {
-                                  _loadData();
-                                }
-                              },
-                              icon: const Icon(Icons.add_rounded, size: 18),
-                              label: const Text(
-                                '+ Nuevo Producto',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF8B5CF6),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                        ],
+                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.lg, hPadding, 0),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: PrimaryActionButton(label: 'Nuevo producto', onPressed: _openNewProduct),
                       ),
                     ),
                   ),
 
-                // Resumen de Métricas de Stock Superior
+                // Resumen del inventario
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: hPadding),
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
                     child: _buildStatsHeader(),
                   ),
                 ),
 
-                // Barra de búsqueda con lector de código, chip de orden rápido y botón de filtros
+                // Accesos rápidos (antes en el menú ⋮)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(hPadding, 8, hPadding, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            onChanged: (_) {
-                              _currentPage = 1;
-                              _loadData();
-                            },
-                            decoration: InputDecoration(
-                              hintText: 'Buscar por nombre o código...',
-                              prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
-                              suffixIcon: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (_searchController.text.isNotEmpty)
-                                    IconButton(
-                                      icon: const Icon(Icons.clear, size: 18),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        _currentPage = 1;
-                                        _loadData();
-                                      },
-                                    ),
-                                  IconButton(
-                                    icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF8B5CF6)),
-                                    tooltip: 'Escanear para buscar',
-                                    onPressed: _scanToSearch,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
+                    child: QuickAccessRow(
+                      items: [
+                        QuickAccessItem(
+                          icon: Icons.menu_book_rounded,
+                          label: 'Catálogo',
+                          caption: 'PDF e historias',
+                          onTap: _openCatalogModal,
                         ),
-                        const SizedBox(width: 8),
-
-                        // Chip de Orden Rápido A - Z
-                        InkWell(
-                          onTap: _openSortFilterModal,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF131126) : Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
-                                    ? const Color(0xFF8B5CF6)
-                                    : (isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1)),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.sort_by_alpha_rounded,
-                                  size: 17,
-                                  color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
-                                      ? const Color(0xFF8B5CF6)
-                                      : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _getSortLabel(_sortOption),
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
-                                        ? const Color(0xFF8B5CF6)
-                                        : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
-                                  ),
-                                ),
-                                const SizedBox(width: 2),
-                                Icon(
-                                  Icons.arrow_drop_down,
-                                  size: 18,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                ),
-                              ],
-                            ),
+                        if (canEditProducts)
+                          QuickAccessItem(
+                            icon: Icons.local_shipping_outlined,
+                            label: 'Pedido',
+                            caption: 'A proveedor',
+                            onTap: _openRestockOrderModal,
                           ),
-                        ),
-                        const SizedBox(width: 8),
-
-                        // Botón de filtros avanzados
-                        InkWell(
-                          onTap: _openSortFilterModal,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
-                                  ? const Color(0xFF8B5CF6).withOpacity(0.15)
-                                  : (isDark ? const Color(0xFF131126) : Colors.white),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
-                                    ? const Color(0xFF8B5CF6)
-                                    : (isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1)),
-                              ),
-                            ),
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Icon(
-                                  Icons.tune_rounded,
-                                  size: 22,
-                                  color: (_sortOption != 'name_asc' || _stockFilterOption != 'all')
-                                      ? const Color(0xFF8B5CF6)
-                                      : const Color(0xFF64748B),
-                                ),
-                                if (_sortOption != 'name_asc' || _stockFilterOption != 'all')
-                                  Positioned(
-                                    top: -2,
-                                    right: -2,
-                                    child: Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF8B5CF6),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
+                        QuickAccessItem(
+                          icon: Icons.table_chart_outlined,
+                          label: 'Excel',
+                          caption: 'Exportar',
+                          onTap: _exportToExcel,
                         ),
                       ],
                     ),
                   ),
                 ),
 
-                // Filtro por categorías con botón de gestión
+                // Buscador a todo el ancho
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(hPadding, 0, hPadding, 12),
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.lg, hPadding, 0),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (_) {
+                        _currentPage = 1;
+                        _loadData();
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Buscar por nombre o código',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_searchController.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 20),
+                                tooltip: 'Borrar búsqueda',
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _currentPage = 1;
+                                  _loadData();
+                                },
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.qr_code_scanner_rounded),
+                              tooltip: 'Escanear código',
+                              onPressed: _scanToSearch,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Orden y filtros (un solo botón) + vista lista o cuadrícula
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.sm, hPadding, 0),
+                    child: Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _openSortFilterModal,
+                          icon: Icon(Icons.tune_rounded, size: 18, color: _hasActiveFilters ? c.accent : c.inkMuted),
+                          label: Text(
+                            _hasActiveFilters ? 'Orden: ${_getSortLabel(_sortOption)} · Filtros' : 'Orden: ${_getSortLabel(_sortOption)}',
+                            style: TextStyle(fontSize: 13, color: _hasActiveFilters ? c.accent : c.ink),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
+                            side: BorderSide(color: _hasActiveFilters ? c.accent : c.line),
+                          ),
+                        ),
+                        const Spacer(),
+                        SegmentedButton<ProductLayout>(
+                          showSelectedIcon: false,
+                          style: SegmentedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            selectedBackgroundColor: c.surfaceMuted,
+                            side: BorderSide(color: c.line),
+                          ),
+                          segments: const [
+                            ButtonSegment(value: ProductLayout.list, icon: Icon(Icons.view_list_rounded), tooltip: 'Ver en lista'),
+                            ButtonSegment(value: ProductLayout.grid, icon: Icon(Icons.grid_view_rounded), tooltip: 'Ver en cuadrícula'),
+                          ],
+                          selected: {_layout},
+                          onSelectionChanged: (s) => _setLayout(s.first),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Categorías, con "Editar" al final (antes había un segundo botón de filtros)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.sm, hPadding, 0),
                     child: Row(
                       children: [
                         Expanded(
@@ -701,265 +616,167 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                             },
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: IconButton(
-                            icon: const Icon(Icons.tune, size: 20, color: Color(0xFF64748B)),
-                            tooltip: 'Gestionar categorías',
+                        if (canEditProducts)
+                          TextButton.icon(
                             onPressed: _openManageCategories,
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            label: const Text('Editar'),
                           ),
-                        ),
                       ],
                     ),
                   ),
                 ),
 
-                // Lista de productos
-                if (_isLoading)
-                  const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_products.isEmpty)
-                  SliverFillRemaining(
-                    child: _buildEmptyState(),
-                  )
-                else
-                  SliverLayoutBuilder(
-                    builder: (context, innerConstraints) {
-                      final isWide = innerConstraints.crossAxisExtent >= 680;
-                      if (isWide) {
-                        return SliverPadding(
-                          padding: EdgeInsets.symmetric(horizontal: hPadding),
-                          sliver: SliverGrid(
-                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 380,
-                              mainAxisExtent: 130,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 10,
-                            ),
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final product = pagedList[index];
-                                return ProductCard(
-                                  product: product,
-                                  margin: EdgeInsets.zero,
-                                  showMargin: canViewCosts,
-                                  canAdjustStock: canEditProducts,
-                                  onTap: () async {
-                                    await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ProductDetailScreen(product: product),
-                                      ),
-                                    );
-                                    _loadData();
-                                  },
-                                  onAdjustStock: canEditProducts ? () => QuickStockDialog.show(context, product: product, onSaved: _loadData) : null,
-                                  onSale: () async {
-                                    final sold = await QuickSaleDialog.show(context, product);
-                                    if (sold == true) {
-                                      _loadData();
-                                    }
-                                  },
-                                );
-                              },
-                              childCount: pagedList.length,
-                            ),
-                          ),
-                        );
-                      }
-
-                      return SliverPadding(
-                        padding: EdgeInsets.symmetric(horizontal: hPadding),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final product = pagedList[index];
-                              return ProductCard(
-                                product: product,
-                                showMargin: canViewCosts,
-                                canAdjustStock: canEditProducts,
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ProductDetailScreen(product: product),
-                                    ),
-                                  );
-                                  _loadData();
-                                },
-                                onAdjustStock: canEditProducts ? () => QuickStockDialog.show(context, product: product, onSaved: _loadData) : null,
-                                onSale: () async {
-                                  final sold = await QuickSaleDialog.show(context, product);
-                                  if (sold == true) {
-                                    _loadData();
-                                  }
-                                },
-                              );
-                            },
-                            childCount: pagedList.length,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-
-                // Controles de Paginación
-                if (_products.length > _pageSize)
+                // Encabezado de la lista con la paginación compacta
+                if (!_isLoading && _products.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.fromLTRB(hPadding, 16, hPadding, MediaQuery.of(context).padding.bottom + 80),
-                      child: _buildPaginationControls(totalPages),
+                      padding: EdgeInsets.fromLTRB(hPadding + AppSpace.xs, AppSpace.md, hPadding, AppSpace.xs),
+                      child: Row(
+                        children: [
+                          Text('Productos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                          const SizedBox(width: AppSpace.sm),
+                          Text('${_products.length}', style: AppText.amount(context, size: 14, weight: FontWeight.w500, color: c.inkMuted)),
+                          const Spacer(),
+                          AppPagination(currentPage: _currentPage, totalPages: totalPages, onPageChanged: _goToPage, compact: true),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                if (_isLoading)
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
+                    sliver: SliverList.separated(
+                      itemCount: 5,
+                      separatorBuilder: (_, __) => const SizedBox(height: AppSpace.sm),
+                      itemBuilder: (_, __) => const SkeletonListTile(),
+                    ),
+                  )
+                else if (_products.isEmpty)
+                  SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
+                else if (columns == 1)
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: hPadding),
+                    sliver: SliverList.separated(
+                      itemCount: pagedList.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: AppSpace.sm),
+                      itemBuilder: (_, i) => _card(pagedList[i]),
                     ),
                   )
                 else
-                  SliverToBoxAdapter(
-                    child: SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: hPadding),
+                    sliver: SliverGrid(
+                      gridDelegate: _layout == ProductLayout.grid
+                          ? SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: columns,
+                              crossAxisSpacing: AppSpace.sm,
+                              mainAxisSpacing: AppSpace.sm,
+                              childAspectRatio: 0.74,
+                            )
+                          : SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: columns,
+                              crossAxisSpacing: AppSpace.sm,
+                              mainAxisSpacing: AppSpace.sm,
+                              mainAxisExtent: 88,
+                            ),
+                      delegate: SliverChildBuilderDelegate((_, i) => _card(pagedList[i]), childCount: pagedList.length),
+                    ),
                   ),
+
+                // Paginación completa abajo; espacio para el botón principal y Stocky
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, MediaQuery.of(context).padding.bottom + 150),
+                    child: _isLoading
+                        ? const SizedBox.shrink()
+                        : AppPagination(currentPage: _currentPage, totalPages: totalPages, onPageChanged: _goToPage),
+                  ),
+                ),
               ],
             );
           },
         ),
       ),
-      floatingActionButton: canEditProducts
+      // El botón principal va a la izquierda: a la derecha está Stocky
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+      floatingActionButton: canEditProducts && !isDesktop
           ? Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 72),
-              child: FloatingActionButton(
-                onPressed: () async {
-                  if (_activeBusiness == null) return;
-                  final created = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
-                    ),
-                  );
-                  if (created == true) {
-                    _loadData();
-                  }
-                },
-                backgroundColor: const Color(0xFF059669),
-                foregroundColor: Colors.white,
-                elevation: 4,
-                shape: const CircleBorder(),
-                tooltip: 'Nuevo Producto',
-                child: const Icon(Icons.add, size: 28),
-              ),
+              // A la altura de la pastilla de Stocky en Inicio, justo encima de la barra
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+              child: PrimaryActionButton(label: 'Producto', onPressed: _openNewProduct),
             )
           : null,
     );
   }
 
   Widget _buildStatsHeader() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
     final total = _stats['totalProducts'] ?? 0;
     final outOfStock = _stats['outOfStock'] ?? 0;
     final lowStock = _stats['lowStock'] ?? 0;
     final totalValue = _stats['totalValue'] ?? 0.0;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(0, 16, 0, 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131127) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    Widget stat(String label, String value, Color color) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatItem('Total Artículos', '$total', isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
-              _buildStatItem('Bajo Stock', '$lowStock', const Color(0xFFD97706)),
-              _buildStatItem('Agotados', '$outOfStock', const Color(0xFFDC2626)),
+              Text(value, style: AppText.amount(context, size: 22, color: color)),
+              Text(label, style: TextStyle(fontSize: 12, color: c.inkMuted)),
             ],
           ),
-          if (totalValue > 0) ...[
-            Divider(height: 20, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        );
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              stat('Productos', '$total', c.ink),
+              stat('Stock bajo', '$lowStock', lowStock > 0 ? c.warning : c.ink),
+              stat('Agotados', '$outOfStock', outOfStock > 0 ? c.danger : c.ink),
+            ],
+          ),
+          if (canViewCosts && totalValue > 0) ...[
+            Divider(height: AppSpace.xl, color: c.line),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Valor comercial en inventario:',
-                  style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                ),
-                Text(
-                  CurrencyFormatter.format(totalValue),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF059669),
-                  ),
-                ),
+                Expanded(child: Text('Valor del inventario', style: TextStyle(fontSize: 13, color: c.inkMuted))),
+                Text(CurrencyFormatter.format(totalValue), style: AppText.amount(context, size: 15)),
               ],
             ),
           ],
           if (lowStock > 0 || outOfStock > 0) ...[
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: _openRestockOrderModal,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF78350F).withOpacity(0.5) : const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.local_shipping_outlined, size: 18, color: Color(0xFFD97706)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${lowStock + outOfStock} productos para reponer • Generar pedido',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+            const SizedBox(height: AppSpace.md),
+            Material(
+              color: c.warningSoft,
+              borderRadius: BorderRadius.circular(AppRadius.control),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                onTap: _openRestockOrderModal,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(Icons.local_shipping_outlined, size: 18, color: c.warning),
+                      const SizedBox(width: AppSpace.sm),
+                      Expanded(
+                        child: Text(
+                          '${lowStock + outOfStock} por reponer · Generar pedido',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.warning),
                         ),
                       ),
-                    ),
-                    Icon(Icons.arrow_forward_ios, size: 12, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E)),
-                  ],
+                      Icon(Icons.chevron_right_rounded, size: 20, color: c.warning),
+                    ],
+                  ),
                 ),
               ),
             ),
           ],
         ],
       ),
-    );
-  }
-
-  Widget _buildStatItem(String title, String count, Color color) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Column(
-      children: [
-        Text(
-          count,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 11,
-            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 
@@ -1000,148 +817,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     );
   }
 
-  Widget _buildPaginationControls(int totalPages) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isMobile = MediaQuery.of(context).size.width < 520;
-    final startIndex = (_currentPage - 1) * _pageSize + 1;
-    final endIndex = math.min(_currentPage * _pageSize, _products.length);
-
-    void goToPrev() {
-      if (_currentPage > 1) {
-        setState(() => _currentPage--);
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-        }
-      }
-    }
-
-    void goToNext() {
-      if (_currentPage < totalPages) {
-        setState(() => _currentPage++);
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-        }
-      }
-    }
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: isMobile ? 8 : 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Flexible(
-            child: Text(
-              isMobile
-                  ? '$startIndex-$endIndex de ${_products.length}'
-                  : 'Mostrando $startIndex-$endIndex de ${_products.length} productos',
-              style: TextStyle(
-                fontSize: isMobile ? 11.5 : 12.5,
-                fontWeight: FontWeight.w500,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (isMobile)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  onPressed: _currentPage > 1 ? goToPrev : null,
-                  icon: const Icon(Icons.chevron_left_rounded, size: 22),
-                  color: const Color(0xFF8B5CF6),
-                  disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF059669).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '$_currentPage / $totalPages',
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF059669),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  onPressed: _currentPage < totalPages ? goToNext : null,
-                  icon: const Icon(Icons.chevron_right_rounded, size: 22),
-                  color: const Color(0xFF8B5CF6),
-                  disabledColor: isDark ? const Color(0xFF332D63) : const Color(0xFFCBD5E1),
-                ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: _currentPage > 1 ? goToPrev : null,
-                  icon: const Icon(Icons.chevron_left_rounded, size: 18),
-                  label: const Text('Anterior', style: TextStyle(fontSize: 12)),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF059669).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '$_currentPage / $totalPages',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF059669),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: _currentPage < totalPages ? goToNext : null,
-                  icon: const Icon(Icons.chevron_right_rounded, size: 18),
-                  label: const Text('Siguiente', style: TextStyle(fontSize: 12)),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
   String _getSortLabel(String option) {
     switch (option) {
       case 'name_desc':
@@ -1161,57 +836,5 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
       default:
         return 'A - Z';
     }
-  }
-
-  Widget _buildDesktopActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-    required bool isDark,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF131126) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 16, color: color),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

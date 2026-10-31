@@ -1,9 +1,11 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../business_identity.dart';
 import 'join_business_dialog.dart';
 import 'business_trash.dart';
+import 'create_business_sheet.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/supabase_service.dart';
-import '../../../../core/utils/currency_options.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
@@ -52,6 +54,7 @@ class BusinessSelectorModal extends StatefulWidget {
     }
 
     return showModalBottomSheet<bool>(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -110,115 +113,18 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
   }
 
   Future<void> _showCreateBusinessDialog() async {
-    final nameController = TextEditingController();
-    String selectedCurrency = 'COP';
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) => AlertDialog(
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.storefront_rounded, color: Color(0xFF10B981), size: 22),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Crear Nueva Empresa', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                      Text(
-                        'Ingresa el nombre y moneda de tu sede',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre de la Empresa o Tienda',
-                      hintText: 'Ej. Minimarket Central, Ropa & Moda...',
-                      prefixIcon: Icon(Icons.storefront_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: selectedCurrency,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Moneda Principal',
-                      prefixIcon: Icon(Icons.monetization_on_outlined),
-                    ),
-                    items: kAvailableCurrencies.map((c) {
-                      return DropdownMenuItem(
-                        value: c.code,
-                        child: Text(c.label),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedCurrency = val);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                ),
-                onPressed: () {
-                  if (nameController.text.trim().isNotEmpty) {
-                    Navigator.pop(ctx, {
-                      'name': nameController.text.trim(),
-                      'currency': selectedCurrency,
-                    });
-                  }
-                },
-                icon: const Icon(Icons.check_rounded, size: 18),
-                label: const Text('Crear y Entrar'),
-              ),
-            ],
-          ),
-        );
-      },
+    final data = await CreateBusinessSheet.show(context);
+    if (data == null || !mounted) return;
+    final newBiz = await _businessRepo.createBusiness(
+      name: data.name,
+      userId: widget.userId,
+      currency: data.currency,
+      country: data.country,
+      icon: data.icon,
+      color: data.color,
     );
-
-    if (result != null && result['name']!.isNotEmpty) {
-      final newBiz = await _businessRepo.createBusiness(
-        name: result['name']!,
-        userId: widget.userId,
-        currency: result['currency'] ?? 'COP',
-      );
-      _businessRepo.setActiveBusiness(newBiz);
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
-    }
+    _businessRepo.setActiveBusiness(newBiz);
+    if (mounted) Navigator.pop(context, true);
   }
 
   Future<void> _confirmLeaveBusiness(Business biz) async {
@@ -296,111 +202,8 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
       return;
     }
 
-    final nameController = TextEditingController(text: biz.name);
-    String selectedCurrency = biz.currency;
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) => AlertDialog(
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF059669).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.edit_note_rounded, color: Color(0xFF10B981), size: 22),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Editar Empresa', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                      Text(
-                        'Modifica el nombre o moneda principal',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre de la Empresa',
-                      prefixIcon: Icon(Icons.storefront_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: selectedCurrency,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Moneda Principal',
-                      prefixIcon: Icon(Icons.monetization_on_outlined),
-                    ),
-                    items: kAvailableCurrencies.map((c) {
-                      return DropdownMenuItem(
-                        value: c.code,
-                        child: Text(c.label),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedCurrency = val);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                ),
-                onPressed: () {
-                  if (nameController.text.trim().isNotEmpty) {
-                    Navigator.pop(ctx, {
-                      'name': nameController.text.trim(),
-                      'currency': selectedCurrency,
-                    });
-                  }
-                },
-                icon: const Icon(Icons.save_rounded, size: 18),
-                label: const Text('Guardar'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (result != null && result['name']!.isNotEmpty) {
-      await _businessRepo.updateBusiness(
-        id: biz.id,
-        name: result['name']!,
-        currency: result['currency'] ?? 'COP',
-      );
-      await _loadBusinesses();
-    }
+    final saved = await CreateBusinessSheet.edit(context, biz);
+    if (saved != null) await _loadBusinesses();
   }
 
   Future<void> _confirmDeleteBusiness(Business biz) async {
@@ -532,426 +335,112 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF131126) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
+    final c = context.colors;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        widget.isDialog ? 24 : MediaQuery.of(context).padding.bottom + 24,
+        AppSpace.xl,
+        AppSpace.md,
+        AppSpace.xl,
+        widget.isDialog ? AppSpace.xl : MediaQuery.of(context).padding.bottom + AppSpace.lg,
       ),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: c.surface,
         borderRadius: widget.isDialog
-            ? BorderRadius.circular(24)
-            : const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(color: borderColor, width: 1.2),
+            ? BorderRadius.circular(AppRadius.sheet)
+            : const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (!widget.isDialog)
             Center(
               child: Container(
-                width: 40,
+                width: 36,
                 height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF332D5C) : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                margin: const EdgeInsets.only(bottom: AppSpace.lg),
+                decoration: BoxDecoration(color: c.lineStrong, borderRadius: BorderRadius.circular(2)),
               ),
             ),
-          const SizedBox(height: 16),
+          Text('Tus negocios', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+          const SizedBox(height: 2),
           Text(
-            'Tus Empresas / Negocios',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-            ),
+            'Cada negocio tiene sus propios productos, ventas y clientes',
+            style: TextStyle(fontSize: 13, color: c.inkMuted),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Los productos y ventas de cada empresa están 100% aislados.',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Botones de acción principales (Unirse y Crear Negocio)
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => JoinBusinessDialog.show(context, userId: widget.userId),
-                  icon: const Icon(Icons.group_add_outlined, size: 18),
-                  label: const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      'Unirme a Negocio',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF38BDF8),
-                    side: BorderSide(
-                      color: isDark ? const Color(0xFF2563EB) : const Color(0xFF93C5FD),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 6),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _showCreateBusinessDialog,
-                  icon: const Icon(Icons.add_business_outlined, size: 18),
-                  label: const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      'Crear Negocio',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF059669),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 6),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpace.lg),
 
           if (_isLoading)
-            const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+            const Padding(
+              padding: EdgeInsets.all(AppSpace.xl),
+              child: Center(child: CircularProgressIndicator()),
+            )
           else if (_businesses.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-                ),
-              ),
-              child: Center(
-                child: Column(
-                  children: [
-                    const Icon(Icons.storefront_outlined, size: 40, color: Color(0xFF94A3B8)),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No tienes empresas activas.',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Usa los botones de arriba para unirte a un equipo o crear tu negocio.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpace.xl),
+              child: Text(
+                'Aún no tienes negocios. Crea el tuyo o únete al de tu equipo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: c.inkMuted),
               ),
             )
           else
             Flexible(
               child: ListView.separated(
                 shrinkWrap: true,
+                padding: EdgeInsets.zero,
                 itemCount: _businesses.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final biz = _businesses[index];
-                  final isSelected = _currentBusiness?.id == biz.id;
-
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? (isDark ? const Color(0xFF0F2D24) : const Color(0xFFECFDF5))
-                          : (isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC)),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFF10B981)
-                            : (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              _businessRepo.setActiveBusiness(biz);
-                              Navigator.pop(context, true);
-                            },
-                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(14)),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: isSelected
-                                        ? const Color(0xFF059669)
-                                        : (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-                                    foregroundColor: isSelected
-                                        ? Colors.white
-                                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                                    child: const Icon(Icons.storefront, size: 20),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Nombre del negocio en su propia fila completa
-                                        Text(
-                                          biz.name,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                            color: isSelected
-                                                ? (isDark ? const Color(0xFF34D399) : const Color(0xFF065F46))
-                                                : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-
-                                        // Etiquetas de estado, rol y moneda
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 4,
-                                          crossAxisAlignment: WrapCrossAlignment.center,
-                                          children: [
-                                            if (isSelected)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF059669),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: const Text(
-                                                  'ACTIVA',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 9,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            Builder(
-                                              builder: (_) {
-                                                final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
-                                                final isOwner = role == 'OWNER';
-                                                final roleLabel = isOwner
-                                                    ? 'Dueño'
-                                                    : (role == 'ADMIN' ? 'Admin' : 'Cajero');
-                                                final roleIcon = isOwner
-                                                    ? Icons.workspace_premium_rounded
-                                                    : (role == 'ADMIN' ? Icons.shield_outlined : Icons.point_of_sale_outlined);
-                                                final roleColor = isOwner
-                                                    ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                                                    : (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB));
-                                                return Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: isOwner
-                                                        ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
-                                                        : (isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF)),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(
-                                                      color: isOwner
-                                                          ? const Color(0xFF059669)
-                                                          : const Color(0xFF2563EB),
-                                                      width: 0.8,
-                                                    ),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(roleIcon, size: 10, color: roleColor),
-                                                      const SizedBox(width: 3),
-                                                      Text(
-                                                        roleLabel,
-                                                        style: TextStyle(
-                                                          color: roleColor,
-                                                          fontSize: 9,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                            Text(
-                                              '• ${getCurrencyLabel(biz.currency)}',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, size: 22, color: Color(0xFF64748B)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          onSelected: (action) {
-                            if (action == 'edit') {
-                              _showEditBusinessDialog(biz);
-                            } else if (action == 'delete') {
-                              _confirmDeleteBusiness(biz);
-                            } else if (action == 'leave') {
-                              _confirmLeaveBusiness(biz);
-                            }
-                          },
-                          itemBuilder: (ctx) {
-                            final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
-                            final isOwner = role == 'OWNER';
-                            final isAdmin = role == 'ADMIN';
-                            final canManage = isOwner || isAdmin;
-                            return [
-                              if (canManage)
-                                PopupMenuItem(
-                                  value: 'edit',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.edit_outlined,
-                                        size: 18,
-                                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const Text('Editar negocio'),
-                                    ],
-                                  ),
-                                ),
-                              if (isOwner)
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                                      SizedBox(width: 8),
-                                      Text('Mover a papelera', style: TextStyle(color: Colors.red)),
-                                    ],
-                                  ),
-                                ),
-                              if (!isOwner)
-                                const PopupMenuItem(
-                                  value: 'leave',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.exit_to_app, size: 18, color: Colors.orange),
-                                      SizedBox(width: 8),
-                                      Text('Salir del equipo', style: TextStyle(color: Colors.orange)),
-                                    ],
-                                  ),
-                                ),
-                            ];
-                          },
-                        ),
-                        const SizedBox(width: 4),
-                      ],
-                    ),
-                  );
-                },
+                separatorBuilder: (_, __) => const SizedBox(height: AppSpace.sm),
+                itemBuilder: (context, index) => _businessTile(_businesses[index]),
               ),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpace.lg),
 
-          // Papelera de Empresas (si existen empresas eliminadas)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => JoinBusinessDialog.show(context, userId: widget.userId),
+                  icon: const Icon(Icons.group_add_outlined, size: 18),
+                  label: const Text('Unirme'),
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _showCreateBusinessDialog,
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: const Text('Nuevo negocio'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.md),
+
           if (_deletedBusinesses.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF450A0A).withOpacity(0.4) : const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
-                ),
-              ),
-              child: ListTile(
-                dense: true,
-                leading: const Icon(Icons.delete_sweep_outlined, color: Color(0xFFDC2626), size: 22),
-                title: Text(
-                  'Papelera (${_deletedBusinesses.length} ${_deletedBusinesses.length == 1 ? "empresa" : "empresas"})',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
-                  ),
-                ),
-                subtitle: Text(
-                  'Recupera empresas antes de 7 días',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
-                  ),
-                ),
-                trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFFDC2626)),
-                onTap: () => BusinessTrash.show(context, userId: widget.userId, onChanged: _loadBusinesses),
-              ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.delete_outline_rounded, color: c.inkMuted),
+              title: Text('Papelera · ${_deletedBusinesses.length}'),
+              subtitle: const Text('Se pueden recuperar durante 7 días'),
+              trailing: Icon(Icons.chevron_right_rounded, color: c.inkMuted),
+              onTap: () => BusinessTrash.show(context, userId: widget.userId, onChanged: _loadBusinesses),
             ),
-
-          Divider(height: 1, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-          const SizedBox(height: 4),
-
-          // Términos y Privacidad
           ListTile(
-            leading: Icon(
-              Icons.shield_outlined,
-              color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-            ),
-            title: Text(
-              'Términos y Privacidad',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-              ),
-            ),
-            trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFF94A3B8)),
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.shield_outlined, color: c.inkMuted),
+            title: const Text('Términos y privacidad'),
+            trailing: Icon(Icons.chevron_right_rounded, color: c.inkMuted),
             onTap: () {
               Navigator.pop(context);
               LegalDocumentScreen.show(context);
             },
           ),
-
-          // Botón de Cerrar Sesión
           ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.logout_rounded, color: c.danger),
+            title: Text('Cerrar sesión', style: TextStyle(color: c.danger, fontWeight: FontWeight.w600)),
             onTap: () {
               Navigator.pop(context);
               AuthRepository.instance.logout();
@@ -959,8 +448,79 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
               widget.onLogout?.call();
             },
           ),
-          const SizedBox(height: 8),
         ],
+      ),
+    );
+  }
+
+  Widget _businessTile(Business biz) {
+    final c = context.colors;
+    final isSelected = _currentBusiness?.id == biz.id;
+    final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
+    final isOwner = role == 'OWNER';
+    final canManage = isOwner || role == 'ADMIN';
+    final roleLabel = isOwner ? 'Dueño' : (role == 'ADMIN' ? 'Administrador' : 'Cajero');
+
+    return Material(
+      color: c.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        side: BorderSide(color: isSelected ? c.accent : c.line, width: isSelected ? 1.6 : 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          _businessRepo.setActiveBusiness(biz);
+          Navigator.pop(context, true);
+        },
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.md, AppSpace.xs, AppSpace.md),
+          child: Row(
+            children: [
+              BusinessAvatar(business: biz, size: 44),
+              const SizedBox(width: AppSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      biz.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.ink),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$roleLabel · ${biz.currency}',
+                      style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected) Icon(Icons.check_circle_rounded, color: c.accent),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert_rounded, color: c.inkMuted),
+                tooltip: 'Opciones de ${biz.name}',
+                onSelected: (action) {
+                  if (action == 'edit') {
+                    _showEditBusinessDialog(biz);
+                  } else if (action == 'delete') {
+                    _confirmDeleteBusiness(biz);
+                  } else if (action == 'leave') {
+                    _confirmLeaveBusiness(biz);
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (canManage) const PopupMenuItem(value: 'edit', child: Text('Editar negocio')),
+                  if (isOwner)
+                    PopupMenuItem(value: 'delete', child: Text('Mover a la papelera', style: TextStyle(color: c.danger))),
+                  if (!isOwner)
+                    PopupMenuItem(value: 'leave', child: Text('Salir del equipo', style: TextStyle(color: c.danger))),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

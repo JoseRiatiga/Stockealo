@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../models/category.dart';
 
+/// Pastillas de categorías para filtrar el inventario
 class CategoryFilterBar extends StatelessWidget {
   final List<Category> categories;
   final String selectedCategory;
@@ -15,43 +17,30 @@ class CategoryFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
     final allCategories = ['Todos', ...categories.map((c) => c.name)];
 
     return SizedBox(
-      height: 44,
+      height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.zero,
         itemCount: allCategories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpace.sm),
         itemBuilder: (context, index) {
           final cat = allCategories[index];
           final isSelected = cat == selectedCategory;
-
-          return FilterChip(
+          return ChoiceChip(
             label: Text(cat),
             selected: isSelected,
-            onSelected: (_) => onCategorySelected(cat),
-            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            selectedColor: const Color(0xFF059669),
-            labelStyle: TextStyle(
-              color: isSelected
-                  ? Colors.white
-                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              fontSize: 13,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(
-                color: isSelected
-                    ? const Color(0xFF059669)
-                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              ),
-            ),
             showCheckmark: false,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            onSelected: (_) => onCategorySelected(cat),
+            labelStyle: TextStyle(
+              color: isSelected ? c.onAccent : c.ink,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              fontSize: 13.5,
+            ),
+            side: BorderSide(color: isSelected ? c.accent : c.line),
           );
         },
       ),

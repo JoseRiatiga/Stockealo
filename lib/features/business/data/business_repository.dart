@@ -3,12 +3,22 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/theme/theme_controller.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../../auth/data/auth_repository.dart';
 import '../models/business.dart';
 
 class BusinessRepository extends ChangeNotifier {
   static final BusinessRepository instance = BusinessRepository._internal();
-  BusinessRepository._internal();
+  BusinessRepository._internal() {
+    // Los montos se muestran con el símbolo de la moneda del negocio activo
+    activeBusinessNotifier.addListener(() {
+      final business = activeBusinessNotifier.value;
+      CurrencyFormatter.useCurrency(business?.currency);
+      // Acento de la app si el usuario eligió usar el color del negocio
+      ThemeController.instance.setBusinessColor(business?.color);
+    });
+  }
 
   final AppDatabase _dbProvider = AppDatabase.instance;
   static Business? _activeBusiness;
@@ -109,6 +119,9 @@ class BusinessRepository extends ChangeNotifier {
     required String name,
     required String userId,
     String currency = 'COP',
+    String country = 'CO',
+    String? icon,
+    String? color,
   }) async {
     final db = await _dbProvider.database;
     final business = Business(
@@ -116,6 +129,9 @@ class BusinessRepository extends ChangeNotifier {
       userId: userId,
       name: name.trim(),
       currency: currency,
+      country: country,
+      icon: icon,
+      color: color,
       createdAt: DateTime.now(),
     );
 
@@ -154,21 +170,29 @@ class BusinessRepository extends ChangeNotifier {
     return business;
   }
 
-  /// Actualiza los datos de una empresa (nombre, moneda y descripción opcional)
-  Future<void> updateBusiness({
+  /// Actualiza los datos de una empresa. Los campos opcionales en null no cambian.
+  Future<Business?> updateBusiness({
     required String id,
     required String name,
     required String currency,
     String? description,
+    String? country,
+    String? icon,
+    String? color,
+    String? logoUrl,
+    bool? cashRegisterEnabled,
   }) async {
     final db = await _dbProvider.database;
     final Map<String, dynamic> updateData = {
       'name': name.trim(),
       'currency': currency,
+      if (description != null) 'description': description.trim(),
+      if (country != null) 'country': country,
+      if (icon != null) 'icon': icon,
+      if (color != null) 'color': color,
+      if (logoUrl != null) 'logo_url': logoUrl,
+      if (cashRegisterEnabled != null) 'cash_register_enabled': cashRegisterEnabled ? 1 : 0,
     };
-    if (description != null) {
-      updateData['description'] = description.trim();
-    }
 
     await db.update(
       'businesses',
@@ -177,26 +201,19 @@ class BusinessRepository extends ChangeNotifier {
       whereArgs: [id],
     );
 
+    final rows = await db.query('businesses', where: 'id = ?', whereArgs: [id], limit: 1);
+    if (rows.isEmpty) return null;
+    final saved = Business.fromMap(rows.first);
+
     if (_activeBusiness?.id == id) {
-      _activeBusiness = _activeBusiness!.copyWith(
-        name: name.trim(),
-        currency: currency,
-        description: description != null ? description.trim() : _activeBusiness!.description,
-      );
+      _activeBusiness = saved;
       activeBusinessNotifier.value = _activeBusiness;
       notifyListeners();
     }
 
-    // Sincronizar actualización en tiempo real a Supabase
-    SupabaseService.instance.upsertBusinessToCloud({
-      'id': id,
-      'name': name.trim(),
-      'currency': currency,
-      'description': description?.trim() ?? _activeBusiness?.description,
-      'type': 'Comercio General',
-      'is_deleted': 0,
-      'created_at': DateTime.now().toIso8601String(),
-    });
+    // Se envía la fila completa: la nube guarda país, ícono, color y demás en cada cambio
+    SupabaseService.instance.upsertBusinessToCloud(saved.toMap());
+    return saved;
   }
 
   /// Mueve una empresa a la papelera (conservando datos durante 7 días)

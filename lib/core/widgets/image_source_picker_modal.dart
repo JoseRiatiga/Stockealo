@@ -54,6 +54,7 @@ class ImageSourcePickerModal extends StatelessWidget {
     }
 
     return showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

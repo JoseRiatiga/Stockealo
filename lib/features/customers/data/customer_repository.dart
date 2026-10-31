@@ -2,6 +2,9 @@ import 'dart:math';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/countries.dart';
+import '../../../core/utils/currency_formatter.dart';
+import '../../team/data/activity_repository.dart';
 import '../models/customer.dart';
 import '../models/customer_payment.dart';
 
@@ -45,6 +48,15 @@ class CustomerRepository {
     return null;
   }
 
+  /// Teléfono con prefijo internacional; un número sin prefijo es del país del negocio
+  Future<String?> _phoneWithPrefix(String? phone, String businessId) async {
+    if (phone == null || phone.trim().isEmpty) return null;
+    final db = await _dbProvider.database;
+    final rows = await db.query('businesses', columns: ['country'], where: 'id = ?', whereArgs: [businessId], limit: 1);
+    final country = countryByCode(rows.isEmpty ? null : rows.first['country'] as String?);
+    return PhoneNumbers.toE164(phone, country: country) ?? phone.trim();
+  }
+
   /// Crea un nuevo cliente
   Future<Customer> createCustomer({
     required String businessId,
@@ -58,7 +70,7 @@ class CustomerRepository {
       id: const Uuid().v4(),
       businessId: businessId,
       name: name.trim(),
-      phone: phone?.trim().isNotEmpty == true ? phone!.trim() : null,
+      phone: await _phoneWithPrefix(phone, businessId),
       address: address?.trim().isNotEmpty == true ? address!.trim() : null,
       debtBalance: max(0.0, initialDebt),
       createdAt: DateTime.now(),
@@ -81,11 +93,12 @@ class CustomerRepository {
     String? address,
   }) async {
     final db = await _dbProvider.database;
+    final current = await getCustomerById(id);
     await db.update(
       'customers',
       {
         'name': name.trim(),
-        'phone': phone?.trim().isNotEmpty == true ? phone!.trim() : null,
+        'phone': current == null ? phone?.trim() : await _phoneWithPrefix(phone, current.businessId),
         'address': address?.trim().isNotEmpty == true ? address!.trim() : null,
       },
       where: 'id = ?',
@@ -165,6 +178,13 @@ class CustomerRepository {
 
     // Restar el abono en la nube por diferencia: no pisa fiados de otros dispositivos
     SupabaseService.instance.adjustCustomerDebtInCloud(customerId, -(previousDebt - remainingDebt));
+    ActivityRepository.instance.log(
+      businessId: businessId,
+      action: ActivityAction.debtPayment,
+      summary: 'Recibió un abono de ${CurrencyFormatter.format(amount)} de ${customer.name} '
+          '(${activityPaymentLabel(paymentMethod)}; ${remainingDebt > 0 ? 'debe ${CurrencyFormatter.format(remainingDebt)}' : 'quedó al día'})',
+      data: {'customer_id': customerId, 'amount': amount},
+    );
 
     return PaymentResult(
       customer: updatedCustomer,
@@ -177,6 +197,17 @@ class CustomerRepository {
   /// Elimina un cliente
   Future<void> deleteCustomer(String id) async {
     final db = await _dbProvider.database;
+    final customer = await getCustomerById(id);
     await db.delete('customers', where: 'id = ?', whereArgs: [id]);
+    if (customer != null) {
+      ActivityRepository.instance.log(
+        businessId: customer.businessId,
+        action: ActivityAction.customerDelete,
+        summary: customer.debtBalance > 0
+            ? 'Eliminó al cliente ${customer.name}, que debía ${CurrencyFormatter.format(customer.debtBalance)}'
+            : 'Eliminó al cliente ${customer.name}',
+        data: {'customer_id': id},
+      );
+    }
   }
 }

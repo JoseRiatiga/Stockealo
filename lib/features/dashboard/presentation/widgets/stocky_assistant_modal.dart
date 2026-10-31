@@ -1,9 +1,12 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/theme/stocky_palette.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import '../../../customers/data/debt_reminder.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../stocky/data/stocky_ai_service.dart';
 import '../../../stocky/data/stocky_assistant_service.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../auth/presentation/widgets/stocky_mascot.dart';
@@ -71,6 +74,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
   final List<StockyAssistantMessage> _messages = [];
 
   bool _isThinking = false;
+  String _thinkingLabel = 'Revisando tu negocio…';
   StockyState _mascotState = StockyState.idle;
   String _effectiveBusinessId = '';
   String _userName = 'Comerciante';
@@ -92,6 +96,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
   void initState() {
     super.initState();
     _initSession();
+    _loadAi();
     if (widget.initialPrompt != null && widget.initialPrompt!.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _handleSendMessage(widget.initialPrompt!);
@@ -104,6 +109,70 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAi() async {
+    final ai = StockyAiService.instance;
+    await ai.load();
+    if (ai.mode.value != StockyAiMode.off) ai.refreshStatus();
+  }
+
+  /// Texto del botón para gastar una pregunta, con las que quedan si se saben
+  String _askAiLabel() {
+    final left = StockyAiService.instance.remaining.value;
+    return left == null ? 'Preguntarle a la IA' : 'Preguntarle a la IA · te quedan $left';
+  }
+
+  /// Respuesta de las reglas cuando no entendieron: según el modo de IA se deja igual,
+  /// se le agrega el botón de la IA o se pregunta directamente
+  StockyAssistantMessage _withAiOffer(StockyAssistantMessage response) {
+    if (response.type != StockyMessageType.fallback) return response;
+    final mode = StockyAiService.instance.mode.value;
+    if (mode == StockyAiMode.off) return response;
+    final prompt = response.data?['prompt'] as String? ?? '';
+    return StockyAssistantMessage(
+      id: response.id,
+      isUser: false,
+      text: 'Esa pregunta todavía no la sé responder con mis reglas. '
+          'Puedo consultarla con la IA (usa 1 de tus preguntas de hoy) o puedes tocar una opción:',
+      timestamp: response.timestamp,
+      type: StockyMessageType.fallback,
+      data: response.data,
+      actions: [
+        StockyAction(label: _askAiLabel(), actionType: 'ask_ai', payload: prompt),
+        ...response.actions,
+      ],
+    );
+  }
+
+  Future<void> _askAi(String prompt) async {
+    if (prompt.trim().isEmpty || _isThinking) return;
+    setState(() {
+      _isThinking = true;
+      _thinkingLabel = 'Preguntándole a la IA…';
+      _mascotState = StockyState.loading;
+    });
+    _scrollToBottom();
+
+    final result = await StockyAiService.instance.ask(prompt, _effectiveBusinessId);
+    if (!mounted) return;
+
+    final message = StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: result.ok ? result.answer! : result.errorMessage,
+      timestamp: DateTime.now(),
+      type: result.ok ? StockyMessageType.aiAnswer : StockyMessageType.text,
+      data: result.ok ? {'remaining': result.remaining, 'cached': result.cached} : null,
+    );
+    StockyAssistantService.instance.addMessage(_effectiveBusinessId, message);
+    setState(() {
+      _messages.add(message);
+      _isThinking = false;
+      _thinkingLabel = 'Revisando tu negocio…';
+      _mascotState = result.ok ? StockyState.success : StockyState.idle;
+    });
+    _scrollToBottom();
   }
 
   void _initSession() {
@@ -167,11 +236,21 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     if (!mounted) return;
 
     try {
-      final response = await StockyAssistantService.instance.processQuery(
+      final ruleResponse = await StockyAssistantService.instance.processQuery(
         prompt: query,
         businessId: _effectiveBusinessId,
         userName: _userName,
       );
+
+      // Modo automático: lo que las reglas no entienden va directo a la IA
+      if (ruleResponse.type == StockyMessageType.fallback &&
+          StockyAiService.instance.mode.value == StockyAiMode.auto) {
+        if (!mounted) return;
+        setState(() => _isThinking = false);
+        await _askAi(query);
+        return;
+      }
+      final response = _withAiOffer(ruleResponse);
 
       StockyAssistantService.instance.addMessage(_effectiveBusinessId, response);
 
@@ -242,6 +321,10 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     final activeBiz = ActiveBusinessScope.read(context);
 
     switch (action.actionType) {
+      case 'ask_ai':
+        _askAi(action.payload as String? ?? '');
+        break;
+
       case 'query_sales':
       case 'query_stock':
       case 'query_debts':
@@ -309,334 +392,318 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.viewInsets.bottom;
-    final screenHeight = mediaQuery.size.height;
-    final screenWidth = mediaQuery.size.width;
 
     // Altura óptima (60% de la pantalla) para no tapar todo el fondo
-    final modalHeight = (screenHeight * 0.60).clamp(400.0, 580.0);
-
-    // Paleta Obsidian Violet Bento
-    final sheetBg = isDark ? const Color(0xFF0F0E1E) : Colors.white;
-    final headerBg = isDark ? const Color(0xFF16142B) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF27214E) : const Color(0xFFE2E8F0);
-    final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final modalHeight = (mediaQuery.size.height * 0.60).clamp(400.0, 580.0);
+    final radius = BorderRadius.circular(AppRadius.sheet);
 
     return SafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Padding(
           padding: EdgeInsets.only(
-            left: 10,
-            right: 10,
-            bottom: bottomInset > 0 ? bottomInset + 8 : 12,
+            left: AppSpace.sm + 2,
+            right: AppSpace.sm + 2,
+            bottom: bottomInset > 0 ? bottomInset + AppSpace.sm : AppSpace.md,
           ),
           child: Material(
             color: Colors.transparent,
             child: Container(
               height: modalHeight,
-              width: math.min(screenWidth - 20, 500.0),
+              width: math.min(mediaQuery.size.width - 20, 500.0),
               decoration: BoxDecoration(
-                color: sheetBg,
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: borderColor, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.35),
-                    blurRadius: 30,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                color: c.paper,
+                borderRadius: radius,
+                border: Border.all(color: c.line),
+                // Flota sobre la app: única sombra, suave
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 28, offset: const Offset(0, 8))],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(26),
+                borderRadius: radius,
                 child: Column(
                   children: [
-
-          // Header de Stocky Asistente
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: headerBg,
-              border: Border(bottom: BorderSide(color: borderColor, width: 1)),
-            ),
-            child: Row(
-              children: [
-                // Mascota Animada Stocky
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isDark ? const Color(0xFF1E1A3C) : const Color(0xFFECFDF5),
-                    border: Border.all(
-                      color: const Color(0xFF10B981).withOpacity(0.3),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Center(
-                    child: StockyMascot(
-                      size: 38,
-                      state: _mascotState,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Título y Estado En Línea
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              'Stocky',
-                              style: TextStyle(
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.3,
-                                color: textMain,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF8B5CF6).withOpacity(0.18),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'BETA',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF8B5CF6),
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ],
+                    _header(c),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.md),
+                        itemCount: _messages.length + (_isThinking ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == _messages.length && _isThinking) return _buildThinkingBubble(c);
+                          return _buildMessageItem(_messages[index], c);
+                        },
                       ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            width: 6.5,
-                            height: 6.5,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'En línea',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: textMuted,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                    ),
+                    _suggestions(c),
+                    _input(c),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _avatar(StockealoColors c, {required double size, StockyState state = StockyState.idle}) => Container(
+        width: size,
+        height: size,
+        decoration: const BoxDecoration(shape: BoxShape.circle, color: StockyPalette.halo),
+        child: Center(child: StockyMascot(size: size * 0.82, state: state)),
+      );
+
+  Widget _header(StockealoColors c) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.xs, AppSpace.sm),
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border(bottom: BorderSide(color: c.line)),
+      ),
+      child: Row(
+        children: [
+          _avatar(c, size: 44, state: _mascotState),
+          const SizedBox(width: AppSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text('Stocky', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.ink)),
+                    const SizedBox(width: AppSpace.sm),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: c.surfaceMuted,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        'BETA',
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: c.inkMuted),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(width: 7, height: 7, decoration: BoxDecoration(color: c.success, shape: BoxShape.circle)),
+                    const SizedBox(width: 6),
+                    Text('En línea', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          _aiModeButton(c),
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, size: 21, color: c.inkMuted),
+            tooltip: 'Reiniciar conversación',
+            onPressed: _resetChat,
+          ),
+          IconButton(
+            icon: Icon(Icons.close_rounded, size: 22, color: c.inkMuted),
+            tooltip: 'Cerrar',
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _aiModeButton(StockealoColors c) {
+    final ai = StockyAiService.instance;
+    return ValueListenableBuilder<StockyAiMode>(
+      valueListenable: ai.mode,
+      builder: (context, mode, _) {
+        final on = mode != StockyAiMode.off;
+        return PopupMenuButton<StockyAiMode>(
+          tooltip: 'IA de Stocky: ${mode.label}',
+          initialValue: mode,
+          position: PopupMenuPosition.under,
+          onSelected: (value) {
+            ai.setMode(value);
+            if (value != StockyAiMode.off) ai.refreshStatus();
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem<StockyAiMode>(
+              enabled: false,
+              child: ValueListenableBuilder<int?>(
+                valueListenable: ai.remaining,
+                builder: (_, left, __) => Text(
+                  left == null ? 'IA de Stocky' : 'IA de Stocky · te quedan $left hoy',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.inkMuted),
+                ),
+              ),
+            ),
+            for (final option in StockyAiMode.values)
+              PopupMenuItem<StockyAiMode>(
+                value: option,
+                child: SizedBox(
+                  width: 240,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Icon(
+                          option == mode ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                          size: 18,
+                          color: option == mode ? c.accent : c.inkFaint,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.sm + 2),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(option.label, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+                            const SizedBox(height: 2),
+                            Text(option.description, style: TextStyle(fontSize: 12.5, height: 1.3, color: c.inkMuted)),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                // Botón Reiniciar Chat
-                IconButton(
-                  icon: Icon(Icons.refresh_rounded, size: 20, color: textMuted),
-                  tooltip: 'Reiniciar conversación',
-                  onPressed: _resetChat,
-                  splashRadius: 20,
-                ),
-
-                // Botón Cerrar
-                IconButton(
-                  icon: Icon(Icons.close_rounded, size: 22, color: textMuted),
-                  tooltip: 'Cerrar',
-                  onPressed: () => Navigator.pop(context),
-                  splashRadius: 20,
-                ),
-              ],
-            ),
-          ),
-
-          // Lista de Mensajes del Chat
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              itemCount: _messages.length + (_isThinking ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length && _isThinking) {
-                  return _buildThinkingBubble(isDark);
-                }
-                final msg = _messages[index];
-                return _buildMessageItem(msg, isDark);
-              },
-            ),
-          ),
-
-          // Carrusel de Sugerencias Rápidas
-          Container(
-            height: 38,
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              itemCount: _quickChips.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final chip = _quickChips[i];
-                return InkWell(
-                  onTap: () => _handleSendMessage(chip['prompt']!),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E1A3C) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF342B63) : const Color(0xFFCBD5E1),
-                        width: 1,
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      chip['label']!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Campo de Entrada de Texto con Botón Enviar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF181530) : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF30285C) : const Color(0xFFCBD5E1),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: TextField(
-                      controller: _textController,
-                      style: TextStyle(fontSize: 14, color: textMain),
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _handleSendMessage(),
-                      decoration: InputDecoration(
-                        hintText: 'Pregúntale algo a Stocky...',
-                        hintStyle: TextStyle(fontSize: 13.5, color: textMuted),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () => _handleSendMessage(),
-                  borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF8B5CF6), Color(0xFF059669)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  ),
-),
-),
-),
-);
-  }
-
-  Widget _buildThinkingBubble(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            margin: const EdgeInsets.only(right: 10, top: 2),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isDark ? const Color(0xFF221C46) : const Color(0xFFECFDF5),
-              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
-            ),
-            child: const Center(
-              child: StockyMascot(size: 26, state: StockyState.loading),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF181530) : const Color(0xFFF1F5F9),
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
               ),
-              border: Border.all(
-                color: isDark ? const Color(0xFF2C2456) : const Color(0xFFE2E8F0),
-              ),
+          ],
+          child: Container(
+            margin: const EdgeInsets.only(right: AppSpace.xs),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm + 2, vertical: 6),
+            decoration: BoxDecoration(
+              color: on ? c.accent.withOpacity(0.12) : c.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(Color(0xFF8B5CF6)),
-                  ),
-                ),
-                const SizedBox(width: 10),
+                Icon(Icons.auto_awesome_rounded, size: 15, color: on ? c.accent : c.inkMuted),
+                const SizedBox(width: 4),
                 Text(
-                  'Stocky está consultando tu negocio...',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontStyle: FontStyle.italic,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
+                  on ? 'IA' : 'IA no',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: on ? c.accent : c.inkMuted),
                 ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _suggestions(StockealoColors c) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
+        itemCount: _quickChips.length,
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpace.sm),
+        itemBuilder: (context, i) {
+          final chip = _quickChips[i];
+          return ActionChip(
+            label: Text(chip['label']!),
+            onPressed: () => _handleSendMessage(chip['prompt']!),
+            backgroundColor: c.surface,
+            side: BorderSide(color: c.line),
+            labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.ink),
+            shape: const StadiumBorder(),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _input(StockealoColors c) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.sm, AppSpace.md, AppSpace.md),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _textController,
+              style: TextStyle(fontSize: 15, color: c.ink),
+              textInputAction: TextInputAction.send,
+              textCapitalization: TextCapitalization.sentences,
+              onSubmitted: (_) => _handleSendMessage(),
+              decoration: InputDecoration(
+                hintText: 'Pregúntale algo a Stocky…',
+                filled: true,
+                fillColor: c.surface,
+                contentPadding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.md),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  borderSide: BorderSide(color: c.line),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  borderSide: BorderSide(color: c.line),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  borderSide: BorderSide(color: c.accent, width: 1.5),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpace.sm),
+          Semantics(
+            button: true,
+            label: 'Enviar',
+            child: Material(
+              color: c.accent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => _handleSendMessage(),
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(Icons.arrow_upward_rounded, color: c.onAccent, size: 22),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static const _stockyBubbleRadius = BorderRadius.only(
+    topRight: Radius.circular(18),
+    bottomLeft: Radius.circular(18),
+    bottomRight: Radius.circular(18),
+  );
+
+  Widget _buildThinkingBubble(StockealoColors c) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpace.sm + 2, top: 2),
+            child: _avatar(c, size: 32, state: StockyState.loading),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: _stockyBubbleRadius,
+              border: Border.all(color: c.line),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: c.accent)),
+                const SizedBox(width: AppSpace.sm + 2),
+                Text(_thinkingLabel, style: TextStyle(fontSize: 13, color: c.inkMuted)),
               ],
             ),
           ),
@@ -645,63 +712,35 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     );
   }
 
-  Widget _buildMessageItem(StockyAssistantMessage msg, bool isDark) {
+  Widget _buildMessageItem(StockyAssistantMessage msg, StockealoColors c) {
     if (msg.isUser) {
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12, left: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          margin: const EdgeInsets.only(bottom: AppSpace.md, left: 48),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: 11),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: c.accent,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(18),
               topRight: Radius.circular(18),
               bottomLeft: Radius.circular(18),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF7C3AED).withOpacity(0.25),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
           ),
-          child: Text(
-            msg.text,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
-              height: 1.35,
-            ),
-          ),
+          child: Text(msg.text, style: TextStyle(fontSize: 14.5, color: c.onAccent, height: 1.35)),
         ),
       );
     }
 
     // Mensaje de Stocky (con avatar a la izquierda)
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpace.lg),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            margin: const EdgeInsets.only(right: 10, top: 2),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isDark ? const Color(0xFF221C46) : const Color(0xFFECFDF5),
-              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.35)),
-            ),
-            child: const Center(
-              child: StockyMascot(size: 28, state: StockyState.idle),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpace.sm + 2, top: 2),
+            child: _avatar(c, size: 34),
           ),
           Expanded(
             child: Column(
@@ -710,29 +749,33 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF181530) : const Color(0xFFF8FAFC),
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(18),
-                      bottomLeft: Radius.circular(18),
-                      bottomRight: Radius.circular(18),
-                    ),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF2C2456) : const Color(0xFFE2E8F0),
-                      width: 1.1,
-                    ),
+                    color: c.surface,
+                    borderRadius: _stockyBubbleRadius,
+                    border: Border.all(color: c.line),
                   ),
-                  child: _buildFormattedText(msg.text, isDark),
+                  child: _buildFormattedText(msg.text, c),
                 ),
-
-                // Botones de acción embebidos
+                if (msg.type == StockyMessageType.aiAnswer) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.auto_awesome_rounded, size: 13, color: c.inkFaint),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          _aiFooter(msg),
+                          style: TextStyle(fontSize: 11.5, color: c.inkFaint),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (msg.actions.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpace.sm),
                   Wrap(
-                    spacing: 8,
+                    spacing: AppSpace.sm,
                     runSpacing: 6,
-                    children: msg.actions.map((act) {
-                      return _buildActionPill(act, isDark);
-                    }).toList(),
+                    children: [for (final act in msg.actions) _buildActionPill(act, c)],
                   ),
                 ],
               ],
@@ -743,93 +786,61 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     );
   }
 
-  Widget _buildActionPill(StockyAction action, bool isDark) {
-    IconData icon;
-    Color color;
+  String _aiFooter(StockyAssistantMessage msg) {
+    final left = msg.data?['remaining'];
+    const base = 'Respuesta con IA, puede tener errores';
+    return left is int ? '$base · te quedan $left hoy' : base;
+  }
 
-    switch (action.actionType) {
-      case 'navigate_sales':
-        icon = Icons.point_of_sale;
-        color = const Color(0xFF2563EB);
-        break;
-      case 'navigate_inventory':
-        icon = Icons.inventory_2_outlined;
-        color = const Color(0xFF10B981);
-        break;
-      case 'navigate_customers':
-        icon = Icons.people_outline;
-        color = const Color(0xFFD97706);
-        break;
-      case 'quick_sale':
-        icon = Icons.add_shopping_cart;
-        color = const Color(0xFF059669);
-        break;
-      case 'restock_modal':
-        icon = Icons.local_shipping_outlined;
-        color = const Color(0xFFDC2626);
-        break;
-      case 'whatsapp_debtor':
-        icon = Icons.chat_bubble_outline;
-        color = const Color(0xFF16A34A);
-        break;
-      default:
-        icon = Icons.arrow_forward_rounded;
-        color = const Color(0xFF8B5CF6);
-    }
+  Widget _buildActionPill(StockyAction action, StockealoColors c) {
+    final (IconData icon, Color color) = switch (action.actionType) {
+      'navigate_sales' => (Icons.point_of_sale_rounded, c.info),
+      'navigate_inventory' => (Icons.inventory_2_outlined, c.accent),
+      'navigate_customers' => (Icons.people_outline_rounded, c.warning),
+      'quick_sale' => (Icons.add_shopping_cart_rounded, c.accent),
+      'restock_modal' => (Icons.local_shipping_outlined, c.danger),
+      'whatsapp_debtor' => (Icons.chat_bubble_outline_rounded, c.success),
+      'ask_ai' => (Icons.auto_awesome_rounded, c.accent),
+      _ => (Icons.arrow_forward_rounded, c.accent),
+    };
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return InkWell(
       onTap: () => _handleActionTap(action),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.pill),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5.5),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 7),
         decoration: BoxDecoration(
-          color: color.withOpacity(isDark ? 0.16 : 0.10),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.4), width: 1),
+          color: color.withOpacity(isDark ? 0.18 : 0.10),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(color: color.withOpacity(0.35)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 5),
-            Text(
-              action.label,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 6),
+            Text(action.label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: color)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFormattedText(String text, bool isDark) {
-    final textMain = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+  Widget _buildFormattedText(String text, StockealoColors c) {
     final lines = text.split('\n');
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: lines.map((line) {
-        if (line.trim().isEmpty) {
-          return const SizedBox(height: 6);
-        }
-
-        // Parsear spans para **negrita** e *itálica*
-        final spans = _parseMarkdownSpans(line, textMain);
-
+        if (line.trim().isEmpty) return const SizedBox(height: 6);
+        // Las viñetas "- " o "* " (comunes en respuestas de la IA) se muestran como "• "
+        line = line.replaceFirst(RegExp(r'^\s*[-*]\s+'), '• ');
         return Padding(
           padding: const EdgeInsets.only(bottom: 2),
-          child: RichText(
-            text: TextSpan(
-              style: TextStyle(
-                fontSize: 13.5,
-                height: 1.42,
-                color: textMain,
-              ),
-              children: spans,
+          child: Text.rich(
+            TextSpan(
+              style: TextStyle(fontSize: 14, height: 1.42, color: c.ink),
+              children: _parseMarkdownSpans(line, c.ink),
             ),
           ),
         );

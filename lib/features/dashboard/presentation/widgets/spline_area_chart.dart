@@ -154,7 +154,7 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Tiempo Real',
+                      'En vivo',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,

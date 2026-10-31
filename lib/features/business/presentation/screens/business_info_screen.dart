@@ -1,3 +1,8 @@
+import '../widgets/create_business_sheet.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/utils/countries.dart';
+import '../../../profile/presentation/widgets/settings_cards.dart';
+import '../business_identity.dart';
 import '../active_business_scope.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -5,11 +10,11 @@ import 'package:flutter/services.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../../core/utils/currency_options.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../team/models/business_member.dart';
+import '../../../team/presentation/screens/activity_screen.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
@@ -124,120 +129,8 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
       return;
     }
 
-    final nameController = TextEditingController(text: _business.name);
-    final descController = TextEditingController(text: _business.description ?? '');
-    String selectedCurrency = _business.currency;
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Row(
-              children: [
-                Icon(Icons.storefront_outlined, color: Color(0xFF059669)),
-                SizedBox(width: 10),
-                Text('Editar Negocio', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre del Negocio *',
-                      prefixIcon: Icon(Icons.store),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    value: selectedCurrency,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Moneda Principal',
-                      prefixIcon: Icon(Icons.monetization_on_outlined),
-                    ),
-                    items: kAvailableCurrencies.map((c) {
-                      return DropdownMenuItem(
-                        value: c.code,
-                        child: Text(c.label),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() => selectedCurrency = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: descController,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'Descripción / Eslogan (Opcional)',
-                      hintText: 'Ej. Venta de abarrotes, tecnología y artículos varios...',
-                      prefixIcon: Icon(Icons.description_outlined),
-                      alignLabelWithHint: true,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: () {
-                  if (nameController.text.trim().isNotEmpty) {
-                    Navigator.pop(ctx, {
-                      'name': nameController.text.trim(),
-                      'currency': selectedCurrency,
-                      'description': descController.text.trim(),
-                    });
-                  }
-                },
-                child: const Text('Guardar'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (result != null && result['name']!.isNotEmpty) {
-      await _businessRepo.updateBusiness(
-        id: _business.id,
-        name: result['name']!,
-        currency: result['currency'] ?? 'COP',
-        description: result['description'],
-      );
-
-      setState(() {
-        _business = _business.copyWith(
-          name: result['name']!,
-          currency: result['currency'] ?? 'COP',
-          description: result['description'],
-        );
-      });
-
-      if (mounted) {
-        AppToast.show(
-          context,
-          message: 'Datos del negocio actualizados correctamente',
-          type: ToastType.success,
-        );
-      }
-    }
+    final saved = await CreateBusinessSheet.edit(context, _business);
+    if (saved != null && mounted) setState(() => _business = saved);
   }
 
   void _copyInviteCode() {
@@ -296,23 +189,16 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.delete_outline, color: Colors.red),
-            SizedBox(width: 8),
-            Text('¿Mover a la Papelera?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
-        ),
+        title: const Text('¿Mover a la papelera?'),
         content: Text(
           'El negocio "${_business.name}" se enviará a la papelera durante 7 días. Podrás restaurarlo o se eliminará de forma definitiva al finalizar el plazo.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: ctx.colors.danger, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Mover a Papelera'),
+            child: const Text('Mover a la papelera'),
           ),
         ],
       ),
@@ -323,7 +209,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
       if (mounted) {
         AppToast.show(
           context,
-          message: 'Empresa enviada a la papelera',
+          message: 'Negocio enviado a la papelera',
           type: ToastType.warning,
         );
         Navigator.pop(context, true);
@@ -332,558 +218,285 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
   }
 
   String _formatDate(DateTime dt) {
-    final months = [
-      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
-    ];
+    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
-  Widget _buildRoleBadge(String role) {
-    Color bg;
-    Color fg;
-    String label;
-    IconData icon;
+  String get _roleLabel => switch (_userRole.toUpperCase()) {
+        'OWNER' => 'Dueño',
+        'ADMIN' => 'Administrador',
+        _ => 'Cajero',
+      };
 
-    switch (role.toUpperCase()) {
-      case 'OWNER':
-        bg = const Color(0xFFFEF3C7);
-        fg = const Color(0xFFB45309);
-        label = 'Dueño Fundador';
-        icon = Icons.workspace_premium_rounded;
-        break;
-      case 'ADMIN':
-        bg = const Color(0xFFEFF6FF);
-        fg = const Color(0xFF1D4ED8);
-        label = 'Administrador';
-        icon = Icons.security_rounded;
-        break;
-      default:
-        bg = const Color(0xFFF1F5F9);
-        fg = const Color(0xFF475569);
-        label = 'Cajero / Ventas';
-        icon = Icons.point_of_sale_rounded;
-    }
+  IconData get _roleIcon => switch (_userRole.toUpperCase()) {
+        'OWNER' => Icons.workspace_premium_rounded,
+        'ADMIN' => Icons.admin_panel_settings_rounded,
+        _ => Icons.point_of_sale_rounded,
+      };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: fg),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: fg),
-          ),
-        ],
-      ),
-    );
+  void _copyBusinessId() {
+    Clipboard.setData(ClipboardData(text: _business.id));
+    AppToast.show(context, message: 'ID copiado', type: ToastType.info);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF131127) : Colors.white;
-    final cardBorder = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Información de tu Negocio',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Cambiar de Empresa',
-            icon: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF2563EB)),
-            onPressed: _switchBusiness,
-          ),
-        ],
-      ),
-      body: _isLoadingMetrics
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final double hPadding = math.max(16.0, (constraints.maxWidth - 860) / 2);
-
-                return ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    hPadding,
-                    14,
-                    hPadding,
-                    MediaQuery.of(context).padding.bottom + 24,
-                  ),
-                  children: [
-                // 1. Tarjeta Principal: Identidad del Negocio
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: cardBorder),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF059669).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFF10B981).withOpacity(0.25),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                _business.name.isNotEmpty
-                                    ? _business.name[0].toUpperCase()
-                                    : 'B',
-                                style: const TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF059669),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _business.name,
-                                  style: TextStyle(
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        'Moneda: ${_business.currency}',
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textMuted),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _buildRoleBadge(_userRole),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      // Descripción o Nota Comercial
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF0F172A).withOpacity(0.5) : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.notes_rounded, size: 18, color: textMuted),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                (_business.description != null && _business.description!.isNotEmpty)
-                                    ? _business.description!
-                                    : 'Sin descripción asignada. Añade una nota comercial o eslogan para identificar tu empresa.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontStyle: (_business.description == null || _business.description!.isEmpty)
-                                      ? FontStyle.italic
-                                      : FontStyle.normal,
-                                  color: (_business.description != null && _business.description!.isNotEmpty)
-                                      ? (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155))
-                                      : textMuted,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      // Botón para editar negocio
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _editBusinessDetails,
-                          icon: Icon(
-                            _canEdit ? Icons.edit_outlined : Icons.lock_outline,
-                            size: 16,
-                            color: _canEdit ? const Color(0xFF059669) : textMuted,
-                          ),
-                          label: Text(
-                            _canEdit ? 'Editar Información y Moneda' : 'Solo Dueño/Admin puede editar',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _canEdit ? const Color(0xFF059669) : textMuted,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: _canEdit ? const Color(0xFF059669) : cardBorder,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // 2. Tarjeta: Código de Invitación y Resumen de Equipo
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: cardBorder),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.groups_rounded, size: 20, color: Color(0xFF2563EB)),
-                              SizedBox(width: 8),
-                              Text(
-                                'Equipo de Trabajo',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '${_members.length} ${_members.length == 1 ? "Colaborador" : "Colaboradores"}',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_canEdit) ...[
-                        const SizedBox(height: 12),
-                        // Código de Invitación (Exclusivo Dueño / Admin)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: cardBorder),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.qr_code_2_rounded, color: Color(0xFF059669), size: 22),
-                              const SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Código de Empresa', style: TextStyle(fontSize: 10, color: textMuted)),
-                                  Text(
-                                    _business.inviteCode,
-                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.2),
-                                  ),
-                                ],
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                tooltip: 'Copiar Código',
-                                icon: const Icon(Icons.copy_rounded, size: 20, color: Color(0xFF059669)),
-                                onPressed: _copyInviteCode,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      // Botón a Administrar / Ver Equipo
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _openEmployeesScreen,
-                          icon: Icon(
-                            _canEdit ? Icons.person_add_alt_1_rounded : Icons.people_outline_rounded,
-                            size: 18,
-                          ),
-                          label: Text(_canEdit ? 'Administrar Miembros y Permisos' : 'Ver Equipo de Trabajo'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // 3. Tarjeta: Métricas y Auditoría del Negocio
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: cardBorder),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.analytics_outlined, size: 20, color: Color(0xFF059669)),
-                          SizedBox(width: 8),
-                          Text(
-                            'Auditoría y Métricas del Negocio',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricTile(
-                              title: 'Catálogo',
-                              value: '$_productsCount',
-                              subtitle: 'Productos activos',
-                              icon: Icons.inventory_2_outlined,
-                              color: const Color(0xFF059669),
-                              isDark: isDark,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildMetricTile(
-                              title: 'Ventas Totales',
-                              value: '$_salesCount',
-                              subtitle: CurrencyFormatter.format(_salesTotalAmount),
-                              icon: Icons.receipt_long_outlined,
-                              color: const Color(0xFF2563EB),
-                              isDark: isDark,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricTile(
-                              title: 'Clientes',
-                              value: '$_customersCount',
-                              subtitle: 'Registrados',
-                              icon: Icons.people_outline_rounded,
-                              color: const Color(0xFFD97706),
-                              isDark: isDark,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildMetricTile(
-                              title: 'Respaldo',
-                              value: _isCloudSync ? 'En la Nube' : 'Modo Local',
-                              subtitle: _isCloudSync ? 'Sincronizado con Supabase' : 'Solo en este equipo',
-                              icon: _isCloudSync ? Icons.cloud_done_rounded : Icons.phone_android_rounded,
-                              color: _isCloudSync ? const Color(0xFF059669) : const Color(0xFF64748B),
-                              isDark: isDark,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Divider(height: 1, color: cardBorder),
-                      const SizedBox(height: 12),
-                      // Registro de Auditoría
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_today_rounded, size: 14, color: textMuted),
-                          const SizedBox(width: 6),
-                          Text('Creado el: ${_formatDate(_business.createdAt)}', style: TextStyle(fontSize: 12, color: textMuted)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.fingerprint_rounded, size: 14, color: textMuted),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'ID Auditoría: ${_business.id}',
-                              style: TextStyle(fontSize: 11, color: textMuted, fontFamily: 'monospace'),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // 4. Zona de Gestión / Peligro
-                if (_userRole == 'OWNER') ...[
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF450A0A).withOpacity(0.2) : const Color(0xFFFEF2F2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Zona de Gestión de Empresa',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Si ya no necesitas esta empresa, puedes moverla a la papelera (se conservará por 7 días por seguridad).',
-                          style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _handleDeleteBusiness,
-                            icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                            label: const Text('Mover Empresa a la Papelera'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red),
-                              padding: const EdgeInsets.symmetric(vertical: 11),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          ),
-                        ),
-                      ],
+      backgroundColor: c.paper,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.sm, AppSpace.md, AppSpace.md),
+              child: Row(
+                children: [
+                  _RoundButton(icon: Icons.chevron_left_rounded, label: 'Atrás', onTap: () => Navigator.pop(context)),
+                  Expanded(
+                    child: Text(
+                      'Tu negocio',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.ink),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  _RoundButton(icon: Icons.swap_horiz_rounded, label: 'Cambiar de negocio', onTap: _switchBusiness),
                 ],
-              ],
-            );
-          },
+              ),
+            ),
+            Expanded(
+              child: _isLoadingMetrics
+                  ? const Center(child: CircularProgressIndicator())
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final double hPadding = math.max(AppSpace.lg, (constraints.maxWidth - 720) / 2);
+                        return RefreshIndicator(
+                          onRefresh: _loadAllInfo,
+                          child: ListView(
+                            padding: EdgeInsets.fromLTRB(hPadding, 0, hPadding, AppSpace.xxl),
+                            children: [
+                              _identityCard(c),
+                              const SizedBox(height: AppSpace.xl),
+                              SettingsPanel(label: 'Resumen', child: _metrics(c)),
+                              SettingsGroup(label: 'Equipo', children: [
+                                SettingsRow(
+                                  icon: Icons.qr_code_2_rounded,
+                                  title: 'Código de invitación',
+                                  subtitle: _canEdit
+                                      ? '${_business.inviteCode} · toca para copiarlo'
+                                      : 'Solo el dueño o un administrador lo comparte',
+                                  onTap: _copyInviteCode,
+                                  trailing: _canEdit ? Icon(Icons.copy_rounded, size: 20, color: c.inkFaint) : null,
+                                ),
+                                SettingsRow(
+                                  icon: Icons.groups_rounded,
+                                  title: 'Miembros y permisos',
+                                  subtitle: _members.length == 1 ? 'Solo tú' : '${_members.length} personas',
+                                  onTap: _openEmployeesScreen,
+                                ),
+                                // Control del dueño: el cajero no ve la actividad del equipo
+                                if (_canEdit)
+                                  SettingsRow(
+                                    icon: Icons.history_rounded,
+                                    title: 'Actividad del equipo',
+                                    subtitle: 'Quién vendió, cambió precios o ajustó el stock',
+                                    onTap: () => ActivityScreen.open(context, _business),
+                                  ),
+                              ]),
+                              SettingsGroup(label: 'Detalles', children: [
+                                SettingsRow(
+                                  icon: Icons.event_rounded,
+                                  title: 'Creado el',
+                                  subtitle: _formatDate(_business.createdAt),
+                                ),
+                                SettingsRow(
+                                  icon: Icons.fingerprint_rounded,
+                                  title: 'ID del negocio',
+                                  subtitle: _business.id,
+                                  onTap: _copyBusinessId,
+                                  trailing: Icon(Icons.copy_rounded, size: 20, color: c.inkFaint),
+                                ),
+                              ]),
+                              SettingsGroup(children: [
+                                SettingsRow(
+                                  icon: Icons.delete_outline_rounded,
+                                  title: 'Mover a la papelera',
+                                  subtitle: _userRole == 'OWNER'
+                                      ? 'Se guarda 7 días por si cambias de opinión'
+                                      : 'Solo el dueño puede hacerlo',
+                                  danger: true,
+                                  onTap: _handleDeleteBusiness,
+                                ),
+                              ]),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
+      ),
     );
   }
 
-  Widget _buildMetricTile({
-    required String title,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required bool isDark,
-  }) {
+  Widget _identityCard(StockealoColors c) {
+    final country = countryByCode(_business.country);
+    final description = _business.description?.trim() ?? '';
+    Widget pill(IconData icon, String text) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm + 2, vertical: AppSpace.xs),
+          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.pill)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: c.inkMuted),
+              const SizedBox(width: AppSpace.xs),
+              Text(text, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.inkMuted)),
+            ],
+          ),
+        );
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpace.xl),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: c.line),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          BusinessAvatar(business: _business, size: 72),
+          const SizedBox(height: AppSpace.md),
+          Text(
+            _business.name,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.ink),
+          ),
+          const SizedBox(height: AppSpace.sm),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
             children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Expanded(
+              pill(_roleIcon, _roleLabel),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm + 2, vertical: AppSpace.xs),
+                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.pill)),
                 child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                  '${country.flag} ${country.name} · ${_business.currency}',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.inkMuted),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: color,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: AppSpace.md),
+            Text(description, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: c.inkMuted)),
+          ],
+          const SizedBox(height: AppSpace.lg),
+          SizedBox(
+            width: double.infinity,
+            child: _canEdit
+                // Neutro: no compite con el color del negocio que está justo arriba
+                ? OutlinedButton.icon(
+                    onPressed: _editBusinessDetails,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(46),
+                      backgroundColor: c.surfaceMuted,
+                      foregroundColor: c.ink,
+                      side: BorderSide(color: c.line),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
+                      textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+                    ),
+                    icon: Icon(Icons.edit_outlined, size: 18, color: c.inkMuted),
+                    label: const Text('Editar negocio'),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.lock_outline_rounded, size: 16, color: c.inkFaint),
+                      const SizedBox(width: AppSpace.xs),
+                      Flexible(
+                        child: Text(
+                          'Solo el dueño o un administrador puede editarlo',
+                          style: TextStyle(fontSize: 13, color: c.inkMuted),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _metrics(StockealoColors c) {
+    Widget tile(IconData icon, String value, String label, {Color? color}) => Container(
+          padding: const EdgeInsets.all(AppSpace.md),
+          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.control)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SettingsIcon(icon, color: color),
+              const SizedBox(height: AppSpace.sm),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.amount(context, size: 18, weight: FontWeight.w800, color: c.ink),
+              ),
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+            ],
+          ),
+        );
+
+    final tiles = [
+      tile(Icons.inventory_2_outlined, '$_productsCount', _productsCount == 1 ? 'Producto activo' : 'Productos activos'),
+      tile(Icons.receipt_long_outlined, CurrencyFormatter.format(_salesTotalAmount),
+          _salesCount == 1 ? '1 venta' : '$_salesCount ventas'),
+      tile(Icons.people_outline_rounded, '$_customersCount', _customersCount == 1 ? 'Cliente' : 'Clientes'),
+      tile(
+        _isCloudSync ? Icons.cloud_done_outlined : Icons.phone_android_rounded,
+        _isCloudSync ? 'En la nube' : 'Local',
+        _isCloudSync ? 'Respaldo automático' : 'Solo en este equipo',
+        color: _isCloudSync ? c.success : c.inkMuted,
+      ),
+    ];
+    return Column(
+      children: [
+        Row(children: [Expanded(child: tiles[0]), const SizedBox(width: AppSpace.sm), Expanded(child: tiles[1])]),
+        const SizedBox(height: AppSpace.sm),
+        Row(children: [Expanded(child: tiles[2]), const SizedBox(width: AppSpace.sm), Expanded(child: tiles[3])]),
+      ],
+    );
+  }
+}
+
+/// Botón redondo de la barra superior (atrás, cambiar de negocio)
+class _RoundButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _RoundButton({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 24,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: c.surface, shape: BoxShape.circle, border: Border.all(color: c.line)),
+            child: Icon(icon, color: c.ink, size: 22),
+          ),
+        ),
       ),
     );
   }

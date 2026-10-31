@@ -644,7 +644,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ),
                 Text(
-                  '${CurrencyFormatter.format(_product.profit)} (+${_product.profitMargin.toStringAsFixed(1)}%)',
+                  '${CurrencyFormatter.format(_product.profit)} (${_product.profitMarginLabel(decimals: 1)})',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13.5,
@@ -653,6 +653,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ],
             ),
+            if (_product.sellsBelowCost) ...[
+              const SizedBox(height: 6),
+              const Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Por debajo del costo: cada venta deja pérdida',
+                  style: TextStyle(fontSize: 11.5, color: Colors.red),
+                ),
+              ),
+            ],
           ],
         ],
       ),

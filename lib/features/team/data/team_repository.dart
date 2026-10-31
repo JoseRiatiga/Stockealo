@@ -7,6 +7,13 @@ import '../../../core/services/supabase_service.dart';
 import '../../business/data/business_repository.dart';
 import '../../business/models/business.dart';
 import '../models/business_member.dart';
+import 'activity_repository.dart';
+
+String _roleLabel(String role) => switch (role.toUpperCase()) {
+      'OWNER' => 'dueño',
+      'ADMIN' => 'administrador',
+      _ => 'cajero',
+    };
 
 class TeamRepository {
   static final TeamRepository instance = TeamRepository._internal();
@@ -126,6 +133,12 @@ class TeamRepository {
 
     // 3. Sincronizar en tiempo real a Supabase Cloud
     SupabaseService.instance.upsertBusinessMemberToCloud(member.toMap());
+    ActivityRepository.instance.log(
+      businessId: businessId,
+      action: ActivityAction.memberAdd,
+      summary: 'Agregó a $memberName ($cleanEmail) como ${_roleLabel(role)}',
+      data: {'member_id': member.id},
+    );
 
     return member;
   }
@@ -133,6 +146,7 @@ class TeamRepository {
   /// Cambia el rol de un miembro
   Future<void> updateRole(String memberId, String newRole) async {
     final db = await _dbProvider.database;
+    final before = await db.query('business_members', where: 'id = ?', whereArgs: [memberId], limit: 1);
     await db.update(
       'business_members',
       {'role': newRole},
@@ -150,11 +164,22 @@ class TeamRepository {
     if (updated.isNotEmpty) {
       SupabaseService.instance.upsertBusinessMemberToCloud(updated.first);
     }
+    if (before.isNotEmpty) {
+      final m = before.first;
+      ActivityRepository.instance.log(
+        businessId: m['business_id'] as String,
+        action: ActivityAction.roleChange,
+        summary: 'Cambió el rol de ${m['name'] ?? m['email']}: '
+            '${_roleLabel((m['role'] as String?) ?? '')} → ${_roleLabel(newRole)}',
+        data: {'member_id': memberId},
+      );
+    }
   }
 
   /// Elimina un miembro del equipo de la empresa
   Future<void> removeMember(String memberId) async {
     final db = await _dbProvider.database;
+    final before = await db.query('business_members', where: 'id = ?', whereArgs: [memberId], limit: 1);
     await db.delete(
       'business_members',
       where: 'id = ?',
@@ -163,6 +188,15 @@ class TeamRepository {
 
     // Eliminar de Supabase en tiempo real
     SupabaseService.instance.deleteBusinessMemberFromCloud(memberId);
+    if (before.isNotEmpty) {
+      final m = before.first;
+      ActivityRepository.instance.log(
+        businessId: m['business_id'] as String,
+        action: ActivityAction.memberRemove,
+        summary: 'Retiró del equipo a ${m['name'] ?? m['email']}',
+        data: {'member_id': memberId},
+      );
+    }
   }
 
   /// Determina el rol del usuario en la empresa actual
@@ -347,6 +381,12 @@ class TeamRepository {
 
     // 6. Establecer empresa como activa
     BusinessRepository.instance.setActiveBusiness(business);
+    ActivityRepository.instance.log(
+      businessId: bizId,
+      action: ActivityAction.memberJoin,
+      summary: 'Se unió al equipo como ${_roleLabel(member.role)}',
+      data: {'member_id': member.id},
+    );
 
     return business;
   }

@@ -1,3 +1,7 @@
+import '../../../../core/design/glass_surface.dart';
+import '../../../../core/services/phone_alerts_service.dart';
+import '../../../backup/data/auto_backup_service.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import '../../../../core/services/supabase_service.dart';
 import 'package:flutter/material.dart';
@@ -49,15 +53,33 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   String _userName = 'Comerciante';
   String _userRole = 'OWNER';
 
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
     _loadNavigationContext();
     _checkAppUpdateSilently();
+    // Copia diaria de los datos en el celular; sin esperar y sin estorbar si falla.
+    // También al volver a la app, por si quedó abierta varios días
+    AutoBackupService.instance.runIfDue();
+    _refreshPhoneAlerts();
+    _lifecycle = AppLifecycleListener(onResume: () {
+      AutoBackupService.instance.runIfDue();
+      _refreshPhoneAlerts();
+    });
+  }
+
+  /// Prepara los avisos del celular y pone al día el resumen programado
+  Future<void> _refreshPhoneAlerts() async {
+    final alerts = PhoneAlertsService.instance;
+    await alerts.init();
+    await alerts.refreshDailySummary();
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     NotificationService.instance.stopRealtimeSalesListening();
     super.dispose();
   }
@@ -119,7 +141,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final screens = [
       DashboardScreen(
         userId: widget.userId,
@@ -180,14 +201,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                             animation: NotificationService.instance,
                             builder: (context, _) {
                               return AppHeaderBar(
-                                title: _currentIndex == 0
-                                    ? (_activeBusiness?.name ?? 'Stockealo Pro')
-                                    : (_currentIndex == 1
-                                        ? 'Catálogo de Inventario'
-                                        : (_currentIndex == 2 ? 'Historial de Ventas' : 'Ajustes y Configuración')),
-                                subtitle: _currentIndex == 0
-                                    ? 'Resumen Operativo en Tiempo Real'
-                                    : 'Gestión Comercial Inteligente',
+                                title: switch (_currentIndex) {
+                                  0 => _activeBusiness?.name ?? 'Inicio',
+                                  1 => 'Inventario',
+                                  2 => 'Ventas',
+                                  _ => 'Ajustes',
+                                },
+                                subtitle: switch (_currentIndex) {
+                                  0 => 'Resumen de hoy',
+                                  1 => 'Productos, stock y precios',
+                                  2 => 'Historial, clientes y cotizaciones',
+                                  _ => 'Haz que la app sea tuya',
+                                },
                                 alertCount: NotificationService.instance.unreadCount,
                                 onNotificationsTap: () => NotificationsModal.show(
                                   context: context,
@@ -226,58 +251,74 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
             // Modo Móvil
             final showStockyFab = _currentIndex != 3;
+            // Inventario y Ventas tienen su botón principal a la izquierda en la misma fila.
+            // En celulares angostos no caben los dos: Stocky sube una fila para no taparlo
+            final hasPrimaryButton = _currentIndex == 1 || _currentIndex == 2;
+            final liftStocky = hasPrimaryButton && constraints.maxWidth < 400;
 
             return Scaffold(
-              body: Stack(
-                children: [
-                  IndexedStack(
-                    index: _currentIndex,
-                    children: screens,
-                  ),
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOutCubic,
-                    right: 16,
-                    bottom: showStockyFab ? 16 : -80,
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: showStockyFab ? 1.0 : 0.0,
-                      child: StockyFloatingButton(
-                        businessId: _activeBusiness?.id,
-                        onNavigateToTab: _navigateToTab,
+              // El contenido pasa por debajo de la barra de cristal
+              extendBody: true,
+              body: Builder(
+                // Este contexto ya incluye el alto de la barra en padding.bottom
+                builder: (bodyContext) => Stack(
+                  children: [
+                    IndexedStack(
+                      index: _currentIndex,
+                      children: screens,
+                    ),
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOutCubic,
+                      right: AppSpace.lg,
+                      bottom: showStockyFab
+                          ? MediaQuery.of(bodyContext).padding.bottom + AppSpace.lg + (liftStocky ? 64 : 0)
+                          : -80,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 200),
+                        opacity: showStockyFab ? 1.0 : 0.0,
+                        child: StockyFloatingButton(
+                          businessId: _activeBusiness?.id,
+                          onNavigateToTab: _navigateToTab,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              bottomNavigationBar: NavigationBar(
-                selectedIndex: _currentIndex,
-                onDestinationSelected: _navigateToTab,
-                backgroundColor: isDark ? const Color(0xFF131126) : Colors.white,
-                elevation: 3,
-                indicatorColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.dashboard_outlined),
-                    selectedIcon: Icon(Icons.dashboard, color: Color(0xFF059669)),
-                    label: 'Inicio',
+              bottomNavigationBar: SafeArea(
+                minimum: const EdgeInsets.fromLTRB(AppSpace.md, 0, AppSpace.md, AppSpace.sm),
+                child: GlassSurface(
+                  borderRadius: BorderRadius.circular(28),
+                  child: NavigationBar(
+                    height: 64,
+                    selectedIndex: _currentIndex,
+                    onDestinationSelected: _navigateToTab,
+                    labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                    destinations: const [
+                      NavigationDestination(
+                        icon: Icon(Icons.dashboard_outlined),
+                        selectedIcon: Icon(Icons.dashboard_rounded),
+                        label: 'Inicio',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.inventory_2_outlined),
+                        selectedIcon: Icon(Icons.inventory_2_rounded),
+                        label: 'Inventario',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.point_of_sale_outlined),
+                        selectedIcon: Icon(Icons.point_of_sale_rounded),
+                        label: 'Ventas',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.settings_outlined),
+                        selectedIcon: Icon(Icons.settings_rounded),
+                        label: 'Ajustes',
+                      ),
+                    ],
                   ),
-                  NavigationDestination(
-                    icon: Icon(Icons.inventory_2_outlined),
-                    selectedIcon: Icon(Icons.inventory_2, color: Color(0xFF059669)),
-                    label: 'Inventario',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.point_of_sale_outlined),
-                    selectedIcon: Icon(Icons.point_of_sale, color: Color(0xFF059669)),
-                    label: 'Ventas',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings, color: Color(0xFF059669)),
-                    label: 'Ajustes',
-                  ),
-                ],
+                ),
               ),
             );
           },

@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -18,8 +19,8 @@ class CashRegisterScreen extends StatefulWidget {
 }
 
 class _CashRegisterScreenState extends State<CashRegisterScreen> {
-  static const _green = Color(0xFF059669);
-  static const _red = Color(0xFFDC2626);
+  Color get _green => context.colors.accent;
+  Color get _red => context.colors.danger;
 
   final _repo = CashRegisterRepository.instance;
   final _amountController = TextEditingController();

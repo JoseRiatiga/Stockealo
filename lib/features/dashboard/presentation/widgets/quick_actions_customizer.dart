@@ -10,6 +10,7 @@ class QuickActionsCustomizer {
     final selectedIds = List<String>.from(current);
 
     final saved = await showModalBottomSheet<bool>(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

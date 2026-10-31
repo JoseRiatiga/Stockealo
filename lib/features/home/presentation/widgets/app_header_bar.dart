@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../dashboard/presentation/widgets/stocky_face_button.dart';
 
+/// Encabezado de la versión de escritorio y web: título de la sección, buscador
+/// (Ctrl K), Stocky, venta rápida, avisos y modo claro u oscuro
 class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final String? subtitle;
@@ -23,177 +26,128 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(68.0);
+  Size get preferredSize => const Size.fromHeight(72.0);
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF0F0E1D) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF262046) : const Color(0xFFE2E8F0);
 
     return Container(
-      height: 68,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.xl),
       decoration: BoxDecoration(
-        color: bgColor,
-        border: Border(bottom: BorderSide(color: borderColor, width: 1.2)),
+        color: c.paper,
+        border: Border(bottom: BorderSide(color: c.line)),
       ),
       child: Row(
         children: [
-          // Título de la sección
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.4,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 2),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 260),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  subtitle!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.3, color: c.ink),
                 ),
+                if (subtitle != null)
+                  Text(subtitle!, maxLines: 1, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
               ],
-            ],
+            ),
           ),
-          const SizedBox(width: 28),
+          const SizedBox(width: AppSpace.xl),
 
-          // Barra de Búsqueda Flotante tipo Command Palette (Bento / Nuxt)
+          // Buscador tipo paleta de comandos
           Expanded(
-            child: InkWell(
-              onTap: onSearchTap,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF181530) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF2B254E) : const Color(0xFFCBD5E1),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.search_rounded,
-                      size: 18,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Buscar producto, cliente o venta...',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Semantics(
+                  button: true,
+                  label: 'Buscar producto, cliente o venta. Atajo Control K',
+                  excludeSemantics: true,
+                  child: InkWell(
+                    onTap: onSearchTap,
+                    borderRadius: BorderRadius.circular(AppRadius.control),
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF231E44) : const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(6),
+                        color: c.surface,
+                        borderRadius: BorderRadius.circular(AppRadius.control),
+                        border: Border.all(color: c.line),
                       ),
-                      child: Text(
-                        'Ctrl K',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.search_rounded, size: 19, color: c.inkMuted),
+                          const SizedBox(width: AppSpace.sm + 2),
+                          Expanded(
+                            child: Text(
+                              'Buscar producto, cliente o venta…',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 13.5, color: c.inkFaint),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: c.surfaceMuted,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: c.line),
+                            ),
+                            child: Text(
+                              'Ctrl K',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c.inkMuted),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: AppSpace.lg),
 
-          // Botón Asistente Stocky (solo en módulos activos, no en Ajustes)
+          // Stocky (no en Ajustes)
           if (onStockyAssistantTap != null) ...[
-            StockyFaceButton(
-              showLabel: true,
-              onTap: onStockyAssistantTap,
-            ),
-            const SizedBox(width: 12),
+            StockyFaceButton(showLabel: true, onTap: onStockyAssistantTap),
+            const SizedBox(width: AppSpace.md),
           ],
 
-          // Botón Acción Rápida + Vender
-          if (onQuickSale != null)
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              ),
+          if (onQuickSale != null) ...[
+            FilledButton.icon(
               onPressed: onQuickSale,
-              icon: const Icon(Icons.add_shopping_cart_rounded, size: 16, color: Colors.white),
-              label: const Text(
-                'Venta Rápida',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
-              ),
+              icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+              label: const Text('Venta rápida'),
             ),
-          const SizedBox(width: 12),
+            const SizedBox(width: AppSpace.sm),
+          ],
 
-          // Botón Notificaciones / Alertas con Badge
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined, size: 20),
-                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                onPressed: onNotificationsTap,
-                splashRadius: 20,
-              ),
-              if (alertCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFDC2626),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '$alertCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          // Avisos
+          IconButton(
+            tooltip: alertCount > 0 ? '$alertCount avisos' : 'Avisos',
+            onPressed: onNotificationsTap,
+            icon: Badge(
+              isLabelVisible: alertCount > 0,
+              backgroundColor: c.danger,
+              label: Text(alertCount > 99 ? '99+' : '$alertCount'),
+              child: Icon(Icons.notifications_outlined, size: 22, color: c.inkMuted),
+            ),
           ),
 
-          // Alternador de Modo Oscuro / Claro
+          // Modo claro u oscuro (se guarda al instante)
           IconButton(
-            icon: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              size: 20,
-            ),
-            color: isDark ? const Color(0xFFFBBF24) : const Color(0xFF475569),
-            tooltip: isDark ? 'Modo Claro' : 'Modo Oscuro',
+            tooltip: isDark ? 'Modo claro' : 'Modo oscuro',
             onPressed: () => ThemeController.instance.toggleTheme(),
-            splashRadius: 20,
+            icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 22, color: c.inkMuted),
           ),
         ],
       ),

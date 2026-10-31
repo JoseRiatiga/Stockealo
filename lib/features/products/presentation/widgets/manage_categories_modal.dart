@@ -12,6 +12,7 @@ class ManageCategoriesModal extends StatefulWidget {
 
   static Future<bool?> show(BuildContext context, String businessId) {
     return showModalBottomSheet<bool>(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

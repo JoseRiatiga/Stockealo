@@ -48,6 +48,16 @@ class Product {
     return ((salePrice - purchasePrice) / salePrice) * 100;
   }
 
+  /// Se vende por debajo del costo de compra
+  bool get sellsBelowCost => purchasePrice > 0 && salePrice < purchasePrice;
+
+  /// Margen con su signo para mostrar: "+21%", "-26%" o "0%"
+  String profitMarginLabel({int decimals = 0}) {
+    final value = profitMargin.abs().toStringAsFixed(decimals);
+    if (double.parse(value) == 0) return '0%';
+    return '${profitMargin > 0 ? '+' : '-'}$value%';
+  }
+
   /// Estados de stock
   bool get isOutOfStock => stock <= 0;
   bool get isLowStock => stock > 0 && stock <= minStock;

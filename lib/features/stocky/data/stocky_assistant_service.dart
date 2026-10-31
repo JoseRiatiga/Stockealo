@@ -1,10 +1,47 @@
+import 'package:flutter/foundation.dart';
+
 import '../../business/data/business_repository.dart';
 import '../../customers/data/customer_repository.dart';
 import '../../dashboard/data/dashboard_repository.dart';
 import '../../products/data/product_repository.dart';
 import '../../sales/data/sales_repository.dart';
+import '../../../core/utils/countries.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/database/app_database.dart';
+
+/// Lo que el usuario quiso preguntar, según las reglas de Stocky
+enum StockyIntent {
+  farewell,
+  gratitude,
+  praise,
+  identity,
+  casualCheckIn,
+  greeting,
+  help,
+  businessHealth,
+  inventoryValue,
+  productCount,
+  customerInfo,
+  advice,
+  sales,
+  profit,
+  howTo,
+  productStock,
+  lowStock,
+  debts,
+  topProducts,
+  stagnantProducts,
+  unknown,
+}
+
+/// Rango de fechas de una pregunta sobre ventas: desde [from] (incluido) hasta [to] (excluido)
+class SalesPeriod {
+  final String label;
+  final DateTime from;
+  final DateTime to;
+
+  const SalesPeriod(this.label, this.from, this.to);
+}
 
 enum StockyMessageType {
   text,
@@ -16,6 +53,12 @@ enum StockyMessageType {
   productLookup,
   businessAdvice,
   help,
+
+  /// Las reglas no entendieron la pregunta: el chat puede ofrecer la IA
+  fallback,
+
+  /// Respuesta redactada por la IA
+  aiAnswer,
 }
 
 class StockyAction {
@@ -86,118 +129,127 @@ class StockyAssistantService {
     required String businessId,
     String? userName,
   }) async {
-    final cleanPrompt = _normalize(prompt);
+    final cleanPrompt = normalizeQuery(prompt);
     final business = BusinessRepository.instance.currentActiveBusiness;
     final bizName = business?.name ?? 'tu negocio';
 
-    // 1. Despedidas
-    if (_isFarewell(cleanPrompt)) {
-      return _buildFarewellResponse(bizName);
+    switch (classifyIntent(cleanPrompt)) {
+      case StockyIntent.farewell:
+        return _buildFarewellResponse(bizName);
+      case StockyIntent.gratitude:
+        return _buildGratitudeResponse();
+      case StockyIntent.praise:
+        return _buildPraiseResponse();
+      case StockyIntent.identity:
+        return _buildIdentityResponse(bizName);
+      case StockyIntent.casualCheckIn:
+        return _buildCasualCheckInResponse(userName, bizName);
+      case StockyIntent.greeting:
+        return _buildGreetingResponse(userName, bizName);
+      case StockyIntent.help:
+        return _buildHelpResponse();
+      case StockyIntent.businessHealth:
+        return await _buildBusinessHealthResponse(businessId, bizName);
+      case StockyIntent.inventoryValue:
+        return await _buildInventoryValueResponse(businessId, bizName);
+      case StockyIntent.productCount:
+        return await _buildProductCountResponse(businessId, bizName);
+      case StockyIntent.customerInfo:
+        return await _buildCustomerInfoResponse(businessId, bizName);
+      case StockyIntent.advice:
+        return await _buildBusinessAdviceResponse(businessId, bizName, cleanPrompt);
+      case StockyIntent.howTo:
+        return _buildHowToResponse(cleanPrompt);
+      case StockyIntent.sales:
+        final period = salesPeriodFor(cleanPrompt);
+        if (period == null) return await _buildSalesTodayResponse(businessId, bizName);
+        return await _buildSalesPeriodResponse(businessId, bizName, period);
+      case StockyIntent.profit:
+        return await _buildProfitResponse(businessId, bizName);
+      case StockyIntent.productStock:
+        // "¿Cuánto stock hay de arroz?": primero el producto; si no se encuentra, el resumen de stock
+        return await _tryFindProductInQuery(cleanPrompt, businessId) ?? await _buildLowStockResponse(businessId);
+      case StockyIntent.lowStock:
+        return await _buildLowStockResponse(businessId);
+      case StockyIntent.debts:
+        return await _buildDebtsResponse(businessId, bizName);
+      case StockyIntent.topProducts:
+        return await _buildTopProductsResponse(businessId);
+      case StockyIntent.stagnantProducts:
+        return await _buildStagnantProductsResponse(businessId);
+      case StockyIntent.unknown:
+        return await _tryFindProductInQuery(cleanPrompt, businessId) ?? _buildFallbackResponse(prompt, bizName);
     }
-
-    // 2. Agradecimientos y confirmaciones
-    if (_isGratitude(cleanPrompt)) {
-      return _buildGratitudeResponse();
-    }
-
-    // 3. Elogios / Piropo al asistente
-    if (_isPraise(cleanPrompt)) {
-      return _buildPraiseResponse();
-    }
-
-    // 4. Identidad / Quién eres / Qué eres
-    if (_isIdentity(cleanPrompt)) {
-      return _buildIdentityResponse(bizName);
-    }
-
-    // 5. Conversación casual / "¿Cómo estás?" / "¿Cómo te va?"
-    if (_isCasualCheckIn(cleanPrompt)) {
-      return _buildCasualCheckInResponse(userName, bizName);
-    }
-
-    // 6. Saludos clásicos
-    if (_isGreeting(cleanPrompt)) {
-      return _buildGreetingResponse(userName, bizName);
-    }
-
-    // 7. Ayuda general
-    if (_isHelp(cleanPrompt)) {
-      return _buildHelpResponse();
-    }
-
-    // 8. Estado general / Termómetro del negocio ("¿Cómo va el negocio?", "¿Cómo vamos?")
-    if (_isBusinessHealth(cleanPrompt)) {
-      return await _buildBusinessHealthResponse(businessId, bizName);
-    }
-
-    // 9. Valor comercial / monetario del inventario
-    if (_isInventoryValue(cleanPrompt)) {
-      return await _buildInventoryValueResponse(businessId, bizName);
-    }
-
-    // 10. Conteo y detalle del catálogo / productos
-    if (_isProductCount(cleanPrompt)) {
-      return await _buildProductCountResponse(businessId, bizName);
-    }
-
-    // 11. Información de clientes
-    if (_isCustomerInfo(cleanPrompt)) {
-      return await _buildCustomerInfoResponse(businessId, bizName);
-    }
-
-    // 12. Preguntas de cómo hacer cosas (tutorial rápido)
-    if (_isHowTo(cleanPrompt)) {
-      return _buildHowToResponse(cleanPrompt);
-    }
-
-    // 13. Ventas de hoy
-    if (_isSalesToday(cleanPrompt)) {
-      return await _buildSalesTodayResponse(businessId, bizName);
-    }
-
-    // 14. Ganancias / Rentabilidad
-    if (_isProfit(cleanPrompt)) {
-      return await _buildProfitResponse(businessId, bizName);
-    }
-
-    // 15. Stock Crítico / Agotados / Inventario
-    if (_isLowStock(cleanPrompt)) {
-      return await _buildLowStockResponse(businessId);
-    }
-
-    // 16. Fiados / Cuentas por Cobrar / Deudas
-    if (_isDebts(cleanPrompt)) {
-      return await _buildDebtsResponse(businessId, bizName);
-    }
-
-    // 17. Productos más vendidos (Top)
-    if (_isTopProducts(cleanPrompt)) {
-      return await _buildTopProductsResponse(businessId);
-    }
-
-    // 18. Mercadería estancada / Sin movimiento
-    if (_isStagnantProducts(cleanPrompt)) {
-      return await _buildStagnantProductsResponse(businessId);
-    }
-
-    // 19. Consejos de negocio
-    if (_isAdvice(cleanPrompt)) {
-      return await _buildBusinessAdviceResponse(businessId, bizName, cleanPrompt);
-    }
-
-    // 20. Búsqueda específica de un producto en inventario
-    final productLookup = await _tryFindProductInQuery(cleanPrompt, businessId);
-    if (productLookup != null) {
-      return productLookup;
-    }
-
-    // 21. Fallback contextual amable
-    return _buildFallbackResponse(prompt, bizName);
   }
 
   // ==========================================
   // CLASIFICADORES DE INTENCIÓN (NLP RULES)
   // ==========================================
+
+  /// Decide qué quiso preguntar el usuario. [text] ya viene normalizado.
+  /// El orden importa: las preguntas sobre datos del negocio van antes que los tutoriales.
+  @visibleForTesting
+  StockyIntent classifyIntent(String text) {
+    if (_isFarewell(text)) return StockyIntent.farewell;
+    if (_isGratitude(text)) return StockyIntent.gratitude;
+    if (_isPraise(text)) return StockyIntent.praise;
+    if (_isIdentity(text)) return StockyIntent.identity;
+    if (_isCasualCheckIn(text)) return StockyIntent.casualCheckIn;
+    if (_isGreeting(text)) return StockyIntent.greeting;
+    if (_isHelp(text)) return StockyIntent.help;
+    if (_isBusinessHealth(text)) return StockyIntent.businessHealth;
+    if (_isInventoryValue(text)) return StockyIntent.inventoryValue;
+    if (_isProductCount(text)) return StockyIntent.productCount;
+    if (_isCustomerInfo(text)) return StockyIntent.customerInfo;
+    // Conceptos y consejos ("¿qué es la regla 80/20?", "¿cómo vender más?") antes que los tutoriales
+    if (_isAdvice(text)) return StockyIntent.advice;
+    if (_isSales(text)) return StockyIntent.sales;
+    if (_isProfit(text)) return StockyIntent.profit;
+    if (_isHowTo(text)) return StockyIntent.howTo;
+    if (_isProductStock(text)) return StockyIntent.productStock;
+    if (_isLowStock(text)) return StockyIntent.lowStock;
+    if (_isDebts(text)) return StockyIntent.debts;
+    if (_isTopProducts(text)) return StockyIntent.topProducts;
+    if (_isStagnantProducts(text)) return StockyIntent.stagnantProducts;
+    return StockyIntent.unknown;
+  }
+
+  /// Periodo de ventas pedido en la pregunta; null significa "hoy"
+  @visibleForTesting
+  SalesPeriod? salesPeriodFor(String text, {DateTime? now}) {
+    final clock = now ?? DateTime.now();
+    final today = DateTime(clock.year, clock.month, clock.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final monday = today.subtract(Duration(days: today.weekday - 1));
+    final firstOfMonth = DateTime(today.year, today.month);
+
+    if (_hasAny(text, ['antier', 'anteayer'])) {
+      final day = today.subtract(const Duration(days: 2));
+      return SalesPeriod('antier', day, day.add(const Duration(days: 1)));
+    }
+    if (_hasWord(text, 'ayer')) {
+      return SalesPeriod('ayer', today.subtract(const Duration(days: 1)), today);
+    }
+    if (_hasAny(text, ['semana pasada', 'ultima semana'])) {
+      return SalesPeriod('la semana pasada', monday.subtract(const Duration(days: 7)), monday);
+    }
+    if (_hasWord(text, 'semana')) {
+      return SalesPeriod('esta semana', monday, tomorrow);
+    }
+    if (_hasAny(text, ['mes pasado', 'ultimo mes'])) {
+      return SalesPeriod('el mes pasado', DateTime(today.year, today.month - 1), firstOfMonth);
+    }
+    if (_hasWord(text, 'mes')) {
+      return SalesPeriod('este mes', firstOfMonth, tomorrow);
+    }
+    return null;
+  }
+
+  /// La palabra (o el inicio de palabra) aparece en el texto: "venta" encuentra "ventas",
+  /// pero "tip" no encuentra "multiplicar" ni "top" encuentra "laptop"
+  static bool _hasWord(String text, String key) => RegExp('(^|\\s)${RegExp.escape(key)}').hasMatch(text);
+
+  static bool _hasAny(String text, List<String> keys) => keys.any((k) => _hasWord(text, k));
 
   bool _isFarewell(String text) {
     final regex = RegExp(r'\b(chao|adios|hasta luego|hasta manana|nos vemos|bye|hasta pronto|me voy|buenas noches)\b');
@@ -214,15 +266,15 @@ class StockyAssistantService {
     return regex.hasMatch(text);
   }
 
-  bool _isIdentity(String text) {
-    return text.contains('quien eres') ||
-        text.contains('como te llamas') ||
-        text.contains('que eres') ||
-        text.contains('presentate') ||
-        text.contains('que funcion tienes') ||
-        text.contains('para que sirves') ||
-        text.contains('cual es tu nombre');
-  }
+  bool _isIdentity(String text) => _hasAny(text, [
+        'quien eres',
+        'como te llamas',
+        'que eres',
+        'presentate',
+        'que funcion tienes',
+        'para que sirves',
+        'cual es tu nombre',
+      ]);
 
   bool _isCasualCheckIn(String text) {
     final regex = RegExp(r'\b(como estas|como te va|como vas|como andas|que tal|que haces|que onda|que mas|que hubo|que hay|todo bien|que cuentas|como te encuentras)\b');
@@ -234,125 +286,150 @@ class StockyAssistantService {
     return regex.hasMatch(text) && text.split(' ').length <= 4;
   }
 
-  bool _isHelp(String text) {
-    return text.contains('que puedes hacer') ||
-        text.contains('como funcionas') ||
-        text.contains('ayuda') ||
-        text.contains('comandos') ||
-        text.contains('opciones');
-  }
+  bool _isHelp(String text) =>
+      _hasAny(text, ['que puedes hacer', 'como funcionas', 'ayuda', 'ayudame', 'comandos', 'opciones']);
 
-  bool _isBusinessHealth(String text) {
-    return text.contains('como va el negocio') ||
-        text.contains('como vamos') ||
-        text.contains('como va todo') ||
-        text.contains('como esta el negocio') ||
-        text.contains('estado del negocio') ||
-        text.contains('resumen general') ||
-        text.contains('termometro') ||
-        text.contains('balance del negocio') ||
-        text.contains('como va mi negocio');
-  }
+  bool _isBusinessHealth(String text) => _hasAny(text, [
+        'como va el negocio',
+        'como va mi negocio',
+        'como vamos',
+        'como va todo',
+        'como esta el negocio',
+        'como esta mi negocio',
+        'estado del negocio',
+        'resumen general',
+        'termometro',
+        'balance del negocio',
+      ]);
 
-  bool _isInventoryValue(String text) {
-    return text.contains('cuanto vale mi inventario') ||
-        text.contains('valor del inventario') ||
-        text.contains('valor comercial') ||
-        text.contains('dinero en stock') ||
-        text.contains('capital en mercancia') ||
-        text.contains('cuanto tengo en mercancia') ||
-        text.contains('cuanto dinero tengo en productos') ||
-        text.contains('valor de los productos') ||
-        text.contains('plata en inventario');
-  }
+  bool _isInventoryValue(String text) => _hasAny(text, [
+        'cuanto vale mi inventario',
+        'cuanto vale el inventario',
+        'valor del inventario',
+        'valor comercial',
+        'dinero en stock',
+        'capital en mercancia',
+        'cuanto tengo en mercancia',
+        'cuanto dinero tengo en productos',
+        'valor de los productos',
+        'plata en inventario',
+      ]);
 
-  bool _isProductCount(String text) {
-    return text.contains('cuantos productos') ||
-        text.contains('total de productos') ||
-        text.contains('cuantos articulos') ||
-        text.contains('cantidad de productos') ||
-        text.contains('total de items') ||
-        text.contains('total catalogo');
-  }
+  bool _isProductCount(String text) => _hasAny(text, [
+        'cuantos productos',
+        'total de productos',
+        'cuantos articulos',
+        'cantidad de productos',
+        'total de items',
+        'total catalogo',
+      ]);
 
-  bool _isCustomerInfo(String text) {
-    return text.contains('cuantos clientes') ||
-        text.contains('mis clientes') ||
-        text.contains('lista de clientes') ||
-        text.contains('total clientes') ||
-        text.contains('directorio de clientes') ||
-        text.contains('base de clientes');
-  }
+  bool _isCustomerInfo(String text) => _hasAny(text, [
+        'cuantos clientes',
+        'mis clientes',
+        'lista de clientes',
+        'total clientes',
+        'directorio de clientes',
+        'base de clientes',
+      ]);
 
+  /// Tutoriales ("¿cómo registro una venta?"), pero no preguntas sobre cómo va el negocio
   bool _isHowTo(String text) {
-    return text.startsWith('como ') || text.contains('como puedo ') || text.contains('como se ');
+    final asksHow = text.startsWith('como ') || _hasAny(text, ['como puedo', 'como se', 'como hago']);
+    final asksStatus = RegExp(r'^como (va|van|vamos|esta|estan|me fue|nos fue|me va)\b').hasMatch(text);
+    return asksHow && !asksStatus;
   }
 
-  bool _isSalesToday(String text) {
-    if (text.contains('venta') || text.contains('vendi') || text.contains('factur') || text.contains('caja') || text.contains('ingreso')) {
-      return text.contains('hoy') || text.contains('dia') || text.contains('cuanto') || text.contains('como van') || text.contains('resumen');
+  bool _isSales(String text) {
+    if (_hasAny(text, ['ventas de hoy', 'como van las ventas', 'cuanto vendi', 'cuanto vendimos', 'cuanto se vendio'])) {
+      return true;
     }
-    return text.contains('ventas de hoy') || text.contains('como van las ventas') || text.contains('cuanto vendimos');
+    final mentionsSales = _hasAny(text, ['venta', 'vend', 'factur', 'ingreso']);
+    final asksAmount = _hasAny(text, ['hoy', 'dia', 'cuanto', 'como van', 'como fue', 'como me fue', 'resumen', 'total']);
+    return mentionsSales && (asksAmount || salesPeriodFor(text) != null);
   }
 
-  bool _isProfit(String text) {
-    return text.contains('ganancia') ||
-        text.contains('margen') ||
-        text.contains('utilidad') ||
-        text.contains('beneficio') ||
-        text.contains('rentabilidad');
-  }
+  bool _isProfit(String text) =>
+      _hasAny(text, ['ganancia', 'gane', 'ganamos', 'margen', 'utilidad', 'beneficio', 'rentabilidad']);
 
-  bool _isLowStock(String text) {
-    return text.contains('stock') ||
-        text.contains('agotado') ||
-        text.contains('acabando') ||
-        text.contains('falta') ||
-        text.contains('critico') ||
-        text.contains('reponer') ||
-        text.contains('proveedor') ||
-        text.contains('mercancia baja') ||
-        text.contains('inventario bajo');
-  }
+  /// Pregunta por el stock de algo concreto ("¿cuánto hay de arroz?")
+  bool _isProductStock(String text) => _hasAny(text, [
+        'cuanto stock',
+        'cuantas unidades',
+        'cuantos quedan',
+        'cuantas quedan',
+        'cuanto queda',
+        'cuanto hay de',
+        'tengo de',
+        'stock de',
+      ]);
 
-  bool _isDebts(String text) {
-    return text.contains('fiado') ||
-        text.contains('deuda') ||
-        text.contains('deben') ||
-        text.contains('cobrar') ||
-        text.contains('cartera') ||
-        text.contains('quien me debe') ||
-        text.contains('cuentas por cobrar');
-  }
+  bool _isLowStock(String text) => _hasAny(text, [
+        'stock',
+        'agotad',
+        'se acab',
+        'acabando',
+        'falta',
+        'critico',
+        'reponer',
+        'reposicion',
+        'surtir',
+        'proveedor',
+        'mercancia baja',
+        'inventario bajo',
+      ]);
 
-  bool _isTopProducts(String text) {
-    return text.contains('mas vendido') ||
-        text.contains('top') ||
-        text.contains('estrella') ||
-        text.contains('populares') ||
-        text.contains('mas salida') ||
-        text.contains('mejores productos');
-  }
+  bool _isDebts(String text) => _hasAny(text, [
+        'fiado',
+        'deuda',
+        'deben',
+        'cobrar',
+        'cartera',
+        'quien me debe',
+        'cuentas por cobrar',
+      ]);
 
-  bool _isStagnantProducts(String text) {
-    return text.contains('estancad') ||
-        text.contains('no se vende') ||
-        text.contains('no se mueve') ||
-        text.contains('lento') ||
-        text.contains('muert') ||
-        text.contains('sin movimiento') ||
-        text.contains('quedado');
-  }
+  bool _isTopProducts(String text) => _hasAny(text, [
+        'mas vendido',
+        'mas se vende',
+        'lo que mas',
+        'top',
+        'estrella',
+        'populares',
+        'mas salida',
+        'mejores productos',
+      ]);
 
-  bool _isAdvice(String text) {
-    return text.contains('consejo') ||
-        text.contains('tip') ||
-        text.contains('sugerencia') ||
-        text.contains('recomendacion') ||
-        text.contains('como vender mas') ||
-        text.contains('estrategia') ||
-        text.contains('que hago');
-  }
+  bool _isStagnantProducts(String text) => _hasAny(text, [
+        'estancad',
+        'no se vende',
+        'no se mueve',
+        'sin vender',
+        'lento',
+        'muert',
+        'sin movimiento',
+        'quedado',
+      ]);
+
+  bool _isAdvice(String text) => _hasAny(text, [
+        'consejo',
+        'tip',
+        'sugerencia',
+        'recomendacion',
+        'recomiendas',
+        'como vender mas',
+        'vender mas',
+        'estrategia',
+        'que hago',
+        'ideas',
+        '8020',
+        '80 20',
+        'pareto',
+      ]);
+
+  /// Minúsculas, sin tildes ni signos: "¿Qué es la regla 80/20?" → "que es la regla 8020"
+  @visibleForTesting
+  String normalizeQuery(String input) => _normalize(input);
 
   String _normalize(String input) {
     return input
@@ -362,7 +439,10 @@ class StockyAssistantService {
         .replaceAll('í', 'i')
         .replaceAll('ó', 'o')
         .replaceAll('ú', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n')
         .replaceAll(RegExp(r'[^\w\s]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
   }
 
@@ -619,6 +699,10 @@ class StockyAssistantService {
     );
   }
 
+  /// Apps de pago del país del negocio activo ("Nequi o Daviplata", "Yape o Plin"...)
+  String get _localPaymentApps =>
+      countryByCode(BusinessRepository.instance.currentActiveBusiness?.country).paymentApps;
+
   StockyAssistantMessage _buildHowToResponse(String query) {
     if (query.contains('venta') || query.contains('vender') || query.contains('factur') || query.contains('cobrar en caja')) {
       return StockyAssistantMessage(
@@ -629,7 +713,7 @@ class StockyAssistantService {
             '2. Selecciona los productos de la lista o escanea su código de barras con la cámara.\n'
             '3. Elige el medio de pago:\n'
             '   • **Efectivo** (calcula cambio automático)\n'
-            '   • **Transferencia** (Nequi, Daviplata, etc.)\n'
+            '   • **Transferencia** ($_localPaymentApps, etc.)\n'
             '   • **Fiado** (asócialo a un cliente para cobrar luego)\n'
             '4. Toca **Confirmar Venta**. El stock se descontará al instante y podrás compartir el ticket digital.',
         timestamp: DateTime.now(),
@@ -727,7 +811,7 @@ class StockyAssistantService {
           '• **📦 Inventario Inactivo:** "¿Qué mercadería no se ha movido?"\n'
           '• **🔍 Consulta Directa:** "Precio de Coca Cola", "Stock de Arroz"\n'
           '• **💡 Consejos:** "¿Qué me recomiendas para vender más hoy?"\n\n'
-          'Todo funciona **100% offline**, sin costos de internet ni demoras.',
+          'Estas respuestas salen de tus datos, sin internet. Lo que no sepa responder se lo puedo preguntar a la IA (botón **IA** arriba).',
       timestamp: DateTime.now(),
       type: StockyMessageType.help,
       actions: const [
@@ -799,6 +883,50 @@ class StockyAssistantService {
     );
   }
 
+  /// Ventas de un periodo distinto a hoy: ayer, esta semana, el mes pasado...
+  Future<StockyAssistantMessage> _buildSalesPeriodResponse(
+    String businessId,
+    String bizName,
+    SalesPeriod period,
+  ) async {
+    final summary = await SalesRepository.instance.getSalesSummary(businessId, from: period.from, to: period.to);
+    final count = summary['count'] as int? ?? 0;
+    final total = (summary['totalAmount'] as num?)?.toDouble() ?? 0.0;
+    final profit = (summary['netProfit'] as num?)?.toDouble() ?? 0.0;
+    final units = summary['totalUnits'] as int? ?? 0;
+    final efectivo = (summary['byEfectivo'] as num?)?.toDouble() ?? 0.0;
+    final transfer = (summary['byTransferencia'] as num?)?.toDouble() ?? 0.0;
+    final fiado = (summary['byFiado'] as num?)?.toDouble() ?? 0.0;
+    final margin = total > 0 ? ((profit / total) * 100).toStringAsFixed(1) : '0';
+
+    final text = count == 0
+        ? 'No hay ventas registradas ${_periodPhrase(period)} en **$bizName**.'
+        : '📊 **Ventas de ${period.label} en $bizName:**\n\n'
+            '• **Total Facturado:** ${CurrencyFormatter.formatCOP(total)}\n'
+            '• **Ganancia Neta:** ${CurrencyFormatter.formatCOP(profit)} *(Margen: $margin%)*\n'
+            '• **Transacciones:** $count ventas ($units unidades vendidas)\n\n'
+            '💳 **Medios de Pago:**\n'
+            '• Efectivo: ${CurrencyFormatter.formatCOP(efectivo)}\n'
+            '• Transferencia: ${CurrencyFormatter.formatCOP(transfer)}\n'
+            '• Fiado: ${CurrencyFormatter.formatCOP(fiado)}';
+
+    return StockyAssistantMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      isUser: false,
+      text: text,
+      timestamp: DateTime.now(),
+      type: StockyMessageType.salesSummary,
+      actions: const [
+        StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
+      ],
+      data: {'total': total, 'profit': profit, 'count': count, 'units': units, 'margin': margin},
+    );
+  }
+
+  /// "ayer" → "ayer"; "esta semana" → "en esta semana"
+  static String _periodPhrase(SalesPeriod period) =>
+      period.label == 'ayer' || period.label == 'antier' ? period.label : 'en ${period.label}';
+
   Future<StockyAssistantMessage> _buildProfitResponse(String businessId, String bizName) async {
     final summary = await SalesRepository.instance.getTodaySummary(businessId);
     final total = (summary['totalAmount'] as num?)?.toDouble() ?? 0.0;
@@ -858,7 +986,9 @@ class StockyAssistantService {
 
     final buffer = StringBuffer();
     buffer.writeln('⚠️ **Diagnóstico de Inventario Crítico:**\n');
-    buffer.writeln('Tienes **$totalCritical productos** que requieren reposición inmediata para no perder ventas:\n');
+    buffer.writeln(totalCritical == 1
+        ? 'Tienes **1 producto** que requiere reposición inmediata para no perder ventas:\n'
+        : 'Tienes **$totalCritical productos** que requieren reposición inmediata para no perder ventas:\n');
 
     if (outOfStock.isNotEmpty) {
       buffer.writeln('🔴 **Agotados (${outOfStock.length}):**');
@@ -1130,7 +1260,7 @@ class StockyAssistantService {
             '👉 **Reglas de oro de cobranza:**\n'
             '1. **Cobra temprano:** Entre 8:00 AM y 10:00 AM las personas suelen tener mayor disposición mental y liquidez en sus cuentas.\n'
             '2. **Usa mensajes cordiales:** Nunca acuses; saluda, desea bendiciones y comparte el saldo con gentileza.\n'
-            '3. **Facilita medios de pago:** Ofrece transferencias por Nequi, Daviplata o pasar a recogerlo.',
+            '3. **Facilita medios de pago:** Ofrece pagar por $_localPaymentApps o pasar a recogerlo.',
         timestamp: DateTime.now(),
         type: StockyMessageType.businessAdvice,
         actions: const [
@@ -1316,7 +1446,8 @@ class StockyAssistantService {
           '• **"¿Cómo hago una venta?"** o **"¿Cómo agrego un producto?"**\n\n'
           'O toca una de estas opciones rápidas:',
       timestamp: DateTime.now(),
-      type: StockyMessageType.text,
+      type: StockyMessageType.fallback,
+      data: {'prompt': prompt},
       actions: const [
         StockyAction(label: '📈 Termómetro general', actionType: 'query_health'),
         StockyAction(label: '📊 Ventas hoy', actionType: 'query_sales'),

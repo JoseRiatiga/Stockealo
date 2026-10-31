@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.8.1+23
+version: 0.9.0+24
 
 environment:
   sdk: ^3.5.4
@@ -56,6 +56,8 @@ dependencies:
   pdf: ^3.11.3
   sqflite_common_ffi_web: ^0.4.5+4
   url_launcher: 6.3.1
+  flutter_local_notifications: ^19.5.0
+  timezone: ^0.10.1
 
 dev_dependencies:
   flutter_test:
@@ -83,8 +85,30 @@ flutter:
   assets:
     - assets/icon/
 
+  # Letra de la app (Google Fonts, licencia OFL en assets/fonts/inter/OFL.txt)
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/inter/Inter-Regular.ttf
+        - asset: assets/fonts/inter/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/inter/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/inter/Inter-Bold.ttf
+          weight: 700
+
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/app_icon.png"
   min_sdk_android: 21
+  # Ícono adaptativo de Android: fondo verde Stockealo y la caja aparte (dibujo en assets/icon)
+  adaptive_icon_background: "#1E6B4E"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  # La App Store no acepta íconos con transparencia
+  remove_alpha_ios: true
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    background_color: "#F6F3EC"
+    theme_color: "#1E6B4E"

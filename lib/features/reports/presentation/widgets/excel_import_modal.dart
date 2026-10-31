@@ -14,6 +14,7 @@ class ExcelImportModal extends StatefulWidget {
 
   static Future<void> show(BuildContext context, {required String businessId, required VoidCallback onImportCompleted}) {
     return showModalBottomSheet(
+      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

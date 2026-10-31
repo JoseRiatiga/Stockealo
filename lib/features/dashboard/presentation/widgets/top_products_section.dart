@@ -1,3 +1,4 @@
+import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
@@ -17,14 +18,14 @@ class TopProductsSection extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          border: Border.all(color: context.colors.line),
         ),
-        child: const Center(
+        child: Center(
           child: Text(
             'Aún no hay ventas registradas para generar el Top de productos.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
           ),
         ),
       );
@@ -33,9 +34,9 @@ class TopProductsSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        border: Border.all(color: context.colors.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,12 +49,12 @@ class TopProductsSection extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                  color: context.colors.ink,
                 ),
               ),
               Text(
                 'Ventas & Ingresos',
-                style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                style: TextStyle(fontSize: 11, color: context.colors.inkMuted),
               ),
             ],
           ),
@@ -79,7 +80,7 @@ class TopProductsSection extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                            color: context.colors.ink,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -87,12 +88,12 @@ class TopProductsSection extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         '${item['qty']} un.',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.colors.accent),
                       ),
                       const SizedBox(width: 6),
                       Text(
                         '(${CurrencyFormatter.format(revenue)})',
-                        style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        style: TextStyle(fontSize: 11, color: context.colors.inkMuted),
                       ),
                     ],
                   ),
@@ -102,8 +103,8 @@ class TopProductsSection extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: share.clamp(0.05, 1.0),
                       minHeight: 5,
-                      backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF059669)),
+                      backgroundColor: context.colors.surfaceMuted,
+                      valueColor: AlwaysStoppedAnimation<Color>(context.colors.accent),
                     ),
                   ),
                 ],
@@ -121,23 +122,23 @@ class TopProductsSection extends StatelessWidget {
 
     switch (rank) {
       case 0: // 1er Lugar - Oro
-        badgeColor = const Color(0xFFF59E0B);
+        badgeColor = AppPalette.warning;
         child = const Icon(Icons.emoji_events_rounded, size: 13, color: Colors.white);
         break;
       case 1: // 2do Lugar - Plata
-        badgeColor = const Color(0xFF94A3B8);
+        badgeColor = AppPalette.inkMuted;
         child = const Icon(Icons.military_tech_rounded, size: 14, color: Colors.white);
         break;
       case 2: // 3er Lugar - Bronce
-        badgeColor = const Color(0xFFD97706);
+        badgeColor = AppPalette.warning;
         child = const Icon(Icons.military_tech_outlined, size: 14, color: Colors.white);
         break;
       default: // 4to y 5to
-        badgeColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-        final textColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+        badgeColor = AppPalette.line;
+        const textColor = AppPalette.inkMuted;
         child = Text(
           '#${rank + 1}',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
             color: textColor,

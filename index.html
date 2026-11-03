@@ -3,16 +3,237 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Stockealo</title>
-  <!-- Mientras llega la página principal, la raíz abre la app web -->
-  <meta http-equiv="refresh" content="0; url=/app/">
-  <style>
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #F6F3EC; color: #1F1D18;
-           font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-    a { color: #1E6B4E; font-weight: 600; }
-  </style>
+  <title>Stockealo · Inventario y ventas para tu negocio</title>
+  <meta name="description" content="Stockealo: inventario, ventas, fiados y catálogos para tiendas y negocios pequeños de Latinoamérica. Gratis, desde el celular o el navegador.">
+  <meta property="og:title" content="Stockealo · Inventario y ventas para tu negocio">
+  <meta property="og:description" content="Sabe qué tienes, cuánto vendes y quién te debe. Gratis, desde el celular.">
+  <meta property="og:image" content="https://stockealo.online/logo.png">
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-  <p>Abriendo Stockealo… <a href="/app/">Entrar</a></p>
+  <!-- Íconos (trazos simples, se adaptan al color del texto) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-box" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10"/></symbol>
+      <symbol id="i-cash" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M3 6h18v12H3zM12 9a3 3 0 100 6 3 3 0 000-6zM6 9v.01M18 15v.01"/></symbol>
+      <symbol id="i-people" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M9 11a4 4 0 100-8 4 4 0 000 8zM2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 000-6M22 21c0-3-2-5-5-5"/></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 5v16M8 7h7"/></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+      <symbol id="i-team" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c1-4 4-6 8-6s7 2 8 6"/></symbol>
+      <symbol id="i-cloud" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M7 18a5 5 0 01-.6-10A6 6 0 0118 9a4.5 4.5 0 01-.5 9zM9 13l2 2 4-4"/></symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2zM19 3v4M17 5h4"/></symbol>
+      <symbol id="i-store" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M4 9l1-5h14l1 5M4 9a2.7 2.7 0 005 0 2.7 2.7 0 005 0 2.7 2.7 0 005 0M5 10v10h14V10M10 20v-5h4v5"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M6 16V11a6 6 0 0112 0v5l2 2H4zM10 21h4"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M5 11h14v10H5zM8 11V7a4 4 0 018 0v4"/></symbol>
+    </defs>
+  </svg>
+
+  <header class="topbar">
+    <div class="wrap topbar-in">
+      <a class="brand" href="/"><img src="/logo.png" alt="" width="32" height="32"> Stockealo</a>
+      <nav>
+        <a class="hide-sm" href="#funciones">Funciones</a>
+        <a class="hide-sm" href="#pro">Pro</a>
+        <a class="hide-sm" href="#tiendas">Tiendas</a>
+        <a class="hide-sm" href="#nosotros">Nosotros</a>
+        <a class="btn btn-primary btn-sm" href="/app/">Entrar</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap hero">
+      <div>
+        <span class="eyebrow">Inventario y ventas para tu negocio</span>
+        <h1>Tu negocio en orden, desde el celular</h1>
+        <p class="lead">Sabe qué tienes, cuánto vendes, cuánto ganas y quién te debe. Hecho para tiendas, misceláneas y
+          emprendimientos de Latinoamérica. Gratis y sin complicaciones.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://github.com/JoseRiatiga/Stockealo/releases/latest/download/Stockealo.apk">Descargar para Android</a>
+          <a class="btn btn-ghost" href="/app/">Usar en el navegador</a>
+        </div>
+        <p class="muted" style="font-size:14px;margin-top:12px">Gratis para siempre en lo esencial. Funciona sin internet.</p>
+      </div>
+      <div class="hero-art"><img src="/logo.png" alt="Logo de Stockealo"></div>
+    </div>
+
+    <section id="funciones">
+      <div class="wrap">
+        <span class="eyebrow">Gratis</span>
+        <h2>Todo lo que tu negocio necesita</h2>
+        <p class="lead">Sin pagar nada: lo esencial de Stockealo es y seguirá siendo gratis.</p>
+        <div class="grid grid-4" style="margin-top:24px">
+          <div class="card"><div class="icon"><svg width="22" height="22"><use href="#i-box"/></svg></div><h3>Inventario</h3><p class="muted">Productos, stock, códigos de barras y avisos cuando algo se acaba.</p></div>
+          <div class="card"><div class="icon"><svg width="22" height="22"><use href="#i-cash"/></svg></div><h3>Ventas y caja</h3><p class="muted">Vende en segundos, comparte el recibo por WhatsApp y cuadra la caja.</p></div>
+          <div class="card"><div class="icon"><svg width="22" height="22"><use href="#i-people"/></svg></div><h3>Fiados</h3><p class="muted">Quién te debe, cuánto y desde cuándo. Recordatorios por WhatsApp.</p></div>
+          <div class="card"><div class="icon"><svg width="22" height="22"><use href="#i-book"/></svg></div><h3>Catálogos</h3><p class="muted">Catálogo en PDF e historias con tus productos, listos para compartir.</p></div>
+          <div class="card"><div class="icon"><svg width="22" height="22"><use href="#i-chart"/></svg></div><h3>Reportes</h3><p class="muted">Ventas, ganancias y lo que más se vende, por día, semana o mes.</p></div>
+          <div class="card"><div class="icon"><svg width="22" height="22"><use href="#i-team"/></svg></div><h3>Equipo</h3><p class="muted">Invita a tus empleados con permisos y mira quién hizo cada movimiento.</p></div>
+          <div class="card"><div class="icon"><svg width="22" height="22"><use href="#i-cloud"/></svg></div><h3>Respaldo</h3><p class="muted">Tus datos en el celular y, si quieres, en la nube con copia diaria.</p></div>
+          <div class="card"><div class="icon"><svg width="22" height="22"><use href="#i-spark"/></svg></div><h3>Stocky</h3><p class="muted">Tu asistente: pregúntale cómo va el negocio y te responde al instante.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pro" style="background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+      <div class="wrap">
+        <span class="eyebrow">Stockealo Pro</span>
+        <h2>Para vender más y cobrar mejor</h2>
+        <p class="lead">Pro suma herramientas para crecer. Todo lo demás sigue gratis.</p>
+        <div class="grid grid-4" style="margin:24px 0 32px">
+          <div class="card" style="background:var(--paper)"><div class="icon"><svg width="22" height="22"><use href="#i-store"/></svg></div><h3>Tienda en línea</h3><p class="muted">Tu catálogo con carrito; los pedidos te llegan por WhatsApp.</p></div>
+          <div class="card" style="background:var(--paper)"><div class="icon"><svg width="22" height="22"><use href="#i-bell"/></svg></div><h3>Cobro de fiados</h3><p class="muted">Recordatorios programados y estado de cuenta en PDF.</p></div>
+          <div class="card" style="background:var(--paper)"><div class="icon"><svg width="22" height="22"><use href="#i-book"/></svg></div><h3>Catálogos personalizados</h3><p class="muted">Más plantillas y colores, sin el pie de Stockealo.</p></div>
+          <div class="card" style="background:var(--paper)"><div class="icon"><svg width="22" height="22"><use href="#i-spark"/></svg></div><h3>Más IA</h3><p class="muted">50 preguntas a Stocky al día en vez de 10.</p></div>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Tipo de plan">
+          <button role="tab" aria-selected="true" data-kind="business">Pro Negocio</button>
+          <button role="tab" aria-selected="false" data-kind="global">Pro Global</button>
+        </div>
+        <p class="muted" id="kind-help">Para un negocio y todo su equipo.</p>
+        <div class="plans" id="plans"><p class="muted">Cargando precios…</p></div>
+        <p class="muted" style="font-size:14px;margin-top:16px">
+          <svg width="16" height="16" style="vertical-align:-3px"><use href="#i-lock"/></svg>
+          Paga dentro de la app con Nequi, PSE, tarjeta o Bancolombia a través de Wompi. Precios en pesos colombianos.
+        </p>
+      </div>
+    </section>
+
+    <section id="tiendas">
+      <div class="wrap">
+        <span class="eyebrow">Tiendas registradas</span>
+        <h2>Negocios que ya venden en línea</h2>
+        <p class="lead">Mira sus catálogos y haz tu pedido por WhatsApp.</p>
+        <div class="grid grid-3" id="stores" style="margin-top:24px"><p class="muted">Cargando tiendas…</p></div>
+      </div>
+    </section>
+
+    <section id="nosotros" style="padding-top:24px">
+      <div class="wrap grid grid-3" style="align-items:start">
+        <div class="card">
+          <span class="eyebrow">Quiénes somos</span>
+          <h3 style="margin-top:8px">Hecho en Colombia, para negocios reales</h3>
+          <p class="muted">Stockealo nació para que las tiendas y emprendimientos dejen el cuaderno: saber qué tienen, cuánto venden y
+            quién les debe, sin complicaciones y sin pagar por lo básico. Lo construimos escuchando a dueños de negocio y
+            mejorándolo con cada versión.</p>
+        </div>
+        <div class="card">
+          <span class="eyebrow">Aliados</span>
+          <h3 style="margin-top:8px">Pagos seguros con Wompi</h3>
+          <p class="muted">Los pagos de Stockealo Pro se procesan con Wompi (Grupo Cibest). Stockealo no guarda datos de tarjetas ni
+            de cuentas bancarias.</p>
+        </div>
+        <div class="card">
+          <span class="eyebrow">Contacto</span>
+          <h3 style="margin-top:8px">¿Hablamos?</h3>
+          <p class="muted">Escríbenos para soporte, para activar Pro o para que tu negocio aparezca aquí.</p>
+          <p><a class="btn btn-primary btn-sm" href="https://wa.me/573138291467?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20de%20Stockealo">WhatsApp</a>
+             <a class="btn btn-ghost btn-sm" href="mailto:byjosealbert@gmail.com">Correo</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="/" style="font-size:16px"><img src="/logo.png" alt="" width="28" height="28"> Stockealo</a>
+        <p class="muted">Inventario y ventas para tu negocio.</p>
+      </div>
+      <div>
+        <h4>Producto</h4>
+        <ul>
+          <li><a href="/app/">Usar en el navegador</a></li>
+          <li><a href="https://github.com/JoseRiatiga/Stockealo/releases/latest/download/Stockealo.apk">Descargar para Android</a></li>
+          <li><a href="#pro">Stockealo Pro</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="/terminos/">Términos y condiciones</a></li>
+          <li><a href="/privacidad/">Política de privacidad</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contacto</h4>
+        <ul>
+          <li><a href="https://wa.me/573138291467">WhatsApp +57 313 829 1467</a></li>
+          <li><a href="mailto:byjosealbert@gmail.com">byjosealbert@gmail.com</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Precios y tiendas en vivo desde el servidor (función pública public_landing).
+    // Si no hay conexión, la página sigue funcionando sin esas dos secciones.
+    var API = 'https://evdwwmkafwjyfawsufjb.supabase.co/rest/v1/rpc/public_landing';
+    var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2ZHd3bWthZndqeWZhd3N1ZmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3OTE0MTYsImV4cCI6MjEwNzM2NzQxNn0.frOJQKnpqXI-ssLtcRxtVgvrDPYeMVZ4grExaQwmeZQ';
+    var data = { plans: [], stores: [] };
+    var kind = 'business';
+
+    function money(v) {
+      return '$' + Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    function esc(t) {
+      return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    var PER = { week: '/ semana', month: '/ mes', year: '/ año', lifetime: 'un solo pago' };
+    var NAME = { week: 'Semanal', month: 'Mensual', year: 'Anual', lifetime: 'Permanente' };
+
+    function renderPlans() {
+      var box = document.getElementById('plans');
+      var plans = data.plans.filter(function (p) { return p.kind === kind; });
+      document.getElementById('kind-help').textContent = kind === 'global'
+        ? 'Para todos los negocios del dueño.' : 'Para un negocio y todo su equipo.';
+      if (!plans.length) { box.innerHTML = '<p class="muted">Consulta los precios en la app.</p>'; return; }
+      box.innerHTML = plans.map(function (p) {
+        var featured = p.period === 'month';
+        return '<div class="card plan' + (featured ? ' featured' : '') + '">' +
+          '<h3>' + esc(NAME[p.period] || p.period) + '</h3>' +
+          (p.label ? '<span class="badge' + (p.period === 'year' ? ' gold' : '') + '">' + esc(p.label) + '</span>' : '') +
+          (p.regular_price ? '<div class="was" style="margin-top:8px">' + money(p.regular_price) + '</div>' : '<div style="height:8px"></div>') +
+          '<div class="price">' + money(p.price) + '</div>' +
+          '<div class="per">' + esc(PER[p.period] || '') + '</div></div>';
+      }).join('');
+    }
+
+    function renderStores() {
+      var box = document.getElementById('stores');
+      if (!data.stores.length) {
+        box.innerHTML = '<div class="card"><p class="muted" style="margin:0">Pronto verás aquí las tiendas de nuestros clientes. ' +
+          '¿Tienes un negocio? Publica tu tienda con Stockealo Pro.</p></div>';
+        return;
+      }
+      box.innerHTML = data.stores.map(function (s) {
+        var color = /^#[0-9A-Fa-f]{6}$/.test(s.color || '') ? s.color : '#1E6B4E';
+        var logo = s.logo_url
+          ? '<img src="' + esc(s.logo_url) + '" alt="" loading="lazy">'
+          : esc((s.name || 'T').trim().charAt(0).toUpperCase());
+        return '<a class="card store" href="/tienda/' + encodeURIComponent(s.slug) + '">' +
+          '<span class="store-logo" style="background:' + color + '">' + logo + '</span>' +
+          '<span><strong>' + esc(s.name) + '</strong><br><span class="muted" style="font-size:14px">' +
+          s.products + (s.products === 1 ? ' producto' : ' productos') + ' · Ver tienda</span></span></a>';
+      }).join('');
+    }
+
+    document.querySelectorAll('.tabs button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        kind = b.dataset.kind;
+        document.querySelectorAll('.tabs button').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); });
+        renderPlans();
+      });
+    });
+
+    fetch(API, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' }, body: '{}' })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (json) { data = { plans: json.plans || [], stores: json.stores || [] }; })
+      .catch(function () {})
+      .then(function () { renderPlans(); renderStores(); });
+  </script>
 </body>
 </html>

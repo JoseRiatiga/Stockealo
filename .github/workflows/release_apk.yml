@@ -69,16 +69,20 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Stockealo Pro
-            - **Catálogos personalizados:** plantillas Vitrina, Lista de precios y Promoción, todos los colores, fondo oscuro y sin el pie de Stockealo. Pruébalas en la vista previa antes de activar Pro.
-            - **Cobro de fiados:** estado de cuenta en PDF para enviar por WhatsApp y recordatorios que te avisan "Hoy toca cobrarle a..." con el mensaje listo. Tú decides cuándo enviarlo.
-            - Activa Pro con un código en Ajustes › Stockealo Pro.
+            ### Paga Stockealo Pro en línea
+            - **Pago seguro con Wompi** dentro de la app: Nequi, PSE, tarjeta o Bancolombia. Pro se activa solo en cuanto se aprueba el pago.
+            - **Planes nuevos:** semanal, mensual y **anual con 2 meses gratis**.
 
-            Todo lo que era gratis sigue gratis.
+            ### Tienda en línea (Stockealo Pro)
+            - **Tu catálogo con carrito** en stockealo.online/tienda/tu-negocio: tus clientes eligen los productos y te mandan el pedido por WhatsApp.
+            - Solo muestra productos con stock, con foto y precio. Nunca tus costos ni tus clientes.
+            - Actívala en Inventario › Tienda y comparte el enlace.
 
             ### Mejoras
-            - Información legal actualizada.
-            - Elegir la hora de los avisos es más fácil.
-            - Los recordatorios por WhatsApp ya no muestran un símbolo raro.
+            - Banderas a color en el número de celular y al elegir el país.
+            - El celular ahora es obligatorio al crear la cuenta.
+            - Gráficas del inicio, menús y pantallas de Ajustes con el diseño de la app, también en el computador.
+            - Stocky ahora está abajo a la derecha también en la versión web.
+            - Términos y política de privacidad actualizados, también en stockealo.online.
           draft: false
           prerelease: false

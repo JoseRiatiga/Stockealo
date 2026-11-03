@@ -651,12 +651,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     }).toList();
 
     final categoryItems = categorySales.take(4).map((cat) {
-      final colors = [
-        const Color(0xFF06B6D4),
-        const Color(0xFFEC4899),
-        const Color(0xFF10B981),
-        const Color(0xFFF59E0B),
-      ];
+      final colors = chartSeries(context.colors);
       final idx = categorySales.indexOf(cat) % colors.length;
       final pct = (cat['percentage'] as num?)?.toDouble() ?? 0.0;
       return SegmentedBarItem(
@@ -675,7 +670,6 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
           data: splineData,
           height: 160,
           primaryColor: context.colors.accent,
-          secondaryColor: context.colors.info,
         ),
         const SizedBox(height: 16),
         SegmentedProgressCard(
@@ -684,11 +678,11 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
           items: categoryItems.isNotEmpty
               ? categoryItems
               : [
-                  const SegmentedBarItem(
+                  SegmentedBarItem(
                     label: 'General',
                     valueText: '100%',
                     percentage: 1.0,
-                    color: Color(0xFF10B981),
+                    color: context.colors.accent,
                   )
                 ],
         ),

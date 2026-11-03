@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/design/pro_crown.dart';
+import '../../../../core/design/content_width.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
+import '../../data/pro_admin_service.dart';
 import '../../data/pro_service.dart';
 
 /// Lo que suma Pro (también lo muestra la ventana de Pro). Todo lo demás sigue gratis.
+/// Correo de soporte (el mismo de los Términos y la Política de privacidad)
+const proSupportEmail = 'byjosealbert@gmail.com';
+
 const proBenefits = [
   (Icons.storefront_outlined, 'Tienda en línea', 'Tu catálogo con carrito; los pedidos te llegan por WhatsApp.'),
   (Icons.notifications_active_outlined, 'Cobro automático de fiados', 'Recordatorios programados y estado de cuenta en PDF.'),
@@ -41,10 +47,20 @@ class _ProScreenState extends State<ProScreen> {
   String _kind = 'business';
   String? _selectedPlanId;
   bool _redeeming = false;
+
+  /// Pago en línea con Wompi en curso / mostrar el pago manual por Nequi
+  bool _paying = false;
+  bool _showManual = false;
+
+  /// Cuenta administradora: puede probar Wompi con la llave de pruebas
+  bool _isAdmin = false;
   String? _codeError;
 
   Future<(List<ProPlan>, Map<String, String>)> _load() async {
     final pro = ProService.instance;
+    ProAdminService.instance.isAdmin().then((v) {
+      if (mounted && v != _isAdmin) setState(() => _isAdmin = v);
+    });
     pro.refresh(widget.business.id);
     final results = await Future.wait([pro.plans(widget.business.currency), pro.settings()]);
     return (results[0] as List<ProPlan>, results[1] as Map<String, String>);
@@ -107,6 +123,23 @@ class _ProScreenState extends State<ProScreen> {
     }
   }
 
+  /// Sin Nequi (otro país o datos sin configurar): pedir Pro por WhatsApp o por correo
+  Future<void> _askForPro(ProPlan? plan, String? whatsapp) async {
+    final email = AuthRepository.instance.currentUser?.email ?? '';
+    final wanted = plan == null
+        ? 'Stockealo Pro'
+        : 'Stockealo ${plan.kind == 'global' ? 'Pro Global' : 'Pro Negocio'} ${plan.periodLabel.toLowerCase()} (${_money(plan.price)})';
+    final message = 'Hola, quiero activar $wanted para el negocio "${widget.business.name}". '
+        'Mi cuenta es $email. ¿Cómo puedo pagar?';
+    final digits = whatsapp?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
+    final uri = digits.isNotEmpty
+        ? Uri.parse('https://wa.me/$digits?text=${Uri.encodeComponent(message)}')
+        : Uri(scheme: 'mailto', path: proSupportEmail, query: 'subject=${Uri.encodeComponent('Quiero Stockealo Pro')}&body=${Uri.encodeComponent(message)}');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+      AppToast.showError(context, digits.isNotEmpty ? 'No se pudo abrir WhatsApp.' : 'Escríbenos a $proSupportEmail');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -119,7 +152,8 @@ class _ProScreenState extends State<ProScreen> {
           final plans = snapshot.data?.$1 ?? const <ProPlan>[];
           final settings = snapshot.data?.$2 ?? const <String, String>{};
           final loading = snapshot.connectionState != ConnectionState.done;
-          return ListView(
+          return ContentWidth(
+            child: ListView(
             controller: _scroll,
             padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
             children: [
@@ -160,6 +194,7 @@ class _ProScreenState extends State<ProScreen> {
                   child: Text(settings['legal_notice']!, style: TextStyle(fontSize: 11.5, height: 1.4, color: c.inkFaint)),
                 ),
             ],
+          ),
           );
         },
       ),
@@ -201,8 +236,7 @@ class _ProScreenState extends State<ProScreen> {
           ),
           child: Row(
             children: [
-              Icon(status.active ? Icons.workspace_premium_rounded : Icons.workspace_premium_outlined,
-                  size: 32, color: status.active ? c.onAccent : c.accent),
+              const ProCrown(size: 36),
               const SizedBox(width: AppSpace.md),
               Expanded(
                 child: Column(
@@ -332,22 +366,58 @@ class _ProScreenState extends State<ProScreen> {
     final plan = plans.where((p) => p.id == _selectedPlanId).firstOrNull;
     // Nequi solo para pesos colombianos
     final nequiAvailable = widget.business.currency == 'COP' && nequi != null && whatsapp != null;
+    // Si el Nequi y el WhatsApp son el mismo número, se muestra una sola vez
+    final nequiDigits = nequi?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
+    final sameNumber = nequiDigits.isNotEmpty && (whatsapp?.replaceAll(RegExp(r'[^0-9]'), '') ?? '').endsWith(nequiDigits);
+    // Wompi cobra en pesos colombianos y Pro se activa solo. Con la llave de pruebas
+    // solo lo ven los administradores (si no, cualquiera tendría Pro sin pagar)
+    final wompiKey = settings['wompi_public_key'] ?? '';
+    final wompiAvailable = widget.business.currency == 'COP' &&
+        (wompiKey.startsWith('pub_prod_') || (wompiKey.startsWith('pub_test_') && _isAdmin));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _section(c, 'Cómo pagar'),
+        if (wompiAvailable) ...[
+          _card(c, _wompiBox(c, plan, testMode: wompiKey.startsWith('pub_test_'))),
+          Center(
+            child: TextButton(
+              onPressed: () => setState(() => _showManual = !_showManual),
+              child: Text(
+                _showManual ? 'Ocultar el pago por Nequi directo' : '¿Prefieres pagar por Nequi y enviar el comprobante?',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+        if (!wompiAvailable || _showManual)
         _card(
           c,
           !nequiAvailable
-              ? Text(
-                  'Pronto podrás pagar desde la app. Mientras tanto, escríbenos para activar Pro con un código.',
-                  style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      whatsapp != null
+                          ? 'Escríbenos al WhatsApp y te decimos cómo pagar. Te enviamos un código para activar Pro aquí abajo.'
+                          : 'Escríbenos a $proSupportEmail y te decimos cómo pagar. Te enviamos un código para activar Pro aquí abajo.',
+                      style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+                    ),
+                    if (whatsapp != null) _copyRow(c, whatsapp, 'WhatsApp de Stockealo', 'Número de WhatsApp copiado'),
+                    const SizedBox(height: AppSpace.md),
+                    FilledButton.icon(
+                      onPressed: () => _askForPro(plan, whatsapp),
+                      icon: Icon(whatsapp != null ? Icons.chat_outlined : Icons.mail_outline_rounded, size: 20),
+                      label: Text(whatsapp != null ? 'Escríbenos al WhatsApp' : 'Escribir un correo'),
+                    ),
+                  ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _step(c, '1', plan == null ? 'Elige un plan arriba.' : 'Envía ${_money(plan.price)} por Nequi a:'),
+                    _step(c, '1',
+                        plan == null ? 'Elige un plan arriba y envía su valor por Nequi a:' : 'Envía ${_money(plan.price)} por Nequi a:'),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(32, AppSpace.xs, 0, AppSpace.sm),
                       child: Row(
@@ -357,8 +427,12 @@ class _ProScreenState extends State<ProScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(nequi, style: AppText.amount(context, size: 18, weight: FontWeight.w800)),
-                                if (settings['nequi_name'] != null)
-                                  Text(settings['nequi_name']!, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                                Text(
+                                    [
+                                      sameNumber ? 'Nequi y WhatsApp de Stockealo' : 'Nequi',
+                                      if (settings['nequi_name'] != null) settings['nequi_name']!,
+                                    ].join(' · '),
+                                    style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
                               ],
                             ),
                           ),
@@ -373,7 +447,8 @@ class _ProScreenState extends State<ProScreen> {
                         ],
                       ),
                     ),
-                    _step(c, '2', 'Envíanos el comprobante por WhatsApp.'),
+                    // El botón ya abre nuestro chat: no hace falta repetir el número
+                    _step(c, '2', 'Toca el botón para enviarnos el comprobante por WhatsApp.'),
                     _step(c, '3', 'Te respondemos con un código para canjear aquí abajo.'),
                     const SizedBox(height: AppSpace.md),
                     FilledButton.icon(
@@ -387,6 +462,91 @@ class _ProScreenState extends State<ProScreen> {
       ],
     );
   }
+
+  Widget _wompiBox(StockealoColors c, ProPlan? plan, {required bool testMode}) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.verified_user_outlined, color: c.accent),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: Text('Pago en línea seguro', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+              ),
+              if (testMode)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 2),
+                  decoration: BoxDecoration(color: c.warningSoft, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                  child: Text('Modo de pruebas',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.warning)),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            'Paga con Nequi, PSE, tarjeta o Bancolombia a través de Wompi. Pro se activa solo cuando se aprueba el pago.',
+            style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+          ),
+          const SizedBox(height: AppSpace.md),
+          FilledButton.icon(
+            onPressed: plan == null || _paying ? null : () => _payOnline(plan),
+            icon: _paying
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.lock_outline_rounded, size: 20),
+            label: Text(plan == null ? 'Elige un plan' : 'Pagar ${_money(plan.price)} con Wompi'),
+          ),
+        ],
+      );
+
+  /// Abre el pago de Wompi y espera la confirmación del servidor
+  Future<void> _payOnline(ProPlan plan) async {
+    setState(() => _paying = true);
+    try {
+      final checkout = await ProService.instance.startCheckout(widget.business.id, plan.id);
+      final opened = await launchUrl(Uri.parse(checkout.url), mode: LaunchMode.externalApplication);
+      if (!mounted) return;
+      if (!opened) {
+        AppToast.showError(context, 'No se pudo abrir el pago. Inténtalo de nuevo.');
+        return;
+      }
+      final approved = await PaymentWaitSheet.show(context, reference: checkout.reference);
+      if (!mounted) return;
+      if (approved == true) {
+        await ProService.instance.refresh(widget.business.id);
+        if (mounted) AppToast.showSuccess(context, 'Listo: ya tienes ${plan.kind == 'global' ? 'Pro Global' : 'Pro'}.');
+      }
+    } on ProCheckoutException catch (e) {
+      if (mounted) AppToast.showError(context, e.message);
+    } finally {
+      if (mounted) setState(() => _paying = false);
+    }
+  }
+
+  /// Número a la vista con botón para copiarlo (WhatsApp de Stockealo)
+  Widget _copyRow(StockealoColors c, String number, String caption, String copied, {double indent = 0}) => Padding(
+        padding: EdgeInsets.fromLTRB(indent, AppSpace.sm, 0, 0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(number, style: AppText.amount(context, size: 18, weight: FontWeight.w800)),
+                  Text(caption, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                ],
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: number));
+                AppToast.showSuccess(context, copied);
+              },
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              label: const Text('Copiar'),
+            ),
+          ],
+        ),
+      );
 
   Widget _step(StockealoColors c, String n, String text) => Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
@@ -429,4 +589,123 @@ class _ProScreenState extends State<ProScreen> {
           ),
         ],
       );
+}
+
+/// Espera a que Wompi confirme el pago (el servidor recibe el aviso y activa Pro).
+/// Devuelve true si el pago quedó aprobado.
+class PaymentWaitSheet extends StatefulWidget {
+  final String reference;
+
+  /// Cada cuánto se pregunta el estado
+  final Duration interval;
+
+  const PaymentWaitSheet({super.key, required this.reference, this.interval = const Duration(seconds: 4)});
+
+  static Future<bool?> show(BuildContext context, {required String reference}) => showModalBottomSheet<bool>(
+        context: context,
+        isDismissible: false,
+        showDragHandle: false,
+        backgroundColor: Colors.transparent,
+        builder: (_) => PaymentWaitSheet(reference: reference),
+      );
+
+  @override
+  State<PaymentWaitSheet> createState() => _PaymentWaitSheetState();
+}
+
+class _PaymentWaitSheetState extends State<PaymentWaitSheet> with WidgetsBindingObserver {
+  ProPaymentState _state = ProPaymentState.pending;
+  bool _checking = false;
+  int _tries = 0;
+
+  /// Unos 5 minutos preguntando; después el cliente puede revisar a mano
+  static const _maxTries = 75;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _schedule();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Al volver de Wompi a la app se revisa de inmediato
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _check();
+  }
+
+  void _schedule() {
+    Future.delayed(widget.interval, () async {
+      if (!mounted || _state != ProPaymentState.pending || _tries >= _maxTries) return;
+      _tries++;
+      await _check();
+      _schedule();
+    });
+  }
+
+  Future<void> _check() async {
+    if (_checking || _state != ProPaymentState.pending) return;
+    setState(() => _checking = true);
+    final state = await ProService.instance.paymentState(widget.reference);
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      if (state != null) _state = state;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final (icon, color, title, body) = switch (_state) {
+      ProPaymentState.approved => (Icons.check_circle_rounded, c.success, 'Listo: ya tienes Pro',
+          'El pago fue aprobado y Pro ya está activo.'),
+      ProPaymentState.declined => (Icons.cancel_outlined, c.danger, 'El pago no se aprobó',
+          'Wompi rechazó o anuló el pago, así que no se te cobró. Puedes intentarlo de nuevo.'),
+      ProPaymentState.error => (Icons.error_outline_rounded, c.warning, 'Revisamos tu pago',
+          'Hubo una diferencia con el pago. Escríbenos por WhatsApp con la referencia y lo resolvemos.'),
+      ProPaymentState.pending => (Icons.hourglass_top_rounded, c.accent, 'Esperando la confirmación',
+          'Termina el pago en Wompi. Cuando se apruebe, Pro se activa solo; puede tardar unos segundos.'),
+    };
+    return Container(
+      decoration: BoxDecoration(
+        color: c.paper,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+      ),
+      padding: const EdgeInsets.all(AppSpace.xl),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Icon(icon, size: 48, color: color),
+            const SizedBox(height: AppSpace.md),
+            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink)),
+            const SizedBox(height: AppSpace.sm),
+            Text(body, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted)),
+            const SizedBox(height: AppSpace.sm),
+            Text('Referencia ${widget.reference}', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: c.inkFaint)),
+            const SizedBox(height: AppSpace.lg),
+            if (_state == ProPaymentState.pending) ...[
+              if (_checking) const LinearProgressIndicator(),
+              const SizedBox(height: AppSpace.sm),
+              OutlinedButton(onPressed: _checking ? null : _check, child: const Text('Ya pagué, revisar')),
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cerrar')),
+            ] else
+              FilledButton(
+                onPressed: () => Navigator.pop(context, _state == ProPaymentState.approved),
+                child: Text(_state == ProPaymentState.approved ? 'Listo' : 'Cerrar'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }

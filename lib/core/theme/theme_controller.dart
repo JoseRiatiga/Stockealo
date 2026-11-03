@@ -184,7 +184,7 @@ class ThemeController extends ChangeNotifier {
   static String themeModeLabel(ThemeMode mode) => switch (mode) {
         ThemeMode.dark => 'Oscuro',
         ThemeMode.light => 'Claro',
-        ThemeMode.system => 'Como el teléfono',
+        ThemeMode.system => 'Automático',
       };
 
   static String accentLabel(String choice) {

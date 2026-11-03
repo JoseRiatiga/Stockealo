@@ -1,3 +1,4 @@
+import '../../../store/presentation/screens/online_store_screen.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/design/app_card.dart';
 import '../../../../core/design/app_pagination.dart';
@@ -503,6 +504,13 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                           caption: 'PDF e historias',
                           onTap: _openCatalogModal,
                         ),
+                        if (canEditProducts)
+                          QuickAccessItem(
+                            icon: Icons.storefront_outlined,
+                            label: 'Tienda',
+                            caption: 'En línea',
+                            onTap: () => OnlineStoreScreen.open(context, _activeBusiness!),
+                          ),
                         if (canEditProducts)
                           QuickAccessItem(
                             icon: Icons.local_shipping_outlined,

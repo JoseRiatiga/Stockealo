@@ -1,39 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
 import '../core/design/primary_action_button.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_toast.dart';
 import '../features/pro/data/pro_admin_service.dart';
-
-/// Panel web de administrador: crear códigos Pro y ver los últimos creados.
-/// Solo entra una cuenta de app_admins; el servidor lo vuelve a comprobar en cada llamada.
-class AdminCodesScreen extends StatefulWidget {
-  final String email;
-  final VoidCallback onSignOut;
-
-  const AdminCodesScreen({super.key, required this.email, required this.onSignOut});
-
-  @override
-  State<AdminCodesScreen> createState() => _AdminCodesScreenState();
-}
+import 'admin_widgets.dart';
 
 /// Duraciones que se ofrecen; null = permanente
 const _durations = <int?>[1, 7, 30, 90, 365, null];
 
-class _AdminCodesScreenState extends State<AdminCodesScreen> {
+/// Plazos para canjear; null = sin vencimiento
+const _validities = <int?>[null, 7, 30, 90];
+
+/// Códigos Pro: crear, buscar, copiar el mensaje para el cliente y desactivar
+class AdminCodesPage extends StatefulWidget {
+  const AdminCodesPage({super.key});
+
+  @override
+  State<AdminCodesPage> createState() => _AdminCodesPageState();
+}
+
+class _AdminCodesPageState extends State<AdminCodesPage> {
   final _admin = ProAdminService.instance;
   final _noteController = TextEditingController();
 
   String _kind = 'business';
   int? _days = 30;
+  int? _validDays;
   int _count = 1;
   int _maxUses = 1;
   bool _creating = false;
-  List<String> _created = const [];
+  List<ProCode> _created = const [];
 
   List<ProCode> _codes = const [];
+  String _search = '';
   bool _loading = true;
   String? _error;
 
@@ -55,7 +55,7 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
       _error = null;
     });
     try {
-      final codes = await _admin.listCodes();
+      final codes = await _admin.listCodes(search: _search);
       if (mounted) setState(() => _codes = codes);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -74,9 +74,23 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
         count: _count,
         maxUses: _maxUses,
         note: _noteController.text.trim(),
+        validDays: _validDays,
       );
       if (!mounted) return;
-      setState(() => _created = codes);
+      final now = DateTime.now();
+      setState(() => _created = [
+            for (final code in codes)
+              ProCode(
+                code: code,
+                kind: _kind,
+                days: _days,
+                maxUses: _maxUses,
+                uses: 0,
+                note: null,
+                createdAt: now,
+                expiresAt: _validDays == null ? null : now.add(Duration(days: _validDays!)),
+              ),
+          ]);
       _noteController.clear();
       _loadCodes();
     } catch (e) {
@@ -86,9 +100,26 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
     }
   }
 
-  Future<void> _copy(String text, String label) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    if (mounted) AppToast.show(context, message: '$label copiado', type: ToastType.success);
+  Future<void> _disable(ProCode code) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('¿Desactivar ${code.code}?'),
+        content: const Text('Nadie más podrá canjearlo. Quien ya lo canjeó conserva su Pro.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Desactivar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _admin.disableCode(code.code);
+      if (mounted) AppToast.show(context, message: 'Código desactivado', type: ToastType.success);
+      _loadCodes();
+    } catch (e) {
+      if (mounted) AppToast.show(context, message: '$e', type: ToastType.error);
+    }
   }
 
   static String durationText(int? days) => switch (days) {
@@ -104,81 +135,32 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Scaffold(
-      backgroundColor: c.paper,
-      appBar: AppBar(
-        title: const Text('Stockealo · Administrador'),
-        actions: [
-          Center(child: Text(widget.email, style: TextStyle(fontSize: 13, color: c.inkMuted))),
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            onPressed: widget.onSignOut,
-            icon: Icon(Icons.logout_rounded, color: c.inkMuted),
-          ),
-          const SizedBox(width: AppSpace.sm),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadCodes,
-        child: ListView(
-          // En pantallas anchas el contenido queda centrado y legible
-          padding: EdgeInsets.fromLTRB(
-            AppSpace.lg + _sideGutter(context), AppSpace.lg, AppSpace.lg + _sideGutter(context), AppSpace.xxl),
-          children: [
-            _card(c, title: 'Crear códigos Pro', child: _form(c)),
-            if (_created.isNotEmpty) ...[
-              const SizedBox(height: AppSpace.md),
-              _createdCard(c),
-            ],
-            const SizedBox(height: AppSpace.lg),
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Últimos códigos', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
-                ),
-                IconButton(
-                  tooltip: 'Actualizar',
-                  onPressed: _loading ? null : _loadCodes,
-                  icon: Icon(Icons.refresh_rounded, color: c.inkMuted),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpace.sm),
-            if (_loading)
-              const Padding(padding: EdgeInsets.all(AppSpace.xl), child: Center(child: CircularProgressIndicator()))
-            else if (_error != null)
-              Text(_error!, style: TextStyle(color: c.danger))
-            else if (_codes.isEmpty)
-              Text('Todavía no hay códigos.', style: TextStyle(color: c.inkMuted))
-            else
-              for (final code in _codes) _codeRow(c, code),
-          ],
-        ),
-      ),
+    final state = AdminLoadState(
+      loading: _loading,
+      error: _error,
+      empty: _codes.isEmpty,
+      emptyText: _search.isEmpty ? 'Todavía no hay códigos.' : 'No hay códigos con "$_search".',
+      onRetry: _loadCodes,
     );
-  }
-
-  static double _sideGutter(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    return width > 760 ? (width - 720) / 2 : 0;
-  }
-
-  Widget _card(StockealoColors c, {required String title, required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpace.lg),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: c.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
-          const SizedBox(height: AppSpace.md),
-          child,
-        ],
-      ),
+    return AdminPage(
+      title: 'Códigos',
+      subtitle: 'Crea códigos Pro para entregar después de cada pago',
+      onRefresh: _loadCodes,
+      children: [
+        AdminCard(child: _form(c)),
+        if (_created.isNotEmpty) _createdCard(c),
+        const SizedBox(height: AppSpace.lg),
+        Text('Últimos códigos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+        const SizedBox(height: AppSpace.sm),
+        AdminSearchField(
+          hint: 'Buscar por código, nota o correo',
+          onSubmitted: (v) {
+            _search = v;
+            _loadCodes();
+          },
+        ),
+        if (state.blocking) state else for (final code in _codes) _codeRow(c, code),
+      ],
     );
   }
 
@@ -187,10 +169,21 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
         child: Text(text, style: TextStyle(fontSize: 13, color: c.inkMuted)),
       );
 
+  Widget _chips<T>(List<T> values, T selected, String Function(T) label, ValueChanged<T> onSelect) => Wrap(
+        spacing: AppSpace.sm,
+        runSpacing: AppSpace.sm,
+        children: [
+          for (final v in values)
+            ChoiceChip(label: Text(label(v)), selected: selected == v, onSelected: (_) => setState(() => onSelect(v))),
+        ],
+      );
+
   Widget _form(StockealoColors c) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text('Crear códigos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+        const SizedBox(height: AppSpace.md),
         _label(c, 'Plan'),
         SegmentedButton<String>(
           segments: const [
@@ -201,19 +194,11 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
           onSelectionChanged: (v) => setState(() => _kind = v.first),
         ),
         const SizedBox(height: AppSpace.lg),
-        _label(c, 'Duración'),
-        Wrap(
-          spacing: AppSpace.sm,
-          runSpacing: AppSpace.sm,
-          children: [
-            for (final d in _durations)
-              ChoiceChip(
-                label: Text(durationText(d)),
-                selected: _days == d,
-                onSelected: (_) => setState(() => _days = d),
-              ),
-          ],
-        ),
+        _label(c, 'Duración de Pro'),
+        _chips<int?>(_durations, _days, durationText, (v) => _days = v),
+        const SizedBox(height: AppSpace.lg),
+        _label(c, 'Plazo para canjearlo'),
+        _chips<int?>(_validities, _validDays, (v) => v == null ? 'Sin vencimiento' : '$v días', (v) => _validDays = v),
         const SizedBox(height: AppSpace.lg),
         Row(
           children: [
@@ -248,10 +233,7 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
       children: [
         _label(c, label),
         Container(
-          decoration: BoxDecoration(
-            color: c.surfaceMuted,
-            borderRadius: BorderRadius.circular(AppRadius.control),
-          ),
+          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.control)),
           child: Row(
             children: [
               IconButton(
@@ -261,8 +243,7 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
               ),
               Expanded(
                 child: Text('$value',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                    textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
               ),
               IconButton(
                 tooltip: 'Más',
@@ -278,11 +259,9 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
 
   Widget _createdCard(StockealoColors c) {
     return Container(
+      margin: const EdgeInsets.only(top: AppSpace.sm),
       padding: const EdgeInsets.all(AppSpace.lg),
-      decoration: BoxDecoration(
-        color: c.successSoft,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-      ),
+      decoration: BoxDecoration(color: c.successSoft, borderRadius: BorderRadius.circular(AppRadius.card)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -298,7 +277,7 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
               ),
               if (_created.length > 1)
                 TextButton(
-                  onPressed: () => _copy(_created.join('\n'), 'Códigos'),
+                  onPressed: () => adminCopy(context, _created.map((e) => e.code).join('\n'), 'Códigos'),
                   child: const Text('Copiar todos'),
                 ),
             ],
@@ -308,14 +287,17 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
             Row(
               children: [
                 Expanded(
-                  child: SelectableText(
-                    code,
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: c.ink),
-                  ),
+                  child: SelectableText(code.code,
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: c.ink)),
+                ),
+                TextButton.icon(
+                  onPressed: () => adminCopy(context, code.shareMessage(), 'Mensaje'),
+                  icon: const Icon(Icons.chat_outlined, size: 18),
+                  label: const Text('Mensaje'),
                 ),
                 IconButton(
-                  tooltip: 'Copiar',
-                  onPressed: () => _copy(code, 'Código'),
+                  tooltip: 'Copiar código',
+                  onPressed: () => adminCopy(context, code.code, 'Código'),
                   icon: Icon(Icons.copy_rounded, size: 20, color: c.inkMuted),
                 ),
               ],
@@ -326,16 +308,12 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
   }
 
   Widget _codeRow(StockealoColors c, ProCode code) {
-    final status = code.exhausted ? 'Usado' : (code.uses > 0 ? '${code.uses}/${code.maxUses} usos' : 'Sin usar');
-    final statusColor = code.exhausted ? c.inkMuted : (code.uses > 0 ? c.warning : c.success);
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpace.sm),
+    final status = code.statusLabel();
+    final tone = code.exhausted || code.isExpired()
+        ? AdminTone.neutral
+        : (code.uses > 0 ? AdminTone.warn : AdminTone.good);
+    return AdminCard(
       padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.sm, AppSpace.xs, AppSpace.sm),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(AppRadius.control),
-        border: Border.all(color: c.line),
-      ),
       child: Row(
         children: [
           Expanded(
@@ -349,14 +327,15 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
                           style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1, color: c.ink)),
                     ),
                     const SizedBox(width: AppSpace.sm),
-                    Text(status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: statusColor)),
+                    AdminBadge(status, tone: tone),
                   ],
                 ),
                 Text(
                   [
                     code.kindLabel,
                     code.durationLabel,
-                    DateFormat('dd/MM/yyyy').format(code.createdAt),
+                    'Creado ${adminDate(code.createdAt)}',
+                    if (code.expiresAt != null) 'Canjear antes del ${adminDate(code.expiresAt)}',
                     if (code.note?.isNotEmpty == true) code.note!,
                   ].join(' · '),
                   style: TextStyle(fontSize: 12, color: c.inkMuted),
@@ -367,9 +346,17 @@ class _AdminCodesScreenState extends State<AdminCodesScreen> {
             ),
           ),
           IconButton(
-            tooltip: 'Copiar',
-            onPressed: () => _copy(code.code, 'Código'),
+            tooltip: 'Copiar código',
+            onPressed: () => adminCopy(context, code.code, 'Código'),
             icon: Icon(Icons.copy_rounded, size: 20, color: c.inkMuted),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Más',
+            onSelected: (v) => v == 'message' ? adminCopy(context, code.shareMessage(), 'Mensaje') : _disable(code),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'message', child: Text('Copiar mensaje para WhatsApp')),
+              if (code.canDisable()) const PopupMenuItem(value: 'disable', child: Text('Desactivar')),
+            ],
           ),
         ],
       ),

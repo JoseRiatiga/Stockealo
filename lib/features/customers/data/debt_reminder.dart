@@ -22,7 +22,6 @@ class DebtReminder {
 
   /// Número para wa.me: internacional, sin "+" ni espacios; null si no es usable.
   /// Un número guardado sin prefijo se toma como del país del negocio ([country]).
-  @visibleForTesting
   static String? normalizePhone(String? phone, {Country country = kDefaultCountry}) {
     final trimmed = phone?.trim() ?? '';
     final e164 = PhoneNumbers.toE164(trimmed, country: country);

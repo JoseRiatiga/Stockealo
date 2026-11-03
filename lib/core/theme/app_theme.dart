@@ -157,6 +157,19 @@ class AppTheme {
         secondaryLabelStyle: TextStyle(fontFamily: AppText.fontFamily, color: c.onAccent, fontSize: 13),
         checkmarkColor: c.onAccent,
       ),
+      // Menús ⋮: tarjeta blanca con borde fino, como el resto de V1 (no el gris de Material)
+      popupMenuTheme: PopupMenuThemeData(
+        color: c.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 6,
+        shadowColor: Colors.black.withOpacity(0.12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          side: BorderSide(color: c.line),
+        ),
+        textStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, color: c.ink),
+        labelTextStyle: WidgetStatePropertyAll(TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, color: c.ink)),
+      ),
       dialogTheme: DialogTheme(
         backgroundColor: c.surface,
         surfaceTintColor: Colors.transparent,

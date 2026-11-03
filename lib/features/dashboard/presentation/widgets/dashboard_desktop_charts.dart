@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_tokens.dart';
 import 'spline_area_chart.dart';
 import 'segmented_progress_card.dart';
 
@@ -34,13 +35,7 @@ class DashboardDesktopCharts extends StatelessWidget {
     }).toList();
 
     final categoryItems = categorySales.take(5).map((cat) {
-      final colors = [
-        const Color(0xFF06B6D4),
-        const Color(0xFFEC4899),
-        const Color(0xFF10B981),
-        const Color(0xFFF59E0B),
-        const Color(0xFF8B5CF6),
-      ];
+      final colors = chartSeries(context.colors);
       final idx = categorySales.indexOf(cat) % colors.length;
       final pct = (cat['percentage'] as num?)?.toDouble() ?? 0.0;
       return SegmentedBarItem(
@@ -51,39 +46,40 @@ class DashboardDesktopCharts extends StatelessWidget {
       );
     }).toList();
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // Las dos tarjetas siempre con la misma altura, haya una categoría o cinco
+    return IntrinsicHeight(
+      child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           flex: 6,
           child: SplineAreaChart(
             title: timelineTitle,
-            subtitle: 'Curva continua de rendimiento operativo',
+            subtitle: 'Cómo se reparten tus ventas en el tiempo',
             data: splineData,
             height: 190,
-            primaryColor: const Color(0xFF06B6D4),
-            secondaryColor: const Color(0xFFEC4899),
           ),
         ),
         const SizedBox(width: 16),
         Expanded(
           flex: 4,
           child: SegmentedProgressCard(
-            title: 'PARTICIPACIÓN POR CATEGORÍA',
-            subtitle: 'Distribución porcentual en el periodo',
+            title: 'Ventas por categoría',
+            subtitle: 'Qué categorías venden más',
             items: categoryItems.isNotEmpty
                 ? categoryItems
                 : [
-                    const SegmentedBarItem(
+                    SegmentedBarItem(
                       label: 'General',
                       valueText: '100%',
                       percentage: 1.0,
-                      color: Color(0xFF10B981),
+                      color: context.colors.accent,
                     )
                   ],
           ),
         ),
       ],
+      ),
     );
   }
 }

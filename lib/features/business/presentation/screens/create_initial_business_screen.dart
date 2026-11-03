@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design/country_flag.dart';
 import '../../../../core/design/primary_action_button.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/countries.dart';
@@ -240,10 +241,9 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '${_country.flag}  ${_country.name} · $_currency',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    CountryLabel(
+                      country: _country,
+                      text: '${_country.name} · $_currency',
                       style: TextStyle(fontSize: 13, color: c.inkMuted),
                     ),
                   ],
@@ -275,7 +275,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
             for (final country in kCountries)
               DropdownMenuItem(
                 value: country.code,
-                child: Text('${country.flag}  ${country.name}', overflow: TextOverflow.ellipsis),
+                child: CountryLabel(country: country, text: country.name),
               ),
           ],
           onChanged: (code) => setState(() {

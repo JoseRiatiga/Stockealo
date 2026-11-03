@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
 class SplineAreaChart extends StatefulWidget {
   final List<Map<String, dynamic>> data; // [{'label': 'Lun', 'value': 120.0}, ...]
   final String title;
   final String? subtitle;
-  final Color primaryColor;
-  final Color secondaryColor;
+  /// Color de la curva; por defecto el acento de la app
+  final Color? primaryColor;
   final double height;
 
   const SplineAreaChart({
@@ -14,8 +15,7 @@ class SplineAreaChart extends StatefulWidget {
     required this.data,
     required this.title,
     this.subtitle,
-    this.primaryColor = const Color(0xFF8B5CF6), // Violeta brillante Obsidian
-    this.secondaryColor = const Color(0xFF10B981), // Esmeralda acento
+    this.primaryColor,
     this.height = 180.0,
   });
 
@@ -48,7 +48,8 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
+    final accent = widget.primaryColor ?? c.accent;
 
     final hoveredItem = (_hoveredIndex != null && _hoveredIndex! < widget.data.length)
         ? widget.data[_hoveredIndex!]
@@ -57,19 +58,9 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.25 : 0.03),
-            blurRadius: 18,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: c.line),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -88,7 +79,7 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
                         fontSize: 14.5,
                         fontWeight: FontWeight.bold,
                         letterSpacing: -0.2,
-                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                        color: c.ink,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -102,7 +93,7 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                              color: c.inkMuted,
                             ),
                           ),
                           Flexible(
@@ -111,7 +102,7 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
+                                color: accent,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -124,7 +115,7 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
                         widget.subtitle!,
                         style: TextStyle(
                           fontSize: 11.5,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          color: c.inkMuted,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -137,9 +128,9 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: widget.primaryColor.withOpacity(0.12),
+                  color: c.successSoft,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: widget.primaryColor.withOpacity(0.3)),
+                  border: Border.all(color: Colors.transparent),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -148,7 +139,7 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: widget.primaryColor,
+                        color: c.success,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -158,7 +149,7 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: widget.primaryColor,
+                        color: c.success,
                       ),
                     ),
                   ],
@@ -185,9 +176,8 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
                       size: Size(constraints.maxWidth, widget.height),
                       painter: _SplineChartPainter(
                         data: widget.data,
-                        primaryColor: widget.primaryColor,
-                        secondaryColor: widget.secondaryColor,
-                        isDark: isDark,
+                        primaryColor: accent,
+                        colors: c,
                         hoveredIndex: _hoveredIndex,
                       ),
                     ),
@@ -205,15 +195,15 @@ class _SplineAreaChartState extends State<SplineAreaChart> {
 class _SplineChartPainter extends CustomPainter {
   final List<Map<String, dynamic>> data;
   final Color primaryColor;
-  final Color secondaryColor;
-  final bool isDark;
+  final StockealoColors colors;
   final int? hoveredIndex;
+
+  bool get isDark => colors.paper.computeLuminance() < 0.5;
 
   _SplineChartPainter({
     required this.data,
     required this.primaryColor,
-    required this.secondaryColor,
-    required this.isDark,
+    required this.colors,
     this.hoveredIndex,
   });
 
@@ -235,7 +225,7 @@ class _SplineChartPainter extends CustomPainter {
 
     // 1. Líneas de referencia horizontales suaves (Grid)
     final gridPaint = Paint()
-      ..color = (isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)).withOpacity(0.6)
+      ..color = colors.line
       ..strokeWidth = 1.0;
 
     for (int i = 0; i <= 3; i++) {
@@ -292,11 +282,9 @@ class _SplineChartPainter extends CustomPainter {
 
     canvas.drawPath(fillPath, fillPaint);
 
-    // 5. Línea de trazo brillante de la curva
+    // 5. Línea de la curva en el color de acento
     final strokePaint = Paint()
-      ..shader = LinearGradient(
-        colors: [primaryColor, secondaryColor],
-      ).createShader(Rect.fromLTWH(0, 0, chartWidth, chartHeight))
+      ..color = primaryColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0
       ..strokeCap = StrokeCap.round;
@@ -337,7 +325,7 @@ class _SplineChartPainter extends CustomPainter {
       canvas.drawCircle(
         p,
         isHovered ? 4.5 : 3.2,
-        Paint()..color = Colors.white,
+        Paint()..color = colors.surface,
       );
       canvas.drawCircle(
         p,
@@ -356,9 +344,7 @@ class _SplineChartPainter extends CustomPainter {
           style: TextStyle(
             fontSize: 10.5,
             fontWeight: isHovered ? FontWeight.bold : FontWeight.w600,
-            color: isHovered
-                ? (isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED))
-                : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+            color: isHovered ? colors.ink : colors.inkFaint,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -379,10 +365,10 @@ class _SplineChartPainter extends CustomPainter {
       final tooltipPainter = TextPainter(
         text: TextSpan(
           text: valText,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: colors.onToast,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -406,7 +392,7 @@ class _SplineChartPainter extends CustomPainter {
       );
 
       final bgPaint = Paint()
-        ..color = isDark ? const Color(0xFF18152F) : const Color(0xFF0F172A)
+        ..color = colors.toast
         ..style = PaintingStyle.fill;
       final borderPaint = Paint()
         ..color = primaryColor
@@ -427,7 +413,7 @@ class _SplineChartPainter extends CustomPainter {
   bool shouldRepaint(covariant _SplineChartPainter oldDelegate) {
     return oldDelegate.data != data ||
         oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.isDark != isDark ||
+        oldDelegate.colors != colors ||
         oldDelegate.hoveredIndex != hoveredIndex;
   }
 }

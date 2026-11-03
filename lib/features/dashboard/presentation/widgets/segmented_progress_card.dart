@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_tokens.dart';
+
 class SegmentedBarItem {
   final String label;
   final String valueText;
@@ -28,24 +30,14 @@ class SegmentedProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131127) : Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark ? const Color(0xFF262046) : const Color(0xFFE2E8F0),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-            blurRadius: 18,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: c.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,7 +48,7 @@ class SegmentedProgressCard extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.bold,
               letterSpacing: -0.2,
-              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+              color: c.ink,
             ),
           ),
           if (subtitle != null) ...[
@@ -65,7 +57,7 @@ class SegmentedProgressCard extends StatelessWidget {
               subtitle!,
               style: TextStyle(
                 fontSize: 11.5,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                color: c.inkMuted,
               ),
             ),
           ],
@@ -86,7 +78,7 @@ class SegmentedProgressCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                          color: c.ink,
                         ),
                       ),
                       Text(
@@ -94,14 +86,14 @@ class SegmentedProgressCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: item.color,
+                          color: c.ink,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   // Barra dividida en segmentos
-                  _buildSegmentedBar(item.percentage.clamp(0.0, 1.0), item.color, isDark),
+                  _buildSegmentedBar(item.percentage.clamp(0.0, 1.0), item.color, c),
                 ],
               ),
             );
@@ -111,7 +103,7 @@ class SegmentedProgressCard extends StatelessWidget {
     );
   }
 
-  Widget _buildSegmentedBar(double pct, Color color, bool isDark) {
+  Widget _buildSegmentedBar(double pct, Color color, StockealoColors c) {
     const totalSegments = 24;
     final activeSegments = (pct * totalSegments).round();
 
@@ -123,19 +115,8 @@ class SegmentedProgressCard extends StatelessWidget {
             height: 8,
             margin: const EdgeInsets.symmetric(horizontal: 1.5),
             decoration: BoxDecoration(
-              color: isActive
-                  ? color
-                  : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+              color: isActive ? color : c.surfaceMuted,
               borderRadius: BorderRadius.circular(3),
-              boxShadow: isActive
-                  ? [
-                      BoxShadow(
-                        color: color.withOpacity(0.35),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ]
-                  : null,
             ),
           ),
         );

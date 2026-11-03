@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/design/country_flag.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/countries.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -237,8 +238,7 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
                   for (final country in kCountries)
                     DropdownMenuItem(
                         value: country.code,
-                        child: Text('${country.flag}  ${country.name}',
-                            overflow: TextOverflow.ellipsis)),
+                        child: CountryLabel(country: country, text: country.name)),
                 ],
                 onChanged: (code) => setState(() {
                   _country = countryByCode(code);

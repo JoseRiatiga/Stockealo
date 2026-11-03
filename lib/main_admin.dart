@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'admin/admin_codes_screen.dart';
 import 'admin/admin_login_screen.dart';
+import 'admin/admin_shell.dart';
 import 'core/services/supabase_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_tokens.dart';
@@ -61,7 +61,7 @@ class _AdminGate extends StatelessWidget {
                 onSignOut: () => client.auth.signOut(),
               );
             }
-            return AdminCodesScreen(
+            return AdminShell(
               email: session.user.email ?? '',
               onSignOut: () => client.auth.signOut(),
             );

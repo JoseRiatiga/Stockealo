@@ -511,11 +511,9 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                   }
                 },
                 itemBuilder: (_) => [
-                  if (canManage) const PopupMenuItem(value: 'edit', child: Text('Editar negocio')),
-                  if (isOwner)
-                    PopupMenuItem(value: 'delete', child: Text('Mover a la papelera', style: TextStyle(color: c.danger))),
-                  if (!isOwner)
-                    PopupMenuItem(value: 'leave', child: Text('Salir del equipo', style: TextStyle(color: c.danger))),
+                  if (canManage) _menuItem('edit', Icons.edit_outlined, 'Editar negocio', c.ink),
+                  if (isOwner) _menuItem('delete', Icons.delete_outline_rounded, 'Mover a la papelera', c.danger),
+                  if (!isOwner) _menuItem('leave', Icons.logout_rounded, 'Salir del equipo', c.danger),
                 ],
               ),
             ],
@@ -524,4 +522,16 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
       ),
     );
   }
+
+  /// Opción del menú ⋮ con ícono, como en el resto de la app
+  PopupMenuItem<String> _menuItem(String value, IconData icon, String label, Color color) => PopupMenuItem(
+        value: value,
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: AppSpace.md),
+            Text(label, style: TextStyle(color: color)),
+          ],
+        ),
+      );
 }

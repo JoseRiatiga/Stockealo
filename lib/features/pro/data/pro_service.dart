@@ -55,15 +55,38 @@ class ProPlan {
   String get periodLabel => switch (period) {
         'week' => 'Semanal',
         'month' => 'Mensual',
+        'year' => 'Anual',
         _ => 'Permanente',
       };
 
   String get perLabel => switch (period) {
         'week' => '/ semana',
         'month' => '/ mes',
+        'year' => '/ año',
         _ => 'un solo pago',
       };
 }
+
+/// Un pago en línea con Wompi recién iniciado
+class ProCheckout {
+  final String reference;
+  final String url;
+
+  const ProCheckout(this.reference, this.url);
+}
+
+/// No se pudo iniciar el pago en línea; [message] se muestra tal cual
+class ProCheckoutException implements Exception {
+  final String message;
+
+  const ProCheckoutException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// Estado de un pago en línea: PENDING, APPROVED, DECLINED, VOIDED o ERROR
+enum ProPaymentState { pending, approved, declined, error }
 
 /// Resultado de canjear un código
 class RedeemResult {
@@ -148,6 +171,58 @@ class ProService {
       debugPrint('Canje de código: $e');
       return const RedeemResult(false, 'No se pudo canjear el código. Inténtalo de nuevo.');
     }
+  }
+
+  /// Inicia el pago de un plan con Wompi: el servidor fija el precio y firma el enlace
+  Future<ProCheckout> startCheckout(String businessId, String planId) async {
+    final client = _client;
+    if (client == null) throw const ProCheckoutException('Necesitas conexión a internet para pagar.');
+    try {
+      // En la web, Wompi devuelve a una página que dice "vuelve a la pestaña de Stockealo"
+      final res = await client.functions.invoke('pro-checkout',
+          body: {'business_id': businessId, 'plan_id': planId, 'platform': kIsWeb ? 'web' : 'app'});
+      final data = Map<String, dynamic>.from(res.data as Map);
+      return ProCheckout(data['reference'] as String, data['url'] as String);
+    } on FunctionException catch (e) {
+      final code = e.details is Map ? (e.details as Map)['error']?.toString() ?? '' : '${e.details}';
+      throw ProCheckoutException(checkoutErrorMessage(code));
+    } on ProCheckoutException {
+      rethrow;
+    } catch (e) {
+      debugPrint('Pago en línea: $e');
+      throw const ProCheckoutException('No se pudo iniciar el pago. Inténtalo de nuevo.');
+    }
+  }
+
+  /// Estado de un pago iniciado desde este celular; null si no se encuentra
+  Future<ProPaymentState?> paymentState(String reference) async {
+    final client = _client;
+    if (client == null) return null;
+    try {
+      final data = await client.rpc('pro_payment_status', params: {'p_reference': reference});
+      if (data == null) return null;
+      return paymentStateFrom((data as Map)['status'] as String?);
+    } catch (e) {
+      debugPrint('Estado del pago: $e');
+      return null;
+    }
+  }
+
+  @visibleForTesting
+  static ProPaymentState paymentStateFrom(String? status) => switch (status) {
+        'APPROVED' => ProPaymentState.approved,
+        'DECLINED' || 'VOIDED' => ProPaymentState.declined,
+        'ERROR' => ProPaymentState.error,
+        _ => ProPaymentState.pending,
+      };
+
+  @visibleForTesting
+  static String checkoutErrorMessage(String code) {
+    if (code.contains('not_allowed')) return 'Solo el dueño o un administrador del negocio puede comprar Pro.';
+    if (code.contains('currency_not_supported')) return 'El pago en línea por ahora es solo en pesos colombianos.';
+    if (code.contains('payments_not_configured')) return 'El pago en línea no está disponible ahora. Usa Nequi.';
+    if (code.contains('plan_not_found')) return 'Ese plan ya no está disponible.';
+    return 'No se pudo iniciar el pago. Inténtalo de nuevo.';
   }
 
   /// Mensaje para cada error del servidor al canjear

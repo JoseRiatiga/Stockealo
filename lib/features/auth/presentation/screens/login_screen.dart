@@ -123,8 +123,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (_isRegisterMode && !_phoneValid) {
-      setState(() => _errorMessage = 'Revisa el número de teléfono o déjalo vacío.');
+    if (_isRegisterMode && (!_phoneValid || _phoneController.text.trim().isEmpty)) {
+      setState(() => _errorMessage = _phoneController.text.trim().isEmpty
+          ? 'Escribe tu número de celular.'
+          : 'Revisa el número de celular.');
       return;
     }
 
@@ -359,7 +361,8 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: AppSpace.lg),
             PhoneField(
               defaultCountry: deviceCountry(),
-              label: 'WhatsApp (opcional)',
+              label: 'Celular',
+              required: true,
               onChanged: (value) {
                 _phoneController.text = value.e164 ?? '';
                 _phoneValid = value.isValid;

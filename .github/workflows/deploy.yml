@@ -35,9 +35,10 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      # stockealo.online/      → página principal (por ahora lleva a /app)
+      # stockealo.online/      → página principal (web_site/index.html)
       # stockealo.online/app    → app web de los negocios
       # stockealo.online/admin  → panel de administrador (app aparte: lib/main_admin.dart)
+      # stockealo.online/tienda/<nombre> → tienda en línea de un negocio (lib/main_store.dart)
       - name: Build Web (app)
         run: |
           flutter build web --base-href "/app/" --release
@@ -49,9 +50,17 @@ jobs:
           flutter build web -t lib/main_admin.dart --base-href "/admin/" --release
           mv build/web build/site/admin
 
+      - name: Build Web (tienda)
+        run: |
+          flutter build web -t lib/main_store.dart --base-href "/tienda/" --release
+          mv build/web build/site/tienda
+
+      # Página principal, páginas de regreso de Wompi y Términos/Privacidad (generados
+      # desde los textos de la app, así la web y la app dicen lo mismo)
       - name: Assemble site
         run: |
-          cp web_site/index.html web_site/404.html web_site/CNAME build/site/
+          python3 tool/build_legal_pages.py web_site
+          cp -r web_site/. build/site/
           touch build/site/.nojekyll
 
       - name: Deploy to GitHub Pages

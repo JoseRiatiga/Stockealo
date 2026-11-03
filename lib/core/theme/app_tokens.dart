@@ -76,6 +76,16 @@ class AppPalette {
       '#${(color.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 }
 
+/// Colores de las series de las gráficas (categorías): el acento primero y luego
+/// tonos de la paleta que se distinguen entre sí en claro y en oscuro
+List<Color> chartSeries(StockealoColors c) => [
+      c.accent,
+      c.info,
+      c.warning,
+      AppPalette.businessColors['morado']!,
+      AppPalette.businessColors['terracota']!,
+    ];
+
 /// Espaciados (múltiplos de 4)
 class AppSpace {
   AppSpace._();

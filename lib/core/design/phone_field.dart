@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'country_flag.dart';
 import '../theme/app_tokens.dart';
 import '../utils/countries.dart';
 
@@ -14,7 +15,7 @@ class PhoneValue {
   const PhoneValue(this.e164, {required this.isValid});
 }
 
-/// Campo de teléfono con selector de país: `[🇨🇴 +57 ▾] [300 123 4567]`.
+/// Campo de teléfono con selector de país: `[bandera +57 ▾] [300 123 4567]`.
 ///
 /// [initialValue] puede venir con prefijo o ser un número antiguo sin él; en ese
 /// caso se toma como de [defaultCountry] (el país del negocio o del teléfono).
@@ -25,6 +26,9 @@ class PhoneField extends StatefulWidget {
   final ValueChanged<PhoneValue> onChanged;
   final TextInputAction? textInputAction;
 
+  /// Obligatorio: vacío también cuenta como inválido
+  final bool required;
+
   const PhoneField({
     super.key,
     this.initialValue,
@@ -32,6 +36,7 @@ class PhoneField extends StatefulWidget {
     this.label = 'Teléfono / WhatsApp',
     required this.onChanged,
     this.textInputAction,
+    this.required = false,
   });
 
   @override
@@ -57,7 +62,7 @@ class _PhoneFieldState extends State<PhoneField> {
   }
 
   bool get _isEmpty => _controller.text.trim().isEmpty;
-  bool get _isValid => _isEmpty || PhoneNumbers.isValidNational(_controller.text, _country);
+  bool get _isValid => _isEmpty ? !widget.required : PhoneNumbers.isValidNational(_controller.text, _country);
 
   void _notify() {
     final digits = _controller.text.replaceAll(RegExp(r'[^0-9]'), '');
@@ -76,7 +81,7 @@ class _PhoneFieldState extends State<PhoneField> {
           children: [
             for (final c in kCountries)
               ListTile(
-                leading: Text(c.flag, style: const TextStyle(fontSize: 22)),
+                leading: CountryFlag(code: c.code, width: 30),
                 title: Text(c.name),
                 trailing: Text('+${c.dialCode}', style: AppText.amount(ctx, size: 14, weight: FontWeight.w500)),
                 selected: c.code == _country.code,
@@ -119,7 +124,7 @@ class _PhoneFieldState extends State<PhoneField> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(_country.flag, style: const TextStyle(fontSize: 18)),
+                  CountryFlag(code: _country.code, width: 24),
                   const SizedBox(width: 6),
                   Text('+${_country.dialCode}', style: AppText.amount(context, size: 15, weight: FontWeight.w500)),
                   Icon(Icons.arrow_drop_down_rounded, color: c.inkMuted),

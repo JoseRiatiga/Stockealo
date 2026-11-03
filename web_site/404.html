@@ -6,7 +6,10 @@
   <script>
     // GitHub Pages solo tiene un 404 para todo el sitio: cada ruta vuelve a su app
     var p = location.pathname;
-    location.replace(p.indexOf('/admin') === 0 ? '/admin/' : '/app/');
+    var tienda = p.match(/^\/tienda\/([a-z0-9-]+)\/?$/i);
+    if (tienda) location.replace('/tienda/?t=' + tienda[1].toLowerCase());
+    else if (p.indexOf('/tienda') === 0) location.replace('/tienda/');
+    else location.replace(p.indexOf('/admin') === 0 ? '/admin/' : '/app/');
   </script>
 </head>
 <body></body>

@@ -35,6 +35,16 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Volver a la app después de pagar en Wompi (stockealo.online/pago abre stockealo://pago).
+                 Solo trae la app al frente: la ventana de espera revisa el pago al volver. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="stockealo" android:host="pago"/>
+            </intent-filter>
+            <!-- Flutter no navega con el enlace (no hay pantalla /pago): la app sigue donde estaba -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>
         </activity>
         <!-- Resumen del día programado (flutter_local_notifications) -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/design/content_width.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -199,7 +200,7 @@ class SettingsRow extends StatelessWidget {
   }
 }
 
-/// Subpantalla de Ajustes: botón atrás redondo, título centrado y la barra de
+/// Subpantalla de Ajustes: barra con flecha, contenido de ancho común y la barra de
 /// cambios pendientes abajo
 class SettingsSubpage extends StatelessWidget {
   final String title;
@@ -225,67 +226,17 @@ class SettingsSubpage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    // Misma barra con flecha que el resto de pantallas (Pro, Legal, Clientes, Tienda)
     return Scaffold(
       backgroundColor: c.paper,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.sm, AppSpace.md, AppSpace.md),
-              child: Row(
-                children: [
-                  _BackButton(onTap: () => Navigator.pop(context)),
-                  Expanded(
-                    child: Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.ink),
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, 120),
-                    children: children,
-                  ),
-                ),
-              ),
-            ),
-          ],
+      appBar: AppBar(title: Text(title), backgroundColor: c.paper, surfaceTintColor: Colors.transparent),
+      body: ContentWidth(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, 120),
+          children: children,
         ),
       ),
       bottomNavigationBar: const PendingChangesBar(),
-    );
-  }
-}
-
-class _BackButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _BackButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Semantics(
-      button: true,
-      label: 'Atrás',
-      child: InkResponse(
-        onTap: onTap,
-        radius: 24,
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(color: c.surface, shape: BoxShape.circle, border: Border.all(color: c.line)),
-          child: Icon(Icons.chevron_left_rounded, color: c.ink),
-        ),
-      ),
     );
   }
 }

@@ -1,3 +1,4 @@
+import '../../../../core/design/country_flag.dart';
 import '../widgets/create_business_sheet.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/countries.dart';
@@ -381,8 +382,9 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm + 2, vertical: AppSpace.xs),
                 decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.pill)),
-                child: Text(
-                  '${country.flag} ${country.name} · ${_business.currency}',
+                child: CountryLabel(
+                  country: country,
+                  text: '${country.name} · ${_business.currency}',
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.inkMuted),
                 ),
               ),

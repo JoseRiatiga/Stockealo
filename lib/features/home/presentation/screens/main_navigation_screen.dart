@@ -23,7 +23,6 @@ import '../widgets/app_header_bar.dart';
 import '../widgets/global_search_dialog.dart';
 import '../widgets/notifications_modal.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
-import '../../../dashboard/presentation/widgets/stocky_assistant_modal.dart';
 import '../../../dashboard/presentation/widgets/stocky_floating_button.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -226,20 +225,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                                   userRole: _userRole,
                                   onNavigateToTab: _navigateToTab,
                                 ),
-                                onStockyAssistantTap: _currentIndex != 3
-                                    ? () => StockyAssistantModal.show(
-                                          context,
-                                          businessId: _activeBusiness?.id,
-                                          onNavigateToTab: _navigateToTab,
-                                        )
-                                    : null,
                               );
                             },
                           ),
                           Expanded(
-                            child: IndexedStack(
-                              index: _currentIndex,
-                              children: screens,
+                            child: Stack(
+                              children: [
+                                IndexedStack(
+                                  index: _currentIndex,
+                                  children: screens,
+                                ),
+                                // Stocky abajo a la derecha, igual que en el celular (arriba pasaba desapercibido)
+                                if (_currentIndex != 3)
+                                  Positioned(
+                                    right: AppSpace.xl,
+                                    bottom: AppSpace.xl,
+                                    child: StockyFloatingButton(
+                                      businessId: _activeBusiness?.id,
+                                      onNavigateToTab: _navigateToTab,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ],

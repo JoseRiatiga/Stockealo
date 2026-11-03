@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stockealo/core/design/country_flag.dart';
 import 'package:stockealo/core/design/phone_field.dart';
 import 'package:stockealo/core/theme/app_theme.dart';
 import 'package:stockealo/core/utils/countries.dart';
 
-Future<List<PhoneValue>> _pump(WidgetTester tester, {String? initial, String country = 'CO'}) async {
+Future<List<PhoneValue>> _pump(WidgetTester tester, {String? initial, String country = 'CO', bool required = false}) async {
   final values = <PhoneValue>[];
   await tester.pumpWidget(MaterialApp(
     theme: AppTheme.lightTheme,
@@ -13,6 +14,7 @@ Future<List<PhoneValue>> _pump(WidgetTester tester, {String? initial, String cou
         initialValue: initial,
         defaultCountry: countryByCode(country),
         onChanged: values.add,
+        required: required,
       ),
     ),
   ));
@@ -59,5 +61,15 @@ void main() {
     await tester.enterText(find.byType(TextField), '912345678');
     expect(values.last.e164, '+51912345678');
     expect(values.last.isValid, isTrue);
+  });
+
+  testWidgets('obligatorio: vacío no es válido y muestra la bandera del país', (tester) async {
+    final values = await _pump(tester, required: true);
+    expect(tester.widget<CountryFlag>(find.byType(CountryFlag)).code, 'CO');
+    await tester.enterText(find.byType(TextField), '300 123 4567');
+    expect(values.last.isValid, isTrue);
+    await tester.enterText(find.byType(TextField), '');
+    expect(values.last.isValid, isFalse);
+    expect(values.last.e164, isNull);
   });
 }

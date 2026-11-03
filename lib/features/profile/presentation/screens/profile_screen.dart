@@ -1,5 +1,6 @@
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/design/phone_field.dart';
+import '../../../../core/design/pro_crown.dart';
 import '../../../../core/utils/countries.dart';
 import '../../../business/presentation/business_identity.dart';
 import '../widgets/change_password_dialog.dart';
@@ -877,7 +878,17 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                         ValueListenableBuilder<ProStatus>(
                           valueListenable: ProService.instance.status,
                           builder: (context, pro, _) => SettingsRow(
-                            icon: Icons.workspace_premium_outlined,
+                            // La corona dorada marca Pro en toda la app
+                            leading: Container(
+                              width: 36,
+                              height: 36,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppPalette.proGold.withOpacity(0.16),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const ProCrown(size: 22),
+                            ),
                             title: pro.active ? 'Stockealo Pro · activo' : 'Stockealo Pro',
                             subtitle: pro.active
                                 ? (pro.lifetime ? '${pro.kindLabel} permanente' : '${pro.kindLabel} hasta el ${pro.endsAt!.day}/${pro.endsAt!.month}/${pro.endsAt!.year}')
@@ -1112,10 +1123,11 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
   List<Widget> _appearanceChildren() {
     final theme = ThemeController.instance;
     final business = _activeBusiness;
+    // El color del negocio va aparte, con su nombre: en la paleta se confundía con el rojo, azul…
+    final hasBusinessColor =
+        AppPalette.fromHex(business?.color) != null && AppPalette.fromHex(business?.color) != AppPalette.brand;
     final choices = <String>[
       'brand',
-      if (AppPalette.fromHex(business?.color) != null && AppPalette.fromHex(business?.color) != AppPalette.brand)
-        'business',
       for (final color in AppPalette.businessColors.values)
         if (color != AppPalette.brand) AppPalette.toHex(color),
     ];
@@ -1123,8 +1135,8 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       SettingsGroup(children: [
         SettingsRow.toggle(
           icon: Icons.brightness_auto_outlined,
-          title: 'Como el teléfono',
-          subtitle: 'Claro u oscuro según el ajuste del sistema',
+          title: 'Automático',
+          subtitle: 'Claro u oscuro según tu dispositivo',
           value: theme.themeMode == ThemeMode.system,
           onChanged: (v) => theme.setThemeMode(v
               ? ThemeMode.system
@@ -1134,18 +1146,53 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       SettingsPanel(
         label: 'Color del tema',
         value: ThemeController.accentLabel(theme.accentChoice),
-        child: Wrap(
-          spacing: AppSpace.sm,
-          runSpacing: AppSpace.sm,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final choice in choices)
-              _AccentDot(
-                color: theme.accentFor(choice),
-                selected: theme.accentChoice == choice,
-                label: ThemeController.accentLabel(choice),
-                icon: choice == 'business' ? Icons.storefront_rounded : null,
-                onTap: () => theme.setAccentChoice(choice),
+            if (hasBusinessColor) ...[
+              InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                onTap: () => theme.setAccentChoice('business'),
+                child: Row(
+                  children: [
+                    _AccentDot(
+                      color: theme.accentFor('business'),
+                      selected: theme.accentChoice == 'business',
+                      label: ThemeController.accentLabel('business'),
+                      icon: Icons.storefront_rounded,
+                      onTap: () => theme.setAccentChoice('business'),
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Color de tu negocio',
+                              style: TextStyle(fontWeight: FontWeight.w600, color: context.colors.ink)),
+                          Text(business?.name ?? '',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12.5, color: context.colors.inkMuted)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              Divider(height: AppSpace.xl, color: context.colors.line),
+            ],
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: [
+                for (final choice in choices)
+                  _AccentDot(
+                    color: theme.accentFor(choice),
+                    selected: theme.accentChoice == choice,
+                    label: ThemeController.accentLabel(choice),
+                    onTap: () => theme.setAccentChoice(choice),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1177,13 +1224,15 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           onChanged: theme.setReduceTransparency,
         ),
       ]),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-        child: Text(
-          'Los cambios se ven al instante. Guárdalos con "Revisar" o vuelve atrás con "Descartar".',
-          style: TextStyle(fontSize: 12.5, color: context.colors.inkMuted),
+      // La barra de abajo ya explica cómo guardar; la nota solo sale con cambios pendientes
+      if (theme.hasPendingChanges)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+          child: Text(
+            'Los cambios se ven al instante. Guárdalos con "Revisar" o vuelve atrás con "Descartar".',
+            style: TextStyle(fontSize: 12.5, color: context.colors.inkMuted),
+          ),
         ),
-      ),
     ];
   }
 

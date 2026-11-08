@@ -92,8 +92,9 @@ class ProductImageService {
       if (imageUrl == null) throw const ProductImageException('No pudimos traer la foto de esa página.');
       return imageUrl;
     } on FunctionException catch (e) {
-      final code = e.details is Map ? (e.details as Map)['error']?.toString() ?? '' : '${e.details}';
-      throw ProductImageException(errorMessage(code));
+      final details = e.details is Map ? e.details as Map : const {};
+      final code = details['error']?.toString() ?? '${e.details}';
+      throw ProductImageException(errorMessage(code, store: details['store']?.toString()));
     } on ProductImageException {
       rethrow;
     } catch (e) {
@@ -113,7 +114,11 @@ class ProductImageService {
   }
 
   @visibleForTesting
-  static String errorMessage(String code) => switch (code) {
+  static String errorMessage(String code, {String? store}) => switch (code) {
+        // La tienda pide "demuestra que no eres un robot": no se puede ni se debe saltar
+        'store_blocked' => '${store ?? 'Esa tienda'} no deja que otros programas lean sus páginas. '
+            'En el computador, recorta la foto con Windows + Shift + S y pégala aquí con Ctrl+V. '
+            'En el celular, toma una captura de pantalla y súbela desde la galería.',
         'no_image' => 'Esa página no muestra una foto que podamos traer. Abre la imagen, copia su dirección '
             'y pégala, o guárdala y súbela desde la galería.',
         'fetch_failed' || 'blocked' => 'No pudimos abrir esa página: algunas tiendas no dejan que otros programas '

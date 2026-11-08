@@ -2,7 +2,7 @@
 //   node --test supabase/functions/product-image/extract.test.ts
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { findImageInHtml, isPrivateIPv4, isPrivateIPv6, sniffType } from "./extract.ts";
+import { findImageInHtml, isChallengeUrl, isPrivateIPv4, isPrivateIPv6, looksLikeBotChallenge, sniffType, storeName } from "./extract.ts";
 
 test("encuentra la imagen principal en las formas más comunes", () => {
   assert.equal(
@@ -50,4 +50,15 @@ test("reconoce imágenes por sus primeros bytes y rechaza lo demás", () => {
   assert.equal(sniffType(pad([0x89, 0x50, 0x4e, 0x47])), "image/png");
   assert.equal(sniffType(pad([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])), "image/webp");
   assert.equal(sniffType(pad([...new TextEncoder().encode("<svg")])), null);
+});
+
+test("reconoce las páginas antibots y el nombre de la tienda", () => {
+  assert.equal(isChallengeUrl("https://www.shein.com.co/risk/challenge?captcha_type=903&redirection=x"), true);
+  assert.equal(isChallengeUrl("https://www.shein.com.co/blusa-p-455514274.html"), false);
+  assert.equal(looksLikeBotChallenge('<div class="cf-chl-widget"></div>'), true);
+  assert.equal(looksLikeBotChallenge('<meta property="og:image" content="https://a/b.jpg">'), false);
+  assert.equal(storeName("www.shein.com.co"), "Shein");
+  assert.equal(storeName("articulo.mercadolibre.com.co"), "Mercadolibre");
+  assert.equal(storeName("m.temu.com"), "Temu");
+  assert.equal(storeName("www.amazon.com"), "Amazon");
 });

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/design/color_sliders.dart';
 import '../../../../core/design/color_swatch_dot.dart';
+import '../../../../core/utils/eyedropper.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../models/product_variant.dart';
 import '../screens/barcode_scanner_screen.dart';
+import 'photo_color_picker.dart';
 
 /// Un color: nombre libre ("Blanco con rojo") y su muestra.
 class VariantColor {
@@ -310,6 +313,36 @@ class VariantEditorController extends ChangeNotifier {
     'Lila': '#B39DDB',
   };
 
+  /// Nombre del color de la paleta más parecido ("#B71C1C" → "Rojo"), para proponer
+  /// un nombre cuando eligen el color con las barras, la foto o el gotero
+  static String nearestPaletteName(Color color) {
+    String best = palette.keys.first;
+    var bestDistance = double.infinity;
+    for (final e in palette.entries) {
+      final p = Color(int.parse('FF${e.value.substring(1)}', radix: 16));
+      // Distancia "redmean": se parece más a como el ojo compara colores que la recta
+      final rMean = (color.red + p.red) / 2;
+      final dr = (color.red - p.red).toDouble(), dg = (color.green - p.green).toDouble(), db = (color.blue - p.blue).toDouble();
+      final d = (2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db;
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = e.key;
+      }
+    }
+    return best;
+  }
+
+  /// Nombre puesto por la paleta ("Rojo", "Blanco con rojo", "Multicolor") y no
+  /// escrito a mano: se puede cambiar solo al elegir otro color
+  static bool isPaletteName(String raw) {
+    final n = raw.trim().toLowerCase();
+    if (n.isEmpty) return true;
+    final names = {for (final k in palette.keys) k.toLowerCase(), 'multicolor'};
+    if (names.contains(n)) return true;
+    final parts = n.split(' con ');
+    return parts.length == 2 && names.contains(parts[0].trim()) && names.contains(parts[1].trim());
+  }
+
   /// Muestra sugerida según el nombre ("Rojo" → rojo); null si no se reconoce
   static String? suggestHex(String name) {
     final n = name.trim().toLowerCase();
@@ -326,7 +359,11 @@ class VariantEditorController extends ChangeNotifier {
 /// Editor visual: tallas arriba y, por cada talla, sus colores y existencias
 class VariantEditor extends StatefulWidget {
   final VariantEditorController controller;
-  const VariantEditor({super.key, required this.controller});
+
+  /// Foto del producto, para tomar el color tocando la prenda
+  final String? photoPath;
+
+  const VariantEditor({super.key, required this.controller, this.photoPath});
 
   @override
   State<VariantEditor> createState() => _VariantEditorState();
@@ -368,6 +405,7 @@ class _VariantEditorState extends State<VariantEditor> {
       builder: (_) => _ColorDialog(
         sizeLabel: size.isEmpty ? null : '${ctrl.attributeName} $size',
         suggestions: ctrl.suggestionsFor(size),
+        photoPath: widget.photoPath,
       ),
     );
     if (result != null) ctrl.addColorTo(size, result);
@@ -376,7 +414,11 @@ class _VariantEditorState extends State<VariantEditor> {
   Future<void> _editColor(String size, VariantColor color) async {
     final result = await showDialog<VariantColor>(
       context: context,
-      builder: (_) => _ColorDialog(initial: color, sizeLabel: size.isEmpty ? null : '${ctrl.attributeName} $size'),
+      builder: (_) => _ColorDialog(
+        initial: color,
+        sizeLabel: size.isEmpty ? null : '${ctrl.attributeName} $size',
+        photoPath: widget.photoPath,
+      ),
     );
     if (result != null) ctrl.updateColorIn(size, color, result);
   }
@@ -699,7 +741,10 @@ class _ColorDialog extends StatefulWidget {
   /// Colores ya usados en otras tallas, para ponerlos con un toque
   final List<VariantColor> suggestions;
 
-  const _ColorDialog({this.initial, this.sizeLabel, this.suggestions = const []});
+  /// Foto del producto (si tiene), para tomar el color de ella
+  final String? photoPath;
+
+  const _ColorDialog({this.initial, this.sizeLabel, this.suggestions = const [], this.photoPath});
 
   @override
   State<_ColorDialog> createState() => _ColorDialogState();
@@ -712,6 +757,9 @@ class _ColorDialogState extends State<_ColorDialog> {
   late bool _multi = ColorSwatchDot.isMulti(widget.initial?.hex);
   late bool _twoTones = widget.initial?.hex2 != null;
   bool _nameTouched = false;
+
+  /// Qué muestra tiene abiertas las barras de "Más colores" (primera o segunda)
+  TextEditingController? _slidersFor;
 
   static String _hexText(String? v) => (v == null || ColorSwatchDot.isMulti(v)) ? '' : v.replaceFirst('#', '');
 
@@ -733,12 +781,42 @@ class _ColorDialogState extends State<_ColorDialog> {
     setState(() {
       _multi = false;
       target.text = hex.replaceFirst('#', '');
-      // El nombre se propone solo si el dueño aún no escribió uno
-      if (!_nameTouched && target == _hex) _name.text = name;
-      if (!_nameTouched && target == _hex2 && _name.text.trim().isNotEmpty && !_name.text.contains(' con ')) {
-        _name.text = '${_name.text.trim()} con ${name.toLowerCase()}';
+      // El nombre sigue a la paleta salvo que el dueño haya escrito uno propio
+      // ("Vinotinto clarito"): así, al cambiar la muestra de un color ya creado,
+      // "Rojo" pasa a "Café" en vez de quedar con el nombre viejo
+      if (_nameTouched && !VariantEditorController.isPaletteName(_name.text)) return;
+      final current = _name.text.trim();
+      if (target == _hex) {
+        final second = current.contains(' con ') ? current.split(' con ').last.trim() : null;
+        _name.text = (_twoTones && second != null) ? '$name con $second' : name;
+      } else {
+        final first = current.contains(' con ') ? current.split(' con ').first.trim() : current;
+        _name.text = first.isEmpty ? name : '$first con ${name.toLowerCase()}';
       }
     });
+  }
+
+  /// Color elegido con las barras, la foto o el gotero (no de la paleta): el nombre
+  /// propuesto es el del color de la paleta más parecido
+  void _setColor(TextEditingController target, Color color) {
+    final hex = '#${(color.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+    _pick(target, VariantEditorController.nearestPaletteName(color), hex);
+  }
+
+  Color? _colorOf(TextEditingController target) {
+    final hex = ProductVariant.validHex(target.text);
+    return hex == null ? null : Color(int.parse('FF${hex.substring(1)}', radix: 16));
+  }
+
+  Future<void> _fromPhoto(TextEditingController target) async {
+    final color = await PhotoColorPicker.show(context, widget.photoPath!);
+    if (color != null && mounted) _setColor(target, color);
+  }
+
+  Future<void> _fromScreen(TextEditingController target) async {
+    final hex = await pickScreenColor();
+    final color = hex == null ? null : Color(int.parse('FF${hex.substring(1)}', radix: 16));
+    if (color != null && mounted) _setColor(target, color);
   }
 
   String? get _hexValue => ProductVariant.validHex(_hex.text);
@@ -770,6 +848,44 @@ class _ColorDialogState extends State<_ColorDialog> {
                   ),
                 ),
               ),
+          ],
+        );
+
+    final hasPhoto = (widget.photoPath ?? '').trim().isNotEmpty;
+    // Para quien no encuentra su color en la paleta: barras, foto o gotero
+    Widget moreWays(TextEditingController target) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                ActionChip(
+                  avatar: Icon(_slidersFor == target ? Icons.expand_less_rounded : Icons.tune_rounded, size: 18),
+                  label: const Text('Más colores'),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => setState(() => _slidersFor = _slidersFor == target ? null : target),
+                ),
+                if (hasPhoto)
+                  ActionChip(
+                    avatar: const Icon(Icons.photo_outlined, size: 18),
+                    label: const Text('De la foto'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _fromPhoto(target),
+                  ),
+                if (canUseEyeDropper)
+                  ActionChip(
+                    avatar: const Icon(Icons.colorize_rounded, size: 18),
+                    label: const Text('Tomar de la pantalla'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _fromScreen(target),
+                  ),
+              ],
+            ),
+            if (_slidersFor == target) ...[
+              const SizedBox(height: AppSpace.sm),
+              ColorSliders(value: _colorOf(target), onChanged: (color) => _setColor(target, color)),
+            ],
           ],
         );
 
@@ -846,8 +962,7 @@ class _ColorDialogState extends State<_ColorDialog> {
               const SizedBox(height: AppSpace.sm),
               paletteFor(_hex),
               const SizedBox(height: AppSpace.sm),
-              hexField(_hex, 'Código del color (hexadecimal)'),
-              const SizedBox(height: AppSpace.sm),
+              moreWays(_hex),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: true,
@@ -858,7 +973,7 @@ class _ColorDialogState extends State<_ColorDialog> {
               if (_twoTones && !_multi) ...[
                 paletteFor(_hex2),
                 const SizedBox(height: AppSpace.sm),
-                hexField(_hex2, 'Segundo color (hexadecimal)'),
+                moreWays(_hex2),
               ],
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
@@ -869,6 +984,23 @@ class _ColorDialogState extends State<_ColorDialog> {
                   if (_multi && !_nameTouched && _name.text.trim().isEmpty) _name.text = 'Multicolor';
                 }),
                 title: const Text('Multicolor o estampado'),
+              ),
+              // El código solo lo necesita quien ya lo tiene (por ejemplo, de su marca)
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: AppSpace.sm),
+                  initiallyExpanded: false,
+                  title: Text('Opciones avanzadas', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                  children: [
+                    hexField(_hex, 'Código del color (hexadecimal)'),
+                    if (_twoTones && !_multi) ...[
+                      const SizedBox(height: AppSpace.sm),
+                      hexField(_hex2, 'Segundo color (hexadecimal)'),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),

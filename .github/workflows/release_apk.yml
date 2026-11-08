@@ -69,15 +69,13 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Colores por talla
-            - Cada talla tiene sus propios colores: la S puede venir solo en rojo y la M en rojo y verde.
-            - Toca "+ Color" en la talla que quieras. Los colores que ya usaste aparecen para ponerlos con un toque.
+            ### Elige cualquier color, sin códigos
+            - **Más colores:** arrastra las barras de tono, intensidad y claridad hasta dar con el color exacto.
+            - **De la foto:** toca la prenda en la foto del producto y se toma ese color.
+            - **Tomar de la pantalla** (Chrome o Edge en el computador): haz clic en cualquier parte, por ejemplo en la foto de la tienda donde compraste.
+            - La app propone el nombre del color más parecido, y al cambiar la muestra de un color de la paleta el nombre se actualiza.
 
-            ### Correcciones
-            - Tienda en línea: el botón "Ver pedido" ya no sale en blanco en el computador.
-            - Las ventas guardan la talla y el color vendidos también en la nube, y al anular una venta desde otro equipo la unidad vuelve a su talla.
-            - Al sincronizar ya no se pierden el vendedor, el número de factura ni el descuento de cada venta.
-            - Avisos más limpios, sin emojis.
-            - La página principal muestra el WhatsApp de Stockealo y lo toma de la configuración.
+            ### Fotos desde un enlace
+            - Si la tienda (como Shein) no deja leer su página, la app te lo dice y te explica cómo traer la foto con un recorte de pantalla.
           draft: false
           prerelease: false

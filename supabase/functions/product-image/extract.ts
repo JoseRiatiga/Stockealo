@@ -57,3 +57,31 @@ export function sniffType(bytes: Uint8Array): string | null {
   ) return "image/webp";
   return null;
 }
+
+/**
+ * La tienda mandó a una página de verificación antibots ("demuestra que no eres un
+ * robot") en vez del producto. Por la dirección final es seguro: se revisa siempre.
+ */
+export function isChallengeUrl(finalUrl: string): boolean {
+  const url = finalUrl.toLowerCase();
+  return /\/(risk|captcha|challenge|verify|punish)([/?#]|$)/.test(url) || url.includes("captcha");
+}
+
+/**
+ * Marcas de verificación antibots dentro del HTML. Solo se usa cuando la página no
+ * trae imagen: una página de producto normal puede mencionar "captcha" en su código.
+ */
+export function looksLikeBotChallenge(html: string): boolean {
+  return /captcha|cf-chl-|challenge-platform|_incapsula_|are you a robot|verify you are human/i.test(
+    html.slice(0, 200_000),
+  );
+}
+
+const GENERIC_PARTS = new Set(["www", "m", "com", "co", "net", "org", "shop", "store", "es", "mx", "ar", "pe", "cl", "us", "uk"]);
+
+/** Nombre corto de la tienda para el mensaje ("www.shein.com.co" → "Shein") */
+export function storeName(host: string): string {
+  const parts = host.toLowerCase().split(".").filter((p) => p && !GENERIC_PARTS.has(p));
+  const name = parts.length ? parts[parts.length - 1] : host;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}

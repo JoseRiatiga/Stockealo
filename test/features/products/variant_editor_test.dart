@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockealo/core/theme/app_theme.dart';
 import 'package:stockealo/features/products/models/product_variant.dart';
+import 'package:stockealo/features/products/presentation/widgets/photo_color_picker.dart';
 import 'package:stockealo/features/products/presentation/widgets/variant_editor.dart';
 
 ProductVariant _v(String id, String size, {String? color, String? hex, int stock = 0}) => ProductVariant(
@@ -242,6 +245,100 @@ void main() {
       expect(c.colorsOf('M').single.hex, '#C62828');
       expect(c.colorsOf('S').length, 1);
       expect(tester.takeException(), isNull);
+      c.dispose();
+    });
+
+    test('propone el nombre del color de la paleta más parecido', () {
+      expect(VariantEditorController.nearestPaletteName(const Color(0xFFB71C1C)), 'Rojo');
+      expect(VariantEditorController.nearestPaletteName(const Color(0xFF0D47A1)), 'Azul');
+      expect(VariantEditorController.nearestPaletteName(const Color(0xFFF5F5F5)), 'Blanco');
+      expect(VariantEditorController.nearestPaletteName(const Color(0xFF5D4037)), 'Café');
+    });
+
+    test('el color de la foto es el promedio alrededor del toque', () {
+      // Imagen de 4×1: dos píxeles rojos y dos azules
+      final rgba = ByteData(16);
+      for (var i = 0; i < 4; i++) {
+        rgba.setUint8(i * 4, i < 2 ? 200 : 0);
+        rgba.setUint8(i * 4 + 2, i < 2 ? 0 : 200);
+        rgba.setUint8(i * 4 + 3, 255);
+      }
+      final left = PhotoColorPicker.sampleAround(rgba, 4, 1, 0, 0, radius: 0);
+      expect(left, const Color(0xFFC80000));
+      final middle = PhotoColorPicker.sampleAround(rgba, 4, 1, 1, 0, radius: 1);
+      expect(middle.red, greaterThan(middle.blue)); // 2 rojos y 1 azul
+    });
+
+    testWidgets('"Más colores" deja elegir con las barras sin escribir códigos', (tester) async {
+      tester.view.physicalSize = const Size(360, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final c = VariantEditorController()..setSizes(['M']);
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.build(Brightness.light),
+        home: Scaffold(body: SingleChildScrollView(child: VariantEditor(controller: c))),
+      ));
+      await tester.tap(find.text('Color'));
+      await tester.pumpAndSettle();
+      expect(find.text('Código del color (hexadecimal)'), findsNothing); // escondido en avanzadas
+      expect(find.text('De la foto'), findsNothing); // el producto no tiene foto
+      expect(find.text('Tomar de la pantalla'), findsNothing); // solo en el computador
+
+      await tester.tap(find.text('Más colores'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tono'), findsOneWidget);
+      // Tocar el azul en la barra de tono (hacia los dos tercios)
+      final bar = tester.getRect(find.ancestor(of: find.text('Tono'), matching: find.byType(Row)).first);
+      await tester.tapAt(Offset(bar.left + 74 + (bar.width - 74) * 0.62, bar.center.dy));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+
+      final color = c.colorsOf('M').single;
+      expect(color.hex, isNotNull);
+      expect(color.name, anyOf('Azul', 'Azul cielo', 'Azul oscuro'));
+      expect(tester.takeException(), isNull);
+      c.dispose();
+    });
+
+    test('distingue los nombres de la paleta de los escritos a mano', () {
+      expect(VariantEditorController.isPaletteName('Rojo'), isTrue);
+      expect(VariantEditorController.isPaletteName('blanco con rojo'), isTrue);
+      expect(VariantEditorController.isPaletteName('Vinotinto clarito'), isFalse);
+    });
+
+    testWidgets('al cambiar la muestra de un color ya creado, el nombre la sigue', (tester) async {
+      tester.view.physicalSize = const Size(360, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final c = VariantEditorController()..setSizes(['M']);
+      c.addColorTo('M', VariantColor('Rojo', hex: '#C62828'));
+      c.addColorTo('M', VariantColor('Vinotinto clarito', hex: '#7B1E3A'));
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.build(Brightness.light),
+        home: Scaffold(body: SingleChildScrollView(child: VariantEditor(controller: c))),
+      ));
+
+      // Rojo → Café: se renombra
+      await tester.tap(find.text('Rojo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Café').first);
+      await tester.pump();
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      expect(c.colorsOf('M').first.name, 'Café');
+      expect(c.colorsOf('M').first.hex, '#6D4C41');
+
+      // Nombre escrito a mano: se respeta aunque cambie la muestra
+      await tester.tap(find.text('Vinotinto clarito'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Rosado').first);
+      await tester.pump();
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      expect(c.colorsOf('M').last.name, 'Vinotinto clarito');
+      expect(c.colorsOf('M').last.hex, '#F48FB1');
+      expect(c.totalStock, 0);
       c.dispose();
     });
 

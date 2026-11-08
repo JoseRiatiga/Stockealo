@@ -140,6 +140,8 @@ class VariantEditorController extends ChangeNotifier {
 
   void removeSize(String size) {
     sizes.remove(size);
+    final prefix = '${size.trim().toLowerCase()}|';
+    removed.removeWhere((k) => k.startsWith(prefix));
     notifyListeners();
   }
 
@@ -166,18 +168,43 @@ class VariantEditorController extends ChangeNotifier {
         colors[i] = color;
       }
     } else if (!colors.any((c) => c.key == color.key)) {
+      // El primer color se queda con lo que ya tenía cada talla (existencias, código, id)
+      if (colors.isEmpty) _moveCells(fromColor: null, toColor: color.name);
       colors.add(color);
     }
     notifyListeners();
   }
 
+  /// Pasa las celdas de cada talla de un color a otro (null = sin color)
+  void _moveCells({required String? fromColor, required String? toColor}) {
+    for (final s in sizes.isEmpty ? [''] : sizes) {
+      final cell = _cells.remove(cellKey(s, fromColor));
+      if (cell != null) _cells[cellKey(s, toColor)] = cell;
+      if (removed.remove(cellKey(s, fromColor))) removed.add(cellKey(s, toColor));
+    }
+  }
+
   void removeColor(VariantColor color) {
     colors.remove(color);
+    final suffix = '|${color.key}';
+    removed.removeWhere((k) => k.endsWith(suffix));
+    // Sin colores, cada talla vuelve a tener sus existencias de ese último color
+    if (colors.isEmpty) _moveCells(fromColor: color.name, toColor: null);
     notifyListeners();
   }
 
+  /// La × de una fila. Sin colores, la fila es la talla: se quita la talla. Con
+  /// tallas y colores se quita solo esa combinación (ej. no hay XL en rojo), y si
+  /// una talla o un color se queda sin combinaciones, se quita también de arriba.
   void removeCombo(String key) {
+    final matches = combos.where((c) => c.key == key);
+    if (matches.isEmpty) return;
+    final combo = matches.first;
+    if (colors.isEmpty) return removeSize(combo.size);
+    if (sizes.isEmpty) return removeColor(combo.color!);
     removed.add(key);
+    if (!combos.any((c) => c.size == combo.size)) return removeSize(combo.size);
+    if (!combos.any((c) => c.color?.key == combo.color!.key)) return removeColor(combo.color!);
     notifyListeners();
   }
 
@@ -554,7 +581,7 @@ class _VariantEditorState extends State<VariantEditor> {
             ),
             IconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Quitar esta combinación (no existe)',
+              tooltip: combo.color == null || combo.size.isEmpty ? 'Quitar' : 'Quitar esta combinación (no existe)',
               icon: Icon(Icons.close_rounded, size: 18, color: c.inkMuted),
               onPressed: () => ctrl.removeCombo(combo.key),
             ),

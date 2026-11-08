@@ -155,4 +155,37 @@ void main() {
       await expectLater(AppDatabase.upgradeSchema(db, 6, 7), completes);
     });
   });
+
+  group('upgradeSchema v8 -> v9', () {
+    setUp(() async {
+      await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY, has_variants INTEGER DEFAULT 0)');
+      await db.execute('''
+        CREATE TABLE product_variants (
+          id TEXT PRIMARY KEY, business_id TEXT, product_id TEXT,
+          attribute_name TEXT, attribute_value TEXT, stock INTEGER
+        )
+      ''');
+    });
+
+    test('agrega talla y color y vuelve a mostrar las variantes perdidas', () async {
+      // La descarga de la nube había dejado este producto sin la marca de variantes
+      await db.insert('products', {'id': 'p1', 'has_variants': 0});
+      await db.insert('products', {'id': 'p2', 'has_variants': 0});
+      await db.insert('product_variants', {'id': 'v1', 'product_id': 'p1', 'attribute_value': 'M (ROJO)', 'stock': 1});
+
+      await AppDatabase.upgradeSchema(db, 8, 9);
+
+      final columns = (await db.rawQuery('PRAGMA table_info(product_variants)')).map((c) => c['name']).toSet();
+      expect(columns, containsAll(['attribute2_name', 'attribute2_value', 'color_hex', 'color_hex2']));
+      final flags = {
+        for (final r in await db.query('products')) r['id']: r['has_variants'],
+      };
+      expect(flags, {'p1': 1, 'p2': 0});
+    });
+
+    test('se puede ejecutar dos veces sin fallar', () async {
+      await AppDatabase.upgradeSchema(db, 8, 9);
+      await expectLater(AppDatabase.upgradeSchema(db, 8, 9), completes);
+    });
+  });
 }

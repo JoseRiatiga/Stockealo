@@ -119,6 +119,7 @@ class ProService {
     }
     final client = _client;
     if (client == null) return status.value;
+    await SupabaseService.instance.ensureFreshSession();
     try {
       final data = await client.rpc('pro_status', params: {'p_business_id': businessId});
       final map = Map<String, dynamic>.from(data as Map);
@@ -156,8 +157,13 @@ class ProService {
   Future<RedeemResult> redeem(String code, String businessId) async {
     final client = _client;
     if (client == null) return const RedeemResult(false, 'Necesitas conexión a internet para canjear el código.');
-    final clean = code.trim().toUpperCase();
+    final clean = normalizeCode(code);
     if (clean.isEmpty) return const RedeemResult(false, 'Escribe el código que te enviamos.');
+    // El servidor busca al dueño en la nube: un negocio que solo vive en este
+    // equipo respondería "Solo el dueño…" aunque quien canjea sí sea el dueño
+    if (!await SupabaseService.instance.ensureBusinessInCloud(businessId)) {
+      return const RedeemResult(false, notInCloudMessage);
+    }
     try {
       final data = await client.rpc('redeem_pro_code', params: {'p_code': clean, 'p_business_id': businessId});
       final map = Map<String, dynamic>.from(data as Map);
@@ -177,6 +183,10 @@ class ProService {
   Future<ProCheckout> startCheckout(String businessId, String planId) async {
     final client = _client;
     if (client == null) throw const ProCheckoutException('Necesitas conexión a internet para pagar.');
+    // Antes de cobrar: el pago se aplica a un negocio que debe existir en la nube
+    if (!await SupabaseService.instance.ensureBusinessInCloud(businessId)) {
+      throw const ProCheckoutException(notInCloudMessage);
+    }
     try {
       // En la web, Wompi devuelve a una página que dice "vuelve a la pestaña de Stockealo"
       final res = await client.functions.invoke('pro-checkout',
@@ -225,9 +235,23 @@ class ProService {
     return 'No se pudo iniciar el pago. Inténtalo de nuevo.';
   }
 
+  static const notInCloudMessage =
+      'Tu negocio todavía no está en la nube y Pro lo necesita. Revisa tu conexión, '
+      've a Ajustes › Nube y respaldo, toca "Sincronizar ahora" e inténtalo de nuevo.';
+
+  /// Mayúsculas y sin espacios; si escribieron el código sin guiones
+  /// (STKJA4YFVFV) se le ponen, porque así se guardan (STK-JA4Y-FVFV).
+  @visibleForTesting
+  static String normalizeCode(String code) {
+    final clean = code.replaceAll(RegExp(r'\s'), '').toUpperCase();
+    final bare = RegExp(r'^STK([A-Z0-9]{4})([A-Z0-9]{4})$').firstMatch(clean);
+    return bare == null ? clean : 'STK-${bare[1]}-${bare[2]}';
+  }
+
   /// Mensaje para cada error del servidor al canjear
   @visibleForTesting
   static String redeemErrorMessage(String serverMessage) {
+    if (serverMessage.contains('not_member')) return notInCloudMessage;
     if (serverMessage.contains('code_not_found')) return 'Ese código no existe. Revisa que esté bien escrito.';
     if (serverMessage.contains('code_expired')) return 'Ese código ya venció.';
     if (serverMessage.contains('code_already_redeemed')) return 'Ya canjeaste ese código.';

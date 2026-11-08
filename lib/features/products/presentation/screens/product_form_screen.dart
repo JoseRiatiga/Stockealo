@@ -1,45 +1,26 @@
+import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/code_generator.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/image_helper.dart';
+import '../../data/product_image_service.dart';
 import '../../data/product_repository.dart';
+import '../../../../core/utils/paste_image.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../models/product_variant.dart';
 import 'barcode_scanner_screen.dart';
 import '../widgets/manage_categories_modal.dart';
 import '../widgets/product_image_view.dart';
+import '../widgets/variant_editor.dart';
 import '../../../../core/widgets/image_source_picker_modal.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../team/data/team_repository.dart';
-
-class _VariantDraft {
-  String id;
-  String attributeValue;
-  int stock;
-  String? skuOrBarcode;
-  TextEditingController valueController;
-  TextEditingController stockController;
-  TextEditingController barcodeController;
-
-  _VariantDraft({
-    String? id,
-    required this.attributeValue,
-    this.stock = 0,
-    this.skuOrBarcode,
-  })  : id = id ?? const Uuid().v4(),
-        valueController = TextEditingController(text: attributeValue),
-        stockController = TextEditingController(text: stock > 0 ? stock.toString() : '0'),
-        barcodeController = TextEditingController(text: skuOrBarcode ?? '');
-
-  void dispose() {
-    valueController.dispose();
-    stockController.dispose();
-    barcodeController.dispose();
-  }
-}
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -70,14 +51,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   late TextEditingController _minStockController;
 
   String? _photoPath;
+  bool _isUploadingPhoto = false;
+
+  /// Id fijo desde que se abre el formulario: la foto se guarda en la nube con él
+  /// antes de guardar el producto
+  late final String _productId = widget.productToEdit?.id ?? const Uuid().v4();
+  void Function()? _stopPasteListener;
   String? _selectedCategory;
   List<Category> _categories = [];
   bool _isLoading = false;
 
-  // Variantes (Tallas / Colores / Presentaciones)
+  // Variantes (tallas y colores)
   bool _hasVariants = false;
-  String _variantAttributeName = 'Talla';
-  final List<_VariantDraft> _variantDrafts = [];
+  final _variants = VariantEditorController();
 
   bool get isEditing => widget.productToEdit != null;
 
@@ -103,104 +89,35 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _hasVariants = p.hasVariants;
       if (p.hasVariants) {
         if (p.variants.isNotEmpty) {
-          _variantAttributeName = p.variants.first.attributeName;
-          for (final v in p.variants) {
-            final draft = _VariantDraft(
-              id: v.id,
-              attributeValue: v.attributeValue,
-              stock: v.stock,
-              skuOrBarcode: v.skuOrBarcode,
-            );
-            draft.stockController.addListener(_updateTotalStockFromVariants);
-            _variantDrafts.add(draft);
-          }
+          _variants.load(p.variants);
         } else {
           _loadExistingVariants(p.id);
         }
       }
     }
+    _variants.addListener(_updateTotalStockFromVariants);
+    _updateTotalStockFromVariants();
 
     _checkRoleSecurity();
     _loadCategories();
+    // En la web: pegar una imagen copiada (Ctrl+V) la pone como foto del producto
+    _stopPasteListener = listenForPastedImages((image) {
+      if (mounted && !_isUploadingPhoto) _uploadPhotoBytes(image.bytes, image.mimeType);
+    });
   }
 
   Future<void> _loadExistingVariants(String productId) async {
     final list = await _repository.getVariantsForProduct(productId);
     if (list.isNotEmpty && mounted) {
-      setState(() {
-        _hasVariants = true;
-        _variantAttributeName = list.first.attributeName;
-        _variantDrafts.clear();
-        for (final v in list) {
-          final draft = _VariantDraft(
-            id: v.id,
-            attributeValue: v.attributeValue,
-            stock: v.stock,
-            skuOrBarcode: v.skuOrBarcode,
-          );
-          draft.stockController.addListener(_updateTotalStockFromVariants);
-          _variantDrafts.add(draft);
-        }
-        _updateTotalStockFromVariants();
-      });
+      setState(() => _hasVariants = true);
+      _variants.load(list);
     }
   }
 
   void _updateTotalStockFromVariants() {
-    final total = _variantDrafts.fold(0, (sum, d) {
-      final s = int.tryParse(d.stockController.text.trim()) ?? 0;
-      return sum + s;
-    });
-    _stockController.text = total.toString();
-  }
-
-  void _addVariantDraft([String initialValue = '']) {
-    setState(() {
-      final draft = _VariantDraft(attributeValue: initialValue, stock: 0);
-      draft.stockController.addListener(_updateTotalStockFromVariants);
-      _variantDrafts.add(draft);
-      _updateTotalStockFromVariants();
-    });
-  }
-
-  void _removeVariantDraft(int index) {
-    setState(() {
-      _variantDrafts[index].dispose();
-      _variantDrafts.removeAt(index);
-      _updateTotalStockFromVariants();
-    });
-  }
-
-  void _applyClothingPreset() {
-    setState(() {
-      _variantAttributeName = 'Talla';
-      for (final d in _variantDrafts) {
-        d.dispose();
-      }
-      _variantDrafts.clear();
-      for (final s in ['S', 'M', 'L', 'XL']) {
-        final d = _VariantDraft(attributeValue: s, stock: 0);
-        d.stockController.addListener(_updateTotalStockFromVariants);
-        _variantDrafts.add(d);
-      }
-      _updateTotalStockFromVariants();
-    });
-  }
-
-  void _applyShoePreset() {
-    setState(() {
-      _variantAttributeName = 'Talla';
-      for (final d in _variantDrafts) {
-        d.dispose();
-      }
-      _variantDrafts.clear();
-      for (final s in ['36', '37', '38', '39', '40']) {
-        final d = _VariantDraft(attributeValue: s, stock: 0);
-        d.stockController.addListener(_updateTotalStockFromVariants);
-        _variantDrafts.add(d);
-      }
-      _updateTotalStockFromVariants();
-    });
+    if (!_hasVariants) return;
+    final total = '${_variants.totalStock}';
+    if (_stockController.text != total) _stockController.text = total;
   }
 
   Future<void> _checkRoleSecurity() async {
@@ -233,9 +150,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _salePriceController.dispose();
     _stockController.dispose();
     _minStockController.dispose();
-    for (final d in _variantDrafts) {
-      d.dispose();
-    }
+    _variants.dispose();
+    _stopPasteListener?.call();
     super.dispose();
   }
 
@@ -254,6 +170,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    // En la web no hay archivos locales: la foto elegida se sube de una vez a la nube
+    // (antes quedaba un enlace temporal del navegador que se perdía al recargar)
+    if (kIsWeb) {
+      final picked = await ImageHelper.pickBytes(source);
+      if (picked != null && mounted) await _uploadPhotoBytes(picked.bytes, picked.mimeType);
+      return;
+    }
     final path = source == ImageSource.camera
         ? await ImageHelper.pickFromCamera()
         : await ImageHelper.pickFromGallery();
@@ -265,6 +188,46 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
   }
 
+  String get _photoBusinessId => widget.productToEdit?.businessId ?? widget.businessId;
+
+  Future<void> _uploadPhotoBytes(Uint8List bytes, String? mimeType) async {
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final url = await ProductImageService.instance.uploadBytes(
+        businessId: _photoBusinessId,
+        productId: _productId,
+        bytes: bytes,
+        mimeType: mimeType,
+      );
+      if (mounted) setState(() => _photoPath = url);
+    } on ProductImageException catch (e) {
+      if (mounted) AppToast.showError(context, e.message);
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  Future<void> _photoFromLink() async {
+    final link = await showDialog<String>(context: context, builder: (_) => const _PhotoLinkDialog());
+    if (link == null || !mounted) return;
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final url = await ProductImageService.instance.importFromUrl(
+        businessId: _photoBusinessId,
+        productId: _productId,
+        url: link,
+      );
+      if (mounted) {
+        setState(() => _photoPath = url);
+        AppToast.showSuccess(context, 'Listo, trajimos la foto.');
+      }
+    } on ProductImageException catch (e) {
+      if (mounted) AppToast.showError(context, e.message);
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
   void _showImagePickerModal() {
     ImageSourcePickerModal.show(
       context,
@@ -272,6 +235,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       subtitle: 'Elige cómo capturar o subir la imagen del producto',
       hasExistingImage: _photoPath != null && _photoPath!.trim().isNotEmpty,
       onSelected: (source) => _pickImage(source),
+      onLink: _photoFromLink,
+      footerHint: canPasteImages
+          ? 'También puedes copiar una imagen y pegarla aquí con Ctrl+V mientras editas el producto.'
+          : null,
       onRemove: () {
         setState(() {
           _photoPath = null;
@@ -363,48 +330,24 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     final purchasePrice = double.tryParse(_purchasePriceController.text.trim()) ?? 0.0;
     final salePrice = double.tryParse(_salePriceController.text.trim()) ?? 0.0;
     final minStock = int.tryParse(_minStockController.text.trim()) ?? 5;
-    final productId = widget.productToEdit?.id ?? const Uuid().v4();
+    final productId = _productId;
     final now = DateTime.now();
 
     List<ProductVariant> variants = [];
     if (_hasVariants) {
-      if (_variantDrafts.isEmpty) {
+      final problem = _variants.validate();
+      if (problem != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Por favor agrega al menos una talla o desactiva la opción de variantes.'),
-            backgroundColor: Colors.orange,
-          ),
+          SnackBar(content: Text('$problem O desactiva la opción de variantes.')),
         );
         setState(() => _isLoading = false);
         return;
       }
-
-      for (final d in _variantDrafts) {
-        final val = d.valueController.text.trim();
-        if (val.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Todas las variantes deben tener un valor o talla (ej: S, M, L).'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-          setState(() => _isLoading = false);
-          return;
-        }
-        final s = int.tryParse(d.stockController.text.trim()) ?? 0;
-        final barcode = d.barcodeController.text.trim();
-        variants.add(ProductVariant(
-          id: d.id,
-          businessId: widget.productToEdit?.businessId ?? widget.businessId,
-          productId: productId,
-          attributeName: _variantAttributeName,
-          attributeValue: val,
-          skuOrBarcode: barcode.isNotEmpty ? barcode : null,
-          stock: s,
-          createdAt: now,
-          updatedAt: now,
-        ));
-      }
+      variants = _variants.build(
+        businessId: widget.productToEdit?.businessId ?? widget.businessId,
+        productId: productId,
+        now: now,
+      );
     }
 
     final totalStock = _hasVariants
@@ -491,7 +434,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   // 1. Selector de Foto
                   Center(
                     child: GestureDetector(
-                      onTap: _showImagePickerModal,
+                      onTap: _isUploadingPhoto ? null : _showImagePickerModal,
                       child: Stack(
                         children: [
                           Container(
@@ -536,6 +479,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                     ],
                                   ),
                           ),
+                          if (_isUploadingPhoto)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.35),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                ),
+                              ),
+                            ),
                           Positioned(
                             bottom: 0,
                             right: 0,
@@ -752,15 +707,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     ),
                   const SizedBox(height: 16),
 
-                  // 5. Stock y Variantes (Tallas / Colores / Presentaciones)
+                  // 5. Stock y Variantes (tallas y colores)
                   Container(
                     decoration: BoxDecoration(
-                      color: _hasVariants
-                          ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1B4B).withOpacity(0.4) : const Color(0xFFF5F3FF))
-                          : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF131127) : const Color(0xFFF8FAFC)),
-                      borderRadius: BorderRadius.circular(16),
+                      color: context.colors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
                       border: Border.all(
-                        color: _hasVariants ? const Color(0xFF8B5CF6) : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
+                        color: _hasVariants ? context.colors.accent : context.colors.line,
                         width: _hasVariants ? 1.5 : 1,
                       ),
                     ),
@@ -771,28 +724,26 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           Icon(
                             Icons.style_outlined,
                             size: 20,
-                            color: _hasVariants ? const Color(0xFF8B5CF6) : const Color(0xFF64748B),
+                            color: _hasVariants ? context.colors.accent : context.colors.inkMuted,
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            '¿Tiene variantes? (Tallas, colores...)',
-                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                          const Flexible(
+                            child: Text(
+                              '¿Tiene variantes? (tallas, colores…)',
+                              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       ),
-                      subtitle: const Text(
-                        'Actívalo si vendes este producto en varias tallas o modelos con stock independiente.',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      subtitle: Text(
+                        'Actívalo si vendes este producto en varias tallas o colores, cada uno con sus existencias.',
+                        style: TextStyle(fontSize: 11, color: context.colors.inkMuted),
                       ),
                       value: _hasVariants,
-                      activeColor: const Color(0xFF8B5CF6),
                       onChanged: (val) {
-                        setState(() {
-                          _hasVariants = val;
-                          if (_hasVariants && _variantDrafts.isEmpty) {
-                            _applyClothingPreset();
-                          }
-                        });
+                        setState(() => _hasVariants = val);
+                        if (val && _variants.combos.isEmpty) _variants.setSizes(['S', 'M', 'L', 'XL']);
+                        _updateTotalStockFromVariants();
                       },
                     ),
                   ),
@@ -842,146 +793,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ],
                     )
                   else ...[
-                    // Si SÍ tiene variantes: Gestor de Tallas / Colores
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF131127) : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF26214A) : const Color(0xFFDDD6FE),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.tune, size: 16, color: Color(0xFF8B5CF6)),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Variantes por: $_variantAttributeName',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF8B5CF6)),
-                                  ),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  ActionChip(
-                                    visualDensity: VisualDensity.compact,
-                                    label: const Text('Ropa', style: TextStyle(fontSize: 11)),
-                                    onPressed: _applyClothingPreset,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  ActionChip(
-                                    visualDensity: VisualDensity.compact,
-                                    label: const Text('Calzado', style: TextStyle(fontSize: 11)),
-                                    onPressed: _applyShoePreset,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-
-                          ..._variantDrafts.asMap().entries.map((entry) {
-                            final idx = entry.key;
-                            final draft = entry.value;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).brightness == Brightness.dark
-                                    ? const Color(0xFF1A1633)
-                                    : const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Theme.of(context).brightness == Brightness.dark
-                                      ? const Color(0xFF26214A)
-                                      : const Color(0xFFE2E8F0),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    flex: 3,
-                                    child: TextFormField(
-                                      controller: draft.valueController,
-                                      decoration: InputDecoration(
-                                        labelText: _variantAttributeName,
-                                        hintText: 'Ej. S, M, 38...',
-                                        isDense: true,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    flex: 3,
-                                    child: TextFormField(
-                                      controller: draft.stockController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Stock',
-                                        hintText: '0',
-                                        isDense: true,
-                                      ),
-                                      onChanged: (_) => _updateTotalStockFromVariants(),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  IconButton(
-                                    visualDensity: VisualDensity.compact,
-                                    icon: const Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFF059669)),
-                                    tooltip: 'Escanear código de barras para esta talla',
-                                    onPressed: () async {
-                                      final code = await Navigator.push<String>(
-                                        context,
-                                        MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
-                                      );
-                                      if (code != null && code.isNotEmpty) {
-                                        setState(() {
-                                          draft.barcodeController.text = code;
-                                        });
-                                      }
-                                    },
-                                  ),
-                                  IconButton(
-                                    visualDensity: VisualDensity.compact,
-                                    icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
-                                    onPressed: () => _removeVariantDraft(idx),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: () => _addVariantDraft(''),
-                                icon: const Icon(Icons.add, size: 16),
-                                label: const Text('Agregar Talla', style: TextStyle(fontSize: 12)),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  'Total: ${_stockController.text} unids',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF059669)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                    // Si SÍ tiene variantes: tallas, colores y existencias por combinación
+                    VariantEditor(controller: _variants),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _minStockController,
@@ -1069,6 +882,86 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             ),
             ),
             ),
+    );
+  }
+}
+
+/// Pegar el enlace del producto o de la imagen
+class _PhotoLinkDialog extends StatefulWidget {
+  const _PhotoLinkDialog();
+
+  @override
+  State<_PhotoLinkDialog> createState() => _PhotoLinkDialogState();
+}
+
+class _PhotoLinkDialogState extends State<_PhotoLinkDialog> {
+  final _link = TextEditingController();
+
+  @override
+  void dispose() {
+    _link.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim();
+    if (text != null && text.isNotEmpty) setState(() => _link.text = text);
+  }
+
+  void _submit() {
+    if (_link.text.trim().isEmpty) return;
+    Navigator.pop(context, _link.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AlertDialog(
+      title: const Text('Foto desde un enlace'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Pega el enlace de la página del producto (Shein, Temu, Mercado Libre, Amazon…) '
+              'o el de la imagen. Traemos la foto principal y la guardamos con tu producto.',
+              style: TextStyle(fontSize: 13, height: 1.4, color: c.inkMuted),
+            ),
+            const SizedBox(height: AppSpace.md),
+            TextField(
+              controller: _link,
+              autofocus: true,
+              keyboardType: TextInputType.url,
+              decoration: InputDecoration(
+                labelText: 'Enlace',
+                hintText: 'https://…',
+                suffixIcon: IconButton(
+                  tooltip: 'Pegar',
+                  icon: const Icon(Icons.content_paste_rounded),
+                  onPressed: _pasteFromClipboard,
+                ),
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            Text(
+              'Usa fotos que tengas permiso de usar.',
+              style: TextStyle(fontSize: 12, color: c.inkFaint),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _link.text.trim().isEmpty ? null : _submit,
+          child: const Text('Traer foto'),
+        ),
+      ],
     );
   }
 }

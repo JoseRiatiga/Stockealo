@@ -191,8 +191,15 @@ class ProductRepository {
       }
     });
 
-    // Sincronizar en tiempo real a Supabase
+    // Sincronizar en tiempo real a Supabase (el producto primero: las variantes lo referencian)
     SupabaseService.instance.upsertProductToCloud(product.toMap());
+    if (product.hasVariants && product.variants.isNotEmpty) {
+      SupabaseService.instance.replaceVariantsInCloud(
+        product.id,
+        product.businessId,
+        [for (final v in product.variants) v.toMap()],
+      );
+    }
     ActivityRepository.instance.log(
       businessId: product.businessId,
       action: ActivityAction.productCreate,
@@ -221,8 +228,9 @@ class ProductRepository {
         whereArgs: [product.id, product.businessId],
       );
 
+      // Sin variantes se borran las que tuviera: si no, reaparecerían al volver a activarlas
+      await txn.delete('product_variants', where: 'product_id = ?', whereArgs: [product.id]);
       if (product.hasVariants) {
-        await txn.delete('product_variants', where: 'product_id = ?', whereArgs: [product.id]);
         for (final v in product.variants) {
           await txn.insert('product_variants', v.toMap());
         }
@@ -232,6 +240,11 @@ class ProductRepository {
     // Sincronizar a Supabase. Editar el producto no envía el stock; si el usuario lo
     // cambió en el formulario, se fija aparte como un ajuste manual.
     SupabaseService.instance.upsertProductToCloud(product.toMap());
+    SupabaseService.instance.replaceVariantsInCloud(
+      product.id,
+      product.businessId,
+      product.hasVariants ? [for (final v in product.variants) v.toMap()] : const [],
+    );
     if (previousStock != null && previousStock != product.stock) {
       SupabaseService.instance.updateProductStockInCloud(product.id, product.stock);
     }

@@ -1,3 +1,4 @@
+import '../../../../core/design/color_swatch_dot.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
@@ -224,6 +225,14 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
 
     if (!mounted) return;
 
+    // Con talla y color: agrupar por talla (en el orden en que se crearon)
+    final twoAttributes =
+        variants.any((v) => v.hasSecondAttribute) && variants.any((v) => v.attributeValue.trim().isNotEmpty);
+    final groups = <String, List<ProductVariant>>{};
+    for (final v in variants) {
+      groups.putIfAbsent(v.attributeValue.trim(), () => []).add(v);
+    }
+
     showModalBottomSheet(
       showDragHandle: false,
       context: context,
@@ -232,6 +241,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
       builder: (ctx) {
         final sheetBg = context.colors.surface;
         final titleColor = context.colors.ink;
+        Widget chip(ProductVariant v, String text) => _variantChip(ctx, p, v, text);
 
         return Container(
           decoration: BoxDecoration(
@@ -277,7 +287,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: titleColor),
                         ),
                         Text(
-                          'Selecciona la ${variants.first.attributeName.toLowerCase()} para agregar:',
+                          twoAttributes
+                              ? 'Elige ${variants.first.attributeName.toLowerCase()} y color para agregar:'
+                              : 'Selecciona la ${variants.first.attributeName.toLowerCase()} para agregar:',
                           style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
                         ),
                       ],
@@ -286,10 +298,46 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                 ],
               ),
               const SizedBox(height: 16),
+              if (twoAttributes)
+                // Talla y color: un renglón por talla con sus colores
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.6),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final group in groups.entries) ...[
+                          Text(
+                            '${variants.first.attributeName} ${group.key}',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.inkMuted),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [for (final v in group.value) chip(v, v.attribute2Value ?? v.label)],
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                      ],
+                    ),
+                  ),
+                )
+              else
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: variants.map((v) {
+                children: [for (final v in variants) chip(v, v.label)],
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _variantChip(BuildContext ctx, Product p, ProductVariant v, String text) {
                   final isAvailable = v.stock > 0;
                   return InkWell(
                     onTap: isAvailable
@@ -316,15 +364,22 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            v.attributeValue,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: isAvailable
-                                  ? (context.colors.ink)
-                                  : context.colors.inkMuted,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (ColorSwatchDot.hasSwatch(v.colorHex)) ...[
+                                ColorSwatchDot(hex: v.colorHex, hex2: v.colorHex2, size: 16),
+                                const SizedBox(width: 6),
+                              ],
+                              Text(
+                                text,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: isAvailable ? context.colors.ink : context.colors.inkMuted,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -339,14 +394,6 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                       ),
                     ),
                   );
-                }).toList(),
-              ),
-              const SizedBox(height: 10),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _scanBarcodeToAdd() async {
@@ -374,7 +421,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
         if (mounted) {
           AppToast.show(
             context,
-            message: 'Agregado: ${matchedVariant != null ? "${product.name} (${matchedVariant.attributeValue})" : product.name}',
+            message: 'Agregado: ${matchedVariant != null ? "${product.name} (${matchedVariant.label})" : product.name}',
             type: ToastType.success,
           );
         }

@@ -18,6 +18,17 @@ class ImageHelper {
     return _pickAndSaveImage(ImageSource.gallery);
   }
 
+  /// Foto elegida como bytes (la web no tiene archivos locales: se sube a la nube)
+  static Future<({Uint8List bytes, String? mimeType})?> pickBytes(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(source: source, maxWidth: 1200, maxHeight: 1200, imageQuality: 82);
+      if (picked == null) return null;
+      return (bytes: await picked.readAsBytes(), mimeType: picked.mimeType);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<String?> _pickAndSaveImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(

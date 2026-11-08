@@ -16,7 +16,7 @@ class CartItem {
     this.discountPercent,
   }) : customUnitPrice = customUnitPrice ?? (product.salePrice + (variant?.additionalPrice ?? 0.0));
 
-  String get displayName => variant != null ? '${product.name} (${variant!.attributeValue})' : product.name;
+  String get displayName => variant != null ? '${product.name} (${variant!.label})' : product.name;
 
   int get availableStock => variant != null ? variant!.stock : product.stock;
 

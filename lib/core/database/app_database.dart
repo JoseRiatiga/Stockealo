@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 8;
+  static const int _schemaVersion = 9;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -324,6 +324,24 @@ class AppDatabase {
       await db.execute(_createActivityLog);
       await db.execute(_createActivityIndex);
     }
+    if (oldVersion < 9 && newVersion >= 9) {
+      // Variantes con dos datos (Talla + Color) y muestra de color
+      for (final column in ['attribute2_name', 'attribute2_value', 'color_hex', 'color_hex2']) {
+        await _addColumnIfMissing(db, 'product_variants', column, 'TEXT');
+      }
+      await repairVariantFlags(db);
+    }
+  }
+
+  /// La descarga de la nube reescribía los productos sin `has_variants` y sus
+  /// variantes dejaban de mostrarse. Vuelve a marcar los que sí tienen variantes.
+  static Future<void> repairVariantFlags(DatabaseExecutor db) async {
+    try {
+      await db.execute(
+        'UPDATE products SET has_variants = 1 '
+        'WHERE has_variants = 0 AND id IN (SELECT DISTINCT product_id FROM product_variants)',
+      );
+    } catch (_) {}
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -424,6 +442,10 @@ class AppDatabase {
         product_id TEXT NOT NULL,
         attribute_name TEXT NOT NULL DEFAULT 'Talla',
         attribute_value TEXT NOT NULL,
+        attribute2_name TEXT,
+        attribute2_value TEXT,
+        color_hex TEXT,
+        color_hex2 TEXT,
         sku_or_barcode TEXT,
         stock INTEGER NOT NULL DEFAULT 0,
         additional_price REAL DEFAULT 0.0,

@@ -9,6 +9,16 @@ void main() {
     expect(ProService.redeemErrorMessage('code_used'), contains('ya fue usado'));
     expect(ProService.redeemErrorMessage('owner_only'), contains('Solo el dueño'));
     expect(ProService.redeemErrorMessage('otra cosa'), contains('Inténtalo de nuevo'));
+    // El negocio no existe en la nube: no decir "Solo el dueño" a quien sí es el dueño
+    expect(ProService.redeemErrorMessage('not_member'), ProService.notInCloudMessage);
+  });
+
+  test('el código se limpia y recupera los guiones si no los escribieron', () {
+    expect(ProService.normalizeCode(' stk-ja4y-fvfv '), 'STK-JA4Y-FVFV');
+    expect(ProService.normalizeCode('STKJA4YFVFV'), 'STK-JA4Y-FVFV');
+    expect(ProService.normalizeCode('stk ja4y fvfv'), 'STK-JA4Y-FVFV');
+    expect(ProService.normalizeCode('OTRO-CODIGO'), 'OTRO-CODIGO');
+    expect(ProService.normalizeCode('   '), '');
   });
 
   test('los planes se leen de la fila de Supabase', () {

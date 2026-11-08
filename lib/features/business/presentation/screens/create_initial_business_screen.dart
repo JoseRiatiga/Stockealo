@@ -6,6 +6,7 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/countries.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/currency_options.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../products/presentation/screens/barcode_scanner_screen.dart';
@@ -43,6 +44,11 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
 
   // false = crear mi negocio, true = unirme a un equipo
   bool _isJoiningTeam = false;
+
+  /// En la web, antes de crear un negocio se pregunta si ya usa Stockealo en el
+  /// celular: con la nube apagada allá, aquí no aparece nada y crearía un duplicado.
+  bool _askPhoneFirst = SupabaseService.cloudSyncForced;
+  bool _isLookingInCloud = false;
   bool _isLoading = false;
   bool _triedSubmit = false;
 
@@ -86,6 +92,31 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
       if (mounted) AppToast.showError(context, 'No se pudo crear el negocio: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// "Ya lo hice": vuelve a buscar en la nube los negocios de la cuenta
+  Future<void> _lookInCloud() async {
+    setState(() => _isLookingInCloud = true);
+    try {
+      final email = widget.userEmail ?? AuthRepository.instance.currentUser?.email;
+      await SupabaseService.instance.syncFromCloud(widget.userId, email);
+      final business = await BusinessRepository.instance.getActiveBusiness(widget.userId, email);
+      if (!mounted) return;
+      if (business != null) {
+        AppToast.showSuccess(context, 'Encontramos ${business.name}');
+        widget.onBusinessCreated();
+      } else {
+        AppToast.showWarning(
+          context,
+          'Todavía no vemos tu negocio en la nube. Revisa que en tu celular la sincronización '
+          'esté activa, espera unos segundos y vuelve a intentarlo.',
+        );
+      }
+    } catch (_) {
+      if (mounted) AppToast.showError(context, 'No pudimos revisar la nube. Revisa tu conexión e inténtalo de nuevo.');
+    } finally {
+      if (mounted) setState(() => _isLookingInCloud = false);
     }
   }
 
@@ -164,6 +195,9 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                     ],
                   ),
                   const SizedBox(height: AppSpace.xxl),
+                  if (_askPhoneFirst)
+                    ..._phoneFirst(c, greeting)
+                  else ...[
                   Text(
                     greeting,
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.inkMuted),
@@ -187,6 +221,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                   ),
                   const SizedBox(height: AppSpace.xl),
                   if (_isJoiningTeam) _joinForm(c) else _createForm(c),
+                  ],
                 ],
               ),
             ),
@@ -194,6 +229,67 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
         ),
       ),
     );
+  }
+
+  List<Widget> _phoneFirst(StockealoColors c, String greeting) {
+    Widget step(int n, String text) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSpace.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: c.accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('$n', style: TextStyle(fontWeight: FontWeight.w700, color: c.accent)),
+              ),
+              const SizedBox(width: AppSpace.md),
+              Expanded(child: Text(text, style: TextStyle(fontSize: 15, height: 1.4, color: c.ink))),
+            ],
+          ),
+        );
+
+    return [
+      Text(greeting, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.inkMuted)),
+      const SizedBox(height: AppSpace.xs),
+      Text(
+        '¿Ya usas Stockealo en tu celular?',
+        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: c.ink),
+      ),
+      const SizedBox(height: AppSpace.sm),
+      Text(
+        'Si tu negocio está en el celular con la sincronización apagada, sus datos están solo en '
+        'ese celular y aquí no aparecen. Para verlos en la web:',
+        style: TextStyle(fontSize: 15, height: 1.4, color: c.inkMuted),
+      ),
+      const SizedBox(height: AppSpace.xl),
+      _card(
+        c,
+        child: Column(
+          children: [
+            step(1, 'Abre Stockealo en tu celular.'),
+            step(2, 'Ve a Ajustes › Nube y respaldo y activa "Sincronización en la nube".'),
+            step(3, 'Espera a que termine de subir y vuelve aquí.'),
+          ],
+        ),
+      ),
+      const SizedBox(height: AppSpace.xl),
+      PrimaryActionButton(
+        label: _isLookingInCloud ? 'Buscando tu negocio…' : 'Ya lo hice',
+        icon: Icons.cloud_download_outlined,
+        onPressed: _isLookingInCloud ? null : _lookInCloud,
+      ),
+      const SizedBox(height: AppSpace.sm),
+      TextButton(
+        onPressed: _isLookingInCloud ? null : () => setState(() => _askPhoneFirst = false),
+        style: TextButton.styleFrom(foregroundColor: c.ink, minimumSize: const Size.fromHeight(48)),
+        child: const Text('Soy nuevo, crear mi negocio', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+    ];
   }
 
   Widget _card(StockealoColors c, {required Widget child}) => Container(

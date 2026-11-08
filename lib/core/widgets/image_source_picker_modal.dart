@@ -9,6 +9,12 @@ class ImageSourcePickerModal extends StatelessWidget {
   final VoidCallback? onRemove;
   final bool isDialog;
 
+  /// Si se pasa, agrega "Traer la foto desde un enlace" (página del producto o imagen)
+  final VoidCallback? onLink;
+
+  /// Nota al pie, por ejemplo "también puedes pegar una imagen con Ctrl+V"
+  final String? footerHint;
+
   const ImageSourcePickerModal({
     super.key,
     required this.title,
@@ -17,6 +23,8 @@ class ImageSourcePickerModal extends StatelessWidget {
     required this.onSelected,
     this.onRemove,
     this.isDialog = false,
+    this.onLink,
+    this.footerHint,
   });
 
   static Future<void> show(
@@ -26,6 +34,8 @@ class ImageSourcePickerModal extends StatelessWidget {
     bool hasExistingImage = false,
     required Function(ImageSource source) onSelected,
     VoidCallback? onRemove,
+    VoidCallback? onLink,
+    String? footerHint,
   }) {
     final isDesktop = MediaQuery.of(context).size.width >= 850;
 
@@ -45,6 +55,8 @@ class ImageSourcePickerModal extends StatelessWidget {
                 hasExistingImage: hasExistingImage,
                 onSelected: onSelected,
                 onRemove: onRemove,
+                onLink: onLink,
+                footerHint: footerHint,
                 isDialog: true,
               ),
             ),
@@ -65,6 +77,8 @@ class ImageSourcePickerModal extends StatelessWidget {
         hasExistingImage: hasExistingImage,
         onSelected: onSelected,
         onRemove: onRemove,
+        onLink: onLink,
+        footerHint: footerHint,
         isDialog: false,
       ),
     );
@@ -185,6 +199,30 @@ class ImageSourcePickerModal extends StatelessWidget {
               onSelected(ImageSource.gallery);
             },
           ),
+
+          // Tarjeta: desde un enlace
+          if (onLink != null) ...[
+            const SizedBox(height: 12),
+            _buildOptionCard(
+              context: context,
+              icon: Icons.link_rounded,
+              iconGradient: const [Color(0xFF1E6B4E), Color(0xFF2E8B66)],
+              title: 'Traer la foto desde un enlace',
+              subtitle: 'Pega el enlace del producto (Shein, Temu, Mercado Libre…) o de la imagen',
+              cardBg: cardBg,
+              borderColor: borderColor,
+              textMain: textMain,
+              textMuted: textMuted,
+              onTap: () {
+                Navigator.pop(context);
+                onLink!();
+              },
+            ),
+          ],
+          if (footerHint != null) ...[
+            const SizedBox(height: 12),
+            Text(footerHint!, style: TextStyle(fontSize: 12, color: textMuted)),
+          ],
 
           // Opción Eliminar Foto
           if (hasExistingImage && onRemove != null) ...[

@@ -32,5 +32,9 @@ void main() {
     expect(ProductImageService.errorMessage('blocked'), contains('pégala'));
     expect(ProductImageService.errorMessage('daily_limit'), contains('Mañana'));
     expect(ProductImageService.errorMessage('otra'), contains('Inténtalo de nuevo'));
+    final shein = ProductImageService.errorMessage('store_blocked', store: 'Shein');
+    expect(shein, startsWith('Shein no deja'));
+    expect(shein, contains('Windows + Shift + S'));
+    expect(ProductImageService.errorMessage('store_blocked'), startsWith('Esa tienda'));
   });
 }

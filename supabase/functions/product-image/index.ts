@@ -9,7 +9,7 @@
 // Salida:
 //   { "url": "https://…/storage/v1/object/public/product-images/<negocio>/<producto>.jpg?t=…" }
 // Errores: not_authenticated, bad_request, not_allowed, invalid_url, blocked,
-//   no_image, too_large, unsupported_type, fetch_failed, daily_limit
+//   no_image, store_blocked (+ store), too_large, unsupported_type, fetch_failed, daily_limit
 //
 // Seguridad:
 //   • Solo el dueño o un administrador del negocio (como al crear productos)
@@ -23,7 +23,15 @@
 // Variables provistas por Supabase: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { findImageInHtml, isPrivateIPv4, isPrivateIPv6, sniffType } from "./extract.ts";
+import {
+  findImageInHtml,
+  isChallengeUrl,
+  isPrivateIPv4,
+  isPrivateIPv6,
+  looksLikeBotChallenge,
+  sniffType,
+  storeName,
+} from "./extract.ts";
 
 const DAILY_LIMIT = 40;
 const MAX_HTML = 1_500_000;
@@ -55,7 +63,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 class ImportError extends Error {
-  constructor(public code: string, public status = 400) {
+  constructor(public code: string, public status = 400, public store?: string) {
     super(code);
   }
 }
@@ -177,8 +185,12 @@ async function fetchImage(link: string): Promise<{ bytes: Uint8Array; type: stri
 
   // Página del producto: se busca su imagen principal
   const html = new TextDecoder().decode(await readLimited(res, MAX_HTML));
+  // La tienda pidió verificar que no es un robot: no muestra el producto (y la imagen
+  // de esa página sería su logo, no la del producto)
+  const blocked = () => new ImportError("store_blocked", 422, storeName(new URL(link).hostname));
+  if (isChallengeUrl(url.toString())) throw blocked();
   const found = findImageInHtml(html);
-  if (!found) throw new ImportError("no_image");
+  if (!found) throw looksLikeBotChallenge(html) ? blocked() : new ImportError("no_image");
   const imageUrl = new URL(found, url).toString();
   // Sin AVIF: algunos navegadores y celulares viejos no lo muestran
   const img = await safeFetch(imageUrl, "image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.5");
@@ -256,7 +268,7 @@ Deno.serve(async (req) => {
     const { data } = admin.storage.from(BUCKET).getPublicUrl(path);
     return json({ url: `${data.publicUrl}?t=${Date.now()}` });
   } catch (e) {
-    if (e instanceof ImportError) return json({ error: e.code }, e.status);
+    if (e instanceof ImportError) return json({ error: e.code, ...(e.store ? { store: e.store } : {}) }, e.status);
     console.error("product-image:", e instanceof Error ? e.message : e);
     return json({ error: "fetch_failed" }, 502);
   }

@@ -77,6 +77,46 @@ void main() {
       c.dispose();
     });
 
+    test('sin colores, quitar una fila quita también la talla de arriba', () {
+      final c = VariantEditorController()..setSizes(['S', 'M', 'L', 'XL']);
+      for (final size in ['M', 'L', 'XL']) {
+        c.removeCombo(VariantEditorController.cellKey(size, null));
+      }
+      expect(c.sizes, ['S']);
+      expect(c.removed, isEmpty); // nada que "mostrar quitado"
+      expect(c.combos.length, 1);
+      c.dispose();
+    });
+
+    test('el caso de la captura: dejar solo S y luego agregar un color', () {
+      final c = VariantEditorController()..setSizes(['S', 'M', 'L', 'XL']);
+      for (final size in ['M', 'L', 'XL']) {
+        c.removeCombo(VariantEditorController.cellKey(size, null));
+      }
+      c.cellFor(VariantEditorController.cellKey('S', null)).stock.text = '1';
+      c.upsertColor(VariantColor('Rojo', hex: '#C62828'));
+      expect(c.combos.map((x) => '${x.size} ${x.color?.name}'), ['S Rojo']);
+      expect(c.totalStock, 1); // la unidad de la S pasa al rojo
+      expect(c.removed, isEmpty);
+
+      c.removeColor(c.colors.single);
+      expect(c.totalStock, 1); // y vuelve a la S al quitar el color
+      c.dispose();
+    });
+
+    test('con colores, quitar la última combinación de una talla la quita de arriba', () {
+      final c = VariantEditorController()..setSizes(['S', 'M']);
+      c.upsertColor(VariantColor('Rojo'));
+      c.upsertColor(VariantColor('Verde'));
+      c.removeCombo(VariantEditorController.cellKey('S', 'Rojo'));
+      expect(c.sizes, ['S', 'M']); // a S le queda el verde
+      c.removeCombo(VariantEditorController.cellKey('S', 'Verde'));
+      expect(c.sizes, ['M']);
+      expect(c.colors.length, 2);
+      expect(c.removed, isEmpty);
+      c.dispose();
+    });
+
     test('sin colores funciona como antes: una fila por talla', () {
       final c = VariantEditorController()..setSizes(['36', '37']);
       final built = c.build(businessId: 'b1', productId: 'p1', now: DateTime(2026, 11, 8));

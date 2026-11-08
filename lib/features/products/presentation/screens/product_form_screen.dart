@@ -15,6 +15,7 @@ import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../models/product_variant.dart';
 import 'barcode_scanner_screen.dart';
+import '../widgets/category_name_dialog.dart';
 import '../widgets/manage_categories_modal.dart';
 import '../widgets/product_image_view.dart';
 import '../widgets/variant_editor.dart';
@@ -260,42 +261,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   }
 
   Future<void> _showAddCategoryDialog() async {
-    final catController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nueva Categoría'),
-        content: TextField(
-          controller: catController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Ej. Accesorios, Ferretería...',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (catController.text.trim().isNotEmpty) {
-                Navigator.pop(ctx, catController.text.trim());
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
-    );
+    final result = await CategoryNameDialog.show(context, existing: [for (final c in _categories) c.name]);
+    if (result == null || result.isEmpty) return;
 
-    if (result != null && result.isNotEmpty) {
+    // Si ya existía con otra escritura ("ropa" / "Ropa"), se elige esa en vez de repetirla
+    final same = _categories.where((c) => c.name.trim().toLowerCase() == result.toLowerCase());
+    if (same.isEmpty) {
       await _repository.addCategory(result, widget.businessId);
       await _loadCategories();
-      setState(() {
-        _selectedCategory = result;
-      });
     }
+    if (!mounted) return;
+    setState(() => _selectedCategory = same.isNotEmpty ? same.first.name : result);
   }
 
   Future<void> _openManageCategoriesModal() async {
@@ -568,14 +544,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           IconButton.filledTonal(
                             onPressed: _showAddCategoryDialog,
                             icon: const Icon(Icons.add),
-                            tooltip: 'Crear Categoría',
+                            tooltip: 'Nueva categoría',
                             style: IconButton.styleFrom(
-                              backgroundColor: Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0xFF064E3B)
-                                  : const Color(0xFFECFDF5),
-                              foregroundColor: Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0xFF34D399)
-                                  : const Color(0xFF059669),
+                              backgroundColor: context.colors.accent.withOpacity(0.12),
+                              foregroundColor: context.colors.accent,
                               padding: const EdgeInsets.all(14),
                             ),
                           ),
@@ -585,12 +557,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             icon: const Icon(Icons.tune, size: 20),
                             tooltip: 'Gestionar categorías',
                             style: IconButton.styleFrom(
-                              backgroundColor: Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0xFF1E293B)
-                                  : const Color(0xFFF1F5F9),
-                              foregroundColor: Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0xFFCBD5E1)
-                                  : const Color(0xFF475569),
+                              backgroundColor: context.colors.surfaceMuted,
+                              foregroundColor: context.colors.inkMuted,
                               padding: const EdgeInsets.all(14),
                             ),
                           ),

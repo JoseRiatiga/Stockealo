@@ -69,12 +69,8 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Colores con nombre de verdad
-            - Escribe el nombre y la muestra se pone sola: "Rojo", "Gris oscuro", "Verde menta"…
-            - ¿Nombre propio, como "Azul bajito"? La app lo marca como **nombre personalizado** y te propone una muestra parecida, que puedes cambiar.
-            - Al elegir el color con las barras, la foto, la pantalla o el código, el nombre sale por su tono y claridad (Gris, Verde oscuro, Mostaza…).
-
-            ### Correcciones
-            - En "Opciones avanzadas", el título del código del color ya no se ve cortado.
+            ### Mejoras
+            - **Categorías:** ventana nueva para crear y renombrar, con el diseño de la app. Ya no se repiten categorías con distinta escritura ("ropa" y "Ropa").
+            - **Fiado sin cliente:** el aviso ahora aparece junto al campo del cliente, en rojo, para que no pase desapercibido.
           draft: false
           prerelease: false

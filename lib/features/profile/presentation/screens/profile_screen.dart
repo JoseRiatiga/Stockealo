@@ -412,7 +412,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     if (value) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('☁️ Sincronización en la nube activada. Respaldando datos...'),
+          content: Text('Sincronización en la nube activada. Respaldando datos...'),
           backgroundColor: Color(0xFF059669),
         ),
       );
@@ -439,7 +439,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ Respaldo al día: ${res.productsCount} productos y ${res.salesCount} ventas.'),
+          content: Text('Respaldo al día: ${res.productsCount} productos y ${res.salesCount} ventas.'),
           backgroundColor: const Color(0xFF059669),
         ),
       );
@@ -699,7 +699,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(ok
-                ? '✅ Datos de la nube purgados. Tu aplicación ahora está 100% en modo local privado.'
+                ? 'Datos de la nube purgados. Tu aplicación ahora está 100% en modo local privado.'
                 : 'Ocurrió un inconveniente al purgar los datos de la nube.'),
             backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
           ),

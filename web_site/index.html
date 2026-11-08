@@ -128,7 +128,7 @@
           <span class="eyebrow">Contacto</span>
           <h3 style="margin-top:8px">¿Hablamos?</h3>
           <p class="muted">Escríbenos para soporte, para activar Pro o para que tu negocio aparezca aquí.</p>
-          <p><a class="btn btn-primary btn-sm" href="https://wa.me/573138291467?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20de%20Stockealo">WhatsApp</a>
+          <p><a class="btn btn-primary btn-sm" data-wa="hola" href="https://wa.me/573117697927?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20de%20Stockealo">WhatsApp</a>
              <a class="btn btn-ghost btn-sm" href="mailto:byjosealbert@gmail.com">Correo</a></p>
         </div>
       </div>
@@ -159,7 +159,7 @@
       <div>
         <h4>Contacto</h4>
         <ul>
-          <li><a href="https://wa.me/573138291467">WhatsApp +57 313 829 1467</a></li>
+          <li><a data-wa="pie" href="https://wa.me/573117697927">WhatsApp +57 311 769 7927</a></li>
           <li><a href="mailto:byjosealbert@gmail.com">byjosealbert@gmail.com</a></li>
         </ul>
       </div>
@@ -229,9 +229,26 @@
       });
     });
 
+    // El WhatsApp de contacto sale de la configuración (panel › Configuración); el que
+    // está escrito arriba es solo el respaldo si el servidor no responde
+    function setWhatsApp(raw) {
+      var digits = String(raw || '').replace(/\D/g, '');
+      if (digits.length < 10) return;
+      if (digits.length === 10) digits = '57' + digits;
+      var pretty = '+' + digits.slice(0, 2) + ' ' + digits.slice(2, 5) + ' ' + digits.slice(5, 8) + ' ' + digits.slice(8);
+      document.querySelectorAll('a[data-wa]').forEach(function (a) {
+        var text = a.dataset.wa === 'hola' ? '?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20de%20Stockealo' : '';
+        a.href = 'https://wa.me/' + digits + text;
+        if (a.dataset.wa === 'pie') a.textContent = 'WhatsApp ' + pretty;
+      });
+    }
+
     fetch(API, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' }, body: '{}' })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-      .then(function (json) { data = { plans: json.plans || [], stores: json.stores || [] }; })
+      .then(function (json) {
+        data = { plans: json.plans || [], stores: json.stores || [] };
+        setWhatsApp(json.whatsapp);
+      })
       .catch(function () {})
       .then(function () { renderPlans(); renderStores(); });
   </script>

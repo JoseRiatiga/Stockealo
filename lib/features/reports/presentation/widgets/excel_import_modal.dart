@@ -92,7 +92,7 @@ class _ExcelImportModalState extends State<ExcelImportModal> {
             backgroundColor: const Color(0xFF059669),
             duration: const Duration(seconds: 4),
             content: Text(
-              '✅ Importación exitosa:\n• ${result.productsImported} productos nuevos añadidos\n• ${result.productsUpdated} productos actualizados\n• ${result.customersImported} clientes registrados.',
+              'Importación exitosa:\n• ${result.productsImported} productos nuevos añadidos\n• ${result.productsUpdated} productos actualizados\n• ${result.customersImported} clientes registrados.',
             ),
           ),
         );

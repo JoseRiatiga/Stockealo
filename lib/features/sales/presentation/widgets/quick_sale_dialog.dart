@@ -1046,7 +1046,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                             ActionChip(
                               avatar: Icon(Icons.shield_outlined, size: 14, color: context.colors.accent),
                               label: Text(
-                                '💡 Máx. sin pérdida (-${_maxSafePercent.toStringAsFixed(0)}%)',
+                                'Máx. sin pérdida (-${_maxSafePercent.toStringAsFixed(0)}%)',
                                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.colors.accent),
                               ),
                               backgroundColor: context.colors.accent.withOpacity(0.12),
@@ -1120,7 +1120,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                                 child: Text(
                                   _isCashier
                                       ? 'Ese descuento deja pérdida: supera el margen del producto.'
-                                      : '⚠️ ¡Venta a pérdida! Este descuento excede el costo de compra en ${CurrencyFormatter.formatCOP(_lossAmount)}.',
+                                      : '¡Venta a pérdida! Este descuento excede el costo de compra en ${CurrencyFormatter.formatCOP(_lossAmount)}.',
                                   style: TextStyle(fontSize: 11.5, color: context.colors.danger, fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -1144,7 +1144,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                                 child: Text(
                                   _isCashier
                                       ? 'Descuento dentro del margen.'
-                                      : '🛡️ Margen seguro: Tu ganancia neta estimada será de ${CurrencyFormatter.formatCOP(_subtotalAmount - _calculatedDiscount - _totalCostAmount)}.',
+                                      : 'Margen seguro: Tu ganancia neta estimada será de ${CurrencyFormatter.formatCOP(_subtotalAmount - _calculatedDiscount - _totalCostAmount)}.',
                                   style: TextStyle(fontSize: 11, color: context.colors.accent, fontWeight: FontWeight.w500),
                                 ),
                               ),

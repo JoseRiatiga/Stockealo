@@ -7,7 +7,7 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../models/product_variant.dart';
 import '../screens/barcode_scanner_screen.dart';
 
-/// Un color de la lista: nombre libre ("Blanco con rojo") y su muestra.
+/// Un color: nombre libre ("Blanco con rojo") y su muestra.
 class VariantColor {
   String name;
   String? hex; // '#RRGGBB' o 'multi'
@@ -15,6 +15,8 @@ class VariantColor {
   VariantColor(this.name, {this.hex, this.hex2});
 
   String get key => name.trim().toLowerCase();
+
+  VariantColor copy() => VariantColor(name, hex: hex, hex2: hex2);
 }
 
 class VariantCell {
@@ -28,33 +30,50 @@ class VariantCell {
   int get value => int.tryParse(stock.text.trim()) ?? 0;
 }
 
-/// Estado del editor de variantes: tallas × colores, con existencias por combinación.
-/// Sin colores funciona como antes (una fila por talla); sin tallas, una por color.
+/// Estado del editor de variantes. Cada talla tiene sus propios colores (la S puede
+/// venir solo en rojo y la M en rojo y verde). Una talla sin colores es una sola fila.
+/// Sin tallas, los colores cuelgan de una talla vacía ('').
 class VariantEditorController extends ChangeNotifier {
   String attributeName;
   final List<String> sizes = [];
-  final List<VariantColor> colors = [];
-  final Map<String, VariantCell> _cells = {};
 
-  /// Combinaciones que el dueño quitó porque no existen (ej. XL en Rojo)
-  final Set<String> removed = {};
+  /// Colores de cada talla, por la clave de la talla (en minúsculas)
+  final Map<String, List<VariantColor>> _colorsBySize = {};
+  final Map<String, VariantCell> _cells = {};
 
   /// Variantes antiguas escritas como "M (ROJO)" que se pueden separar
   bool canSplitLegacy = false;
 
   VariantEditorController({this.attributeName = 'Talla'});
 
-  static String cellKey(String size, String? color) => '${size.trim().toLowerCase()}|${(color ?? '').trim().toLowerCase()}';
+  static String _sizeKey(String size) => size.trim().toLowerCase();
 
-  /// Combinaciones visibles, en orden de talla y luego de color
-  List<({String size, VariantColor? color, String key})> get combos {
-    final sizeList = sizes.isEmpty ? [''] : sizes;
-    final colorList = colors.isEmpty ? <VariantColor?>[null] : colors.cast<VariantColor?>();
-    if (sizes.isEmpty && colors.isEmpty) return const [];
+  static String cellKey(String size, String? color) => '${_sizeKey(size)}|${(color ?? '').trim().toLowerCase()}';
+
+  /// Tallas que se muestran: si no hay ninguna pero sí colores, una talla vacía
+  List<String> get _sizeList => sizes.isEmpty ? [''] : sizes;
+
+  List<VariantColor> colorsOf(String size) => _colorsBySize[_sizeKey(size)] ?? const [];
+
+  /// Todos los colores usados, sin repetir, en el orden en que aparecen
+  List<VariantColor> get colors {
+    final seen = <String>{};
     return [
-      for (final s in sizeList)
-        for (final c in colorList)
-          if (!removed.contains(cellKey(s, c?.name))) (size: s, color: c, key: cellKey(s, c?.name)),
+      for (final s in _sizeList)
+        for (final c in colorsOf(s))
+          if (seen.add(c.key)) c,
+    ];
+  }
+
+  /// Combinaciones en orden de talla y luego de color
+  List<({String size, VariantColor? color, String key})> get combos {
+    if (sizes.isEmpty && colorsOf('').isEmpty) return const [];
+    return [
+      for (final s in _sizeList)
+        if (colorsOf(s).isEmpty)
+          (size: s, color: null, key: cellKey(s, null))
+        else
+          for (final c in colorsOf(s)) (size: s, color: c, key: cellKey(s, c.name)),
     ];
   }
 
@@ -72,6 +91,11 @@ class VariantEditorController extends ChangeNotifier {
   int totalForColor(VariantColor color) =>
       combos.where((c) => c.color?.key == color.key).fold(0, (sum, c) => sum + cellFor(c.key).value);
 
+  void _putCell(String key, VariantCell cell) {
+    cell.stock.addListener(notifyListeners);
+    _cells[key] = cell;
+  }
+
   void load(List<ProductVariant> variants) {
     if (variants.isEmpty) return;
     attributeName = variants.first.attributeName;
@@ -79,51 +103,42 @@ class VariantEditorController extends ChangeNotifier {
       final size = v.attributeValue.trim();
       final colorName = (v.attribute2Value ?? '').trim();
       if (size.isNotEmpty && !sizes.contains(size)) sizes.add(size);
-      if (colorName.isNotEmpty && !colors.any((c) => c.key == colorName.toLowerCase())) {
-        colors.add(VariantColor(colorName, hex: v.colorHex, hex2: v.colorHex2));
+      if (colorName.isNotEmpty) {
+        final list = _colorsBySize.putIfAbsent(_sizeKey(size), () => []);
+        if (!list.any((c) => c.key == colorName.toLowerCase())) {
+          list.add(VariantColor(colorName, hex: v.colorHex, hex2: v.colorHex2));
+        }
       }
-      final cell = VariantCell(id: v.id, stock: v.stock, barcode: v.skuOrBarcode);
-      cell.stock.addListener(notifyListeners);
-      _cells[cellKey(size, colorName.isEmpty ? null : colorName)] = cell;
-    }
-    // Las combinaciones que no estaban guardadas se consideran quitadas
-    for (final s in sizes.isEmpty ? [''] : sizes) {
-      for (final c in colors.isEmpty ? <VariantColor?>[null] : colors.cast<VariantColor?>()) {
-        final key = cellKey(s, c?.name);
-        if (!_cells.containsKey(key)) removed.add(key);
-      }
+      _putCell(cellKey(size, colorName.isEmpty ? null : colorName),
+          VariantCell(id: v.id, stock: v.stock, barcode: v.skuOrBarcode));
     }
     canSplitLegacy = colors.isEmpty && sizes.where((s) => ProductVariant.splitLegacy(s) != null).length >= 2;
     notifyListeners();
   }
 
-  /// "M (ROJO)", "M (VERDE)" → Talla M con colores Rojo y Verde. Conserva cada
+  /// "M (ROJO)", "M (VERDE)" → Talla M con sus colores Rojo y Verde. Conserva cada
   /// variante (su id, existencias y código) para no romper el historial de ventas.
   void splitLegacy() {
     final oldSizes = List<String>.from(sizes);
     final oldCells = Map<String, VariantCell>.from(_cells);
     sizes.clear();
     _cells.clear();
-    removed.clear();
-    final kept = <String>{};
+    _colorsBySize.clear();
     for (final raw in oldSizes) {
       final parts = ProductVariant.splitLegacy(raw);
       final size = parts?.first ?? raw;
       final colorName = parts?.second;
       if (!sizes.contains(size)) sizes.add(size);
-      if (colorName != null && !colors.any((c) => c.key == colorName.toLowerCase())) {
-        colors.add(VariantColor(colorName, hex: suggestHex(colorName)));
+      if (colorName != null) {
+        final list = _colorsBySize.putIfAbsent(_sizeKey(size), () => []);
+        if (!list.any((c) => c.key == colorName.toLowerCase())) {
+          // Mismo color en varias tallas: misma muestra
+          final known = colors.where((c) => c.key == colorName.toLowerCase());
+          list.add(known.isNotEmpty ? known.first.copy() : VariantColor(colorName, hex: suggestHex(colorName)));
+        }
       }
-      final key = cellKey(size, colorName);
       final cell = oldCells[cellKey(raw, null)];
-      if (cell != null) _cells[key] = cell;
-      kept.add(key);
-    }
-    for (final s in sizes) {
-      for (final c in colors.isEmpty ? <VariantColor?>[null] : colors.cast<VariantColor?>()) {
-        final key = cellKey(s, c?.name);
-        if (!kept.contains(key)) removed.add(key);
-      }
+      if (cell != null) _cells[cellKey(size, colorName)] = cell;
     }
     canSplitLegacy = false;
     notifyListeners();
@@ -133,6 +148,14 @@ class VariantEditorController extends ChangeNotifier {
     for (final part in raw.split(',')) {
       final s = part.trim();
       if (s.isEmpty || sizes.any((x) => x.toLowerCase() == s.toLowerCase())) continue;
+      // Si había colores sin talla, pasan a la primera talla que se agrega
+      if (sizes.isEmpty && colorsOf('').isNotEmpty) {
+        _colorsBySize[_sizeKey(s)] = _colorsBySize.remove('')!;
+        for (final c in colorsOf(s)) {
+          final cell = _cells.remove(cellKey('', c.name));
+          if (cell != null) _cells[cellKey(s, c.name)] = cell;
+        }
+      }
       sizes.add(s);
     }
     notifyListeners();
@@ -140,8 +163,7 @@ class VariantEditorController extends ChangeNotifier {
 
   void removeSize(String size) {
     sizes.remove(size);
-    final prefix = '${size.trim().toLowerCase()}|';
-    removed.removeWhere((k) => k.startsWith(prefix));
+    _colorsBySize.remove(_sizeKey(size));
     notifyListeners();
   }
 
@@ -149,68 +171,74 @@ class VariantEditorController extends ChangeNotifier {
     sizes
       ..clear()
       ..addAll(list);
-    removed.clear();
+    _colorsBySize.removeWhere((k, _) => !list.any((s) => _sizeKey(s) == k));
     notifyListeners();
   }
 
-  void upsertColor(VariantColor color, {VariantColor? replacing}) {
-    if (replacing != null) {
-      final i = colors.indexOf(replacing);
-      if (i >= 0) {
-        // Al renombrar, las existencias siguen con el color
-        if (replacing.key != color.key) {
-          for (final s in sizes.isEmpty ? [''] : sizes) {
-            final cell = _cells.remove(cellKey(s, replacing.name));
-            if (cell != null) _cells[cellKey(s, color.name)] = cell;
-            if (removed.remove(cellKey(s, replacing.name))) removed.add(cellKey(s, color.name));
-          }
+  /// Agrega un color solo a esa talla. El primer color de la talla se queda con lo
+  /// que ella ya tenía (existencias, código, id).
+  void addColorTo(String size, VariantColor color) {
+    final list = _colorsBySize.putIfAbsent(_sizeKey(size), () => []);
+    if (list.any((c) => c.key == color.key)) return;
+    if (list.isEmpty) {
+      final cell = _cells.remove(cellKey(size, null));
+      if (cell != null) _cells[cellKey(size, color.name)] = cell;
+    }
+    list.add(color);
+    notifyListeners();
+  }
+
+  /// Cambia nombre o muestra de un color en esa talla; la muestra nueva se aplica
+  /// también al mismo color en las otras tallas, para que se vea igual en todas.
+  void updateColorIn(String size, VariantColor old, VariantColor updated) {
+    final list = _colorsBySize[_sizeKey(size)];
+    if (list == null) return;
+    final i = list.indexWhere((c) => c.key == old.key);
+    if (i < 0) return;
+    if (old.key != updated.key) {
+      if (list.any((c) => c.key == updated.key)) return; // ya existe en esta talla
+      final cell = _cells.remove(cellKey(size, old.name));
+      if (cell != null) _cells[cellKey(size, updated.name)] = cell;
+    }
+    list[i] = updated;
+    for (final other in _colorsBySize.values) {
+      for (final c in other) {
+        if (c.key == updated.key && !identical(c, updated)) {
+          c.hex = updated.hex;
+          c.hex2 = updated.hex2;
         }
-        colors[i] = color;
       }
-    } else if (!colors.any((c) => c.key == color.key)) {
-      // El primer color se queda con lo que ya tenía cada talla (existencias, código, id)
-      if (colors.isEmpty) _moveCells(fromColor: null, toColor: color.name);
-      colors.add(color);
     }
     notifyListeners();
   }
 
-  /// Pasa las celdas de cada talla de un color a otro (null = sin color)
-  void _moveCells({required String? fromColor, required String? toColor}) {
-    for (final s in sizes.isEmpty ? [''] : sizes) {
-      final cell = _cells.remove(cellKey(s, fromColor));
-      if (cell != null) _cells[cellKey(s, toColor)] = cell;
-      if (removed.remove(cellKey(s, fromColor))) removed.add(cellKey(s, toColor));
+  /// Quita un color de esa talla. Si era el último, la talla vuelve a ser una
+  /// sola fila con esas existencias.
+  void removeColorFrom(String size, VariantColor color) {
+    final list = _colorsBySize[_sizeKey(size)];
+    if (list == null) return;
+    list.removeWhere((c) => c.key == color.key);
+    if (list.isEmpty) {
+      final cell = _cells.remove(cellKey(size, color.name));
+      if (cell != null) _cells[cellKey(size, null)] = cell;
+      _colorsBySize.remove(_sizeKey(size));
     }
-  }
-
-  void removeColor(VariantColor color) {
-    colors.remove(color);
-    final suffix = '|${color.key}';
-    removed.removeWhere((k) => k.endsWith(suffix));
-    // Sin colores, cada talla vuelve a tener sus existencias de ese último color
-    if (colors.isEmpty) _moveCells(fromColor: color.name, toColor: null);
     notifyListeners();
   }
 
-  /// La × de una fila. Sin colores, la fila es la talla: se quita la talla. Con
-  /// tallas y colores se quita solo esa combinación (ej. no hay XL en rojo), y si
-  /// una talla o un color se queda sin combinaciones, se quita también de arriba.
+  /// La × de una fila: el color en esa talla, o la talla si no tiene colores
   void removeCombo(String key) {
     final matches = combos.where((c) => c.key == key);
     if (matches.isEmpty) return;
     final combo = matches.first;
-    if (colors.isEmpty) return removeSize(combo.size);
-    if (sizes.isEmpty) return removeColor(combo.color!);
-    removed.add(key);
-    if (!combos.any((c) => c.size == combo.size)) return removeSize(combo.size);
-    if (!combos.any((c) => c.color?.key == combo.color!.key)) return removeColor(combo.color!);
-    notifyListeners();
+    if (combo.color != null) return removeColorFrom(combo.size, combo.color!);
+    removeSize(combo.size);
   }
 
-  void restoreCombos() {
-    removed.clear();
-    notifyListeners();
+  /// Colores usados en otras tallas que esta todavía no tiene (para ponerlos con un toque)
+  List<VariantColor> suggestionsFor(String size) {
+    final mine = colorsOf(size).map((c) => c.key).toSet();
+    return [for (final c in colors) if (!mine.contains(c.key)) c];
   }
 
   void fillAll(int value) {
@@ -232,7 +260,6 @@ class VariantEditorController extends ChangeNotifier {
   }
 
   List<ProductVariant> build({required String businessId, required String productId, required DateTime now}) {
-    final hasColors = colors.isNotEmpty;
     return [
       for (final c in combos)
         ProductVariant(
@@ -241,7 +268,7 @@ class VariantEditorController extends ChangeNotifier {
           productId: productId,
           attributeName: attributeName.trim().isEmpty ? 'Talla' : attributeName.trim(),
           attributeValue: c.size,
-          attribute2Name: hasColors ? 'Color' : null,
+          attribute2Name: c.color == null ? null : 'Color',
           attribute2Value: c.color?.name.trim(),
           colorHex: ProductVariant.validHex(c.color?.hex, allowMulti: true),
           colorHex2: ProductVariant.validHex(c.color?.hex2),
@@ -296,7 +323,7 @@ class VariantEditorController extends ChangeNotifier {
   }
 }
 
-/// Editor visual: tallas, colores con muestra y la tabla de combinaciones
+/// Editor visual: tallas arriba y, por cada talla, sus colores y existencias
 class VariantEditor extends StatefulWidget {
   final VariantEditorController controller;
   const VariantEditor({super.key, required this.controller});
@@ -335,14 +362,23 @@ class _VariantEditorState extends State<VariantEditor> {
     _sizeInput.clear();
   }
 
-  Future<void> _editColor([VariantColor? existing]) async {
+  Future<void> _addColor(String size) async {
     final result = await showDialog<VariantColor>(
       context: context,
-      builder: (_) => _ColorDialog(initial: existing),
+      builder: (_) => _ColorDialog(
+        sizeLabel: size.isEmpty ? null : '${ctrl.attributeName} $size',
+        suggestions: ctrl.suggestionsFor(size),
+      ),
     );
-    if (result == null) return;
-    if (existing == null && ctrl.colors.any((c) => c.key == result.key)) return;
-    ctrl.upsertColor(result, replacing: existing);
+    if (result != null) ctrl.addColorTo(size, result);
+  }
+
+  Future<void> _editColor(String size, VariantColor color) async {
+    final result = await showDialog<VariantColor>(
+      context: context,
+      builder: (_) => _ColorDialog(initial: color, sizeLabel: size.isEmpty ? null : '${ctrl.attributeName} $size'),
+    );
+    if (result != null) ctrl.updateColorIn(size, color, result);
   }
 
   Future<void> _scan(String key) async {
@@ -357,7 +393,7 @@ class _VariantEditorState extends State<VariantEditor> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final label = ctrl.attributeName;
-    TextStyle section = TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.ink);
+    final section = TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.ink);
 
     return Container(
       padding: const EdgeInsets.all(AppSpace.md + 2),
@@ -420,42 +456,11 @@ class _VariantEditorState extends State<VariantEditor> {
 
           const SizedBox(height: AppSpace.lg),
 
-          // 2. Colores
-          Text('Colores (opcional)', style: section),
-          const SizedBox(height: 2),
-          Text(
-            'Si la prenda viene en varios colores, agrégalos y pon cuántas hay de cada combinación.',
-            style: TextStyle(fontSize: 12, color: c.inkMuted),
-          ),
-          const SizedBox(height: AppSpace.sm),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          // 2. Existencias: cada talla con sus colores
+          Row(
             children: [
-              for (final col in ctrl.colors)
-                InputChip(
-                  avatar: ColorSwatchDot(hex: col.hex, hex2: col.hex2, size: 18),
-                  label: Text(col.name),
-                  onPressed: () => _editColor(col),
-                  onDeleted: () => ctrl.removeColor(col),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ActionChip(
-                avatar: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Agregar color'),
-                onPressed: () => _editColor(),
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: AppSpace.lg),
-
-          // 3. Existencias por combinación
-          if (ctrl.combos.isNotEmpty) ...[
-            Row(
-              children: [
-                Expanded(child: Text('Existencias', style: section)),
+              Expanded(child: Text('Existencias', style: section)),
+              if (ctrl.combos.isNotEmpty) ...[
                 SizedBox(
                   width: 70,
                   child: TextField(
@@ -473,18 +478,20 @@ class _VariantEditorState extends State<VariantEditor> {
                   child: const Text('Llenar todas'),
                 ),
               ],
-            ),
-            const SizedBox(height: AppSpace.sm),
-            ..._comboRows(c),
-            if (ctrl.removed.isNotEmpty)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: ctrl.restoreCombos,
-                  icon: const Icon(Icons.undo_rounded, size: 16),
-                  label: Text('Mostrar las ${ctrl.removed.length} combinaciones quitadas'),
-                ),
-              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Si una ${label.toLowerCase()} viene en varios colores, toca "+ Color" en esa ${label.toLowerCase()}.',
+            style: TextStyle(fontSize: 12, color: c.inkMuted),
+          ),
+          const SizedBox(height: AppSpace.sm),
+          if (ctrl.sizes.isEmpty)
+            // Sin tallas: el producto puede variar solo por color
+            _sizeBlock(c, '')
+          else
+            for (final s in ctrl.sizes) _sizeBlock(c, s),
+          if (ctrl.combos.isNotEmpty) ...[
             const SizedBox(height: AppSpace.sm),
             _totals(c),
           ],
@@ -522,74 +529,131 @@ class _VariantEditorState extends State<VariantEditor> {
     );
   }
 
-  List<Widget> _comboRows(StockealoColors c) {
-    final rows = <Widget>[];
-    String? currentSize;
-    final grouped = ctrl.sizes.isNotEmpty && ctrl.colors.isNotEmpty;
-    for (final combo in ctrl.combos) {
-      if (grouped && combo.size != currentSize) {
-        currentSize = combo.size;
-        rows.add(Padding(
-          padding: const EdgeInsets.only(top: AppSpace.sm, bottom: 4),
-          child: Text(
-            '${ctrl.attributeName} ${combo.size}',
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.inkMuted),
-          ),
-        ));
-      }
-      final cell = ctrl.cellFor(combo.key);
-      final name = combo.color == null ? combo.size : combo.color!.name;
-      rows.add(Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 4),
-        decoration: BoxDecoration(
-          color: c.surfaceMuted,
-          borderRadius: BorderRadius.circular(AppRadius.control),
-        ),
-        child: Row(
-          children: [
-            if (combo.color != null) ...[
-              ColorSwatchDot(hex: combo.color!.hex, hex2: combo.color!.hex2, size: 18),
-              const SizedBox(width: AppSpace.sm),
+  /// Una talla: su encabezado con "+ Color" y sus filas de existencias
+  Widget _sizeBlock(StockealoColors c, String size) {
+    final colors = ctrl.colorsOf(size);
+    final title = size.isEmpty ? 'Colores' : '${ctrl.attributeName} $size';
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpace.sm),
+      padding: const EdgeInsets.fromLTRB(AppSpace.sm + 2, 4, 4, AppSpace.sm),
+      decoration: BoxDecoration(
+        color: c.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.ink),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _addColor(size),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Color'),
+                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              ),
+              if (size.isNotEmpty && colors.isNotEmpty)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Quitar la ${ctrl.attributeName.toLowerCase()} $size',
+                  icon: Icon(Icons.delete_outline_rounded, size: 18, color: c.inkMuted),
+                  onPressed: () => ctrl.removeSize(size),
+                ),
             ],
-            Expanded(
-              child: Text(
-                name.isEmpty ? '—' : name,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.ink),
-              ),
+          ),
+          if (colors.isEmpty)
+            size.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      'Agrega tallas arriba o toca "+ Color" si solo varía por color.',
+                      style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                    ),
+                  )
+                : _row(c, size: size, color: null)
+          else
+            for (final col in colors) _row(c, size: size, color: col),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(StockealoColors c, {required String size, required VariantColor? color}) {
+    final key = VariantEditorController.cellKey(size, color?.name);
+    final cell = ctrl.cellFor(key);
+    final hasCode = (cell.barcode ?? '').isNotEmpty;
+    return Container(
+      margin: const EdgeInsets.only(top: 4, right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 2),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        border: Border.all(color: c.line),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: color == null
+                ? Text(
+                    'Sin color',
+                    style: TextStyle(fontSize: 13.5, color: c.inkMuted),
+                  )
+                : InkWell(
+                    onTap: () => _editColor(size, color),
+                    borderRadius: BorderRadius.circular(AppRadius.control),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          ColorSwatchDot(hex: color.hex, hex2: color.hex2, size: 18),
+                          const SizedBox(width: AppSpace.sm),
+                          Flexible(
+                            child: Text(
+                              color.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.ink),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+          ),
+          SizedBox(
+            width: 68,
+            child: TextField(
+              controller: cell.stock,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(isDense: true, hintText: '0'),
             ),
-            SizedBox(
-              width: 72,
-              child: TextField(
-                controller: cell.stock,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                textAlign: TextAlign.center,
-                decoration: const InputDecoration(isDense: true, hintText: '0'),
-              ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: hasCode ? 'Código: ${cell.barcode}' : 'Escanear código',
+            icon: Icon(
+              hasCode ? Icons.qr_code_2_rounded : Icons.qr_code_scanner_rounded,
+              size: 18,
+              color: hasCode ? c.accent : c.inkMuted,
             ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: (cell.barcode ?? '').isEmpty ? 'Escanear código de esta combinación' : 'Código: ${cell.barcode}',
-              icon: Icon(
-                (cell.barcode ?? '').isEmpty ? Icons.qr_code_scanner_rounded : Icons.qr_code_2_rounded,
-                size: 18,
-                color: (cell.barcode ?? '').isEmpty ? c.inkMuted : c.accent,
-              ),
-              onPressed: () => _scan(combo.key),
-            ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: combo.color == null || combo.size.isEmpty ? 'Quitar' : 'Quitar esta combinación (no existe)',
-              icon: Icon(Icons.close_rounded, size: 18, color: c.inkMuted),
-              onPressed: () => ctrl.removeCombo(combo.key),
-            ),
-          ],
-        ),
-      ));
-    }
-    return rows;
+            onPressed: () => _scan(key),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: color == null ? 'Quitar la ${ctrl.attributeName.toLowerCase()} $size' : 'Quitar ${color.name} de esta ${ctrl.attributeName.toLowerCase()}',
+            icon: Icon(Icons.close_rounded, size: 18, color: c.inkMuted),
+            onPressed: () => ctrl.removeCombo(key),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _totals(StockealoColors c) {
@@ -608,15 +672,17 @@ class _VariantEditorState extends State<VariantEditor> {
             ),
           ),
         );
-    final grouped = ctrl.sizes.isNotEmpty && ctrl.colors.isNotEmpty;
+    final colors = ctrl.colors;
     return Wrap(
       spacing: 6,
       runSpacing: 6,
       children: [
         pill('Total: ${ctrl.totalStock} unid.', strong: true),
-        if (grouped) ...[
-          for (final s in ctrl.sizes) pill('$s: ${ctrl.totalForSize(s)}'),
-          for (final col in ctrl.colors) pill('${col.name}: ${ctrl.totalForColor(col)}'),
+        if (colors.isNotEmpty) ...[
+          if (ctrl.sizes.length > 1)
+            for (final s in ctrl.sizes) pill('$s: ${ctrl.totalForSize(s)}'),
+          if (colors.length > 1)
+            for (final col in colors) pill('${col.name}: ${ctrl.totalForColor(col)}'),
         ],
       ],
     );
@@ -626,7 +692,14 @@ class _VariantEditorState extends State<VariantEditor> {
 /// Elegir nombre y muestra de un color: paleta, código hexadecimal, dos tonos o multicolor
 class _ColorDialog extends StatefulWidget {
   final VariantColor? initial;
-  const _ColorDialog({this.initial});
+
+  /// "Talla M": a qué talla se le agrega el color
+  final String? sizeLabel;
+
+  /// Colores ya usados en otras tallas, para ponerlos con un toque
+  final List<VariantColor> suggestions;
+
+  const _ColorDialog({this.initial, this.sizeLabel, this.suggestions = const []});
 
   @override
   State<_ColorDialog> createState() => _ColorDialogState();
@@ -715,7 +788,11 @@ class _ColorDialogState extends State<_ColorDialog> {
 
     final canSave = _name.text.trim().isNotEmpty;
     return AlertDialog(
-      title: Text(widget.initial == null ? 'Agregar color' : 'Editar color'),
+      title: Text(
+        widget.initial == null
+            ? (widget.sizeLabel == null ? 'Agregar color' : 'Agregar color a la ${widget.sizeLabel!.toLowerCase()}')
+            : 'Editar color',
+      ),
       content: SizedBox(
         width: 380,
         child: SingleChildScrollView(
@@ -723,6 +800,26 @@ class _ColorDialogState extends State<_ColorDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.suggestions.isNotEmpty) ...[
+                Text('Ya usados', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.ink)),
+                const SizedBox(height: AppSpace.sm),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final s in widget.suggestions)
+                      ActionChip(
+                        avatar: ColorSwatchDot(hex: s.hex, hex2: s.hex2, size: 18),
+                        label: Text(s.name),
+                        onPressed: () => Navigator.pop(context, s.copy()),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpace.md),
+                Text('O uno nuevo', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.ink)),
+                const SizedBox(height: AppSpace.sm),
+              ],
               Row(
                 children: [
                   ColorSwatchDot(

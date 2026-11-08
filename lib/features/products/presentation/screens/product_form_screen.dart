@@ -844,7 +844,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       const Padding(
                         padding: EdgeInsets.only(left: 4),
                         child: Text(
-                          '💡 Código único automático. Toca el escáner si tu producto ya tiene código de barras impreso.',
+                          'Código único automático. Toca el escáner si tu producto ya tiene código de barras impreso.',
                           style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                         ),
                       ),

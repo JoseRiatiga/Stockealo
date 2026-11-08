@@ -959,7 +959,9 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                       SettingsRow(
                         icon: Icons.delete_outline_rounded,
                         title: 'Borrar datos',
-                        subtitle: 'Purgar la nube o eliminar la cuenta',
+                        subtitle: SupabaseService.cloudSyncForced
+                            ? 'Eliminar la cuenta'
+                            : 'Purgar la nube o eliminar la cuenta',
                         danger: true,
                         onTap: _openDeletion,
                       ),
@@ -1243,15 +1245,23 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       final c = context.colors;
       return [
         SettingsGroup(children: [
-          SettingsRow.toggle(
-            icon: Icons.cloud_sync_outlined,
-            title: 'Sincronización en la nube',
-            subtitle: _isCloudSyncEnabled
-                ? 'Respaldo automático y datos compartidos con tu equipo'
-                : 'Tus datos se guardan solo en este equipo',
-            value: _isCloudSyncEnabled,
-            onChanged: _toggleCloudSync,
-          ),
+          // En la web no se puede apagar: lo que queda solo en el navegador se pierde
+          if (SupabaseService.cloudSyncForced)
+            const SettingsRow(
+              icon: Icons.cloud_done_outlined,
+              title: 'Sincronización en la nube',
+              subtitle: 'Siempre activa en la web: tus datos quedan guardados en tu cuenta',
+            )
+          else
+            SettingsRow.toggle(
+              icon: Icons.cloud_sync_outlined,
+              title: 'Sincronización en la nube',
+              subtitle: _isCloudSyncEnabled
+                  ? 'Respaldo automático y datos compartidos con tu equipo'
+                  : 'Tus datos se guardan solo en este equipo',
+              value: _isCloudSyncEnabled,
+              onChanged: _toggleCloudSync,
+            ),
           if (_isCloudSyncEnabled)
             SettingsRow(
               icon: Icons.sync_rounded,
@@ -1334,13 +1344,15 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     SettingsSubpage.open(context, title: 'Borrar datos', children: () {
       return [
         SettingsGroup(children: [
-          SettingsRow(
-            icon: Icons.cloud_off_outlined,
-            title: 'Purgar datos de la nube',
-            subtitle: 'Borra la copia en la nube y conserva la de este equipo',
-            danger: true,
-            onTap: _showPurgeCloudDialog,
-          ),
+          // En la web la nube es la copia principal: purgarla dejaría los datos solo en el navegador
+          if (!SupabaseService.cloudSyncForced)
+            SettingsRow(
+              icon: Icons.cloud_off_outlined,
+              title: 'Purgar datos de la nube',
+              subtitle: 'Borra la copia en la nube y conserva la de este equipo',
+              danger: true,
+              onTap: _showPurgeCloudDialog,
+            ),
           SettingsRow(
             icon: Icons.delete_forever_outlined,
             title: 'Eliminar cuenta y datos',

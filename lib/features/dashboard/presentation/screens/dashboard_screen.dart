@@ -3,6 +3,7 @@ import '../../../reports/presentation/screens/profit_report_screen.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/business_identity.dart';
 import '../widgets/quick_actions_customizer.dart';
+import '../widgets/cloud_sync_reminder.dart';
 import '../widgets/dashboard_desktop_charts.dart';
 import '../widgets/top_products_section.dart';
 import '../widgets/dashboard_metrics_grid.dart';
@@ -487,6 +488,11 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                   ],
                 ),
                 const SizedBox(height: AppSpace.lg),
+
+                CloudSyncReminder(
+                  key: ValueKey('cloud-reminder-${_activeBusiness?.id}-$_userRole'),
+                  canManage: _userRole == 'OWNER' || _userRole == 'ADMIN',
+                ),
 
                 _buildPeriodSelector(),
                 const SizedBox(height: AppSpace.lg),

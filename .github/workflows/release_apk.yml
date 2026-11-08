@@ -69,20 +69,25 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Paga Stockealo Pro en línea
-            - **Pago seguro con Wompi** dentro de la app: Nequi, PSE, tarjeta o Bancolombia. Pro se activa solo en cuanto se aprueba el pago.
-            - **Planes nuevos:** semanal, mensual y **anual con 2 meses gratis**.
+            ### Tallas y colores
+            - **Variantes con talla y color:** escribe las tallas y los colores y la app arma la tabla para poner cuántas hay de cada combinación (M Rojo, M Verde…).
+            - **Muestra de color** de una paleta o con su código, de **dos tonos** (blanca con roja) o **multicolor**.
+            - Si ya tenías tallas escritas como "M (ROJO)", la app te ofrece separarlas en talla y color sin perder tus existencias.
+            - Al vender eliges la talla y luego el color, con su muestra y las unidades disponibles.
+            - Tus tallas y colores ahora se guardan en la nube y se ven en todos tus equipos.
 
-            ### Tienda en línea (Stockealo Pro)
-            - **Tu catálogo con carrito** en stockealo.online/tienda/tu-negocio: tus clientes eligen los productos y te mandan el pedido por WhatsApp.
-            - Solo muestra productos con stock, con foto y precio. Nunca tus costos ni tus clientes.
-            - Actívala en Inventario › Tienda y comparte el enlace.
+            ### Fotos de productos
+            - **Trae la foto desde un enlace:** pega el enlace del producto de Shein, Temu, Mercado Libre, Amazon u otra tienda.
+            - En el computador puedes **pegar una imagen con Ctrl+V** mientras editas el producto.
 
-            ### Mejoras
-            - Banderas a color en el número de celular y al elegir el país.
-            - El celular ahora es obligatorio al crear la cuenta.
-            - Gráficas del inicio, menús y pantallas de Ajustes con el diseño de la app, también en el computador.
-            - Stocky ahora está abajo a la derecha también en la versión web.
-            - Términos y política de privacidad actualizados, también en stockealo.online.
+            ### La versión web, siempre en la nube
+            - En el navegador tus datos se guardan siempre en tu cuenta: no se pierden al borrar el historial ni al cambiar de computador.
+            - Si usas Stockealo en el celular sin la nube, la web te explica cómo activarla para ver tu negocio.
+            - En el celular, un recordatorio de vez en cuando para activar la copia en la nube.
+
+            ### Correcciones
+            - Canjear un código Pro o pagar ya no falla cuando el negocio aún no estaba en la nube; el código se acepta aunque lo escribas sin guiones.
+            - Al anular una venta, la unidad vuelve también a su talla o color.
+            - La sesión se renueva sola al volver a la pestaña después de un rato.
           draft: false
           prerelease: false

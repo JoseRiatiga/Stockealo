@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/app_database.dart';
+import '../../features/products/models/product_variant.dart';
 import 'sync_queue.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -100,8 +101,13 @@ class SupabaseService {
     }
   }
 
+  /// En la web la nube va siempre encendida: los datos del navegador se pierden al
+  /// borrar los datos de navegación y el negocio debe existir en la nube para Pro.
+  static bool get cloudSyncForced => kIsWeb;
+
   /// Comprueba si el usuario tiene activada la sincronización en la nube (False por defecto = Local-First)
   Future<bool> isCloudSyncEnabled() async {
+    if (cloudSyncForced) return true;
     final val = await AppDatabase.instance.getSetting('cloud_sync_enabled');
     if (val == 'true') return true;
 
@@ -121,8 +127,30 @@ class SupabaseService {
     return false;
   }
 
+  /// Pro, la tienda y los pagos viven en el servidor: el negocio tiene que existir en
+  /// la nube. Si no está (nube apagada o datos aún sin subir), enciende la nube y lo
+  /// sube. Devuelve false si después de intentarlo sigue sin estar.
+  Future<bool> ensureBusinessInCloud(String businessId) async {
+    final db = client;
+    if (db == null || db.auth.currentSession == null) return false;
+    await ensureFreshSession();
+    Future<bool> inCloud() async =>
+        await db.from('businesses').select('id').eq('id', businessId).maybeSingle() != null;
+    try {
+      if (await inCloud()) return true;
+      await setCloudSyncEnabled(true);
+      final result = await syncToCloud();
+      if (!result.success) return false;
+      return await inCloud();
+    } catch (e) {
+      debugPrint('No se pudo subir el negocio a la nube: $e');
+      return false;
+    }
+  }
+
   /// Activa o desactiva la sincronización en la nube
   Future<void> setCloudSyncEnabled(bool enabled) async {
+    if (cloudSyncForced && !enabled) return;
     await AppDatabase.instance.setSetting('cloud_sync_enabled', enabled ? 'true' : 'false');
   }
 
@@ -325,6 +353,8 @@ class SupabaseService {
             'current_stock': (p['stock'] as num?)?.toInt() ?? 0,
             'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
             'image_url': imageUrl,
+            'has_variants': (p['has_variants'] as int? ?? 0) == 1,
+            'description': p['description'],
             'created_at': p['created_at'],
           });
         }
@@ -336,6 +366,31 @@ class SupabaseService {
           onConflict: 'id',
           ignoreDuplicates: true,
         );
+
+        // Los productos que ya estaban en la nube no se tocan arriba: se les marca aquí
+        // que tienen variantes (antes la nube no guardaba ese dato)
+        final withVariants = [
+          for (final p in localProducts)
+            if ((p['has_variants'] as int? ?? 0) == 1) p['id'] as String,
+        ];
+        if (withVariants.isNotEmpty) {
+          await client!.from('products').update({'has_variants': true}).inFilter('id', withVariants);
+          final marks = List.filled(withVariants.length, '?').join(', ');
+          final localVariants = await db.query(
+            'product_variants',
+            where: 'product_id IN ($marks)',
+            whereArgs: withVariants,
+          );
+          if (localVariants.isNotEmpty) {
+            // Como el stock del producto: solo se crean las que faltan; las existentes
+            // cambian por diferencia con cada venta
+            await client!.from('product_variants').upsert(
+              [for (final v in localVariants) ProductVariant.cloudRow(v)],
+              onConflict: 'id',
+              ignoreDuplicates: true,
+            );
+          }
+        }
       }
 
       // 3. Sincronizar Customers
@@ -626,7 +681,14 @@ class SupabaseService {
       // 2. Descargar Productos
       try {
         final List<dynamic> cloudProducts = await client!.from('products').select();
+        // Lo que la nube no guardaba antes (variantes, descripción) no se pierde al reescribir
+        final localExtras = <String, Map<String, Object?>>{
+          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description']))
+            r['id'] as String: r,
+        };
         for (final p in cloudProducts) {
+          final local = localExtras[p['id']];
+          final localHasVariants = (local?['has_variants'] as int? ?? 0) == 1;
           await db.insert(
             'products',
             {
@@ -634,7 +696,8 @@ class SupabaseService {
               'business_id': p['business_id'],
               'code': p['sku'] ?? '',
               'name': p['name'],
-              'description': p['description'],
+              'description': p['description'] ?? local?['description'],
+              'has_variants': (p['has_variants'] == true || localHasVariants) ? 1 : 0,
               'category': p['category'] ?? 'General',
               'purchase_price': (p['cost_price'] as num?)?.toDouble() ?? 0.0,
               'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
@@ -652,6 +715,50 @@ class SupabaseService {
         }
       } catch (e) {
         debugPrint('Error descargando productos de Supabase: $e');
+      }
+
+      // 2.1 Descargar variantes (tallas, colores…)
+      try {
+        final List<dynamic> cloudVariants = await client!.from('product_variants').select();
+        final idsByProduct = <String, Set<String>>{};
+        for (final v in cloudVariants) {
+          final row = Map<String, dynamic>.from(v as Map);
+          idsByProduct.putIfAbsent(row['product_id'] as String, () => {}).add(row['id'] as String);
+          await db.insert(
+            'product_variants',
+            {
+              'id': row['id'],
+              'business_id': row['business_id'],
+              'product_id': row['product_id'],
+              'attribute_name': row['attribute_name'] ?? 'Talla',
+              'attribute_value': row['attribute_value'] ?? '',
+              'attribute2_name': row['attribute2_name'],
+              'attribute2_value': row['attribute2_value'],
+              'color_hex': row['color_hex'],
+              'color_hex2': row['color_hex2'],
+              'sku_or_barcode': row['sku_or_barcode'],
+              'stock': (row['stock'] as num?)?.toInt() ?? 0,
+              'additional_price': (row['additional_price'] as num?)?.toDouble() ?? 0.0,
+              'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+              'updated_at': row['updated_at'] ?? DateTime.now().toIso8601String(),
+              'is_synced': 1,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        // Se sube antes de bajar, así que lo que falta en la nube se borró en otro equipo
+        for (final entry in idsByProduct.entries) {
+          final keep = entry.value.toList();
+          final marks = List.filled(keep.length, '?').join(', ');
+          await db.delete(
+            'product_variants',
+            where: 'product_id = ? AND id NOT IN ($marks)',
+            whereArgs: [entry.key, ...keep],
+          );
+        }
+        await AppDatabase.repairVariantFlags(db);
+      } catch (e) {
+        debugPrint('Error descargando variantes de Supabase: $e');
       }
 
       // 3. Descargar Clientes
@@ -842,6 +949,22 @@ class SupabaseService {
     await flushPendingSync();
   }
 
+  /// Renueva la sesión si ya venció o está por vencer. En la web, con la pestaña en
+  /// segundo plano, el navegador frena la renovación automática y las consultas
+  /// salían con 401 (sesión vencida) hasta que se renovaba sola minutos después.
+  Future<void> ensureFreshSession() async {
+    final auth = client?.auth;
+    final expiresAt = auth?.currentSession?.expiresAt;
+    if (auth == null || expiresAt == null) return;
+    final expiry = DateTime.fromMillisecondsSinceEpoch(expiresAt * 1000);
+    if (expiry.difference(DateTime.now()) > const Duration(minutes: 1)) return;
+    try {
+      await auth.refreshSession();
+    } catch (e) {
+      debugPrint('No se pudo renovar la sesión: $e');
+    }
+  }
+
   /// Envía los cambios pendientes. Devuelve cuántos siguen sin enviarse (-1 si falló).
   Future<int> flushPendingSync() async {
     try {
@@ -849,6 +972,7 @@ class SupabaseService {
       if (!_isInitialized) await initialize();
       // Sin sesión, RLS rechazaría todo: se espera al próximo inicio de sesión
       if (client?.auth.currentSession == null) return await SyncQueue.instance.pendingCount();
+      await ensureFreshSession();
       return await SyncQueue.instance.flush(_send);
     } catch (e) {
       debugPrint('Error enviando cambios pendientes: $e');
@@ -887,6 +1011,20 @@ class SupabaseService {
         await db.from('products').update({'current_stock': p['stock']}).eq('id', p['id'] as String);
       case 'adjust_stock':
         await db.rpc('adjust_product_stock', params: {'p_product_id': p['id'], 'p_delta': p['delta']});
+      case 'replace_variants':
+        // Edición del producto: las variantes quedan exactamente como en el formulario
+        final productId = p['product_id'] as String;
+        final rows = [
+          for (final v in (p['variants'] as List? ?? const []))
+            ProductVariant.cloudRow(Map<String, dynamic>.from(v as Map)),
+        ];
+        if (rows.isNotEmpty) await db.from('product_variants').upsert(rows, onConflict: 'id');
+        final keep = rows.map((r) => r['id'] as String).toList();
+        var delete = db.from('product_variants').delete().eq('product_id', productId);
+        if (keep.isNotEmpty) delete = delete.not('id', 'in', '(${keep.join(',')})');
+        await delete;
+      case 'adjust_variant_stock':
+        await db.rpc('adjust_variant_stock', params: {'p_variant_id': p['id'], 'p_delta': p['delta']});
       case 'adjust_debt':
         await db.rpc('adjust_customer_debt', params: {'p_customer_id': p['id'], 'p_delta': p['delta']});
       case 'upsert_sale':
@@ -1068,6 +1206,8 @@ class SupabaseService {
       'current_stock': (p['stock'] as num?)?.toInt() ?? 0,
       'min_stock_alert': (p['min_stock'] as num?)?.toInt() ?? 5,
       'image_url': imageUrl,
+      'has_variants': (p['has_variants'] as int? ?? 0) == 1,
+      'description': p['description'],
       'created_at': p['created_at'],
       if (editedAt != null) 'updated_at': editedAt,
     }, keepColumns: ['current_stock', 'created_at']);
@@ -1116,6 +1256,14 @@ class SupabaseService {
 
   /// Crea o actualiza un producto en Supabase (incluida su foto)
   Future<void> upsertProductToCloud(Map<String, dynamic> p) => _write('upsert_product', p);
+
+  /// Deja las variantes del producto en la nube igual que en el dispositivo
+  Future<void> replaceVariantsInCloud(String productId, String businessId, List<Map<String, dynamic>> variants) =>
+      _write('replace_variants', {'id': productId, 'product_id': productId, 'business_id': businessId, 'variants': variants});
+
+  /// Venta o anulación de una variante: ajuste por diferencia
+  Future<void> adjustVariantStockInCloud(String variantId, int delta) =>
+      _write('adjust_variant_stock', {'id': variantId, 'delta': delta});
 
   /// Registra una venta en Supabase
   Future<void> insertSaleToCloud(Map<String, dynamic> s) => _write('upsert_sale', s);

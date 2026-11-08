@@ -93,6 +93,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Al volver a la app, reintentar los cambios que quedaron sin enviar
     if (state == AppLifecycleState.resumed && _authRepo.currentUser != null) {
+      // flushPendingSync renueva primero la sesión si venció con la app en segundo plano
       SupabaseService.instance.flushPendingSync();
     }
   }

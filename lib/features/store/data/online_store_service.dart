@@ -141,6 +141,7 @@ class OnlineStoreService {
     if (client == null || client.auth.currentSession == null) {
       throw const OnlineStoreException('Necesitas iniciar sesión y tener internet.');
     }
+    await SupabaseService.instance.ensureFreshSession();
     try {
       final data = await client.rpc('get_my_store', params: {'p_business_id': businessId});
       return data == null ? null : OnlineStoreConfig.fromJson(Map<String, dynamic>.from(data as Map));

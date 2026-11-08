@@ -216,6 +216,7 @@ class SalesRepository {
 
     final List<Sale> createdSales = [];
     final Map<String, int> stockDeltas = {};
+    final Map<String, int> variantDeltas = {};
     String? customerId;
     var customerIsNew = false;
 
@@ -264,18 +265,14 @@ class SalesRepository {
         final double itemTotal = (item.subtotal - itemDiscount).clamp(0.0, double.infinity);
         final double itemProfit = itemTotal - item.totalCost;
 
-        // Descontar stock específico de la variante si aplica
+        // Descontar stock específico de la variante si aplica. Por diferencia: la
+        // variante del carrito puede traer existencias de hace rato
         if (item.variant != null) {
-          final newVariantStock = item.variant!.stock - item.quantity;
-          await txn.update(
-            'product_variants',
-            {
-              'stock': newVariantStock,
-              'updated_at': now.toIso8601String(),
-            },
-            where: 'id = ?',
-            whereArgs: [item.variant!.id],
+          await txn.rawUpdate(
+            'UPDATE product_variants SET stock = stock - ?, updated_at = ? WHERE id = ?',
+            [item.quantity, now.toIso8601String(), item.variant!.id],
           );
+          variantDeltas[item.variant!.id] = (variantDeltas[item.variant!.id] ?? 0) - item.quantity;
         }
 
         // Descontar stock general en products
@@ -298,7 +295,7 @@ class SalesRepository {
           'quantity': item.quantity,
           'resulting_stock': newStock,
           'reason': item.variant != null
-              ? 'Venta POS $invoiceNumber - ${item.variant!.attributeValue} ($paymentMethod)'
+              ? 'Venta POS $invoiceNumber - ${item.variant!.label} ($paymentMethod)'
               : 'Venta POS $invoiceNumber ($paymentMethod)',
           'date': now.toIso8601String(),
         });
@@ -324,7 +321,7 @@ class SalesRepository {
           'invoice_number': invoiceNumber,
           'discount_amount': itemDiscount,
           'variant_id': item.variant?.id,
-          'variant_name': item.variant?.attributeValue,
+          'variant_name': item.variant?.label,
           'created_at': now.toIso8601String(),
           'is_synced': 0,
         });
@@ -356,7 +353,7 @@ class SalesRepository {
           sellerName: seller,
           date: now,
           variantId: item.variant?.id,
-          variantName: item.variant?.attributeValue,
+          variantName: item.variant?.label,
         );
 
         createdSales.add(sale);
@@ -370,6 +367,7 @@ class SalesRepository {
       SupabaseService.instance.insertSaleToCloud(sale.toMap());
     }
     stockDeltas.forEach(SupabaseService.instance.adjustProductStockInCloud);
+    variantDeltas.forEach(SupabaseService.instance.adjustVariantStockInCloud);
 
     final units = items.fold<int>(0, (sum, i) => sum + i.quantity);
     final who = customerName?.trim().isNotEmpty == true ? ' a ${customerName!.trim()}' : '';
@@ -456,7 +454,7 @@ class SalesRepository {
           unitPrice: item.unitPrice,
           subtotal: item.subtotal,
           variantId: item.variant?.id,
-          variantName: item.variant?.attributeValue,
+          variantName: item.variant?.label,
         );
         quotationItems.add(qItem);
 
@@ -644,6 +642,14 @@ class SalesRepository {
       );
       restoredStock = productRows.isNotEmpty ? productRows.first['stock'] as int : null;
 
+      // La talla o el color vendido también recupera su unidad
+      if (sale.variantId != null) {
+        await txn.rawUpdate(
+          'UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?',
+          [sale.quantity, DateTime.now().toIso8601String(), sale.variantId],
+        );
+      }
+
       // Registrar reverso en kardex
       await txn.insert('stock_movements', {
         'id': const Uuid().v4(),
@@ -691,6 +697,7 @@ class SalesRepository {
     final cloud = SupabaseService.instance;
     await cloud.deleteSaleFromCloud(sale.id);
     if (restoredStock != null) await cloud.adjustProductStockInCloud(sale.productId, sale.quantity);
+    if (sale.variantId != null) await cloud.adjustVariantStockInCloud(sale.variantId!, sale.quantity);
     if (debtorId != null) await cloud.adjustCustomerDebtInCloud(debtorId!, -sale.totalAmount);
   }
 }

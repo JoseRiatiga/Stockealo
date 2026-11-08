@@ -437,6 +437,7 @@ class SupabaseService {
             'customer_id': s['customer_id'],
             'customer_name': s['customer_name'],
             'sale_date': s['date'] ?? s['created_at'] ?? DateTime.now().toIso8601String(),
+            ..._saleVariantFields(s),
           };
         }).toList();
 
@@ -448,11 +449,14 @@ class SupabaseService {
         } catch (e) {
           if (e.toString().contains('product_name') ||
               e.toString().contains('customer_name') ||
+              e.toString().contains('variant_') ||
               e.toString().contains('42703')) {
             final fallbackSales = formattedSales.map((m) {
               final copy = Map<String, dynamic>.from(m);
               copy.remove('product_name');
               copy.remove('customer_name');
+              copy.remove('variant_id');
+              copy.remove('variant_name');
               return copy;
             }).toList();
             await client!.from('sales').upsert(
@@ -788,7 +792,16 @@ class SupabaseService {
       // 4. Descargar Ventas
       try {
         final List<dynamic> cloudSales = await client!.from('sales').select();
+        // La nube no guarda vendedor, factura, foto ni descuento: al reescribir la
+        // venta se conservan los del equipo (antes se borraban en cada descarga)
+        final localSales = <String, Map<String, Object?>>{
+          for (final r in await db.query('sales', columns: [
+            'id', 'variant_id', 'variant_name', 'seller_name', 'invoice_number', 'product_photo_path', 'discount_amount',
+          ]))
+            r['id'] as String: r,
+        };
         for (final s in cloudSales) {
+          final local = localSales[s['id']];
           final qty = (s['quantity'] as num?)?.toInt() ?? 1;
           final unitCost = (s['unit_cost'] as num?)?.toDouble() ?? 0.0;
           final unitPrice = (s['unit_price'] as num?)?.toDouble() ?? 0.0;
@@ -869,6 +882,12 @@ class SupabaseService {
               'payment_status': 'PAGADO',
               'notes': s['notes'],
               'created_at': s['sale_date'] ?? DateTime.now().toIso8601String(),
+              'variant_id': s['variant_id'] ?? local?['variant_id'],
+              'variant_name': s['variant_name'] ?? local?['variant_name'],
+              'seller_name': local?['seller_name'],
+              'invoice_number': local?['invoice_number'],
+              'product_photo_path': local?['product_photo_path'],
+              'discount_amount': local?['discount_amount'] ?? 0.0,
               'is_synced': 1,
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
@@ -1213,6 +1232,12 @@ class SupabaseService {
     }, keepColumns: ['current_stock', 'created_at']);
   }
 
+  /// Talla o color vendido, solo si la venta lo tiene
+  static Map<String, dynamic> _saleVariantFields(Map<String, dynamic> s) => {
+        if ((s['variant_id'] as String?)?.isNotEmpty == true) 'variant_id': s['variant_id'],
+        if ((s['variant_name'] as String?)?.isNotEmpty == true) 'variant_name': s['variant_name'],
+      };
+
   Future<void> _sendSale(SupabaseClient db, Map<String, dynamic> s) async {
     final total = (s['total_amount'] as num?)?.toDouble() ?? (s['total'] as num?)?.toDouble() ?? 0.0;
     final qty = (s['quantity'] as num?)?.toInt() ?? 1;
@@ -1233,6 +1258,7 @@ class SupabaseService {
       'customer_id': s['customer_id'],
       'customer_name': s['customer_name'],
       'sale_date': s['date'] ?? s['created_at'] ?? DateTime.now().toIso8601String(),
+      ..._saleVariantFields(s),
     };
 
     // upsert: si un reintento llega después de que la venta ya se guardó, no se duplica
@@ -1241,9 +1267,12 @@ class SupabaseService {
     } catch (e) {
       if (e.toString().contains('product_name') ||
           e.toString().contains('customer_name') ||
+          e.toString().contains('variant_') ||
           e.toString().contains('42703')) {
         payload.remove('product_name');
         payload.remove('customer_name');
+        payload.remove('variant_id');
+        payload.remove('variant_name');
         await db.from('sales').upsert(payload, onConflict: 'id');
       } else {
         rethrow;

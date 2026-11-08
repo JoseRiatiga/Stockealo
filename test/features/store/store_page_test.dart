@@ -16,9 +16,9 @@ const _store = PublicStore(
   ],
 );
 
-Future<void> _pump(WidgetTester tester, PublicStore? store) async {
-  tester.view.physicalSize = const Size(1080, 2400);
-  tester.view.devicePixelRatio = 3;
+Future<void> _pump(WidgetTester tester, PublicStore? store, {Size size = const Size(1080, 2400), double ratio = 3}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = ratio;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(MaterialApp(
     theme: AppTheme.lightTheme,
@@ -62,5 +62,16 @@ void main() {
   testWidgets('una tienda que no existe o está apagada lo dice', (tester) async {
     await _pump(tester, null);
     expect(find.text('Esta tienda no está disponible en este momento.'), findsOneWidget);
+  });
+
+  testWidgets('en un computador ancho el botón del pedido se ve (no queda en blanco)', (tester) async {
+    await _pump(tester, _store, size: const Size(1920, 1080), ratio: 1);
+    await tester.tap(find.text('Agregar').first);
+    await tester.pumpAndSettle();
+    final button = find.textContaining('Ver pedido · 1');
+    expect(button, findsOneWidget);
+    final size = tester.getSize(find.ancestor(of: button, matching: find.byWidgetPredicate((w) => w is FilledButton)));
+    expect(size.width, greaterThan(300)); // antes quedaba sin espacio
+    expect(tester.takeException(), isNull);
   });
 }

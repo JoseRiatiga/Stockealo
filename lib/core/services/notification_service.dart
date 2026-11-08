@@ -144,7 +144,7 @@ class NotificationService extends ChangeNotifier {
             final method = newRecord['payment_method'] ?? 'EFECTIVO';
 
             addNotification(
-              title: 'Nueva Venta en Tiempo Real 🚀',
+              title: 'Nueva venta en tiempo real',
               message: '$productName x$qty ($total) cobrado por $method.',
               type: NotificationType.sale,
               data: newRecord,

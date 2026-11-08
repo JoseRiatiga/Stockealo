@@ -55,15 +55,15 @@ void main() {
   });
 
   group('VariantEditorController', () {
-    test('tallas × colores forman la tabla y se pueden quitar combinaciones', () {
-      final c = VariantEditorController();
-      c.setSizes(['S', 'M']);
-      c.upsertColor(VariantColor('Rojo', hex: '#C62828'));
-      c.upsertColor(VariantColor('Verde', hex: '#2E7D32'));
-      expect(c.combos.length, 4);
+    test('cada talla tiene sus propios colores (S solo rojo, M rojo y verde)', () {
+      final c = VariantEditorController()..setSizes(['S', 'M']);
+      c.addColorTo('S', VariantColor('Rojo', hex: '#C62828'));
+      c.addColorTo('M', VariantColor('Rojo', hex: '#C62828'));
+      c.addColorTo('M', VariantColor('Verde', hex: '#2E7D32'));
 
-      c.removeCombo(VariantEditorController.cellKey('S', 'Verde'));
-      expect(c.combos.length, 3);
+      expect(c.combos.map((x) => '${x.size} ${x.color?.name}'), ['S Rojo', 'M Rojo', 'M Verde']);
+      expect(c.colorsOf('S').map((x) => x.name), ['Rojo']); // la S no recibe el verde
+      expect(c.colors.map((x) => x.name), ['Rojo', 'Verde']);
 
       c.fillAll(2);
       expect(c.totalStock, 6);
@@ -77,63 +77,79 @@ void main() {
       c.dispose();
     });
 
-    test('sin colores, quitar una fila quita también la talla de arriba', () {
+    test('tallas con y sin colores conviven', () {
+      final c = VariantEditorController()..setSizes(['S', 'M']);
+      c.addColorTo('M', VariantColor('Azul'));
+      final built = c.build(businessId: 'b1', productId: 'p1', now: DateTime(2026, 11, 8));
+      expect(built.map((v) => v.label), ['S', 'M · Azul']);
+      expect(built.first.attribute2Name, isNull);
+      c.dispose();
+    });
+
+    test('la × de una talla sin colores la quita de arriba', () {
       final c = VariantEditorController()..setSizes(['S', 'M', 'L', 'XL']);
       for (final size in ['M', 'L', 'XL']) {
         c.removeCombo(VariantEditorController.cellKey(size, null));
       }
       expect(c.sizes, ['S']);
-      expect(c.removed, isEmpty); // nada que "mostrar quitado"
       expect(c.combos.length, 1);
       c.dispose();
     });
 
-    test('el caso de la captura: dejar solo S y luego agregar un color', () {
-      final c = VariantEditorController()..setSizes(['S', 'M', 'L', 'XL']);
-      for (final size in ['M', 'L', 'XL']) {
-        c.removeCombo(VariantEditorController.cellKey(size, null));
-      }
-      c.cellFor(VariantEditorController.cellKey('S', null)).stock.text = '1';
-      c.upsertColor(VariantColor('Rojo', hex: '#C62828'));
-      expect(c.combos.map((x) => '${x.size} ${x.color?.name}'), ['S Rojo']);
-      expect(c.totalStock, 1); // la unidad de la S pasa al rojo
-      expect(c.removed, isEmpty);
-
-      c.removeColor(c.colors.single);
-      expect(c.totalStock, 1); // y vuelve a la S al quitar el color
-      c.dispose();
-    });
-
-    test('con colores, quitar la última combinación de una talla la quita de arriba', () {
+    test('el primer color de una talla se queda con sus unidades, y vuelven al quitarlo', () {
       final c = VariantEditorController()..setSizes(['S', 'M']);
-      c.upsertColor(VariantColor('Rojo'));
-      c.upsertColor(VariantColor('Verde'));
+      c.cellFor(VariantEditorController.cellKey('S', null)).stock.text = '3';
+      c.addColorTo('S', VariantColor('Rojo'));
+      expect(c.totalForSize('S'), 3);
+      expect(c.totalForSize('M'), 0); // la M no se toca
+
       c.removeCombo(VariantEditorController.cellKey('S', 'Rojo'));
-      expect(c.sizes, ['S', 'M']); // a S le queda el verde
-      c.removeCombo(VariantEditorController.cellKey('S', 'Verde'));
-      expect(c.sizes, ['M']);
-      expect(c.colors.length, 2);
-      expect(c.removed, isEmpty);
+      expect(c.colorsOf('S'), isEmpty);
+      expect(c.totalForSize('S'), 3);
+      expect(c.sizes, ['S', 'M']); // quitar el color no quita la talla
       c.dispose();
     });
 
-    test('sin colores funciona como antes: una fila por talla', () {
-      final c = VariantEditorController()..setSizes(['36', '37']);
-      final built = c.build(businessId: 'b1', productId: 'p1', now: DateTime(2026, 11, 8));
-      expect(built.map((v) => v.label), ['36', '37']);
-      expect(built.first.attribute2Name, isNull);
+    test('los colores usados en otras tallas se sugieren con su muestra', () {
+      final c = VariantEditorController()..setSizes(['S', 'M']);
+      c.addColorTo('S', VariantColor('Rojo', hex: '#C62828'));
+      c.addColorTo('S', VariantColor('Negro', hex: '#1F1D18'));
+      c.addColorTo('M', VariantColor('Negro', hex: '#1F1D18'));
+      expect(c.suggestionsFor('M').map((x) => x.name), ['Rojo']);
+      expect(c.suggestionsFor('M').single.hex, '#C62828');
       c.dispose();
     });
 
-    test('al cargar, las combinaciones que no existían quedan quitadas', () {
+    test('cambiar la muestra de un color la cambia en todas las tallas', () {
+      final c = VariantEditorController()..setSizes(['S', 'M']);
+      c.addColorTo('S', VariantColor('Rojo', hex: '#C62828'));
+      c.addColorTo('M', VariantColor('Rojo', hex: '#C62828'));
+      c.cellFor(VariantEditorController.cellKey('S', 'Rojo')).stock.text = '5';
+      c.updateColorIn('S', c.colorsOf('S').single, VariantColor('Rojo', hex: '#7B1E3A'));
+      expect(c.colorsOf('M').single.hex, '#7B1E3A');
+
+      // renombrar solo en la S mantiene sus unidades
+      c.updateColorIn('S', c.colorsOf('S').single, VariantColor('Vinotinto', hex: '#7B1E3A'));
+      expect(c.colorsOf('S').single.name, 'Vinotinto');
+      expect(c.colorsOf('M').single.name, 'Rojo');
+      expect(c.totalForSize('S'), 5);
+      c.dispose();
+    });
+
+    test('al cargar, cada talla recupera solo sus colores', () {
       final c = VariantEditorController()
         ..load([
-          _v('a', 'M', color: 'Rojo', stock: 1),
-          _v('b', 'L', color: 'Verde', stock: 2),
+          _v('a', 'S', color: 'Rojo', stock: 1),
+          _v('b', 'M', color: 'Rojo', stock: 2),
+          _v('c', 'M', color: 'Verde', stock: 3),
+          _v('d', 'L', stock: 4),
         ]);
-      expect(c.combos.length, 2);
-      expect(c.removed.length, 2);
-      expect(c.totalStock, 3);
+      expect(c.colorsOf('S').map((x) => x.name), ['Rojo']);
+      expect(c.colorsOf('M').map((x) => x.name), ['Rojo', 'Verde']);
+      expect(c.colorsOf('L'), isEmpty);
+      expect(c.totalStock, 10);
+      final ids = c.build(businessId: 'b1', productId: 'p1', now: DateTime(2026, 11, 8)).map((v) => v.id);
+      expect(ids, ['a', 'b', 'c', 'd']); // se conservan para el historial de ventas
       c.dispose();
     });
 
@@ -148,7 +164,7 @@ void main() {
       c.splitLegacy();
 
       expect(c.sizes, ['M', 'L']);
-      expect(c.colors.map((x) => x.name), ['Rojo', 'Verde']);
+      expect(c.colorsOf('L').map((x) => x.name), ['Rojo']); // la L no recibe el verde
       expect(c.colors.first.hex, '#C62828'); // muestra sugerida por el nombre
       final built = c.build(businessId: 'b1', productId: 'p1', now: DateTime(2026, 11, 8));
       expect({for (final v in built) v.id: (v.label, v.stock)}, {
@@ -159,14 +175,16 @@ void main() {
       c.dispose();
     });
 
-    test('renombrar un color mantiene sus existencias', () {
-      final c = VariantEditorController()..setSizes(['M']);
-      final rojo = VariantColor('Rojo');
-      c.upsertColor(rojo);
-      c.fillAll(5);
-      c.upsertColor(VariantColor('Vinotinto', hex: '#7B1E3A'), replacing: rojo);
-      expect(c.totalStock, 5);
-      expect(c.combos.single.color!.name, 'Vinotinto');
+    test('sin tallas, el producto puede variar solo por color', () {
+      final c = VariantEditorController();
+      c.addColorTo('', VariantColor('Rojo'));
+      c.addColorTo('', VariantColor('Azul'));
+      final built = c.build(businessId: 'b1', productId: 'p1', now: DateTime(2026, 11, 8));
+      expect(built.map((v) => v.label), ['Rojo', 'Azul']);
+
+      // al agregar la primera talla, esos colores pasan a ella
+      c.addSize('Única');
+      expect(c.colorsOf('Única').map((x) => x.name), ['Rojo', 'Azul']);
       c.dispose();
     });
   });
@@ -193,13 +211,40 @@ void main() {
         await tester.tap(find.text('Separar talla y color'));
         await tester.pump();
         expect(find.text('Talla M'), findsOneWidget);
+        expect(find.text('Talla L'), findsOneWidget);
         expect(find.text('Azul oscuro'), findsWidgets);
         expect(find.text('Total: 4 unid.'), findsOneWidget);
         expect(tester.takeException(), isNull);
         c.dispose();
       });
     }
-  
+
+    testWidgets('"+ Color" en una talla agrega el color solo a esa talla', (tester) async {
+      tester.view.physicalSize = const Size(360, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final c = VariantEditorController()..setSizes(['S', 'M']);
+      c.addColorTo('S', VariantColor('Rojo', hex: '#C62828'));
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.build(Brightness.light),
+        home: Scaffold(body: SingleChildScrollView(child: VariantEditor(controller: c))),
+      ));
+
+      // El "+ Color" de la talla M es el segundo
+      await tester.tap(find.text('Color').at(1));
+      await tester.pumpAndSettle();
+      expect(find.text('Agregar color a la talla m'), findsOneWidget);
+      expect(find.text('Ya usados'), findsOneWidget);
+      await tester.tap(find.widgetWithText(ActionChip, 'Rojo'));
+      await tester.pumpAndSettle();
+
+      expect(c.colorsOf('M').single.name, 'Rojo');
+      expect(c.colorsOf('M').single.hex, '#C62828');
+      expect(c.colorsOf('S').length, 1);
+      expect(tester.takeException(), isNull);
+      c.dispose();
+    });
+
     testWidgets('el diálogo de color se ve bien en un celular angosto', (tester) async {
       tester.view.physicalSize = const Size(360, 780);
       tester.view.devicePixelRatio = 1;
@@ -209,7 +254,7 @@ void main() {
         theme: AppTheme.build(Brightness.light),
         home: Scaffold(body: SingleChildScrollView(child: VariantEditor(controller: c))),
       ));
-      await tester.tap(find.text('Agregar color'));
+      await tester.tap(find.text('Color'));
       await tester.pumpAndSettle();
       expect(find.text('Muestra'), findsOneWidget);
       await tester.tap(find.text('Es de dos colores (ej. blanca con roja)'));
@@ -221,9 +266,10 @@ void main() {
       expect(find.widgetWithText(TextField, 'Blanco con rojo'), findsOneWidget);
       await tester.tap(find.text('Guardar'));
       await tester.pumpAndSettle();
-      expect(c.colors.single.name, 'Blanco con rojo');
-      expect(c.colors.single.hex, '#FFFFFF');
-      expect(c.colors.single.hex2, '#C62828');
+      final color = c.colorsOf('M').single;
+      expect(color.name, 'Blanco con rojo');
+      expect(color.hex, '#FFFFFF');
+      expect(color.hex2, '#C62828');
       expect(tester.takeException(), isNull);
       c.dispose();
     });

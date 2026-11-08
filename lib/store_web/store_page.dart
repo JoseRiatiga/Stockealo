@@ -183,7 +183,9 @@ class _StorePageState extends State<StorePage> {
           ),
         ],
       ),
-      bottomSheet: lines.isEmpty ? null : _cartBar(c, store, lines, side),
+      // bottomNavigationBar y no bottomSheet: en Material 3 el bottomSheet se limita a 640 px
+      // y, con el margen calculado para pantallas anchas, el botón quedaba sin espacio (barra en blanco)
+      bottomNavigationBar: lines.isEmpty ? null : _cartBar(c, store, lines),
     );
   }
 
@@ -233,19 +235,28 @@ class _StorePageState extends State<StorePage> {
         child: ChoiceChip(label: Text(label), selected: selected, onSelected: (_) => onTap()),
       );
 
-  Widget _cartBar(StockealoColors c, PublicStore store, List<CartLine> lines, double side) {
+  Widget _cartBar(StockealoColors c, PublicStore store, List<CartLine> lines) {
     final units = lines.fold<int>(0, (s, l) => s + l.quantity);
     final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
     return Container(
       decoration: BoxDecoration(color: c.surface, border: Border(top: BorderSide(color: c.line))),
-      padding: EdgeInsets.fromLTRB(side, AppSpace.md, side, AppSpace.md),
+      padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, AppSpace.md),
       child: SafeArea(
         top: false,
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-          onPressed: () => _openCart(store),
-          icon: const Icon(Icons.shopping_bag_outlined),
-          label: Text('Ver pedido · $units · ${CurrencyFormatter.formatIn(total, store.currency)}'),
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              onPressed: () => _openCart(store),
+              icon: const Icon(Icons.shopping_bag_outlined),
+              label: Text(
+                'Ver pedido · $units · ${CurrencyFormatter.formatIn(total, store.currency)}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
         ),
       ),
     );

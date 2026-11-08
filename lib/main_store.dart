@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/services/supabase_service.dart';
 import 'core/theme/app_theme.dart';
@@ -9,6 +10,8 @@ import 'store_web/store_page.dart';
 ///   flutter run -d chrome -t lib/main_store.dart --web-browser-flag=--disable-web-security
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Fechas en español (las pantallas usan DateFormat con 'es_CO')
+  await initializeDateFormatting('es_CO', null);
   await SupabaseService.instance.initialize();
   runApp(const StoreApp());
 }

@@ -69,12 +69,17 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Mantenimientos sin perder ventas
-            - Si Stockealo programa un mantenimiento, verás un aviso con el horario.
-            - Durante la mayoría de mantenimientos **puedes seguir vendiendo**: todo se guarda en tu equipo y se sube solo al terminar.
+            ### Reportes en Excel
+            - Nueva pantalla de Reportes: elige qué descargar (inventario con tallas y colores, ventas, clientes y fiados, movimientos y ganancias).
+            - Escoge el periodo: hoy, esta semana, este mes, unas fechas o todo.
+            - Descárgalo en un solo Excel o en un archivo por cada parte.
+
+            ### Tallas y colores en el detalle del producto
+            - Al ver un producto ahora aparecen sus tallas y colores con la cantidad de cada uno.
+            - Ajustar el stock de un producto con variantes se hace talla por talla y color por color; el total se calcula solo.
+            - El detalle del producto tiene el diseño nuevo.
 
             ### Correcciones
-            - Descargar el reporte de Excel en el computador ya no baja dos archivos iguales.
-            - Los botones que todavía no se pueden tocar ahora se ven apagados.
+            - La pantalla de mantenimiento ya no se queda en gris.
           draft: false
           prerelease: false

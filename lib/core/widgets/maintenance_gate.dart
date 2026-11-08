@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../services/maintenance_service.dart';
 import '../services/supabase_service.dart';
@@ -11,12 +10,21 @@ class MaintenanceGate extends StatefulWidget {
   final Widget child;
   const MaintenanceGate({super.key, required this.child});
 
-  static String when(DateTime? d) {
+  static const _months = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+  ];
+
+  /// "hoy a las 4:30 p. m." o "12 de noviembre a las 10:00 p. m.". Se arma a mano y
+  /// no con los formatos de intl: el panel y las tiendas no cargaban el español y
+  /// la página quedaba en gris ("Locale data has not been initialized").
+  static String when(DateTime? d, {DateTime? now}) {
     if (d == null) return '';
-    final now = DateTime.now();
-    final sameDay = d.year == now.year && d.month == now.month && d.day == now.day;
-    final hour = DateFormat('h:mm a', 'es_CO').format(d).toLowerCase();
-    return sameDay ? 'hoy a las $hour' : '${DateFormat("d 'de' MMMM", 'es_CO').format(d)} a las $hour';
+    final today = now ?? DateTime.now();
+    final sameDay = d.year == today.year && d.month == today.month && d.day == today.day;
+    final h12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final hour = '$h12:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'a. m.' : 'p. m.'}';
+    return sameDay ? 'hoy a las $hour' : '${d.day} de ${_months[d.month - 1]} a las $hour';
   }
 
   @override

@@ -1,3 +1,5 @@
+import '../../../reports/presentation/screens/reports_screen.dart';
+import '../../../reports/data/report_export_service.dart';
 import '../../../store/presentation/screens/online_store_screen.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/design/app_card.dart';
@@ -27,7 +29,6 @@ import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../auth/data/auth_repository.dart';
-import '../../../reports/data/excel_export_service.dart';
 import '../widgets/restock_order_modal.dart';
 import '../widgets/catalog_generator_modal.dart';
 import '../../../team/data/team_repository.dart';
@@ -262,77 +263,16 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     }
   }
 
-  Future<void> _exportToExcel() async {
-    if (_activeBusiness == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay una empresa activa seleccionada.'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
+    Future<void> _exportToExcel() async {
     final user = AuthRepository.instance.currentUser;
-    final userEmail = user?.email ?? '';
-
-    // Modal de progreso
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: Card(
-          elevation: 6,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: Color(0xFF059669)),
-                SizedBox(height: 18),
-                Text(
-                  'Generando Excel (.xlsx)...',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Inventario, Ventas y Clientes',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    if (_activeBusiness == null || user == null) return;
+    await ReportsScreen.open(
+      context,
+      business: _activeBusiness!,
+      userId: user.id,
+      userEmail: user.email,
+      initial: const {ReportSection.inventory},
     );
-
-    bool dialogClosed = false;
-    void closeDialog() {
-      if (!dialogClosed && mounted) {
-        dialogClosed = true;
-        Navigator.pop(context);
-      }
-    }
-
-    try {
-      await ExcelExportService.instance.exportBusinessData(
-        business: _activeBusiness!,
-        userId: widget.userId,
-        userEmail: userEmail,
-        onGenerated: closeDialog,
-      );
-      closeDialog();
-    } catch (e) {
-      closeDialog();
-      if (mounted) {
-        final errorMsg = e.toString().replaceAll('Exception: ', '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    }
   }
 
   Future<void> _openManageCategories() async {

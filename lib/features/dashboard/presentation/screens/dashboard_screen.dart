@@ -1,3 +1,4 @@
+import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../../core/design/skeleton.dart';
 import '../../../reports/presentation/screens/profit_report_screen.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -20,7 +21,6 @@ import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../products/data/product_repository.dart';
 import '../../../products/presentation/screens/barcode_scanner_screen.dart';
 import '../../../products/presentation/screens/product_form_screen.dart';
-import '../../../reports/data/excel_export_service.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
@@ -165,66 +165,10 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
 
   bool get canViewProfits => _userRole == 'OWNER' || _userRole == 'ADMIN';
 
-  Future<void> _exportExcelDirectly() async {
-    if (_activeBusiness == null) return;
+    Future<void> _exportExcelDirectly() async {
     final user = _authRepo.currentUser;
-    if (user == null) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: Card(
-          elevation: 6,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: Color(0xFF059669)),
-                SizedBox(height: 18),
-                Text('Generando reporte Excel (.xlsx)...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    bool dialogClosed = false;
-    void closeDialog() {
-      if (!dialogClosed && mounted) {
-        dialogClosed = true;
-        Navigator.pop(context);
-      }
-    }
-
-    try {
-      await ExcelExportService.instance.exportBusinessData(
-        business: _activeBusiness!,
-        userId: user.id,
-        userEmail: user.email,
-        onGenerated: closeDialog,
-      );
-      closeDialog();
-      if (mounted) {
-        AppToast.show(
-          context,
-          message: 'Reporte Excel generado y compartido con éxito',
-          type: ToastType.success,
-        );
-      }
-    } catch (e) {
-      closeDialog();
-      if (mounted) {
-        AppToast.show(
-          context,
-          message: 'Error al exportar: $e',
-          type: ToastType.error,
-        );
-      }
-    }
+    if (_activeBusiness == null || user == null) return;
+    await ReportsScreen.open(context, business: _activeBusiness!, userId: user.id, userEmail: user.email);
   }
 
   Future<void> _openCustomizeQuickActionsModal() async {

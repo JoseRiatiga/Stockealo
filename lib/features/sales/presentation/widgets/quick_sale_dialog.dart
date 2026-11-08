@@ -68,6 +68,11 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   final _salesRepo = SalesRepository();
   final _productRepo = ProductRepository();
   final _customerController = TextEditingController();
+  final _customerFocus = FocusNode();
+
+  /// Fiado sin cliente: el aviso va pegado al campo (abajo, en un aviso flotante,
+  /// pasaba desapercibido detrás de la ventana)
+  bool _customerMissing = false;
   final _searchProductController = TextEditingController();
   final _discountController = TextEditingController();
 
@@ -176,6 +181,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
   @override
   void dispose() {
     _customerController.dispose();
+    _customerFocus.dispose();
     _searchProductController.dispose();
     _discountController.dispose();
     super.dispose();
@@ -515,11 +521,8 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
     }
 
     if (_paymentMethod == 'FIADO' && _customerController.text.trim().isEmpty) {
-      AppToast.show(
-        context,
-        message: 'Escribe o elige el cliente del fiado.',
-        type: ToastType.warning,
-      );
+      setState(() => _customerMissing = true);
+      _customerFocus.requestFocus();
       return;
     }
 
@@ -1219,12 +1222,19 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _customerController,
+                focusNode: _customerFocus,
                 decoration: InputDecoration(
                   labelText: _paymentMethod == 'FIADO' ? 'Cliente del fiado' : 'Cliente (opcional)',
                   hintText: 'Juan Pérez',
                   prefixIcon: const Icon(Icons.person_outline, size: 18),
                   isDense: true,
+                  errorText: _customerMissing && _paymentMethod == 'FIADO'
+                      ? 'Escribe o elige a quién le fías para poder cobrar.'
+                      : null,
                 ),
+                onChanged: (_) {
+                  if (_customerMissing) setState(() => _customerMissing = false);
+                },
               ),
               if (_existingCustomers.isNotEmpty) ...[
                 const SizedBox(height: 6),
@@ -1237,7 +1247,10 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                         child: ActionChip(
                           label: Text(c.name, style: const TextStyle(fontSize: 10.5)),
                           avatar: const Icon(Icons.person, size: 12),
-                          onPressed: () => _customerController.text = c.name,
+                          onPressed: () => setState(() {
+                            _customerController.text = c.name;
+                            _customerMissing = false;
+                          }),
                         ),
                       );
                     }).toList(),

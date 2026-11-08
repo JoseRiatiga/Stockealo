@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_tokens.dart';
+import 'category_name_dialog.dart';
 import '../../data/product_repository.dart';
 import '../../models/category.dart';
 
@@ -53,97 +55,29 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
     });
   }
 
-  Future<void> _showAddCategoryDialog() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Nueva Categoría', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nombre de la categoría',
-            hintText: 'Ej. Bebidas, Abarrotes, Snacks...',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final text = controller.text.trim();
-              if (text.isNotEmpty) Navigator.pop(ctx, text);
-            },
-            child: const Text('Crear'),
-          ),
-        ],
-      ),
-    );
+  List<String> get _names => [for (final c in _categories) c.name];
 
-    if (result != null && result.isNotEmpty) {
-      await _repository.addCategory(result, widget.businessId);
-      _hasChanges = true;
-      await _loadCategories();
-    }
+  Future<void> _showAddCategoryDialog() async {
+    final result = await CategoryNameDialog.show(context, existing: _names);
+    if (result == null || result.isEmpty) return;
+    // Si ya existía con otra escritura, no se crea otra igual
+    if (_names.any((n) => n.trim().toLowerCase() == result.toLowerCase())) return;
+    await _repository.addCategory(result, widget.businessId);
+    _hasChanges = true;
+    await _loadCategories();
   }
 
   Future<void> _showEditCategoryDialog(Category category) async {
-    final controller = TextEditingController(text: category.name);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Editar Categoría', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Nuevo nombre',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Todos los productos de "${category.name}" se actualizarán automáticamente.',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final text = controller.text.trim();
-              if (text.isNotEmpty && text != category.name) {
-                Navigator.pop(ctx, text);
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
+    final result = await CategoryNameDialog.show(context, existing: _names, initial: category.name);
+    if (result == null || result.isEmpty || result == category.name) return;
+    await _repository.updateCategory(
+      id: category.id,
+      businessId: widget.businessId,
+      oldName: category.name,
+      newName: result,
     );
-
-    if (result != null && result.isNotEmpty) {
-      await _repository.updateCategory(
-        id: category.id,
-        businessId: widget.businessId,
-        oldName: category.name,
-        newName: result,
-      );
-      _hasChanges = true;
-      await _loadCategories();
-    }
+    _hasChanges = true;
+    await _loadCategories();
   }
 
   Future<void> _confirmDeleteCategory(Category category) async {
@@ -151,22 +85,21 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('¿Eliminar "${category.name}"?'),
         content: Text(
           count > 0
-              ? 'Esta categoría tiene $count ${count == 1 ? "producto" : "productos"}. Al eliminarla, esos productos se reasignarán a la categoría "General".'
-              : '¿Estás seguro de eliminar esta categoría?',
-          style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+              ? 'Tiene $count ${count == 1 ? "producto" : "productos"}. Al eliminarla, '
+                  '${count == 1 ? "pasa" : "pasan"} a la categoría "General".'
+              : 'No tiene productos.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancelar'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: FilledButton.styleFrom(backgroundColor: ctx.colors.danger, foregroundColor: Colors.white),
             child: const Text('Eliminar'),
           ),
         ],
@@ -334,7 +267,7 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
               child: ElevatedButton.icon(
                 onPressed: _showAddCategoryDialog,
                 icon: const Icon(Icons.add, size: 20),
-                label: const Text('Nueva Categoría'),
+                label: const Text('Nueva categoría'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF059669),
                   foregroundColor: Colors.white,

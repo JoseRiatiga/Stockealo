@@ -47,12 +47,12 @@ jobs:
 
       - name: Build Web (admin)
         run: |
-          flutter build web -t lib/main_admin.dart --base-href "/admin/" --release
+          flutter build web -t lib/main_admin.dart --base-href "/admin/" --release --pwa-strategy=none
           mv build/web build/site/admin
 
       - name: Build Web (tienda)
         run: |
-          flutter build web -t lib/main_store.dart --base-href "/tienda/" --release
+          flutter build web -t lib/main_store.dart --base-href "/tienda/" --release --pwa-strategy=none
           mv build/web build/site/tienda
 
       # Página principal, páginas de regreso de Wompi y Términos/Privacidad (generados

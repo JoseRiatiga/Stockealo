@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../../../core/design/color_swatch_dot.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/product_repository.dart';
 import '../../models/product.dart';
+import '../../models/product_variant.dart';
 import '../widgets/barcode_modal.dart';
 import '../widgets/product_image_view.dart';
 import '../widgets/stock_status_badge.dart';
@@ -32,6 +36,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.initState();
     _product = widget.product;
     _checkRole();
+    // La lista no trae las variantes: se cargan aquí para ver tallas y colores
+    _refreshProduct();
   }
 
   Future<void> _checkRole() async {
@@ -49,117 +55,196 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool get canEdit => _userRole == 'OWNER' || _userRole == 'ADMIN';
   bool get canViewCosts => _userRole == 'OWNER' || _userRole == 'ADMIN';
 
+  bool get _withVariants => _product.hasVariants && _product.variants.isNotEmpty;
+
   Future<void> _refreshProduct() async {
-    final updated = await _repository.getProductById(_product.id, _product.businessId);
-    if (updated != null && mounted) {
-      setState(() {
-        _product = updated;
-      });
+    try {
+      final updated = await _repository.getProductById(_product.id, _product.businessId);
+      if (updated != null && mounted) setState(() => _product = updated);
+    } catch (e) {
+      debugPrint('No se pudo recargar el producto: $e');
     }
   }
 
+  Future<void> _sell() async {
+    final sold = await QuickSaleDialog.show(context, _product);
+    if (sold == true) _refreshProduct();
+  }
+
   Future<void> _showAdjustStockDialog() async {
-    final stockController = TextEditingController(text: _product.stock.toString());
+    final c = context.colors;
+    final variants = _product.variants;
+    final totalController = TextEditingController(text: _product.stock.toString());
+    final variantControllers = {
+      for (final v in variants) v.id: TextEditingController(text: v.stock.toString()),
+    };
     final reasonController = TextEditingController();
+
+    int? parse(TextEditingController t) {
+      final n = int.tryParse(t.text.trim());
+      return n != null && n >= 0 ? n : null;
+    }
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF10B981), size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Ajustar Stock', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold)),
-                  Text(
-                    _product.name,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final valid = _withVariants
+              ? variantControllers.values.every((t) => parse(t) != null)
+              : parse(totalController) != null;
+          final newTotal = _withVariants
+              ? variantControllers.values.fold<int>(0, (s, t) => s + (parse(t) ?? 0))
+              : (parse(totalController) ?? 0);
+          return AlertDialog(
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpace.sm),
+                  decoration: BoxDecoration(
+                    color: c.successSoft,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
+                  child: Icon(Icons.inventory_2_rounded, color: c.success, size: 20),
+                ),
+                const SizedBox(width: AppSpace.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Ajustar stock', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold)),
+                      Text(
+                        _product.name,
+                        style: TextStyle(fontSize: 12, color: c.inkMuted, fontWeight: FontWeight.normal),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 380,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _withVariants
+                          ? 'Escribe cuántas unidades hay de cada talla y color. El total se calcula solo.'
+                          : 'Indica la nueva cantidad física disponible y el motivo:',
+                      style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                    ),
+                    const SizedBox(height: 14),
+                    if (_withVariants) ...[
+                      for (final v in variants)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpace.sm),
+                          child: Row(
+                            children: [
+                              if (ColorSwatchDot.hasSwatch(v.colorHex)) ...[
+                                ColorSwatchDot(hex: v.colorHex, hex2: v.colorHex2, size: 18),
+                                const SizedBox(width: AppSpace.sm),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  v.label.isEmpty ? 'Sin nombre' : v.label,
+                                  style: TextStyle(fontSize: 13.5, color: c.ink, fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              SizedBox(
+                                width: 90,
+                                child: TextField(
+                                  controller: variantControllers[v.id],
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                  textAlign: TextAlign.center,
+                                  onChanged: (_) => setLocal(() {}),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    suffixText: 'u.',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Container(
+                        margin: const EdgeInsets.only(top: AppSpace.xs, bottom: AppSpace.md),
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: c.surfaceMuted,
+                          borderRadius: BorderRadius.circular(AppRadius.control),
+                        ),
+                        child: Row(
+                          children: [
+                            Text('Nuevo total', style: TextStyle(color: c.inkMuted, fontSize: 13)),
+                            const Spacer(),
+                            Text(
+                              '$newTotal unidades',
+                              style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      TextField(
+                        controller: totalController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        autofocus: true,
+                        onChanged: (_) => setLocal(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Nuevo stock total',
+                          prefixIcon: Icon(Icons.pin_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpace.md),
+                    ],
+                    TextField(
+                      controller: reasonController,
+                      decoration: const InputDecoration(
+                        labelText: 'Motivo del ajuste',
+                        hintText: 'Ej. Conteo físico, merma, compra...',
+                        prefixIcon: Icon(Icons.comment_outlined),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Indica la nueva cantidad física disponible y el motivo:',
-              style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: stockController,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Nuevo Stock Total',
-                prefixIcon: Icon(Icons.pin_outlined),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Motivo del ajuste',
-                hintText: 'Ej. Conteo físico, Merma, Compra...',
-                prefixIcon: Icon(Icons.comment_outlined),
+              FilledButton(
+                onPressed: valid ? () => Navigator.pop(ctx, true) : null,
+                child: const Text('Guardar'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF059669),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            ),
-            onPressed: () {
-              final newStock = int.tryParse(stockController.text.trim());
-              if (newStock != null && newStock >= 0) {
-                Navigator.pop(ctx, true);
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
 
     if (result == true) {
-      final newStock = int.parse(stockController.text.trim());
-      final reason = reasonController.text.trim().isEmpty
-          ? 'Ajuste manual de stock'
-          : reasonController.text.trim();
-
-      await _repository.adjustStock(_product.id, _product.businessId, newStock, reason);
+      final reason = reasonController.text.trim().isEmpty ? 'Ajuste manual de stock' : reasonController.text.trim();
+      if (_withVariants) {
+        await _repository.adjustVariantStocks(
+          _product,
+          {for (final e in variantControllers.entries) e.key: parse(e.value) ?? 0},
+          reason,
+        );
+      } else {
+        await _repository.adjustStock(_product.id, _product.businessId, parse(totalController)!, reason);
+      }
       await _refreshProduct();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Stock actualizado correctamente'),
-            backgroundColor: Color(0xFF059669),
-          ),
+          const SnackBar(content: Text('Stock actualizado correctamente')),
         );
       }
     }
@@ -178,7 +263,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: ctx.colors.danger),
             child: const Text('Eliminar'),
           ),
         ],
@@ -198,20 +283,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
     final isWide = MediaQuery.of(context).size.width >= 780;
-    final totalCostInventory = _product.purchasePrice * _product.stock;
-    final totalSaleInventory = _product.salePrice * _product.stock;
-    final totalPotentialProfit = totalSaleInventory - totalCostInventory;
+    final hasDescription = _product.description != null && _product.description!.isNotEmpty;
+    final showValuation = canViewCosts && _product.stock > 0;
+
+    final rightColumn = <Widget>[
+      _buildHeaderBlock(),
+      const SizedBox(height: 14),
+      _buildStockCard(),
+      if (_withVariants) ...[
+        const SizedBox(height: 14),
+        _buildVariantsCard(),
+      ],
+      const SizedBox(height: 14),
+      _buildPricingCard(),
+      if (showValuation) ...[
+        const SizedBox(height: 14),
+        _buildValuationCard(),
+      ],
+    ];
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0915) : const Color(0xFFF8FAFC),
+      backgroundColor: c.paper,
       appBar: AppBar(
-        title: const Text('Detalle de Producto'),
+        title: const Text('Detalle de producto'),
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_2),
-            tooltip: 'Código de Barras / QR',
+            tooltip: 'Código de barras / QR',
             onPressed: () => BarcodeModal.show(context, _product),
           ),
           if (canEdit)
@@ -228,9 +328,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                   ),
                 );
-                if (updated == true) {
-                  _refreshProduct();
-                }
+                if (updated == true) _refreshProduct();
               },
             ),
           if (canEdit)
@@ -246,52 +344,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           constraints: const BoxConstraints(maxWidth: 1040),
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
-              20,
-              16,
-              20,
+              AppSpace.lg,
+              AppSpace.lg,
+              AppSpace.lg,
               MediaQuery.of(context).padding.bottom + 28,
             ),
             child: isWide
                 ? Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Columna Izquierda: Foto, QR y Acciones Rápidas
                       SizedBox(
                         width: 340,
                         child: Column(
                           children: [
-                            _buildPhotoCard(isDark),
+                            _buildPhotoCard(),
                             const SizedBox(height: 14),
-                            _buildBarcodeCard(isDark),
+                            _buildBarcodeCard(),
                             const SizedBox(height: 14),
-                            _buildQuickActionsCard(isDark),
+                            _buildQuickActionsCard(),
                           ],
                         ),
                       ),
                       const SizedBox(width: 20),
-
-                      // Columna Derecha: Título, Stock, Precios y Métricas Comerciales
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildHeaderBlock(isDark),
-                            const SizedBox(height: 14),
-                            _buildStockCard(isDark),
-                            const SizedBox(height: 14),
-                            _buildPricingCard(isDark),
-                            if (canViewCosts && _product.stock > 0) ...[
+                            ...rightColumn,
+                            if (hasDescription) ...[
                               const SizedBox(height: 14),
-                              _buildValuationCard(
-                                isDark: isDark,
-                                totalCost: totalCostInventory,
-                                totalSale: totalSaleInventory,
-                                totalProfit: totalPotentialProfit,
-                              ),
-                            ],
-                            if (_product.description != null && _product.description!.isNotEmpty) ...[
-                              const SizedBox(height: 14),
-                              _buildDescriptionCard(isDark),
+                              _buildDescriptionCard(),
                             ],
                           ],
                         ),
@@ -301,27 +383,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildPhotoCard(isDark),
+                      _buildPhotoCard(),
                       const SizedBox(height: 14),
-                      _buildHeaderBlock(isDark),
+                      ...rightColumn,
                       const SizedBox(height: 14),
-                      _buildStockCard(isDark),
-                      const SizedBox(height: 14),
-                      _buildPricingCard(isDark),
-                      if (canViewCosts && _product.stock > 0) ...[
+                      _buildBarcodeCard(),
+                      if (hasDescription) ...[
                         const SizedBox(height: 14),
-                        _buildValuationCard(
-                          isDark: isDark,
-                          totalCost: totalCostInventory,
-                          totalSale: totalSaleInventory,
-                          totalProfit: totalPotentialProfit,
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      _buildBarcodeCard(isDark),
-                      if (_product.description != null && _product.description!.isNotEmpty) ...[
-                        const SizedBox(height: 14),
-                        _buildDescriptionCard(isDark),
+                        _buildDescriptionCard(),
                       ],
                     ],
                   ),
@@ -331,25 +400,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildPhotoCard(bool isDark) {
+  /// Tarjeta base del diseño: superficie con borde fino
+  Widget _card({required Widget child, EdgeInsets padding = const EdgeInsets.all(18), Color? color}) {
+    final c = context.colors;
     return Container(
+      width: double.infinity,
+      padding: padding,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: color ?? c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: c.line),
       ),
-      padding: const EdgeInsets.all(8),
+      child: child,
+    );
+  }
+
+  Widget _row(String label, String value, {Color? valueColor, bool bold = false}) {
+    final c = context.colors;
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: TextStyle(fontSize: 12.5, color: c.inkMuted))),
+        const SizedBox(width: AppSpace.sm),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: bold ? FontWeight.bold : FontWeight.w600,
+            color: valueColor ?? c.ink,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoCard() {
+    return _card(
+      padding: const EdgeInsets.all(AppSpace.sm),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.control),
         child: ProductImageView(
           imagePath: _product.photoPath,
           width: double.infinity,
@@ -361,110 +449,69 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildBarcodeCard(bool isDark) {
-    return InkWell(
-      onTap: () => BarcodeModal.show(context, _product),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF131126) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+  Widget _buildBarcodeCard() {
+    final c = context.colors;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => BarcodeModal.show(context, _product),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: _card(
+          color: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: AppSpace.md),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpace.sm),
+                decoration: BoxDecoration(
+                  color: c.surfaceMuted,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.qr_code_rounded, size: 22, color: c.accent),
+              ),
+              const SizedBox(width: AppSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Código / SKU', style: TextStyle(fontSize: 11, color: c.inkMuted)),
+                    const SizedBox(height: 2),
+                    Text(
+                      _product.code,
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: c.ink),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 20, color: c.inkFaint),
+            ],
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B5CF6).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.qr_code_rounded, size: 22, color: Color(0xFF8B5CF6)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Código / SKU',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _product.code,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF8B5CF6)),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickActionsCard(bool isDark) {
-    return Container(
+  Widget _buildQuickActionsCard() {
+    return _card(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-        ),
-      ),
       child: Column(
         children: [
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                final sold = await QuickSaleDialog.show(context, _product);
-                if (sold == true) {
-                  _refreshProduct();
-                }
-              },
+            child: FilledButton.icon(
+              onPressed: _sell,
               icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
-              label: const Text(
-                'Registrar Venta',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B5CF6),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+              label: const Text('Registrar venta'),
             ),
           ),
           if (canEdit) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpace.sm),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: _showAdjustStockDialog,
                 icon: const Icon(Icons.tune_rounded, size: 17),
-                label: const Text('Ajustar Stock Físico', style: TextStyle(fontSize: 13)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                  side: BorderSide(
-                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
+                label: const Text('Ajustar stock físico'),
               ),
             ),
           ],
@@ -473,104 +520,172 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildHeaderBlock(bool isDark) {
+  Widget _buildHeaderBlock() {
+    final c = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF18152F) : const Color(0xFFF3E8FF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFE9D5FF),
-                ),
+                color: c.surfaceMuted,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(color: c.line),
               ),
               child: Text(
                 _product.category,
-                style: const TextStyle(
-                  color: Color(0xFF8B5CF6),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11.5,
-                ),
+                style: TextStyle(color: c.inkMuted, fontWeight: FontWeight.w600, fontSize: 11.5),
               ),
             ),
-            const SizedBox(width: 8),
             StockStatusBadge(product: _product),
           ],
         ),
         const SizedBox(height: 10),
         Text(
           _product.name,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-            height: 1.25,
-          ),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: c.ink, height: 1.25),
         ),
       ],
     );
   }
 
-  Widget _buildStockCard(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-        ),
-      ),
+  Widget _buildStockCard() {
+    final c = context.colors;
+    final variants = _product.variants;
+    final outOfStock = variants.where((v) => v.stock <= 0).length;
+    return _card(
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Inventario disponible', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                const SizedBox(height: 6),
+                Text(
+                  '${_product.stock} ${_product.stock == 1 ? 'unidad' : 'unidades'}',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: c.ink),
+                ),
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  _withVariants
+                      ? 'Suma de ${variants.length} ${variants.length == 1 ? 'variante' : 'variantes'}'
+                          '${outOfStock > 0 ? ' · $outOfStock agotada${outOfStock == 1 ? '' : 's'}' : ''}'
+                      : 'Alerta mínima: ${_product.minStock} unid.',
+                  style: TextStyle(fontSize: 11.5, color: c.inkMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpace.md),
+          FilledButton.icon(
+            onPressed: _sell,
+            icon: const Icon(Icons.shopping_bag_outlined, size: 17),
+            label: const Text('Vender'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tallas y colores, agrupados por talla, con la cantidad de cada uno
+  Widget _buildVariantsCard() {
+    final c = context.colors;
+    final groups = <String, List<ProductVariant>>{};
+    for (final v in _product.variants) {
+      groups.putIfAbsent(v.attributeValue.trim(), () => []).add(v);
+    }
+    final firstName = _product.variants.first.attributeName.trim();
+    final plural = switch (firstName.toLowerCase()) {
+      '' || 'talla' => 'Tallas',
+      'presentación' => 'Presentaciones',
+      _ => firstName,
+    };
+    final title = _product.variants.any((v) => v.hasSecondAttribute) ? '$plural y colores' : plural;
+
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Text(
-                'Inventario Disponible',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
+              Expanded(
+                child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink)),
               ),
-              const SizedBox(height: 6),
-              Text(
-                '${_product.stock} unidades',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+              if (canEdit)
+                TextButton.icon(
+                  onPressed: _showAdjustStockDialog,
+                  icon: const Icon(Icons.tune_rounded, size: 16),
+                  label: const Text('Ajustar'),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Alerta mínima configurada: ${_product.minStock} unid.',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
-              ),
             ],
           ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              final sold = await QuickSaleDialog.show(context, _product);
-              if (sold == true) {
-                _refreshProduct();
-              }
-            },
-            icon: const Icon(Icons.shopping_bag_outlined, size: 17),
-            label: const Text('Vender', style: TextStyle(fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          const SizedBox(height: AppSpace.sm),
+          for (final entry in groups.entries) ...[
+            if (entry.key.isNotEmpty && entry.value.any((v) => v.hasSecondAttribute))
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpace.sm, bottom: 6),
+                child: Text(
+                  '${firstName.isEmpty ? 'Talla' : firstName} ${entry.key} · '
+                  '${entry.value.fold<int>(0, (s, v) => s + v.stock)} u.',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.inkMuted),
+                ),
+              ),
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: [
+                for (final v in entry.value) _variantChip(v, showFirst: !v.hasSecondAttribute || entry.key.isEmpty),
+              ],
+            ),
+            const SizedBox(height: AppSpace.xs),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _variantChip(ProductVariant v, {required bool showFirst}) {
+    final c = context.colors;
+    final out = v.stock <= 0;
+    final name = showFirst ? v.label : (v.attribute2Value ?? '').trim();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: out ? c.dangerSoft : c.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: out ? c.danger.withOpacity(0.3) : c.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (ColorSwatchDot.hasSwatch(v.colorHex)) ...[
+            ColorSwatchDot(hex: v.colorHex, hex2: v.colorHex2, size: 16),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            name.isEmpty ? 'Sin nombre' : name,
+            style: TextStyle(fontSize: 12.5, color: c.ink, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(width: AppSpace.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: out ? c.danger : c.surface,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(
+              out ? 'Agotado' : '${v.stock}',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+                color: out ? Colors.white : c.ink,
+              ),
             ),
           ),
         ],
@@ -578,88 +693,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildPricingCard(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-        ),
-      ),
+  Widget _buildPricingCard() {
+    final c = context.colors;
+    return _card(
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Precio de Venta al Público (PVP)',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
+              Expanded(
+                child: Text('Precio de venta', style: TextStyle(fontSize: 13, color: c.inkMuted)),
               ),
               Text(
                 CurrencyFormatter.format(_product.salePrice),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF10B981),
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: c.ink),
               ),
             ],
           ),
           if (canViewCosts) ...[
-            Divider(height: 24, color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Costo de Compra',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                ),
-                Text(
-                  CurrencyFormatter.format(_product.purchasePrice),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13.5,
-                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                  ),
-                ),
-              ],
-            ),
+            Divider(height: 24, color: c.line),
+            _row('Costo de compra', CurrencyFormatter.format(_product.purchasePrice)),
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Ganancia por Unidad',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                ),
-                Text(
-                  '${CurrencyFormatter.format(_product.profit)} (${_product.profitMarginLabel(decimals: 1)})',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13.5,
-                    color: _product.profit >= 0 ? const Color(0xFF10B981) : Colors.red,
-                  ),
-                ),
-              ],
+            _row(
+              'Ganancia por unidad',
+              '${CurrencyFormatter.format(_product.profit)} (${_product.profitMarginLabel(decimals: 1)})',
+              valueColor: _product.profit >= 0 ? c.success : c.danger,
+              bold: true,
             ),
             if (_product.sellsBelowCost) ...[
               const SizedBox(height: 6),
-              const Align(
+              Align(
                 alignment: Alignment.centerRight,
                 child: Text(
                   'Por debajo del costo: cada venta deja pérdida',
-                  style: TextStyle(fontSize: 11.5, color: Colors.red),
+                  style: TextStyle(fontSize: 11.5, color: c.danger),
                 ),
               ),
             ],
@@ -669,122 +735,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildValuationCard({
-    required bool isDark,
-    required double totalCost,
-    required double totalSale,
-    required double totalProfit,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-        ),
-      ),
+  Widget _buildValuationCard() {
+    final c = context.colors;
+    final totalCost = _product.purchasePrice * _product.stock;
+    final totalSale = _product.salePrice * _product.stock;
+    return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Valorización Comercial de Existencias',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13.5,
-              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-            ),
+            'Valor del inventario',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink),
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Capital Invertido en Stock:',
-                style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-              ),
-              Text(
-                CurrencyFormatter.format(totalCost),
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12.5,
-                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Venta Total Estimada:',
-                style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-              ),
-              Text(
-                CurrencyFormatter.format(totalSale),
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12.5,
-                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Ganancia Proyectada:',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
-              ),
-              Text(
-                CurrencyFormatter.format(totalProfit),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.5,
-                  color: Color(0xFF10B981),
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: AppSpace.md),
+          _row('Invertido en stock', CurrencyFormatter.format(totalCost)),
+          const SizedBox(height: AppSpace.sm),
+          _row('Venta total estimada', CurrencyFormatter.format(totalSale)),
+          const SizedBox(height: AppSpace.sm),
+          _row('Ganancia proyectada', CurrencyFormatter.format(totalSale - totalCost),
+              valueColor: c.success, bold: true),
         ],
       ),
     );
   }
 
-  Widget _buildDescriptionCard(bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131126) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-        ),
-      ),
+  Widget _buildDescriptionCard() {
+    final c = context.colors;
+    return _card(
+      padding: const EdgeInsets.all(AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Descripción / Notas',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            ),
+            'Descripción / notas',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: c.inkMuted),
           ),
           const SizedBox(height: 6),
-          Text(
-            _product.description!,
-            style: TextStyle(
-              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF334155),
-              fontSize: 13,
-              height: 1.4,
-            ),
-          ),
+          Text(_product.description!, style: TextStyle(color: c.ink, fontSize: 13, height: 1.4)),
         ],
       ),
     );

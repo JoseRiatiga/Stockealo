@@ -1,3 +1,5 @@
+import '../../../reports/presentation/screens/reports_screen.dart';
+import '../../../reports/data/report_export_service.dart';
 import '../widgets/sales_summary_card.dart';
 import '../widgets/quotations_list_modal.dart';
 import '../../../../core/design/app_pagination.dart';
@@ -21,7 +23,6 @@ import '../../../auth/data/auth_repository.dart';
 import '../../models/sale.dart';
 import '../widgets/quick_sale_dialog.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
-import '../../../reports/data/excel_export_service.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
@@ -229,76 +230,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     }
   }
 
-  Future<void> _exportToExcel() async {
+    Future<void> _exportToExcel() async {
     final biz = ActiveBusinessScope.read(context);
-    if (biz == null) {
+    final user = AuthRepository.instance.currentUser;
+    if (biz == null || user == null) {
       AppToast.showWarning(context, 'No hay una empresa activa seleccionada.');
       return;
     }
-
-    final user = AuthRepository.instance.currentUser;
-    if (user == null) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: Card(
-          elevation: 6,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: Color(0xFF059669)),
-                SizedBox(height: 18),
-                Text(
-                  'Generando Excel (.xlsx)...',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Inventario, Ventas y Clientes',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    await ReportsScreen.open(
+      context,
+      business: biz,
+      userId: user.id,
+      userEmail: user.email,
+      initial: const {ReportSection.sales, ReportSection.profit},
     );
-
-    bool dialogClosed = false;
-    void closeDialog() {
-      if (!dialogClosed && mounted) {
-        dialogClosed = true;
-        Navigator.pop(context);
-      }
-    }
-
-    try {
-      await ExcelExportService.instance.exportBusinessData(
-        business: biz,
-        userId: user.id,
-        userEmail: user.email,
-        onGenerated: closeDialog,
-      );
-      closeDialog();
-      if (mounted) {
-        AppToast.showSuccess(
-          context,
-          'El archivo Excel (.xlsx) ha sido generado y compartido.',
-          title: 'Exportación Exitosa',
-        );
-      }
-    } catch (e) {
-      closeDialog();
-      if (mounted) {
-        final errorMsg = e.toString().replaceAll('Exception: ', '');
-        AppToast.showError(context, errorMsg);
-      }
-    }
   }
 
   Future<void> _openCashRegister() async {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'admin/admin_login_screen.dart';
@@ -13,6 +14,8 @@ import 'features/pro/data/pro_admin_service.dart';
 ///   flutter run -d chrome -t lib/main_admin.dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Fechas en español (las pantallas usan DateFormat con 'es_CO')
+  await initializeDateFormatting('es_CO', null);
   await SupabaseService.instance.initialize();
   runApp(const AdminApp());
 }

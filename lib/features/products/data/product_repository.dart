@@ -340,6 +340,58 @@ class ProductRepository {
     );
   }
 
+  /// Ajuste manual de un producto con tallas y colores: fija la cantidad de cada
+  /// variante y el total del producto queda como la suma de todas.
+  Future<void> adjustVariantStocks(Product product, Map<String, int> newStockByVariant, String reason) async {
+    final db = await _dbProvider.database;
+    final variants = await getVariantsForProduct(product.id);
+    if (variants.isEmpty) return;
+    final now = DateTime.now().toIso8601String();
+    final updated = [
+      for (final v in variants) v.copyWith(stock: newStockByVariant[v.id] ?? v.stock),
+    ];
+    final newTotal = updated.fold<int>(0, (s, v) => s + v.stock);
+    final changed = <String>[
+      for (var i = 0; i < variants.length; i++)
+        if (variants[i].stock != updated[i].stock) '${variants[i].label}: ${variants[i].stock} → ${updated[i].stock}',
+    ];
+    if (changed.isEmpty && newTotal == product.stock) return;
+    final diff = newTotal - product.stock;
+
+    await db.transaction((txn) async {
+      for (final v in updated) {
+        await txn.update('product_variants', {'stock': v.stock},
+            where: 'id = ? AND product_id = ?', whereArgs: [v.id, product.id]);
+      }
+      await txn.update('products', {'stock': newTotal, 'updated_at': now},
+          where: 'id = ? AND business_id = ?', whereArgs: [product.id, product.businessId]);
+      await txn.insert('stock_movements', {
+        'id': const Uuid().v4(),
+        'business_id': product.businessId,
+        'product_id': product.id,
+        'type': diff >= 0 ? 'AJUSTE' : 'MERMA',
+        'quantity': diff.abs(),
+        'resulting_stock': newTotal,
+        'reason': changed.isEmpty ? reason : '$reason (${changed.join(', ')})',
+        'date': now,
+      });
+    });
+
+    SupabaseService.instance.replaceVariantsInCloud(
+      product.id,
+      product.businessId,
+      [for (final v in updated) v.toMap()],
+    );
+    SupabaseService.instance.updateProductStockInCloud(product.id, newTotal);
+    final why = reason.trim().isEmpty ? '' : ' · ${reason.trim()}';
+    ActivityRepository.instance.log(
+      businessId: product.businessId,
+      action: diff < 0 ? ActivityAction.shrinkage : ActivityAction.stockAdjust,
+      summary: 'Ajustó ${product.name}: ${changed.join(', ')} (queda $newTotal)$why',
+      data: {'product_id': product.id, 'diff': diff},
+    );
+  }
+
   /// Obtener categorías de la empresa
   Future<List<Category>> getCategories(String businessId) async {
     final db = await _dbProvider.database;

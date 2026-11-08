@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/date_symbol_data_local.dart';
 import 'package:stockealo/admin/admin_team_page.dart';
 import 'package:stockealo/core/services/maintenance_service.dart';
 import 'package:stockealo/core/theme/app_theme.dart';
@@ -20,8 +19,17 @@ MaintenanceState _m(String state, int level, Set<String> scopes) => MaintenanceS
 Widget _app(Widget child) => MaterialApp(theme: AppTheme.build(Brightness.light), home: child);
 
 void main() {
-  setUpAll(() => initializeDateFormatting('es_CO'));
+  // A propósito SIN initializeDateFormatting: así arrancan el panel y las tiendas
+  // si alguien olvida cargarlo, y antes eso dejaba la pantalla en gris
   tearDown(() => MaintenanceService.instance.debugSet(MaintenanceState.none));
+
+  test('la hora se escribe en español sin depender de intl', () {
+    final now = DateTime(2026, 11, 8, 10);
+    expect(MaintenanceGate.when(DateTime(2026, 11, 8, 16, 5), now: now), 'hoy a las 4:05 p. m.');
+    expect(MaintenanceGate.when(DateTime(2026, 11, 12, 0, 30), now: now), '12 de noviembre a las 12:30 a. m.');
+    expect(MaintenanceGate.when(DateTime(2026, 11, 8, 12), now: now), 'hoy a las 12:00 p. m.');
+    expect(MaintenanceGate.when(null), '');
+  });
 
   group('estado del mantenimiento', () {
     test('cada nivel hace lo suyo', () {

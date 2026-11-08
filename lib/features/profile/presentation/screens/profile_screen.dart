@@ -1,3 +1,4 @@
+import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/design/phone_field.dart';
 import '../../../../core/design/pro_crown.dart';
@@ -22,7 +23,6 @@ import '../../../business/models/business.dart';
 import '../../../business/presentation/screens/business_info_screen.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
-import '../../../reports/data/excel_export_service.dart';
 import '../../../reports/presentation/widgets/excel_import_modal.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/theme/theme_controller.dart';
@@ -596,63 +596,9 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     }
   }
 
-  Future<void> _exportToExcel() async {
-    if (_activeBusiness == null || _user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay una empresa activa seleccionada.'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: Card(
-          elevation: 6,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: Color(0xFF059669)),
-                SizedBox(height: 18),
-                Text('Generando Excel (.xlsx)...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                SizedBox(height: 6),
-                Text('Inventario, Ventas y Clientes', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    bool dialogClosed = false;
-    void closeDialog() {
-      if (!dialogClosed && mounted) {
-        dialogClosed = true;
-        Navigator.pop(context);
-      }
-    }
-
-    try {
-      await ExcelExportService.instance.exportBusinessData(
-        business: _activeBusiness!,
-        userId: _user!.id,
-        userEmail: _user!.email,
-        onGenerated: closeDialog,
-      );
-      closeDialog();
-    } catch (e) {
-      closeDialog();
-      if (mounted) {
-        final errorMsg = e.toString().replaceAll('Exception: ', '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red, duration: const Duration(seconds: 4)),
-        );
-      }
-    }
+    Future<void> _exportToExcel() async {
+    if (_activeBusiness == null || _user == null) return;
+    await ReportsScreen.open(context, business: _activeBusiness!, userId: _user!.id, userEmail: _user!.email);
   }
 
   void _openExcelImport() {
@@ -1282,8 +1228,8 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           ),
           SettingsRow(
             icon: Icons.file_download_outlined,
-            title: 'Exportar a Excel',
-            subtitle: 'Inventario, ventas y clientes',
+            title: 'Reportes en Excel',
+            subtitle: 'Elige qué descargar: inventario, ventas, clientes, movimientos o ganancias',
             onTap: _exportToExcel,
           ),
         ]),

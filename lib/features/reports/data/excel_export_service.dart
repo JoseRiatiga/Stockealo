@@ -198,7 +198,9 @@ class ExcelExportService {
     }
 
     // Guardar archivo y compartir
-    final fileBytes = excel.save();
+    // encode() y no save(): en la web save() además descarga solo un "FlutterExcel.xlsx",
+    // y el reporte salía dos veces
+    final fileBytes = excel.encode();
     if (fileBytes == null) {
       throw Exception('No se pudo generar el archivo de Excel.');
     }

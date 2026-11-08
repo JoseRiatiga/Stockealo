@@ -228,6 +228,7 @@ class ProService {
 
   @visibleForTesting
   static String checkoutErrorMessage(String code) {
+    if (code.contains('maintenance')) return 'Los pagos están en pausa por mantenimiento. Inténtalo en un rato.';
     if (code.contains('not_allowed')) return 'Solo el dueño o un administrador del negocio puede comprar Pro.';
     if (code.contains('currency_not_supported')) return 'El pago en línea por ahora es solo en pesos colombianos.';
     if (code.contains('payments_not_configured')) return 'El pago en línea no está disponible ahora. Usa Nequi.';

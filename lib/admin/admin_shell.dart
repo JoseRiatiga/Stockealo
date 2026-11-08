@@ -8,15 +8,23 @@ import 'admin_stores_page.dart';
 import 'admin_subscriptions_page.dart';
 import 'admin_summary_page.dart';
 import 'admin_users_page.dart';
+import 'admin_maintenance_page.dart';
+import 'admin_search_dialog.dart';
+import 'admin_team_page.dart';
+import '../features/pro/data/pro_admin_service.dart';
+import 'admin_businesses_page.dart';
 
 /// Secciones del panel
 enum AdminSection {
   summary('Resumen', Icons.dashboard_outlined),
   users('Usuarios', Icons.people_outline_rounded),
+  businesses('Negocios', Icons.store_mall_directory_outlined),
   stores('Tiendas', Icons.storefront_outlined),
   subscriptions('Suscripciones', Icons.workspace_premium_outlined),
   payments('Pagos', Icons.payments_outlined),
   codes('Códigos', Icons.confirmation_number_outlined),
+  maintenance('Mantenimiento', Icons.construction_rounded),
+  team('Equipo y registro', Icons.badge_outlined),
   config('Configuración', Icons.tune_rounded);
 
   final String label;
@@ -44,12 +52,24 @@ class _AdminShellState extends State<AdminShell> {
   Widget _page() => switch (_section) {
         AdminSection.summary => AdminSummaryPage(onOpen: _go),
         AdminSection.users => const AdminUsersPage(),
+        AdminSection.businesses => const AdminBusinessesPage(),
         AdminSection.stores => const AdminStoresPage(),
         AdminSection.subscriptions => const AdminSubscriptionsPage(),
         AdminSection.payments => const AdminPaymentsPage(),
         AdminSection.codes => const AdminCodesPage(),
+        AdminSection.maintenance => const AdminMaintenancePage(),
+        AdminSection.team => const AdminTeamPage(),
         AdminSection.config => const AdminConfigPage(),
       };
+
+  @override
+  void initState() {
+    super.initState();
+    // El rol decide qué botones se ven (el servidor igual lo hace cumplir)
+    ProAdminService.instance.loadMe();
+  }
+
+  void _search() => AdminSearchDialog.show(context, onOpenSection: _go);
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +78,10 @@ class _AdminShellState extends State<AdminShell> {
     final menu = _Menu(selected: _section, email: widget.email, onSelect: (s) {
       _go(s);
       if (!wide) Navigator.of(context).maybePop();
-    }, onSignOut: widget.onSignOut);
+    }, onSignOut: widget.onSignOut, onSearch: () {
+      if (!wide) Navigator.of(context).maybePop();
+      _search();
+    });
 
     return Scaffold(
       backgroundColor: c.paper,
@@ -67,6 +90,9 @@ class _AdminShellState extends State<AdminShell> {
           : AppBar(
               title: Text('Stockealo · ${_section.label}'),
               backgroundColor: c.paper,
+              actions: [
+                IconButton(tooltip: 'Buscar', onPressed: _search, icon: const Icon(Icons.search_rounded)),
+              ],
             ),
       drawer: wide ? null : Drawer(backgroundColor: c.surface, child: SafeArea(child: menu)),
       body: wide
@@ -90,8 +116,15 @@ class _Menu extends StatelessWidget {
   final String email;
   final ValueChanged<AdminSection> onSelect;
   final VoidCallback onSignOut;
+  final VoidCallback onSearch;
 
-  const _Menu({required this.selected, required this.email, required this.onSelect, required this.onSignOut});
+  const _Menu({
+    required this.selected,
+    required this.email,
+    required this.onSelect,
+    required this.onSignOut,
+    required this.onSearch,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +142,20 @@ class _Menu extends StatelessWidget {
             ],
           ),
         ),
+        // Búsqueda global: correo, negocio, código Pro o referencia de pago
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpace.sm, 0, AppSpace.sm, AppSpace.sm),
+          child: OutlinedButton.icon(
+            onPressed: onSearch,
+            icon: const Icon(Icons.search_rounded, size: 18),
+            label: const Align(alignment: Alignment.centerLeft, child: Text('Buscar…')),
+            style: OutlinedButton.styleFrom(foregroundColor: c.inkMuted, alignment: Alignment.centerLeft),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
         for (final s in AdminSection.values)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 2),
@@ -135,7 +182,9 @@ class _Menu extends StatelessWidget {
               ),
             ),
           ),
-        const Spacer(),
+            ],
+          ),
+        ),
         Divider(height: 1, color: c.line),
         Padding(
           padding: const EdgeInsets.all(AppSpace.lg),
@@ -143,6 +192,13 @@ class _Menu extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(email, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+              ValueListenableBuilder<String>(
+                valueListenable: ProAdminService.instance.role,
+                builder: (context, role, _) => Text(
+                  switch (role) { 'OWNER' => 'Dueño', 'SUPPORT' => 'Soporte', _ => 'Solo lectura' },
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.inkFaint),
+                ),
+              ),
               const SizedBox(height: AppSpace.sm),
               OutlinedButton.icon(
                 onPressed: onSignOut,

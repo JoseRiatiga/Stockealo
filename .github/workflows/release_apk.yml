@@ -69,8 +69,12 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Mejoras
-            - **Categorías:** ventana nueva para crear y renombrar, con el diseño de la app. Ya no se repiten categorías con distinta escritura ("ropa" y "Ropa").
-            - **Fiado sin cliente:** el aviso ahora aparece junto al campo del cliente, en rojo, para que no pase desapercibido.
+            ### Mantenimientos sin perder ventas
+            - Si Stockealo programa un mantenimiento, verás un aviso con el horario.
+            - Durante la mayoría de mantenimientos **puedes seguir vendiendo**: todo se guarda en tu equipo y se sube solo al terminar.
+
+            ### Correcciones
+            - Descargar el reporte de Excel en el computador ya no baja dos archivos iguales.
+            - Los botones que todavía no se pueden tocar ahora se ven apagados.
           draft: false
           prerelease: false

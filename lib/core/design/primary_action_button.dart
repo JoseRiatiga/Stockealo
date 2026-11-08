@@ -21,10 +21,15 @@ class PrimaryActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     const radius = BorderRadius.all(Radius.circular(AppRadius.sheet));
+    final enabled = onPressed != null;
     return Semantics(
       button: true,
+      enabled: enabled,
       label: label,
-      child: GlassSurface(
+      // Apagado se ve apagado: antes se veía igual y parecía que no respondía
+      child: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: GlassSurface(
         tint: c.accent,
         borderRadius: radius,
         child: Material(
@@ -58,6 +63,7 @@ class PrimaryActionButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

@@ -17,6 +17,7 @@
 //
 // Secretos: WOMPI_INTEGRITY_SECRET
 // Ajustes (pro_settings): wompi_public_key
+// Mantenimiento (get_maintenance): con "payments" activo en nivel 2 o 3 responde { error: "maintenance" }
 // Variables provistas por Supabase: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -71,6 +72,15 @@ Deno.serve(async (req) => {
   const businessId = typeof body.business_id === "string" ? body.business_id : "";
   const planId = typeof body.plan_id === "string" ? body.plan_id : "";
   if (!businessId || !planId) return json({ error: "bad_request" }, 400);
+
+  // Mantenimiento con los pagos en pausa (nivel 2 o 3): nadie paga mientras tanto,
+  // salvo los administradores, que deben poder probar antes de reabrir
+  const { data: maintenance } = await admin.rpc("get_maintenance");
+  const m = maintenance as { state?: string; level?: number; scopes?: string[] } | null;
+  if (m?.state === "active" && (m.level ?? 0) >= 2 && (m.scopes ?? []).includes("payments")) {
+    const { data: isAdminRow } = await admin.from("app_admins").select("email").ilike("email", emailPattern).maybeSingle();
+    if (!isAdminRow) return json({ error: "maintenance" }, 503);
+  }
 
   const { data: plan } = await admin
     .from("pro_plans")

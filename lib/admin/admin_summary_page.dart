@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_tokens.dart';
 import '../features/pro/data/pro_admin_service.dart';
+import 'admin_health_section.dart';
+import 'admin_usage_section.dart';
 import 'admin_shell.dart';
 import 'admin_widgets.dart';
 
@@ -18,6 +20,9 @@ class AdminSummaryPage extends StatefulWidget {
 class _AdminSummaryPageState extends State<AdminSummaryPage> {
   AdminSummary? _summary;
   AdminConfig? _config;
+  AdminHealth? _health;
+  Map<String, Map<String, dynamic>> _contacts = const {};
+  String? _healthError;
   bool _loading = true;
   String? _error;
 
@@ -34,6 +39,20 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
     });
     try {
       final admin = ProAdminService.instance;
+      // La salud va aparte: si falla, el resto del resumen se ve igual
+      admin.contacts().then((m) {
+        if (mounted) setState(() => _contacts = m);
+      }, onError: (Object _) {});
+      admin.health().then((h) {
+        if (mounted) {
+          setState(() {
+            _health = h;
+            _healthError = null;
+          });
+        }
+      }, onError: (Object e) {
+        if (mounted) setState(() => _healthError = '$e');
+      });
       final results = await Future.wait([admin.summary(), admin.config()]);
       if (!mounted) return;
       setState(() {
@@ -72,7 +91,7 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
                     _Tile('Cuentas', '${s.usersTotal}', '+${s.users7d} esta semana · +${s.users30d} en 30 días',
                         Icons.people_outline_rounded, () => widget.onOpen(AdminSection.users)),
                     _Tile('Negocios', '${s.businessesTotal}', '${s.businessesPro} con Pro', Icons.store_mall_directory_outlined,
-                        null),
+                        () => widget.onOpen(AdminSection.businesses)),
                     _Tile('Suscripciones activas', '${s.subscriptionsActive}', '${s.redemptions30d} canjes en 30 días',
                         Icons.workspace_premium_outlined, () => widget.onOpen(AdminSection.subscriptions)),
                     _Tile('Códigos sin usar', '${s.codesUnused}', 'Listos para entregar', Icons.confirmation_number_outlined,
@@ -88,6 +107,14 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
                   );
                 },
               ),
+              if (_health != null)
+                AdminHealthSection(health: _health!, contacts: _contacts)
+              else if (_healthError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpace.lg),
+                  child: Text('Salud de Stockealo: $_healthError', style: TextStyle(fontSize: 12.5, color: c.inkFaint)),
+                ),
+              const AdminUsageSection(),
             ],
     );
   }

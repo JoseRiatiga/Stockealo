@@ -69,13 +69,12 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Elige cualquier color, sin códigos
-            - **Más colores:** arrastra las barras de tono, intensidad y claridad hasta dar con el color exacto.
-            - **De la foto:** toca la prenda en la foto del producto y se toma ese color.
-            - **Tomar de la pantalla** (Chrome o Edge en el computador): haz clic en cualquier parte, por ejemplo en la foto de la tienda donde compraste.
-            - La app propone el nombre del color más parecido, y al cambiar la muestra de un color de la paleta el nombre se actualiza.
+            ### Colores con nombre de verdad
+            - Escribe el nombre y la muestra se pone sola: "Rojo", "Gris oscuro", "Verde menta"…
+            - ¿Nombre propio, como "Azul bajito"? La app lo marca como **nombre personalizado** y te propone una muestra parecida, que puedes cambiar.
+            - Al elegir el color con las barras, la foto, la pantalla o el código, el nombre sale por su tono y claridad (Gris, Verde oscuro, Mostaza…).
 
-            ### Fotos desde un enlace
-            - Si la tienda (como Shein) no deja leer su página, la app te lo dice y te explica cómo traer la foto con un recorte de pantalla.
+            ### Correcciones
+            - En "Opciones avanzadas", el título del código del color ya no se ve cortado.
           draft: false
           prerelease: false

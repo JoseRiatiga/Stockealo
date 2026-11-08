@@ -313,23 +313,127 @@ class VariantEditorController extends ChangeNotifier {
     'Lila': '#B39DDB',
   };
 
-  /// Nombre del color de la paleta más parecido ("#B71C1C" → "Rojo"), para proponer
-  /// un nombre cuando eligen el color con las barras, la foto o el gotero
-  static String nearestPaletteName(Color color) {
-    String best = palette.keys.first;
-    var bestDistance = double.infinity;
-    for (final e in palette.entries) {
-      final p = Color(int.parse('FF${e.value.substring(1)}', radix: 16));
-      // Distancia "redmean": se parece más a como el ojo compara colores que la recta
-      final rMean = (color.red + p.red) / 2;
-      final dr = (color.red - p.red).toDouble(), dg = (color.green - p.green).toDouble(), db = (color.blue - p.blue).toDouble();
-      final d = (2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db;
-      if (d < bestDistance) {
-        bestDistance = d;
-        best = e.key;
+  /// Nombre en español para cualquier color, por su tono, qué tan vivo es y qué
+  /// tan claro u oscuro ("#6F6E6C" → "Gris", "#0B6623" → "Verde oscuro"). Se usa
+  /// cuando eligen el color con las barras, la foto, el gotero o el código.
+  static String colorNameFor(Color color) {
+    final hsl = HSLColor.fromColor(color);
+    final h = hsl.hue, s = hsl.saturation, l = hsl.lightness;
+
+    // Sin color: blancos, grises y negros
+    if (l >= 0.93) return 'Blanco';
+    if (l <= 0.13) return 'Negro';
+    if (s < 0.12 || (s < 0.2 && (l < 0.25 || l > 0.85))) {
+      if (l > 0.75) return 'Gris claro';
+      if (l < 0.35) return 'Gris oscuro';
+      return 'Gris';
+    }
+
+    String shade(String base, {String? light, String? dark}) {
+      if (l > 0.70) return light ?? '$base claro';
+      if (l <= 0.30) return dark ?? '$base oscuro';
+      return base;
+    }
+
+    // Tonos cálidos con poca luz o poco color: cafés, beiges y mostaza
+    if (h >= 15 && h < 50) {
+      if (l > 0.78 && s < 0.65) return 'Beige';
+      // Muy oscuro, apagado, u oscuro sin ser intenso: café. El mostaza es oscuro
+      // pero muy vivo, así que sigue de largo
+      if (l < 0.3 || s < 0.45 || (l < 0.45 && s < 0.75)) return 'Café';
+    }
+    if (h < 15 || h >= 345) {
+      if (l <= 0.32) return 'Vinotinto';
+      return shade('Rojo', light: 'Rosado');
+    }
+    if (h < 40) return shade('Naranja');
+    if (h < 65) return l < 0.42 ? 'Mostaza' : shade('Amarillo');
+    if (h < 150) return shade('Verde');
+    if (h < 175) return l > 0.65 ? 'Verde menta' : shade('Turquesa');
+    if (h < 195) return shade('Turquesa');
+    if (h < 250) return shade('Azul', light: 'Azul cielo');
+    if (h < 290) return shade('Morado', light: 'Lila');
+    // 290–345: rosados, fucsias y vinotintos
+    if (l <= 0.32) return 'Vinotinto';
+    if (s > 0.6 && l < 0.6) return 'Fucsia';
+    return 'Rosado';
+  }
+
+  /// Todos los nombres que pone la app sola (paleta y [colorNameFor])
+  static final Set<String> _autoNames = {
+    for (final k in palette.keys) k.toLowerCase(),
+    'multicolor', 'gris claro', 'gris oscuro', 'mostaza', 'turquesa',
+    for (final base in ['naranja', 'amarillo', 'verde', 'turquesa', 'azul', 'morado', 'rojo'])
+      for (final mod in ['claro', 'oscuro']) '$base $mod',
+  };
+
+  /// Colores base por nombre, para poner la muestra cuando escriben el nombre
+  static const _baseByName = <String, String>{
+    'verde menta': '#98D8C8',
+    'azul cielo': '#81D4FA',
+    'azul oscuro': '#1A237E',
+    'blanco': '#FFFFFF',
+    'negro': '#1F1D18',
+    'gris': '#9E9E9E',
+    'plateado': '#C0C0C0',
+    'beige': '#E8D9B5',
+    'crema': '#F3E5C0',
+    'café': '#6D4C41',
+    'cafe': '#6D4C41',
+    'marrón': '#6D4C41',
+    'marron': '#6D4C41',
+    'mostaza': '#B8860B',
+    'dorado': '#D4AF37',
+    'rojo': '#C62828',
+    'vinotinto': '#7B1E3A',
+    'vino': '#7B1E3A',
+    'rosado': '#F48FB1',
+    'rosa': '#F48FB1',
+    'fucsia': '#D81B60',
+    'naranja': '#EF6C00',
+    'amarillo': '#FBC02D',
+    'verde': '#2E7D32',
+    'turquesa': '#00ACC1',
+    'celeste': '#81D4FA',
+    'azul': '#1565C0',
+    'morado': '#6A1B9A',
+    'lila': '#B39DDB',
+  };
+
+  static const _lighter = ['claro', 'clarito', 'bajito', 'pastel', 'suave', 'palo'];
+  static const _darker = ['oscuro', 'oscurito', 'fuerte', 'profundo', 'intenso'];
+
+  /// La muestra que corresponde a un nombre escrito. `exact` es true si el nombre es
+  /// uno que la app conoce tal cual ("Rojo", "Gris oscuro"); false si es un nombre
+  /// propio con un color reconocible dentro ("Azul bajito" → un azul claro).
+  /// null si no reconoce ningún color ("Pepito").
+  static ({String hex, bool exact})? swatchForName(String raw) {
+    final n = raw.trim().toLowerCase();
+    if (n.isEmpty) return null;
+    if (n == 'multicolor' || n == 'estampado') return (hex: ProductVariant.multicolor, exact: true);
+    final exactKnown = isPaletteName(n) && !n.contains(' con ');
+
+    // El color base: primero los nombres compuestos ("verde menta" antes que "verde")
+    final keys = _baseByName.keys.toList()..sort((a, b) => b.length.compareTo(a.length));
+    String? base;
+    for (final k in keys) {
+      if (RegExp('(^|\\s)${RegExp.escape(k)}(\\s|\$)').hasMatch(n)) {
+        base = k;
+        break;
       }
     }
-    return best;
+    if (base == null) return null;
+    var hsl = HSLColor.fromColor(Color(int.parse('FF${_baseByName[base]!.substring(1)}', radix: 16)));
+    final words = n.split(RegExp(r'\s+'));
+    final compound = base.contains(' '); // "azul cielo" ya trae su claridad
+    if (!compound && words.any(_lighter.contains)) {
+      hsl = hsl.withLightness((hsl.lightness + 0.25).clamp(0.0, 0.88));
+    } else if (!compound && words.any(_darker.contains)) {
+      hsl = hsl.withLightness((hsl.lightness - 0.18).clamp(0.12, 1.0));
+    }
+    final c = hsl.toColor();
+    final hex = '#${(c.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+    return (hex: hex, exact: exactKnown);
   }
 
   /// Nombre puesto por la paleta ("Rojo", "Blanco con rojo", "Multicolor") y no
@@ -337,7 +441,7 @@ class VariantEditorController extends ChangeNotifier {
   static bool isPaletteName(String raw) {
     final n = raw.trim().toLowerCase();
     if (n.isEmpty) return true;
-    final names = {for (final k in palette.keys) k.toLowerCase(), 'multicolor'};
+    final names = _autoNames;
     if (names.contains(n)) return true;
     final parts = n.split(' con ');
     return parts.length == 2 && names.contains(parts[0].trim()) && names.contains(parts[1].trim());
@@ -758,6 +862,10 @@ class _ColorDialogState extends State<_ColorDialog> {
   late bool _twoTones = widget.initial?.hex2 != null;
   bool _nameTouched = false;
 
+  /// La muestra la eligió el dueño a mano para un nombre propio: ya no se cambia
+  /// sola al seguir escribiendo el nombre
+  bool _swatchPinned = false;
+
   /// Qué muestra tiene abiertas las barras de "Más colores" (primera o segunda)
   TextEditingController? _slidersFor;
 
@@ -767,6 +875,9 @@ class _ColorDialogState extends State<_ColorDialog> {
   void initState() {
     super.initState();
     _nameTouched = widget.initial != null;
+    // Al editar un color con nombre propio, su muestra ya fue elegida: se respeta
+    final initial = widget.initial;
+    _swatchPinned = initial != null && !VariantEditorController.isPaletteName(initial.name);
   }
 
   @override
@@ -777,30 +888,66 @@ class _ColorDialogState extends State<_ColorDialog> {
     super.dispose();
   }
 
+  /// Al escribir el nombre se pone la muestra que le corresponde ("Rojo" → rojo,
+  /// "Azul bajito" → un azul claro), salvo que el dueño ya la haya elegido a mano
+  void _nameChanged(String value) {
+    setState(() {
+      _nameTouched = true;
+      if (_swatchPinned) return;
+      final match = VariantEditorController.swatchForName(value);
+      if (match == null) return;
+      if (match.hex == ProductVariant.multicolor) {
+        _multi = true;
+      } else {
+        _multi = false;
+        _hex.text = match.hex.replaceFirst('#', '');
+      }
+    });
+  }
+
+  /// "Nombre personalizado" cuando el nombre no es uno de los que la app conoce
+  String? get _customNameHint {
+    final name = _name.text.trim();
+    if (name.isEmpty || VariantEditorController.isPaletteName(name)) return null;
+    if (_swatchPinned) return 'Nombre personalizado';
+    final match = VariantEditorController.swatchForName(name);
+    return match == null
+        ? 'Nombre personalizado: elige la muestra abajo'
+        : 'Nombre personalizado: pusimos una muestra parecida, cámbiala si quieres';
+  }
+
   void _pick(TextEditingController target, String name, String hex) {
     setState(() {
+      // Con un nombre propio, elegir la muestra la deja fija
+      if (_nameTouched && !VariantEditorController.isPaletteName(_name.text)) _swatchPinned = true;
       _multi = false;
       target.text = hex.replaceFirst('#', '');
       // El nombre sigue a la paleta salvo que el dueño haya escrito uno propio
       // ("Vinotinto clarito"): así, al cambiar la muestra de un color ya creado,
       // "Rojo" pasa a "Café" en vez de quedar con el nombre viejo
-      if (_nameTouched && !VariantEditorController.isPaletteName(_name.text)) return;
-      final current = _name.text.trim();
-      if (target == _hex) {
-        final second = current.contains(' con ') ? current.split(' con ').last.trim() : null;
-        _name.text = (_twoTones && second != null) ? '$name con $second' : name;
-      } else {
-        final first = current.contains(' con ') ? current.split(' con ').first.trim() : current;
-        _name.text = first.isEmpty ? name : '$first con ${name.toLowerCase()}';
-      }
+      _proposeName(target, name);
     });
+  }
+
+  /// Pone el nombre del color salvo que el dueño haya escrito uno propio. Con dos
+  /// tonos arma "Blanco con rojo".
+  void _proposeName(TextEditingController target, String name) {
+    if (_nameTouched && !VariantEditorController.isPaletteName(_name.text)) return;
+    final current = _name.text.trim();
+    if (target == _hex) {
+      final second = current.contains(' con ') ? current.split(' con ').last.trim() : null;
+      _name.text = (_twoTones && second != null) ? '$name con $second' : name;
+    } else {
+      final first = current.contains(' con ') ? current.split(' con ').first.trim() : current;
+      _name.text = first.isEmpty ? name : '$first con ${name.toLowerCase()}';
+    }
   }
 
   /// Color elegido con las barras, la foto o el gotero (no de la paleta): el nombre
   /// propuesto es el del color de la paleta más parecido
   void _setColor(TextEditingController target, Color color) {
     final hex = '#${(color.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
-    _pick(target, VariantEditorController.nearestPaletteName(color), hex);
+    _pick(target, VariantEditorController.colorNameFor(color), hex);
   }
 
   Color? _colorOf(TextEditingController target) {
@@ -899,7 +1046,13 @@ class _ColorDialogState extends State<_ColorDialog> {
             counterText: '',
             isDense: true,
           ),
-          onChanged: (_) => setState(() => _multi = false),
+          onChanged: (v) => setState(() {
+            _multi = false;
+            final hex = ProductVariant.validHex(v);
+            if (hex != null) {
+              _proposeName(ctrl, VariantEditorController.colorNameFor(Color(int.parse('FF${hex.substring(1)}', radix: 16))));
+            }
+          }),
         );
 
     final canSave = _name.text.trim().isNotEmpty;
@@ -948,11 +1101,14 @@ class _ColorDialogState extends State<_ColorDialog> {
                     child: TextField(
                       controller: _name,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Nombre del color',
-                        hintText: 'Ej. Rojo, Vinotinto, Blanco con rojo',
+                        hintText: 'Ej. Rojo, Azul bajito, Blanco con rojo',
+                        helperText: _customNameHint,
+                        helperMaxLines: 2,
+                        helperStyle: TextStyle(fontSize: 11.5, color: c.inkMuted),
                       ),
-                      onChanged: (_) => setState(() => _nameTouched = true),
+                      onChanged: _nameChanged,
                     ),
                   ),
                 ],
@@ -990,7 +1146,9 @@ class _ColorDialogState extends State<_ColorDialog> {
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
                   tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(bottom: AppSpace.sm),
+                  // Arriba hay que dejar sitio a la etiqueta flotante del campo: sin él,
+                  // "Código del color (hexadecimal)" quedaba cortada contra el título
+                  childrenPadding: const EdgeInsets.only(top: AppSpace.lg, bottom: AppSpace.sm),
                   initiallyExpanded: false,
                   title: Text('Opciones avanzadas', style: TextStyle(fontSize: 13, color: c.inkMuted)),
                   children: [

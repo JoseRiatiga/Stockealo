@@ -248,11 +248,25 @@ void main() {
       c.dispose();
     });
 
-    test('propone el nombre del color de la paleta más parecido', () {
-      expect(VariantEditorController.nearestPaletteName(const Color(0xFFB71C1C)), 'Rojo');
-      expect(VariantEditorController.nearestPaletteName(const Color(0xFF0D47A1)), 'Azul');
-      expect(VariantEditorController.nearestPaletteName(const Color(0xFFF5F5F5)), 'Blanco');
-      expect(VariantEditorController.nearestPaletteName(const Color(0xFF5D4037)), 'Café');
+    test('cada color de la paleta recibe su propio nombre', () {
+      for (final e in VariantEditorController.palette.entries) {
+        final color = Color(int.parse('FF${e.value.substring(1)}', radix: 16));
+        expect(VariantEditorController.colorNameFor(color), e.key, reason: e.value);
+      }
+    });
+
+    test('nombra cualquier color: grises, claros y oscuros', () {
+      String name(int argb) => VariantEditorController.colorNameFor(Color(argb));
+      expect(name(0xFF6F6E6C), 'Gris'); // el de la captura salía "Café"
+      expect(name(0xFFD0D0D0), 'Gris claro');
+      expect(name(0xFF3A3A3A), 'Gris oscuro');
+      expect(name(0xFF0B6623), 'Verde oscuro');
+      expect(name(0xFFA5D6A7), 'Verde claro');
+      expect(name(0xFFFA3838), 'Rojo'); // el código de la otra captura
+      expect(name(0xFF8D6E63), 'Café');
+      expect(name(0xFFB8860B), 'Mostaza');
+      expect(name(0xFF00838F), 'Turquesa oscuro');
+      expect(name(0xFF26C6DA), 'Turquesa');
     });
 
     test('el color de la foto es el promedio alrededor del toque', () {
@@ -296,8 +310,106 @@ void main() {
 
       final color = c.colorsOf('M').single;
       expect(color.hex, isNotNull);
-      expect(color.name, anyOf('Azul', 'Azul cielo', 'Azul oscuro'));
+      expect(color.name, anyOf('Azul', 'Azul cielo', 'Azul oscuro', 'Turquesa'));
       expect(tester.takeException(), isNull);
+      c.dispose();
+    });
+
+    testWidgets('en opciones avanzadas la etiqueta del código no queda cortada', (tester) async {
+      tester.view.physicalSize = const Size(360, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final c = VariantEditorController()..setSizes(['M']);
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.build(Brightness.light),
+        home: Scaffold(body: SingleChildScrollView(child: VariantEditor(controller: c))),
+      ));
+      await tester.tap(find.text('Color'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Rojo').first); // con valor, la etiqueta flota arriba
+      await tester.pump();
+      await tester.tap(find.text('Opciones avanzadas'));
+      await tester.pumpAndSettle();
+
+      // La fila del título recorta lo que se le meta encima: la etiqueta flotante
+      // tiene que quedar completa debajo de ella
+      final header = tester.getRect(find.ancestor(of: find.text('Opciones avanzadas'), matching: find.byType(ListTile)));
+      final label = tester.getRect(find.text('Código del color (hexadecimal)'));
+      expect(label.top, greaterThanOrEqualTo(header.bottom));
+      c.dispose();
+    });
+
+    testWidgets('al escribir el código, el nombre también cambia', (tester) async {
+      tester.view.physicalSize = const Size(360, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final c = VariantEditorController()..setSizes(['M']);
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.build(Brightness.light),
+        home: Scaffold(body: SingleChildScrollView(child: VariantEditor(controller: c))),
+      ));
+      await tester.tap(find.text('Color'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Opciones avanzadas'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Código del color (hexadecimal)'), '0B6623');
+      await tester.pump();
+      expect(find.widgetWithText(TextField, 'Verde oscuro'), findsOneWidget);
+      c.dispose();
+    });
+
+    test('del nombre a la muestra: conocidos, personalizados y sin pista', () {
+      final rojo = VariantEditorController.swatchForName('Rojo')!;
+      expect(rojo.hex, '#C62828');
+      expect(rojo.exact, isTrue);
+      expect(VariantEditorController.swatchForName('gris oscuro')!.exact, isTrue);
+      expect(VariantEditorController.swatchForName('Verde menta')!.hex, '#98D8C8');
+
+      final bajito = VariantEditorController.swatchForName('Azul bajito')!;
+      expect(bajito.exact, isFalse); // nombre propio
+      final azul = HSLColor.fromColor(const Color(0xFF1565C0));
+      final claro = HSLColor.fromColor(Color(int.parse('FF${bajito.hex.substring(1)}', radix: 16)));
+      expect(claro.lightness, greaterThan(azul.lightness)); // "bajito" = más claro
+      expect(VariantEditorController.colorNameFor(Color(int.parse('FF${bajito.hex.substring(1)}', radix: 16))),
+          startsWith('Azul'));
+
+      expect(VariantEditorController.swatchForName('Pepito'), isNull);
+      expect(VariantEditorController.swatchForName('Estampado')!.hex, 'multi');
+    });
+
+    testWidgets('escribir el nombre pone la muestra y marca los nombres personalizados', (tester) async {
+      tester.view.physicalSize = const Size(360, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final c = VariantEditorController()..setSizes(['M']);
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.build(Brightness.light),
+        home: Scaffold(body: SingleChildScrollView(child: VariantEditor(controller: c))),
+      ));
+      await tester.tap(find.text('Color'));
+      await tester.pumpAndSettle();
+      final nameField = find.widgetWithText(TextField, 'Nombre del color');
+
+      await tester.enterText(nameField, 'Rojo');
+      await tester.pump();
+      expect(find.textContaining('Nombre personalizado'), findsNothing);
+
+      await tester.enterText(nameField, 'Azul bajito');
+      await tester.pump();
+      expect(find.textContaining('Nombre personalizado: pusimos una muestra parecida'), findsOneWidget);
+
+      // Elegir la muestra a mano la deja fija aunque se siga escribiendo
+      await tester.tap(find.byTooltip('Lila').first);
+      await tester.pump();
+      await tester.enterText(nameField, 'Azul bajito de verano');
+      await tester.pump();
+      expect(find.text('Nombre personalizado'), findsOneWidget);
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      final color = c.colorsOf('M').single;
+      expect(color.name, 'Azul bajito de verano');
+      expect(color.hex, '#B39DDB');
+
       c.dispose();
     });
 
@@ -305,6 +417,7 @@ void main() {
       expect(VariantEditorController.isPaletteName('Rojo'), isTrue);
       expect(VariantEditorController.isPaletteName('blanco con rojo'), isTrue);
       expect(VariantEditorController.isPaletteName('Vinotinto clarito'), isFalse);
+      expect(VariantEditorController.isPaletteName('Gris oscuro'), isTrue); // puesto por la app
     });
 
     testWidgets('al cambiar la muestra de un color ya creado, el nombre la sigue', (tester) async {

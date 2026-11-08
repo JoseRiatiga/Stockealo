@@ -443,6 +443,84 @@ class ProAdminService {
   Future<List<AdminBusiness>> findBusinesses(String search) async =>
       _rows(await _rpc('admin_find_businesses', {'p_search': search})).map(AdminBusiness.fromRow).toList();
 
+  // --- Rol, equipo y registro -------------------------------------------------
+
+  /// Rol de quien usa el panel: 'OWNER', 'SUPPORT' o 'VIEWER'. Se guarda para que
+  /// las pantallas oculten lo que no puede hacer (el servidor igual lo impide).
+  final role = ValueNotifier<String>('VIEWER');
+  bool get isOwner => role.value == 'OWNER';
+  bool get canSupport => role.value == 'OWNER' || role.value == 'SUPPORT';
+
+  Future<void> loadMe() async {
+    try {
+      final me = Map<String, dynamic>.from(await _rpc('admin_me') as Map);
+      role.value = me['role'] as String? ?? 'VIEWER';
+    } catch (_) {
+      // Servidor sin roles todavía: los administradores de antes son dueños
+      role.value = 'OWNER';
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listAdmins() async => _maps(await _rpc('admin_list_admins'));
+  Future<void> setAdmin(String email, String? role) => _rpc('admin_set_admin', {'p_email': email, 'p_role': role});
+  Future<List<Map<String, dynamic>>> listActions({int limit = 100}) async =>
+      _maps(await _rpc('admin_list_actions', {'p_limit': limit}));
+
+  // --- Notas y contactos ------------------------------------------------------
+
+  Future<Map<String, dynamic>> notes(String email) async =>
+      Map<String, dynamic>.from(await _rpc('admin_list_notes', {'p_email': email}) as Map);
+  Future<void> addNote(String email, String note) => _rpc('admin_add_note', {'p_email': email, 'p_note': note});
+  Future<void> deleteNote(int id) => _rpc('admin_delete_note', {'p_id': id});
+  Future<void> setContacted(String email, bool contacted) =>
+      _rpc('admin_set_contacted', {'p_email': email, 'p_contacted': contacted});
+
+  /// correo → {at, by}
+  Future<Map<String, Map<String, dynamic>>> contacts() async {
+    final data = Map<String, dynamic>.from(await _rpc('admin_list_contacts') as Map);
+    return {for (final e in data.entries) e.key: Map<String, dynamic>.from(e.value as Map)};
+  }
+
+  // --- Búsqueda, embudo, IA y versiones --------------------------------------
+
+  Future<Map<String, dynamic>> search(String query) async =>
+      Map<String, dynamic>.from(await _rpc('admin_search', {'p_query': query}) as Map);
+  Future<Map<String, dynamic>> funnel() async => Map<String, dynamic>.from(await _rpc('admin_funnel') as Map);
+  Future<Map<String, dynamic>> aiUsage() async => Map<String, dynamic>.from(await _rpc('admin_ai_usage') as Map);
+  Future<List<Map<String, dynamic>>> appVersions() async => _maps(await _rpc('admin_app_versions'));
+
+  // --- Mantenimiento ----------------------------------------------------------
+
+  Future<Map<String, dynamic>> getMaintenance() async =>
+      Map<String, dynamic>.from(await _rpc('admin_get_maintenance') as Map);
+  Future<void> setMaintenance({
+    required int level,
+    required List<String> scopes,
+    required DateTime startsAt,
+    required DateTime endsAt,
+    String? message,
+    int noticeHours = 2,
+    String? confirm,
+  }) =>
+      _rpc('admin_set_maintenance', {
+        'p_level': level,
+        'p_scopes': scopes,
+        'p_message': message,
+        'p_starts_at': startsAt.toUtc().toIso8601String(),
+        'p_ends_at': endsAt.toUtc().toIso8601String(),
+        'p_notice_hours': noticeHours,
+        'p_confirm': confirm,
+      });
+  Future<void> endMaintenance() => _rpc('admin_end_maintenance');
+
+  /// Ficha de soporte de una cuenta: cuenta, negocios, Pro, códigos y pagos.
+  /// Nunca productos, ventas ni clientes.
+  Future<AdminUserDetail> userDetail(String email) async =>
+      AdminUserDetail.fromJson(Map<String, dynamic>.from(await _rpc('admin_user_detail', {'p_email': email}) as Map));
+
+  /// A quién conviene escribirle hoy
+  Future<AdminHealth> health() async => AdminHealth.fromJson(Map<String, dynamic>.from(await _rpc('admin_health') as Map));
+
   Future<List<AdminStore>> listStores() async => _rows(await _rpc('admin_list_stores')).map(AdminStore.fromRow).toList();
 
   // --- Suscripciones ---------------------------------------------------------
@@ -509,6 +587,23 @@ class ProAdminService {
   @visibleForTesting
   static String errorMessage(String serverMessage) {
     if (serverMessage.contains('admin_only')) return 'Esta cuenta no es administradora.';
+    if (serverMessage.contains('user_not_found')) return 'Esa cuenta ya no existe.';
+    if (serverMessage.contains('admin_role_forbidden')) return 'Tu rol en el panel no permite hacer esto.';
+    if (serverMessage.contains('cannot_demote_self')) return 'No puedes quitarte a ti mismo el rol de dueño.';
+    if (serverMessage.contains('last_owner')) return 'El panel debe tener al menos un dueño.';
+    if (serverMessage.contains('invalid_email')) return 'Escribe un correo válido.';
+    if (serverMessage.contains('invalid_role')) return 'Elige un rol válido.';
+    if (serverMessage.contains('empty_note')) return 'Escribe la nota.';
+    if (serverMessage.contains('invalid_level')) return 'Elige el nivel del mantenimiento.';
+    if (serverMessage.contains('invalid_scopes')) return 'Elige qué partes entran en mantenimiento.';
+    if (serverMessage.contains('invalid_end')) return 'La hora de fin debe ser después del inicio y en el futuro.';
+    if (serverMessage.contains('too_long')) return 'El mantenimiento puede durar máximo 48 horas.';
+    if (serverMessage.contains('confirm_required')) return 'Para el cierre total escribe MANTENIMIENTO.';
+    if (RegExp(r'admin_(user_detail|health|me|search|funnel|ai_usage|app_versions|list_notes|list_contacts|'
+            r'get_maintenance|list_admins|list_actions)')
+        .hasMatch(serverMessage)) {
+      return 'Falta actualizar el servidor para esta función.';
+    }
     if (serverMessage.contains('invalid_count')) return 'Puedes crear de 1 a 50 códigos por vez.';
     if (serverMessage.contains('invalid_valid_days')) return 'El plazo para canjear debe ser de 1 a 3650 días.';
     if (serverMessage.contains('invalid_days')) return 'La duración debe ser de 1 a 3650 días.';
@@ -528,4 +623,159 @@ class ProAdminException implements Exception {
 
   @override
   String toString() => message;
+}
+
+List<Map<String, dynamic>> _maps(Object? v) => [for (final r in (v as List? ?? const [])) Map<String, dynamic>.from(r as Map)];
+
+/// "+57 311 769 7927" o "3117697927" → "573117697927" para wa.me; null si no sirve
+String? whatsappDigits(String? phone) {
+  final d = (phone ?? '').replaceAll(RegExp(r'\D'), '');
+  if (d.length < 10) return null;
+  return d.length == 10 ? '57$d' : d;
+}
+
+/// Ficha de soporte de una cuenta
+class AdminUserDetail {
+  final String email;
+  final String? name;
+  final String? phone;
+  final DateTime? createdAt;
+  final DateTime? lastSignInAt;
+  final DateTime? emailConfirmedAt;
+  final String provider;
+  final List<AdminUserBusiness> businesses;
+  final List<Map<String, dynamic>> redemptions;
+  final List<Map<String, dynamic>> payments;
+  final List<Map<String, dynamic>> subscriptions;
+
+  const AdminUserDetail({
+    required this.email,
+    this.name,
+    this.phone,
+    this.createdAt,
+    this.lastSignInAt,
+    this.emailConfirmedAt,
+    this.provider = 'email',
+    this.businesses = const [],
+    this.redemptions = const [],
+    this.payments = const [],
+    this.subscriptions = const [],
+  });
+
+  String get providerLabel => switch (provider) {
+        'google' => 'Google',
+        'apple' => 'Apple',
+        'facebook' => 'Facebook',
+        _ => 'Correo',
+      };
+
+  factory AdminUserDetail.fromJson(Map<String, dynamic> j) {
+    final a = Map<String, dynamic>.from(j['account'] as Map);
+    return AdminUserDetail(
+      email: a['email'] as String? ?? '',
+      name: a['name'] as String?,
+      phone: a['phone'] as String?,
+      createdAt: _date(a['created_at']),
+      lastSignInAt: _date(a['last_sign_in_at']),
+      emailConfirmedAt: _date(a['email_confirmed_at']),
+      provider: a['provider'] as String? ?? 'email',
+      businesses: [for (final b in _maps(j['businesses'])) AdminUserBusiness.fromJson(b)],
+      redemptions: _maps(j['redemptions']),
+      payments: _maps(j['payments']),
+      subscriptions: _maps(j['subscriptions']),
+    );
+  }
+}
+
+/// Un negocio de la cuenta, visto desde el panel
+class AdminUserBusiness {
+  final String id;
+  final String name;
+  final String role;
+  final String? country;
+  final bool pro;
+  final DateTime? proUntil;
+  final String? storeSlug;
+  final bool storeEnabled;
+
+  const AdminUserBusiness({
+    required this.id,
+    required this.name,
+    required this.role,
+    this.country,
+    this.pro = false,
+    this.proUntil,
+    this.storeSlug,
+    this.storeEnabled = false,
+  });
+
+  String get roleLabel => switch (role) {
+        'OWNER' => 'Dueño',
+        'ADMIN' => 'Administrador',
+        _ => 'Cajero',
+      };
+
+  factory AdminUserBusiness.fromJson(Map<String, dynamic> j) {
+    final pro = j['pro'] is Map ? Map<String, dynamic>.from(j['pro'] as Map) : const <String, dynamic>{};
+    return AdminUserBusiness(
+      id: j['id'] as String? ?? '',
+      name: j['name'] as String? ?? '',
+      role: j['role'] as String? ?? 'CASHIER',
+      country: j['country'] as String?,
+      pro: pro['active'] == true,
+      proUntil: _date(pro['ends_at']),
+      storeSlug: j['store_slug'] as String?,
+      storeEnabled: j['store_enabled'] == true,
+    );
+  }
+}
+
+/// Salud de Stockealo: a quién conviene escribirle hoy
+class AdminHealth {
+  final List<Map<String, dynamic>> noCloud;
+  final List<Map<String, dynamic>> expiring;
+  final List<Map<String, dynamic>> failedPayments;
+  final int inactive30d;
+  final int dbBytes;
+  final int dbLimitBytes;
+  final int storageBytes;
+  final int storageObjects;
+  final int storageLimitBytes;
+
+  const AdminHealth({
+    this.noCloud = const [],
+    this.expiring = const [],
+    this.failedPayments = const [],
+    this.inactive30d = 0,
+    this.dbBytes = 0,
+    this.dbLimitBytes = 0,
+    this.storageBytes = 0,
+    this.storageObjects = 0,
+    this.storageLimitBytes = 0,
+  });
+
+  double get dbUse => dbLimitBytes == 0 ? 0 : dbBytes / dbLimitBytes;
+  double get storageUse => storageLimitBytes == 0 ? 0 : storageBytes / storageLimitBytes;
+
+  /// "14,2 MB", "2,5 MB", "1 GB"
+  static String bytesLabel(int bytes) {
+    if (bytes >= 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1).replaceAll('.', ',')} GB';
+    if (bytes >= 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1).replaceAll('.', ',')} MB';
+    if (bytes >= 1024) return '${(bytes / 1024).round()} KB';
+    return '$bytes B';
+  }
+
+  bool get allGood => noCloud.isEmpty && expiring.isEmpty && failedPayments.isEmpty;
+
+  factory AdminHealth.fromJson(Map<String, dynamic> j) => AdminHealth(
+        noCloud: _maps(j['no_cloud']),
+        expiring: _maps(j['expiring']),
+        failedPayments: _maps(j['failed_payments']),
+        inactive30d: (j['inactive_30d'] as num?)?.toInt() ?? 0,
+        dbBytes: _int((j['usage'] as Map?)?['db_bytes']),
+        dbLimitBytes: _int((j['usage'] as Map?)?['db_limit_bytes']),
+        storageBytes: _int((j['usage'] as Map?)?['storage_bytes']),
+        storageObjects: _int((j['usage'] as Map?)?['storage_objects']),
+        storageLimitBytes: _int((j['usage'] as Map?)?['storage_limit_bytes']),
+      );
 }

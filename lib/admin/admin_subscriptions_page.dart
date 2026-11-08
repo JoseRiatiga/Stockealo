@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/design/primary_action_button.dart';
@@ -84,6 +86,8 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
       subtitle: _loading ? null : '${_subs.length} ${_onlyActive ? 'activas' : 'en total'}',
       onRefresh: _load,
       actions: [
+        // Dar y terminar Pro: solo el dueño del panel (el servidor también lo exige)
+        if (ProAdminService.instance.isOwner)
         FilledButton.icon(
           onPressed: _grant,
           icon: const Icon(Icons.card_giftcard_rounded, size: 18),
@@ -141,7 +145,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
                       ],
                     ),
                   ),
-                  if (s.active)
+                  if (s.active && ProAdminService.instance.isOwner)
                     TextButton(
                       onPressed: () => _end(s),
                       style: TextButton.styleFrom(foregroundColor: c.danger),
@@ -168,17 +172,50 @@ class _GrantDialogState extends State<_GrantDialog> {
   AdminBusiness? _selected;
   int? _days = 30;
   bool _searching = false;
+  bool _searched = false;
   bool _saving = false;
+  Timer? _debounce;
+  int _searchId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Al abrir se ven los negocios más recientes, para elegir sin escribir
+    _search('');
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  /// Busca mientras se escribe (antes solo con Enter y, sin lista, "Dar Pro" no hacía nada)
+  void _onQueryChanged(String q) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () => _search(q));
+  }
 
   Future<void> _search(String q) async {
+    final id = ++_searchId;
     setState(() => _searching = true);
     try {
-      final r = await ProAdminService.instance.findBusinesses(q);
-      if (mounted) setState(() => _results = r);
+      final r = await ProAdminService.instance.findBusinesses(q.trim());
+      if (!mounted || id != _searchId) return; // llegó una búsqueda más nueva
+      setState(() {
+        _results = r;
+        _searched = true;
+        // Un solo resultado al buscar algo concreto: queda elegido
+        if (q.trim().isNotEmpty && r.length == 1) {
+          _selected = r.first;
+        } else if (_selected != null && !r.any((b) => b.id == _selected!.id)) {
+          _selected = null;
+        }
+      });
     } catch (e) {
       if (mounted) AppToast.show(context, message: '$e', type: ToastType.error);
     } finally {
-      if (mounted) setState(() => _searching = false);
+      if (mounted && id == _searchId) setState(() => _searching = false);
     }
   }
 
@@ -215,13 +252,23 @@ class _GrantDialogState extends State<_GrantDialog> {
             TextField(
               autofocus: true,
               textInputAction: TextInputAction.search,
+              onChanged: _onQueryChanged,
               onSubmitted: _search,
               decoration: const InputDecoration(
                 hintText: 'Nombre del negocio o correo del dueño',
                 prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
-            if (_searching) const LinearProgressIndicator(),
+            SizedBox(height: 3, child: _searching ? const LinearProgressIndicator() : null),
+            if (_searched && !_searching && _results.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpace.md),
+                child: Text(
+                  'No encontramos ese negocio. Revisa el nombre o el correo del dueño '
+                  '(el negocio tiene que estar en la nube).',
+                  style: TextStyle(fontSize: 13, color: c.inkMuted),
+                ),
+              ),
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 220),
               child: ListView(
@@ -232,12 +279,18 @@ class _GrantDialogState extends State<_GrantDialog> {
                       dense: true,
                       selected: _selected?.id == b.id,
                       selectedTileColor: c.successSoft,
+                      trailing: _selected?.id == b.id ? Icon(Icons.check_circle_rounded, color: c.accent) : null,
                       title: Text(b.name),
                       subtitle: Text([b.ownerEmail ?? 'sin dueño', if (b.pro) 'ya tiene Pro'].join(' · ')),
                       onTap: () => setState(() => _selected = b),
                     ),
                 ],
               ),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            Text(
+              _selected == null ? 'Elige el negocio en la lista.' : 'Le darás Pro a ${_selected!.name}.',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _selected == null ? c.warning : c.ink),
             ),
             const SizedBox(height: AppSpace.md),
             Wrap(

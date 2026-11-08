@@ -10,7 +10,9 @@ import 'features/business/presentation/active_business_scope.dart';
 import 'features/business/presentation/screens/create_initial_business_screen.dart';
 import 'features/home/presentation/screens/main_navigation_screen.dart';
 
+import 'core/services/maintenance_service.dart';
 import 'core/services/supabase_service.dart';
+import 'core/widgets/maintenance_gate.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/presentation/widgets/stockealo_splash_screen.dart';
 import 'features/onboarding/presentation/welcome_screen.dart';
@@ -26,6 +28,7 @@ void main() async {
     debugPrint('Error inicializando formato de fecha: $e');
   }
   await SupabaseService.instance.initialize();
+  MaintenanceService.instance.start(SupabaseService.instance.client);
   await ThemeController.instance.initialize();
   _showWelcome = await WelcomeScreen.shouldShow();
   // La sincronización empieza al restaurar o iniciar la sesión (syncFromCloud sube
@@ -54,7 +57,7 @@ class StockealoApp extends StatelessWidget {
             final scale = (media.textScaler.scale(1) * ThemeController.instance.textScale).clamp(0.8, 1.8);
             return MediaQuery(
               data: media.copyWith(textScaler: TextScaler.linear(scale)),
-              child: ActiveBusinessScope(child: child!),
+              child: ActiveBusinessScope(child: MaintenanceGate(child: child!)),
             );
           },
           home: const AuthWrapper(),
@@ -92,6 +95,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Al volver a la app, reintentar los cambios que quedaron sin enviar
+    if (state == AppLifecycleState.resumed) MaintenanceService.instance.refresh();
     if (state == AppLifecycleState.resumed && _authRepo.currentUser != null) {
       // flushPendingSync renueva primero la sesión si venció con la app en segundo plano
       SupabaseService.instance.flushPendingSync();
@@ -99,6 +103,8 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   }
 
   void _refresh() {
+    // Con sesión nueva: saber si es administrador y reportar la versión
+    MaintenanceService.instance.refresh();
     setState(() {
       _sessionFuture = Future.value(_authRepo.currentUser);
     });

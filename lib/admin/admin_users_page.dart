@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_tokens.dart';
 import '../features/pro/data/pro_admin_service.dart';
+import 'admin_user_detail.dart';
 import 'admin_widgets.dart';
 
 /// Cuentas registradas: correo, nombre, celular, negocios y si tienen Pro
@@ -65,7 +66,11 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           state
         else
           for (final u in _users)
-            AdminCard(
+            // Toda la tarjeta abre la ficha de soporte de la cuenta
+            InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              onTap: () => AdminUserDetailDialog.show(context, u.email),
+              child: AdminCard(
               child: Row(
                 children: [
                   CircleAvatar(
@@ -108,8 +113,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                     onPressed: () => adminCopy(context, u.email, 'Correo'),
                     icon: Icon(Icons.copy_rounded, size: 18, color: c.inkMuted),
                   ),
+                  Icon(Icons.chevron_right_rounded, color: c.inkFaint),
                 ],
               ),
+            ),
             ),
       ],
     );

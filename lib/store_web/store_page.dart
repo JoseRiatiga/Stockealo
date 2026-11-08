@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/services/maintenance_service.dart';
+import '../core/services/supabase_service.dart';
 import '../core/theme/app_theme.dart';
+import '../core/widgets/maintenance_gate.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/utils/currency_formatter.dart';
 import '../features/store/data/online_store_service.dart';
@@ -24,7 +27,19 @@ class StorePage extends StatefulWidget {
   /// De dónde sale la tienda (por defecto, el servidor; las pruebas pasan la suya)
   final Future<PublicStore?> Function(String slug)? loader;
 
-  const StorePage({super.key, required this.slug, this.loader});
+  /// Estado del mantenimiento (por defecto, el servidor; las pruebas pasan el suyo)
+  final Future<MaintenanceState> Function()? maintenanceLoader;
+
+  const StorePage({super.key, required this.slug, this.loader, this.maintenanceLoader});
+
+  static Future<MaintenanceState> _serverMaintenance() async {
+    try {
+      final data = await SupabaseService.instance.client?.rpc('get_maintenance');
+      return data is Map ? MaintenanceState.fromJson(Map<String, dynamic>.from(data)) : MaintenanceState.none;
+    } catch (_) {
+      return MaintenanceState.none; // si no se sabe, la tienda abre
+    }
+  }
 
   @override
   State<StorePage> createState() => _StorePageState();
@@ -32,6 +47,7 @@ class StorePage extends StatefulWidget {
 
 class _StorePageState extends State<StorePage> {
   PublicStore? _store;
+  MaintenanceState _maintenance = MaintenanceState.none;
   bool _loading = true;
   String? _error;
 
@@ -57,8 +73,15 @@ class _StorePageState extends State<StorePage> {
       _error = null;
     });
     try {
+      final maintenanceFuture = (widget.maintenanceLoader ?? StorePage._serverMaintenance)();
       final store = await (widget.loader ?? OnlineStoreService.instance.getPublic)(slug);
-      if (mounted) setState(() => _store = store);
+      final maintenance = await maintenanceFuture;
+      if (mounted) {
+        setState(() {
+          _store = store;
+          _maintenance = maintenance;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
@@ -96,9 +119,24 @@ class _StorePageState extends State<StorePage> {
       );
     }
     final accent = AppPalette.fromHex(store.color) ?? AppPalette.brand;
+    // Mantenimiento de las tiendas: se ve el aviso y se puede escribir igual al negocio
+    if (_maintenance.storesClosed) {
+      return Theme(
+        data: AppTheme.build(Brightness.light, accent: accent),
+        child: _MaintenancePage(store: store, maintenance: _maintenance),
+      );
+    }
+    final notice = _maintenance.affects('stores') && (_maintenance.notice || _maintenance.active);
     return Theme(
       data: AppTheme.build(Brightness.light, accent: accent),
-      child: Builder(builder: (context) => _storeView(context, store)),
+      child: Builder(
+        builder: (context) => notice
+            ? Column(children: [
+                _MaintenanceNotice(maintenance: _maintenance),
+                Expanded(child: _storeView(context, store)),
+              ])
+            : _storeView(context, store),
+      ),
     );
   }
 
@@ -553,6 +591,91 @@ class _MessagePage extends StatelessWidget {
               const SizedBox(height: AppSpace.xl),
               Text('Tienda hecha con Stockealo', style: TextStyle(fontSize: 12, color: c.inkFaint)),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Franja de aviso: mantenimiento programado o en curso que no cierra la tienda
+class _MaintenanceNotice extends StatelessWidget {
+  final MaintenanceState maintenance;
+  const _MaintenanceNotice({required this.maintenance});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final m = maintenance;
+    final text = m.notice
+        ? 'Mantenimiento programado ${MaintenanceGate.when(m.startsAt)}: la tienda puede no estar disponible '
+            'hasta ${MaintenanceGate.when(m.endsAt)}.'
+        : 'Estamos haciendo mantenimiento hasta ${MaintenanceGate.when(m.endsAt)}.';
+    return Material(
+      color: c.warningSoft,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.sm),
+          child: Row(children: [
+            Icon(Icons.construction_rounded, size: 18, color: c.warning),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(child: Text(text, style: TextStyle(fontSize: 13, color: c.ink))),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tienda cerrada por mantenimiento: el cliente igual puede escribirle al negocio
+class _MaintenancePage extends StatelessWidget {
+  final PublicStore store;
+  final MaintenanceState maintenance;
+  const _MaintenancePage({required this.store, required this.maintenance});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final note = (maintenance.message ?? '').trim();
+    final wa = store.whatsapp.replaceAll(RegExp(r'\D'), '');
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpace.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.construction_rounded, size: 48, color: c.accent),
+                const SizedBox(height: AppSpace.md),
+                Text(store.businessName,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink)),
+                const SizedBox(height: AppSpace.sm),
+                Text(
+                  'La tienda está en mantenimiento. Vuelve ${MaintenanceGate.when(maintenance.endsAt)}.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, height: 1.4, color: c.inkMuted),
+                ),
+                if (note.isNotEmpty) ...[
+                  const SizedBox(height: AppSpace.md),
+                  Text(note, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: c.ink)),
+                ],
+                if (wa.length >= 10) ...[
+                  const SizedBox(height: AppSpace.xl),
+                  FilledButton.icon(
+                    onPressed: () => launchUrl(Uri.parse('https://wa.me/$wa'), webOnlyWindowName: '_blank'),
+                    icon: const Icon(Icons.chat_outlined),
+                    label: const Text('Escribir al negocio por WhatsApp'),
+                  ),
+                ],
+                const SizedBox(height: AppSpace.xl),
+                Text('Tienda hecha con Stockealo', style: TextStyle(fontSize: 12, color: c.inkFaint)),
+              ],
+            ),
           ),
         ),
       ),

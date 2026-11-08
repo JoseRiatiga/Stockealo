@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/app_database.dart';
 import '../../features/products/models/product_variant.dart';
+import 'maintenance_service.dart';
 import 'sync_queue.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -156,6 +157,10 @@ class SupabaseService {
 
   /// Sincroniza todos los datos locales de SQLite hacia Supabase
   Future<SyncResult> syncToCloud() async {
+    // Mantenimiento con la nube en pausa: se trabaja en el equipo y se sube después
+    if (MaintenanceService.instance.cloudPaused) {
+      return const SyncResult(success: false, errorMessage: 'La nube está en mantenimiento. Tus datos se guardan en este equipo.');
+    }
     try {
       // 1. Verificar si el usuario tiene activada la sincronización en la nube
       if (!(await isCloudSyncEnabled())) {
@@ -492,6 +497,9 @@ class SupabaseService {
 
   /// Descarga todos los datos desde Supabase hacia la base de datos local SQLite
   Future<SyncResult> syncFromCloud(String userId, [String? userEmail]) async {
+    if (MaintenanceService.instance.cloudPaused) {
+      return const SyncResult(success: false, errorMessage: 'La nube está en mantenimiento. Tus datos se guardan en este equipo.');
+    }
     try {
       if (!_isInitialized) {
         final ok = await initialize();
@@ -988,6 +996,8 @@ class SupabaseService {
   Future<int> flushPendingSync() async {
     try {
       if (!(await isCloudSyncEnabled())) return 0;
+      // En mantenimiento los cambios quedan en la cola y salen al terminar
+      if (MaintenanceService.instance.cloudPaused) return await SyncQueue.instance.pendingCount();
       if (!_isInitialized) await initialize();
       // Sin sesión, RLS rechazaría todo: se espera al próximo inicio de sesión
       if (client?.auth.currentSession == null) return await SyncQueue.instance.pendingCount();

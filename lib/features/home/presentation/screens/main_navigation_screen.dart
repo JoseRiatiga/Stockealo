@@ -10,6 +10,7 @@ import '../../../dashboard/presentation/screens/dashboard_screen.dart';
 import '../../../products/presentation/screens/products_list_screen.dart';
 import '../../../sales/presentation/screens/sales_history_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
@@ -140,6 +141,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     });
   }
 
+  /// Números de pantalla: 0 Inicio, 1 Inventario, 2 Ventas, 3 Ajustes, 4 Reportes.
+  /// Reportes llegó después: se muestra antes de Ajustes sin cambiar los números
+  /// que ya usan Stocky, las notificaciones y el buscador.
+  static const _reportsIndex = 4;
+
+  bool get _showReports => ReportsTab.allowed(_userRole);
+
+  /// Orden en la barra de abajo
+  List<int> get _tabOrder => [0, 1, 2, if (_showReports) _reportsIndex, 3];
+
   @override
   Widget build(BuildContext context) {
     final screens = [
@@ -161,7 +172,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
       ProfileScreen(
         onLogout: widget.onLogout,
       ),
+      ReportsTab(userRole: _userRole),
     ];
+    // Si la cuenta deja de poder ver Reportes, vuelve a Inicio
+    if (_currentIndex == _reportsIndex && !_showReports) _currentIndex = 0;
+    final order = _tabOrder;
 
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
@@ -206,12 +221,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                                   0 => _activeBusiness?.name ?? 'Inicio',
                                   1 => 'Inventario',
                                   2 => 'Ventas',
+                                  _reportsIndex => 'Reportes',
                                   _ => 'Ajustes',
                                 },
                                 subtitle: switch (_currentIndex) {
                                   0 => 'Resumen de hoy',
                                   1 => 'Productos, stock y precios',
                                   2 => 'Historial, clientes y cotizaciones',
+                                  _reportsIndex => 'Descarga en Excel lo que necesites',
                                   _ => 'Haz que la app sea tuya',
                                 },
                                 alertCount: NotificationService.instance.unreadCount,
@@ -237,7 +254,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                                   children: screens,
                                 ),
                                 // Stocky abajo a la derecha, igual que en el celular (arriba pasaba desapercibido)
-                                if (_currentIndex != 3)
+                                if (_currentIndex != 3 && _currentIndex != _reportsIndex)
                                   Positioned(
                                     right: AppSpace.xl,
                                     bottom: AppSpace.xl,
@@ -258,7 +275,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
             }
 
             // Modo Móvil
-            final showStockyFab = _currentIndex != 3;
+            final showStockyFab = _currentIndex != 3 && _currentIndex != _reportsIndex;
             // Inventario y Ventas tienen su botón principal a la izquierda en la misma fila.
             // En celulares angostos no caben los dos: Stocky sube una fila para no taparlo
             final hasPrimaryButton = _currentIndex == 1 || _currentIndex == 2;
@@ -300,26 +317,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                   borderRadius: BorderRadius.circular(28),
                   child: NavigationBar(
                     height: 64,
-                    selectedIndex: _currentIndex,
-                    onDestinationSelected: _navigateToTab,
+                    selectedIndex: order.indexOf(_currentIndex).clamp(0, order.length - 1),
+                    onDestinationSelected: (i) => _navigateToTab(order[i]),
                     labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                    destinations: const [
-                      NavigationDestination(
+                    destinations: [
+                      const NavigationDestination(
                         icon: Icon(Icons.dashboard_outlined),
                         selectedIcon: Icon(Icons.dashboard_rounded),
                         label: 'Inicio',
                       ),
-                      NavigationDestination(
+                      const NavigationDestination(
                         icon: Icon(Icons.inventory_2_outlined),
                         selectedIcon: Icon(Icons.inventory_2_rounded),
                         label: 'Inventario',
                       ),
-                      NavigationDestination(
+                      const NavigationDestination(
                         icon: Icon(Icons.point_of_sale_outlined),
                         selectedIcon: Icon(Icons.point_of_sale_rounded),
                         label: 'Ventas',
                       ),
-                      NavigationDestination(
+                      if (_showReports)
+                        const NavigationDestination(
+                          icon: Icon(Icons.insert_chart_outlined_rounded),
+                          selectedIcon: Icon(Icons.insert_chart_rounded),
+                          label: 'Reportes',
+                        ),
+                      const NavigationDestination(
                         icon: Icon(Icons.settings_outlined),
                         selectedIcon: Icon(Icons.settings_rounded),
                         label: 'Ajustes',

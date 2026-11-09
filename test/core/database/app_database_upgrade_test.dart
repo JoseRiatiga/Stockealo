@@ -204,4 +204,23 @@ void main() {
       expect(await db.query('purchases'), isEmpty);
     });
   });
+
+  group('upgradeSchema v10 -> v11', () {
+    test('agrega servicios, empleados, tablero y columnas de servicio en ventas', () async {
+      await db.execute("CREATE TABLE businesses (id TEXT PRIMARY KEY, name TEXT)");
+      await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, product_id TEXT, total REAL)');
+      await db.insert('businesses', {'id': 'b1', 'name': 'Lavadero'});
+      await db.insert('sales', {'id': 's1', 'product_id': 'p1', 'total': 1000});
+
+      await AppDatabase.upgradeSchema(db, 10, 11);
+      await expectLater(AppDatabase.upgradeSchema(db, 10, 11), completes);
+
+      Future<Set<Object?>> cols(String t) async => (await db.rawQuery('PRAGMA table_info($t)')).map((c) => c['name']).toSet();
+      expect(await cols('businesses'), containsAll(['services_enabled', 'service_type']));
+      expect(await cols('sales'), containsAll(['service_id', 'work_order_id', 'staff_ids']));
+      expect((await db.query('businesses')).single['services_enabled'], 0);
+      expect((await db.query('sales')).single['total'], 1000);
+      expect(await db.query('work_orders'), isEmpty);
+    });
+  });
 }

@@ -7,6 +7,10 @@ import 'package:stockealo/core/theme/app_theme.dart';
 import 'package:stockealo/features/reports/data/report_export_service.dart';
 import 'package:stockealo/features/reports/presentation/screens/reports_screen.dart';
 import 'package:stockealo/features/suppliers/models/purchase.dart';
+import 'package:stockealo/features/auth/data/auth_repository.dart';
+import 'package:stockealo/features/auth/models/app_user.dart';
+import 'package:stockealo/features/business/data/business_repository.dart';
+import 'package:stockealo/features/business/presentation/active_business_scope.dart';
 
 final _biz = Business(id: 'b1', userId: 'u1', name: 'Loliando', createdAt: DateTime(2026, 11, 1));
 
@@ -164,6 +168,32 @@ void main() {
     expect(double.parse(costos[2][5]), 2000, reason: 'con El Sol subió de 20.000 a 22.000');
     await db.close();
   });
+
+  for (final (role, sees) in const [('OWNER', true), ('ADMIN', true), ('CASHIER', false)]) {
+    testWidgets('la pestaña Reportes con rol $role', (tester) async {
+      tester.view.physicalSize = const Size(360, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      AuthRepository.debugCurrentUser = AppUser(id: 'u1', email: 'a@b.com', name: 'Ana', createdAt: DateTime(2026));
+      addTearDown(() => AuthRepository.debugCurrentUser = null);
+      final notifier = BusinessRepository.instance.activeBusinessNotifier;
+      final previous = notifier.value;
+      notifier.value = _biz;
+      addTearDown(() => notifier.value = previous);
+
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.build(Brightness.light),
+        builder: (context, child) => ActiveBusinessScope(child: child!),
+        home: ReportsTab(userRole: role),
+      ));
+      expect(ReportsTab.allowed(role), sees);
+      expect(find.text('1. ¿Qué incluir?'), sees ? findsOneWidget : findsNothing);
+      expect(find.text('Solo el dueño o un administrador pueden descargar reportes.'), sees ? findsNothing : findsOneWidget);
+      // Es una pestaña: no tiene botón de volver
+      expect(find.byType(BackButton), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final width in [360.0, 1200.0]) {
     testWidgets('la pantalla Reportes se ve bien a ${width.toInt()} px', (tester) async {

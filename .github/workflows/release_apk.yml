@@ -69,23 +69,20 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Proveedores y entrada de mercancía
-            - Nueva sección Inventario › Proveedores: ficha de cada proveedor con WhatsApp, día en que pasa, forma de pago y notas.
-            - En cada producto puedes indicar su proveedor (es opcional).
-            - Entrada de mercancía: lo que llega suma al inventario, también por talla y color, con factura, foto de la factura y borrador.
-            - Si el costo cambió, la app te avisa y te deja actualizarlo.
+            ### Negocios de servicios: lavaderos, barberías y talleres
+            - Activa "Mi negocio ofrece servicios" al editar tu negocio y elige el tipo; te dejamos servicios de ejemplo para empezar.
+            - Tablero de trabajos: cada moto pasa por En espera, Lavando, Lista y Entregada, con placa y quién la atiende.
+            - Avisa al cliente por WhatsApp cuando su moto está lista.
+            - Cobra con descuento, propina para el empleado y fiado; cada servicio queda en tus ventas.
+            - Historial por placa: cuántas veces vino, qué se le hizo y cuánto ha gastado.
+            - Empleados sin cuenta en la app (2 gratis; sin límite con Pro).
 
-            ### Pedidos al proveedor
-            - El pedido sale por talla y color y se envía directo al WhatsApp del proveedor.
-            - Al recibir la mercancía ves qué faltó y puedes pedirlo de nuevo.
-            - El día que pasa tu proveedor la app te lo recuerda.
-
-            ### Cuentas por pagar y costos
-            - Compras a crédito con abonos y aviso de las vencidas.
-            - En cada producto ves cuánto te cobra cada proveedor y cuál es el más barato.
-            - Reportes en Excel de compras y de costos por proveedor.
+            ### Reportes en su propia pestaña
+            - Reportes ahora está en el menú principal, junto a Inicio, Inventario, Ventas y Ajustes.
 
             ### Correcciones
-            - Al pegar la foto de un producto ahora ves que quedó lista.
+            - El logo del negocio ya se sube desde la web.
+            - La ventana para elegir una foto tiene el diseño nuevo.
+            - Al anular la venta de una talla o color, esa variante recupera su unidad.
           draft: false
           prerelease: false

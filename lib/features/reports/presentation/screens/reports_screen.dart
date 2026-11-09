@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/design/content_width.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
+import '../../../business/presentation/active_business_scope.dart';
 import '../../data/report_export_service.dart';
 
 /// Reportes: el dueño elige qué descargar, de qué periodo y si va todo en un solo
@@ -16,12 +18,16 @@ class ReportsScreen extends StatefulWidget {
   /// Lo que llega marcado (desde Inventario, solo inventario; desde Ajustes, todo)
   final Set<ReportSection> initial;
 
+  /// Es la pestaña Reportes del menú principal (sin botón de volver)
+  final bool embedded;
+
   const ReportsScreen({
     super.key,
     required this.business,
     required this.userId,
     required this.userEmail,
     this.initial = const {...ReportSection.values},
+    this.embedded = false,
   });
 
   static Future<void> open(
@@ -110,12 +116,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
         );
     final allChecked = _sections.length == ReportSection.values.length;
 
+    // En el computador la pestaña ya tiene su título arriba; en el celular, la
+    // barra de abajo pasa por encima del final de la lista
+    final wide = MediaQuery.of(context).size.width >= 850;
     return Scaffold(
       backgroundColor: c.paper,
-      appBar: AppBar(title: const Text('Reportes'), backgroundColor: c.paper),
+      appBar: widget.embedded && wide
+          ? null
+          : AppBar(
+              title: const Text('Reportes'),
+              backgroundColor: c.paper,
+              automaticallyImplyLeading: !widget.embedded,
+            ),
       body: ContentWidth(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
+          padding: EdgeInsets.fromLTRB(
+            AppSpace.lg,
+            widget.embedded && wide ? AppSpace.lg : AppSpace.sm,
+            AppSpace.lg,
+            AppSpace.xxl + (widget.embedded ? MediaQuery.of(context).padding.bottom + 88 : 0),
+          ),
           children: [
             Text(
               'Elige qué quieres descargar en Excel. Puedes bajarlo todo junto o cada parte por separado.',
@@ -219,6 +239,46 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Pestaña Reportes del menú principal: usa el negocio activo y la cuenta en sesión
+class ReportsTab extends StatelessWidget {
+  final String userRole;
+  const ReportsTab({super.key, required this.userRole});
+
+  /// Solo el dueño y los administradores descargan reportes (tienen costos y ganancias)
+  static bool allowed(String role) => role == 'OWNER' || role == 'ADMIN';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final business = ActiveBusinessScope.of(context);
+    final user = AuthRepository.instance.currentUser;
+    if (business == null || user == null || !allowed(userRole)) {
+      return Scaffold(
+        backgroundColor: c.paper,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpace.xl),
+            child: Text(
+              business == null
+                  ? 'Elige un negocio para ver sus reportes.'
+                  : 'Solo el dueño o un administrador pueden descargar reportes.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: c.inkMuted),
+            ),
+          ),
+        ),
+      );
+    }
+    return ReportsScreen(
+      key: ValueKey('reports-${business.id}'),
+      business: business,
+      userId: user.id,
+      userEmail: user.email,
+      embedded: true,
     );
   }
 }

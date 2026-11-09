@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/design/country_flag.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/countries.dart';
@@ -7,12 +7,14 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/currency_options.dart';
 import '../../../../core/utils/image_helper.dart';
 import '../../../../core/widgets/image_source_picker_modal.dart';
+import '../../../products/data/product_image_service.dart';
 import '../../../products/presentation/widgets/product_image_view.dart';
-import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
 import '../business_identity.dart';
+import '../../../services/data/services_repository.dart';
+import '../../../services/models/service_models.dart';
 
 /// Datos elegidos en la hoja "Nuevo negocio"
 class NewBusinessData {
@@ -25,10 +27,15 @@ class NewBusinessData {
   // Solo al editar
   final String? description;
 
-  /// Foto elegida en el teléfono para subir como logo
-  final String? newLogoPath;
+  /// Logo elegido (los bytes de la imagen) para subir al guardar
+  final Uint8List? newLogoBytes;
+  final String? newLogoMime;
   final bool removeLogo;
   final bool cashRegisterEnabled;
+
+  /// El negocio ofrece servicios (lavadero, barbería, taller) y de qué tipo
+  final bool servicesEnabled;
+  final String? serviceType;
 
   const NewBusinessData({
     required this.name,
@@ -37,9 +44,12 @@ class NewBusinessData {
     required this.icon,
     required this.color,
     this.description,
-    this.newLogoPath,
+    this.newLogoBytes,
+    this.newLogoMime,
     this.removeLogo = false,
     this.cashRegisterEnabled = false,
+    this.servicesEnabled = false,
+    this.serviceType,
   });
 }
 
@@ -66,13 +76,17 @@ class CreateBusinessSheet extends StatefulWidget {
     if (data == null || !context.mounted) return null;
 
     String? logoUrl;
-    if (data.newLogoPath != null) {
-      logoUrl = await SupabaseService.instance.uploadBusinessLogo(
-        businessId: business.id,
-        localFilePath: data.newLogoPath!,
-      );
-      if (logoUrl == null && context.mounted) {
-        AppToast.showWarning(context, 'No se pudo subir el logo. Revisa tu conexión e inténtalo de nuevo.');
+    final bytes = data.newLogoBytes;
+    if (bytes != null) {
+      try {
+        logoUrl = await ProductImageService.instance.uploadBytes(
+          businessId: business.id,
+          productId: 'logo',
+          bytes: bytes,
+          mimeType: data.newLogoMime,
+        );
+      } on ProductImageException catch (e) {
+        if (context.mounted) AppToast.showWarning(context, 'No se pudo subir el logo: ${e.message}');
       }
     } else if (data.removeLogo) {
       logoUrl = '';
@@ -88,8 +102,22 @@ class CreateBusinessSheet extends StatefulWidget {
       color: data.color,
       logoUrl: logoUrl,
       cashRegisterEnabled: data.cashRegisterEnabled,
+      servicesEnabled: data.servicesEnabled,
+      serviceType: data.serviceType,
     );
-    if (context.mounted) AppToast.showSuccess(context, 'Datos del negocio guardados');
+    // Al activar los servicios por primera vez se proponen los de ejemplo del tipo
+    var seeded = 0;
+    if (data.servicesEnabled && !business.servicesEnabled) {
+      seeded = await ServicesRepository.instance.seedExamples(business.id, ServiceType.of(data.serviceType));
+    }
+    if (context.mounted) {
+      AppToast.showSuccess(
+        context,
+        seeded > 0
+            ? 'Listo. Agregamos $seeded servicios de ejemplo: cámbiales el precio en Inicio › Tablero › Servicios.'
+            : 'Datos del negocio guardados',
+      );
+    }
     return saved;
   }
 
@@ -105,7 +133,10 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
   late String _icon = widget.initial?.icon ?? kBusinessKinds.first.key;
   late String _colorKey = _colorKeyFor(widget.initial?.color);
   late bool _cashRegister = widget.initial?.cashRegisterEnabled ?? false;
-  String? _newLogoPath;
+  late bool _services = widget.initial?.servicesEnabled ?? false;
+  late ServiceType _serviceType = ServiceType.of(widget.initial?.serviceType ?? ServiceType.lavaderoMotos.code);
+  Uint8List? _newLogoBytes;
+  String? _newLogoMime;
   bool _removeLogo = false;
   bool _triedSubmit = false;
 
@@ -127,23 +158,24 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
   }
 
   Future<void> _pickLogo() async {
-    final hasLogo = !_removeLogo && (_newLogoPath != null || (widget.initial?.logoUrl?.isNotEmpty ?? false));
+    final hasLogo = !_removeLogo && (_newLogoBytes != null || (widget.initial?.logoUrl?.isNotEmpty ?? false));
     await ImageSourcePickerModal.show(
       context,
       title: 'Logo del negocio',
       hasExistingImage: hasLogo,
+      subtitle: 'Se sube al guardar los cambios',
       onSelected: (source) async {
-        final path =
-            source == ImageSource.camera ? await ImageHelper.pickFromCamera() : await ImageHelper.pickFromGallery();
-        if (path != null && mounted) {
+        final picked = await ImageHelper.pickBytes(source);
+        if (picked != null && mounted) {
           setState(() {
-            _newLogoPath = path;
+            _newLogoBytes = picked.bytes;
+            _newLogoMime = picked.mimeType;
             _removeLogo = false;
           });
         }
       },
       onRemove: () => setState(() {
-        _newLogoPath = null;
+        _newLogoBytes = null;
         _removeLogo = true;
       }),
     );
@@ -164,9 +196,12 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
         icon: _icon,
         color: AppPalette.toHex(AppPalette.businessColors[_colorKey]!),
         description: _isEditing ? _descriptionController.text.trim() : null,
-        newLogoPath: _newLogoPath,
+        newLogoBytes: _newLogoBytes,
+        newLogoMime: _newLogoMime,
         removeLogo: _removeLogo,
         cashRegisterEnabled: _cashRegister,
+        servicesEnabled: _services,
+        serviceType: _services ? _serviceType.code : widget.initial?.serviceType,
       ),
     );
   }
@@ -358,6 +393,29 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
                   title: const Text('Usar arqueo de caja'),
                   subtitle: const Text('Abre y cierra caja para cuadrar el efectivo del día'),
                 ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _services,
+                  onChanged: (v) => setState(() => _services = v),
+                  title: const Text('Mi negocio ofrece servicios'),
+                  subtitle: const Text('Lavadero, barbería o taller: tablero de trabajos, empleados y servicios'),
+                ),
+                if (_services)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpace.sm),
+                    child: Wrap(
+                      spacing: AppSpace.sm,
+                      runSpacing: AppSpace.sm,
+                      children: [
+                        for (final t in ServiceType.values)
+                          ChoiceChip(
+                            label: Text(t.label),
+                            selected: _serviceType == t,
+                            onSelected: (_) => setState(() => _serviceType = t),
+                          ),
+                      ],
+                    ),
+                  ),
               ],
               const SizedBox(height: AppSpace.xxl),
               FilledButton(
@@ -376,7 +434,14 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
   Widget _logoPreview(Color color) {
     const size = 52.0;
     final radius = BorderRadius.circular(14);
-    final path = _newLogoPath ?? (_removeLogo ? null : widget.initial?.logoUrl);
+    final bytes = _newLogoBytes;
+    if (bytes != null) {
+      return ClipRRect(
+        borderRadius: radius,
+        child: Image.memory(bytes, width: size, height: size, fit: BoxFit.cover),
+      );
+    }
+    final path = _removeLogo ? null : widget.initial?.logoUrl;
     if (path != null && path.isNotEmpty) {
       return ProductImageView(imagePath: path, width: size, height: size, borderRadius: radius);
     }

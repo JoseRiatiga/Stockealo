@@ -17,6 +17,15 @@ class Sale {
   final String? variantId;
   final String? variantName;
 
+  /// Línea de servicio (lavado, corte...): no tiene producto (productId vacío)
+  final String? serviceId;
+  final String? workOrderId;
+
+  /// Empleados que hicieron el servicio (lista JSON de ids)
+  final String? staffIds;
+
+  bool get isService => serviceId != null || productId.isEmpty;
+
   Sale({
     required this.id,
     this.businessId = 'default_business',
@@ -35,13 +44,16 @@ class Sale {
     this.isSynced = false,
     this.variantId,
     this.variantName,
+    this.serviceId,
+    this.workOrderId,
+    this.staffIds,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'business_id': businessId,
-      'product_id': productId,
+      'product_id': productId.isEmpty ? null : productId,
       'product_name': productName,
       'product_photo_path': productPhotoPath,
       'quantity': quantity,
@@ -56,6 +68,9 @@ class Sale {
       'is_synced': isSynced ? 1 : 0,
       'variant_id': variantId,
       'variant_name': variantName,
+      'service_id': serviceId,
+      'work_order_id': workOrderId,
+      'staff_ids': staffIds,
     };
   }
 
@@ -63,7 +78,7 @@ class Sale {
     return Sale(
       id: map['id'] as String,
       businessId: map['business_id'] as String? ?? 'default_business',
-      productId: map['product_id'] as String,
+      productId: map['product_id'] as String? ?? '',
       productName: map['product_name'] as String,
       productPhotoPath: map['product_photo_path'] as String?,
       quantity: (map['quantity'] as num).toInt(),
@@ -78,6 +93,9 @@ class Sale {
       isSynced: (map['is_synced'] as int?) == 1,
       variantId: map['variant_id'] as String?,
       variantName: map['variant_name'] as String?,
+      serviceId: map['service_id'] as String?,
+      workOrderId: map['work_order_id'] as String?,
+      staffIds: map['staff_ids'] as String?,
     );
   }
 }

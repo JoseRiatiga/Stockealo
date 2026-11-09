@@ -16,6 +16,12 @@ class Business {
 
   /// Arqueo de caja activado (opcional; apagado por defecto)
   final bool cashRegisterEnabled;
+
+  /// El negocio ofrece servicios (lavadero, barbería, taller): tablero y empleados
+  final bool servicesEnabled;
+
+  /// Tipo de negocio de servicios: ver ServiceType
+  final String? serviceType;
   final String? description;
   final DateTime createdAt;
   final bool isSynced;
@@ -32,6 +38,8 @@ class Business {
     this.color,
     this.logoUrl,
     this.cashRegisterEnabled = false,
+    this.servicesEnabled = false,
+    this.serviceType,
     this.description,
     required this.createdAt,
     this.isSynced = false,
@@ -66,6 +74,8 @@ class Business {
     String? color,
     String? logoUrl,
     bool? cashRegisterEnabled,
+    bool? servicesEnabled,
+    String? serviceType,
     String? description,
     DateTime? createdAt,
     bool? isSynced,
@@ -82,6 +92,8 @@ class Business {
       color: color ?? this.color,
       logoUrl: logoUrl ?? this.logoUrl,
       cashRegisterEnabled: cashRegisterEnabled ?? this.cashRegisterEnabled,
+      servicesEnabled: servicesEnabled ?? this.servicesEnabled,
+      serviceType: serviceType ?? this.serviceType,
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       isSynced: isSynced ?? this.isSynced,
@@ -101,6 +113,8 @@ class Business {
       'color': color,
       'logo_url': logoUrl,
       'cash_register_enabled': cashRegisterEnabled ? 1 : 0,
+      'services_enabled': servicesEnabled ? 1 : 0,
+      'service_type': serviceType,
       'description': description,
       'created_at': createdAt.toIso8601String(),
       'is_synced': isSynced ? 1 : 0,
@@ -121,6 +135,8 @@ class Business {
       logoUrl: map['logo_url'] as String?,
       // En SQLite es 0/1; en la nube, booleano
       cashRegisterEnabled: map['cash_register_enabled'] == true || map['cash_register_enabled'] == 1,
+      servicesEnabled: map['services_enabled'] == true || map['services_enabled'] == 1,
+      serviceType: map['service_type'] as String?,
       description: map['description'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       isSynced: (map['is_synced'] as int?) == 1,

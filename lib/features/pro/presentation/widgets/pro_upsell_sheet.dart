@@ -9,7 +9,7 @@ import '../../data/pro_service.dart';
 import '../screens/pro_screen.dart';
 
 /// Qué beneficio de Pro resaltar en la ventana
-enum ProBenefit { onlineStore, debtCollection, catalogs, stockyAi }
+enum ProBenefit { onlineStore, debtCollection, catalogs, stockyAi, staff }
 
 /// Cómo se cerró la ventana de Pro
 enum ProUpsellResult {

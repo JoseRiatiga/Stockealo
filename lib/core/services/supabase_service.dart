@@ -579,6 +579,8 @@ class SupabaseService {
               'color': b['color'],
               'logo_url': b['logo_url'],
               'cash_register_enabled': b['cash_register_enabled'] == true ? 1 : 0,
+              'services_enabled': b['services_enabled'] == true ? 1 : 0,
+              'service_type': b['service_type'],
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
               'deleted_at': b['deleted_at'],
               'created_at': b['created_at'] ?? DateTime.now().toIso8601String(),
@@ -807,6 +809,7 @@ class SupabaseService {
         final localSales = <String, Map<String, Object?>>{
           for (final r in await db.query('sales', columns: [
             'id', 'variant_id', 'variant_name', 'seller_name', 'invoice_number', 'product_photo_path', 'discount_amount',
+            'service_id', 'work_order_id', 'staff_ids',
           ]))
             r['id'] as String: r,
         };
@@ -894,6 +897,9 @@ class SupabaseService {
               'created_at': s['sale_date'] ?? DateTime.now().toIso8601String(),
               'variant_id': s['variant_id'] ?? local?['variant_id'],
               'variant_name': s['variant_name'] ?? local?['variant_name'],
+              'service_id': s['service_id'] ?? local?['service_id'],
+              'work_order_id': s['work_order_id'] ?? local?['work_order_id'],
+              'staff_ids': s['staff_ids'] ?? local?['staff_ids'],
               'seller_name': local?['seller_name'],
               'invoice_number': local?['invoice_number'],
               'product_photo_path': local?['product_photo_path'],
@@ -931,6 +937,27 @@ class SupabaseService {
         }
       } catch (e) {
         debugPrint('Error descargando pedidos a proveedores: $e');
+      }
+
+      // 6. Negocios de servicios: catálogo, empleados y tablero
+      for (final (table, bools) in const [
+        ('services', ['is_active']),
+        ('staff', ['is_active']),
+        ('work_orders', <String>[]),
+      ]) {
+        try {
+          final List<dynamic> rows = await client!.from(table).select();
+          for (final row in rows) {
+            final map = Map<String, dynamic>.from(row as Map);
+            await db.insert(
+              table,
+              table == 'work_orders' ? workOrderLocalRow(map) : intRow(map, bools),
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+        } catch (e) {
+          debugPrint('Error descargando $table: $e');
+        }
       }
 
       return SyncResult(
@@ -1085,6 +1112,12 @@ class SupabaseService {
         await db.from('suppliers').delete().eq('id', p['id'] as String);
       case 'upsert_purchase':
         await db.from('purchases').upsert(purchaseCloudRow(p), onConflict: 'id');
+      case 'upsert_service':
+        await db.from('services').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
+      case 'upsert_staff':
+        await db.from('staff').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
+      case 'upsert_work_order':
+        await db.from('work_orders').upsert(workOrderCloudRow(p), onConflict: 'id');
       case 'upsert_supplier_order':
         await db.from('supplier_orders').upsert(orderCloudRow(p), onConflict: 'id');
       case 'adjust_variant_stock':
@@ -1203,6 +1236,11 @@ class SupabaseService {
         'color': b['color'],
         'logo_url': b['logo_url'],
         'cash_register_enabled': b['cash_register_enabled'] == 1 || b['cash_register_enabled'] == true,
+        // Solo los negocios que usan servicios mandan estas columnas (más nuevas)
+        if (b['service_type'] != null || b['services_enabled'] == 1 || b['services_enabled'] == true) ...{
+          'services_enabled': b['services_enabled'] == 1 || b['services_enabled'] == true,
+          'service_type': b['service_type'],
+        },
         'is_deleted': (b['is_deleted'] as int?) ?? 0,
       };
 
@@ -1290,6 +1328,10 @@ class SupabaseService {
   static Map<String, dynamic> _saleVariantFields(Map<String, dynamic> s) => {
         if ((s['variant_id'] as String?)?.isNotEmpty == true) 'variant_id': s['variant_id'],
         if ((s['variant_name'] as String?)?.isNotEmpty == true) 'variant_name': s['variant_name'],
+        // Línea de servicio (lavado, corte...): solo la mandan los negocios de servicios
+        if ((s['service_id'] as String?)?.isNotEmpty == true) 'service_id': s['service_id'],
+        if ((s['work_order_id'] as String?)?.isNotEmpty == true) 'work_order_id': s['work_order_id'],
+        if ((s['staff_ids'] as String?)?.isNotEmpty == true) 'staff_ids': s['staff_ids'],
       };
 
   Future<void> _sendSale(SupabaseClient db, Map<String, dynamic> s) async {
@@ -1302,7 +1344,8 @@ class SupabaseService {
     final payload = {
       'id': s['id'],
       'business_id': s['business_id'],
-      'product_id': s['product_id'],
+      // Una línea de servicio no tiene producto
+      'product_id': (s['product_id'] as String?)?.isEmpty == true ? null : s['product_id'],
       'product_name': s['product_name'],
       'quantity': qty,
       'unit_price': unitPrice,
@@ -1322,11 +1365,15 @@ class SupabaseService {
       if (e.toString().contains('product_name') ||
           e.toString().contains('customer_name') ||
           e.toString().contains('variant_') ||
+          e.toString().contains('service_id') ||
           e.toString().contains('42703')) {
         payload.remove('product_name');
         payload.remove('customer_name');
         payload.remove('variant_id');
         payload.remove('variant_name');
+        payload.remove('service_id');
+        payload.remove('work_order_id');
+        payload.remove('staff_ids');
         await db.from('sales').upsert(payload, onConflict: 'id');
       } else {
         rethrow;
@@ -1471,6 +1518,44 @@ class SupabaseService {
       'created_by': r['created_by'],
       'created_at': r['created_at'] ?? DateTime.now().toIso8601String(),
       'received_at': r['received_at'],
+    };
+  }
+
+  /// Servicio del catálogo, empleado u orden del tablero
+  Future<void> upsertServiceToCloud(Map<String, dynamic> row) => _write('upsert_service', row);
+  Future<void> upsertStaffToCloud(Map<String, dynamic> row) => _write('upsert_staff', row);
+  Future<void> upsertWorkOrderToCloud(Map<String, dynamic> row) => _write('upsert_work_order', row);
+
+  /// Fila local -> nube: quita lo interno de la cola y pasa 0/1 a booleano en [boolColumns]
+  static Map<String, dynamic> boolRow(Map<String, dynamic> r, List<String> boolColumns) => {
+        for (final e in r.entries)
+          if (!e.key.startsWith('_') && e.key != 'is_synced')
+            e.key: boolColumns.contains(e.key) ? (e.value == 1 || e.value == true) : e.value,
+      };
+
+  /// Fila de la nube -> local: booleanos a 0/1
+  static Map<String, dynamic> intRow(Map<String, dynamic> r, List<String> boolColumns) => {
+        for (final e in r.entries) e.key: boolColumns.contains(e.key) ? (e.value == true || e.value == 1 ? 1 : 0) : e.value,
+      };
+
+  /// Orden del tablero: los JSON locales (texto) pasan como JSON a la nube
+  static Map<String, dynamic> workOrderCloudRow(Map<String, dynamic> r) {
+    dynamic json(Object? v, Object fallback) => v is String ? jsonDecode(v) : (v ?? fallback);
+    final row = boolRow(r, const []);
+    row['lines'] = json(r['lines'], const []);
+    row['status_times'] = json(r['status_times'], const {});
+    row['sale_ids'] = json(r['sale_ids'], const []);
+    return row;
+  }
+
+  /// Orden del tablero: nube -> local (JSON como texto)
+  static Map<String, dynamic> workOrderLocalRow(Map<String, dynamic> r) {
+    String text(Object? v, Object fallback) => v is String ? v : jsonEncode(v ?? fallback);
+    return {
+      ...r,
+      'lines': text(r['lines'], const []),
+      'status_times': text(r['status_times'], const {}),
+      'sale_ids': text(r['sale_ids'], const []),
     };
   }
 

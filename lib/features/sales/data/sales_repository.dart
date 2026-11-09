@@ -1,3 +1,5 @@
+import '../../services/models/service_models.dart';
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
@@ -385,6 +387,143 @@ class SalesRepository {
     return createdSales;
   }
 
+  /// Cobra los servicios de una orden del tablero. Cada servicio queda como una
+  /// línea de venta sin producto (no toca el inventario), con la placa y quién lo
+  /// hizo en la nota. El descuento se reparte en proporción al precio.
+  /// La propina no es venta del negocio: se guarda en la orden para el empleado.
+  Future<List<Sale>> recordServiceSale({
+    required WorkOrder order,
+    required String paymentMethod, // 'EFECTIVO' | 'TRANSFERENCIA' | 'FIADO'
+    String? customerName,
+    double discountAmount = 0,
+    Map<String, String> staffNames = const {},
+    DateTime? now,
+  }) async {
+    final lines = order.lines;
+    if (lines.isEmpty) throw Exception('La orden no tiene servicios para cobrar.');
+    if (paymentMethod == 'FIADO' && (customerName ?? '').trim().isEmpty) {
+      throw Exception('Para fiar escribe el nombre del cliente.');
+    }
+    final db = await _dbProvider.database;
+    final businessId = order.businessId;
+    final subtotal = lines.fold(0.0, (s, l) => s + l.price);
+    final discount = discountAmount.clamp(0.0, subtotal).toDouble();
+    final finalTotal = subtotal - discount;
+    final at = now ?? DateTime.now();
+    final invoiceNumber = '#INV-${at.millisecondsSinceEpoch.toString().substring(5)}';
+    final currentUser = AuthRepository.instance.currentUser;
+    final seller = (currentUser?.name ?? '').trim().isNotEmpty
+        ? currentUser!.name!
+        : (currentUser?.email.split('@').first ?? 'Vendedor');
+    final cleanCustomer = (customerName ?? '').trim().isEmpty ? null : customerName!.trim();
+
+    final created = <Sale>[];
+    String? customerId;
+    var customerIsNew = false;
+
+    await db.transaction((txn) async {
+      if (paymentMethod == 'FIADO' && cleanCustomer != null) {
+        final existing = await txn.query(
+          'customers',
+          where: 'business_id = ? AND LOWER(name) = ?',
+          whereArgs: [businessId, cleanCustomer.toLowerCase()],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) {
+          customerId = existing.first['id'] as String;
+          await txn.rawUpdate(
+            'UPDATE customers SET debt_balance = debt_balance + ? WHERE id = ?',
+            [finalTotal, customerId],
+          );
+        } else {
+          customerId = const Uuid().v4();
+          customerIsNew = true;
+          await txn.insert('customers', {
+            'id': customerId,
+            'business_id': businessId,
+            'name': cleanCustomer,
+            'phone': order.customerPhone,
+            'debt_balance': finalTotal,
+            'created_at': at.toIso8601String(),
+            'is_synced': 0,
+          });
+        }
+      }
+
+      for (final line in lines) {
+        final share = subtotal > 0 ? line.price / subtotal : 1 / lines.length;
+        final lineDiscount = discount * share;
+        final lineTotal = (line.price - lineDiscount).clamp(0.0, double.infinity).toDouble();
+        final who = [for (final id in line.staffIds) staffNames[id] ?? 'Empleado'].join(', ');
+        final note = [
+          if ((order.plate ?? '').isNotEmpty) 'Placa ${order.plate}',
+          if (who.isNotEmpty) 'Atendió: $who',
+        ].join(' · ');
+        final saleId = const Uuid().v4();
+        final staffJson = jsonEncode(line.staffIds);
+        await txn.insert('sales', {
+          'id': saleId,
+          'business_id': businessId,
+          'product_id': null,
+          'product_name': line.name,
+          'quantity': 1,
+          'customer_id': customerId,
+          'customer_name': cleanCustomer,
+          'seller_name': seller,
+          'date': at.toIso8601String(),
+          'total': lineTotal,
+          // La comisión del empleado se descuenta como costo desde la 0.11.1
+          'total_cost': 0.0,
+          'net_profit': lineTotal,
+          'payment_method': paymentMethod,
+          'payment_status': paymentMethod == 'FIADO' ? 'PENDIENTE' : 'PAGADO',
+          'notes': note.isEmpty ? null : note,
+          'invoice_number': invoiceNumber,
+          'discount_amount': lineDiscount,
+          'service_id': line.serviceId,
+          'work_order_id': order.id,
+          'staff_ids': staffJson,
+          'created_at': at.toIso8601String(),
+          'is_synced': 0,
+        });
+        created.add(Sale(
+          id: saleId,
+          businessId: businessId,
+          productId: '',
+          productName: line.name,
+          quantity: 1,
+          unitPrice: lineTotal,
+          unitCost: 0,
+          totalAmount: lineTotal,
+          netProfit: lineTotal,
+          paymentMethod: paymentMethod,
+          customerName: cleanCustomer,
+          sellerName: seller,
+          date: at,
+          serviceId: line.serviceId,
+          workOrderId: order.id,
+          staffIds: staffJson,
+        ));
+      }
+    });
+
+    await _syncCustomer(db, customerId, customerIsNew, finalTotal);
+    for (final sale in created) {
+      SupabaseService.instance.insertSaleToCloud({...sale.toMap(), 'notes': null});
+    }
+    final what = lines.length == 1 ? lines.first.name : '${lines.length} servicios';
+    ActivityRepository.instance.log(
+      businessId: businessId,
+      action: ActivityAction.serviceSale,
+      summary: 'Cobró $what${(order.plate ?? '').isNotEmpty ? ' (${order.plate})' : ''} por '
+          '${CurrencyFormatter.format(finalTotal)} (${activityPaymentLabel(paymentMethod)})'
+          '${discount > 0 ? ' con ${CurrencyFormatter.format(discount)} de descuento' : ''}',
+      data: {'work_order_id': order.id, 'total': finalTotal},
+    );
+    DataEvents.instance.salesChanged();
+    return created;
+  }
+
   /// Lleva a la nube el fiado: un cliente nuevo se crea con su deuda; a uno
   /// existente se le suma la diferencia, para no pisar abonos de otros dispositivos.
   Future<void> _syncCustomer(Database db, String? customerId, bool isNew, double amount) async {
@@ -566,6 +705,12 @@ class SalesRepository {
         sellerName: map['seller_name'] as String?,
         date: DateTime.parse(map['date'] as String),
         isSynced: (map['is_synced'] as int?) == 1,
+        // Sin la talla, anular la venta no le devolvía la unidad a la variante
+        variantId: map['variant_id'] as String?,
+        variantName: map['variant_name'] as String?,
+        serviceId: map['service_id'] as String?,
+        workOrderId: map['work_order_id'] as String?,
+        staffIds: map['staff_ids'] as String?,
       );
     }).toList();
   }
@@ -628,39 +773,43 @@ class SalesRepository {
     final db = await _dbProvider.database;
     int? restoredStock;
     String? debtorId;
+    // Un servicio (lavado, corte...) no tiene inventario que reponer
+    final hasProduct = sale.productId.isNotEmpty;
     await db.transaction((txn) async {
-      // Reponer stock
-      await txn.rawUpdate(
-        'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
-        [sale.quantity, sale.productId, sale.businessId],
-      );
-      final productRows = await txn.query(
-        'products',
-        columns: ['stock'],
-        where: 'id = ? AND business_id = ?',
-        whereArgs: [sale.productId, sale.businessId],
-      );
-      restoredStock = productRows.isNotEmpty ? productRows.first['stock'] as int : null;
-
-      // La talla o el color vendido también recupera su unidad
-      if (sale.variantId != null) {
+      if (hasProduct) {
+        // Reponer stock
         await txn.rawUpdate(
-          'UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?',
-          [sale.quantity, DateTime.now().toIso8601String(), sale.variantId],
+          'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
+          [sale.quantity, sale.productId, sale.businessId],
         );
-      }
+        final productRows = await txn.query(
+          'products',
+          columns: ['stock'],
+          where: 'id = ? AND business_id = ?',
+          whereArgs: [sale.productId, sale.businessId],
+        );
+        restoredStock = productRows.isNotEmpty ? productRows.first['stock'] as int : null;
 
-      // Registrar reverso en kardex
-      await txn.insert('stock_movements', {
-        'id': const Uuid().v4(),
-        'business_id': sale.businessId,
-        'product_id': sale.productId,
-        'type': 'AJUSTE',
-        'quantity': sale.quantity,
-        'resulting_stock': restoredStock ?? 0,
-        'reason': 'Venta cancelada / reversada',
-        'date': DateTime.now().toIso8601String(),
-      });
+        // La talla o el color vendido también recupera su unidad
+        if (sale.variantId != null) {
+          await txn.rawUpdate(
+            'UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?',
+            [sale.quantity, DateTime.now().toIso8601String(), sale.variantId],
+          );
+        }
+
+        // Registrar reverso en kardex
+        await txn.insert('stock_movements', {
+          'id': const Uuid().v4(),
+          'business_id': sale.businessId,
+          'product_id': sale.productId,
+          'type': 'AJUSTE',
+          'quantity': sale.quantity,
+          'resulting_stock': restoredStock ?? 0,
+          'reason': 'Venta cancelada / reversada',
+          'date': DateTime.now().toIso8601String(),
+        });
+      }
 
       // Si fue fiado, reducir deuda
       if (sale.paymentMethod == 'FIADO' && sale.customerName != null) {
@@ -697,7 +846,7 @@ class SalesRepository {
     final cloud = SupabaseService.instance;
     await cloud.deleteSaleFromCloud(sale.id);
     if (restoredStock != null) await cloud.adjustProductStockInCloud(sale.productId, sale.quantity);
-    if (sale.variantId != null) await cloud.adjustVariantStockInCloud(sale.variantId!, sale.quantity);
+    if (hasProduct && sale.variantId != null) await cloud.adjustVariantStockInCloud(sale.variantId!, sale.quantity);
     if (debtorId != null) await cloud.adjustCustomerDebtInCloud(debtorId!, -sale.totalAmount);
   }
 }

@@ -83,7 +83,10 @@ void main() {
         containsAll(['is_deleted', 'deleted_at', 'description', 'country', 'icon', 'color', 'logo_url', 'cash_register_enabled']),
       );
       expect(await columnsOf('app_settings'), isNotEmpty);
-      expect(await db.getVersion(), 9);
+      expect(await db.getVersion(), 10);
+      expect(await columnsOf('suppliers'), containsAll(['name', 'phone', 'payment_terms', 'credit_days']));
+      expect(await columnsOf('purchases'), containsAll(['supplier_id', 'items', 'due_date', 'is_paid']));
+      expect(await columnsOf('products'), contains('supplier_id'));
       expect(
         await columnsOf('product_variants'),
         containsAll(['attribute2_name', 'attribute2_value', 'color_hex', 'color_hex2']),

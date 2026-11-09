@@ -18,6 +18,9 @@ abstract final class ActivityAction {
   static const productDelete = 'product_delete';
   static const stockAdjust = 'stock_adjust';
   static const shrinkage = 'shrinkage';
+  static const purchase = 'purchase';
+  static const supplierChange = 'supplier_change';
+  static const supplierPayment = 'supplier_payment';
   static const debtPayment = 'debt_payment';
   static const customerDelete = 'customer_delete';
   static const cashOpen = 'cash_open';

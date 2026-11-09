@@ -6,6 +6,7 @@ import 'package:stockealo/features/business/models/business.dart';
 import 'package:stockealo/core/theme/app_theme.dart';
 import 'package:stockealo/features/reports/data/report_export_service.dart';
 import 'package:stockealo/features/reports/presentation/screens/reports_screen.dart';
+import 'package:stockealo/features/suppliers/models/purchase.dart';
 
 final _biz = Business(id: 'b1', userId: 'u1', name: 'Loliando', createdAt: DateTime(2026, 11, 1));
 
@@ -115,6 +116,52 @@ void main() {
     // "Todo" incluye las dos ventas
     final sales = _rows(Excel.decodeBytes(files[1].bytes).tables['Ventas']!);
     expect(sales.where((r) => r.contains('Leggins')).length, 1);
+    await db.close();
+  });
+
+  test('compras del periodo y costo por proveedor', () async {
+    final db = await _db();
+    await db.execute('''CREATE TABLE purchases (id TEXT PRIMARY KEY, business_id TEXT, supplier_id TEXT, supplier_name TEXT,
+      invoice_number TEXT, date TEXT, items TEXT, total REAL, payment_terms TEXT, due_date TEXT, is_paid INTEGER,
+      payments TEXT, photo_path TEXT, order_id TEXT, notes TEXT, created_by TEXT, created_at TEXT)''');
+    Purchase entry(String id, String supplier, int day, double cost, {bool credit = false}) => Purchase(
+          id: id, businessId: 'b1', supplierId: supplier, supplierName: supplier == 's1' ? 'El Sol' : 'La Luna',
+          invoiceNumber: 'F-$id', date: DateTime(2026, 11, day), createdAt: DateTime(2026, 11, day),
+          paymentTerms: credit ? 'CREDITO' : 'CONTADO', isPaid: !credit, dueDate: credit ? DateTime(2026, 12, 1) : null,
+          items: [
+            PurchaseItem(productId: 'p1', productName: 'Pijama', variantId: 'v1', variantName: 'M · Rojo', quantity: 2, unitCost: cost),
+            PurchaseItem(productId: 'p1', productName: 'Pijama', variantId: 'v2', variantName: 'L · Azul', quantity: 1, unitCost: cost),
+          ],
+        );
+    await db.insert('purchases', entry('a', 's1', 2, 20000).toMap());
+    await db.insert('purchases', entry('b', 's1', 6, 22000, credit: true).toMap());
+    await db.insert('purchases', entry('c', 's2', 20, 19000).toMap());
+
+    final files = await ReportExportService.instance.buildFiles(
+      db: db,
+      business: _biz,
+      sections: [ReportSection.purchases, ReportSection.supplierCosts],
+      period: ReportPeriod.range(DateTime(2026, 11, 1), DateTime(2026, 11, 10)),
+      singleFile: true,
+    );
+    final excel = Excel.decodeBytes(files.single.bytes);
+
+    final compras = _rows(excel.tables['Compras']!);
+    // Encabezado + 2 entradas del periodo con 2 renglones cada una + vacía + total
+    expect(compras.where((r) => r.contains('Pijama')).length, 4);
+    expect(compras.any((r) => r.contains('F-c')), isFalse, reason: 'la del 20 está fuera del periodo');
+    expect(compras.firstWhere((r) => r.contains('F-b'))[9], 'Por pagar');
+    expect(compras.last.first, startsWith('TOTAL'));
+    expect(double.parse(compras.last[10]), 66000);
+
+    // Costos: todas las entradas (no usa periodo); La Luna es la más barata
+    final costos = _rows(excel.tables['Costos por proveedor']!);
+    expect(costos[1].sublist(0, 2), ['Pijama', 'La Luna']);
+    expect(double.parse(costos[1][2]), 19000);
+    expect(costos[1][6], 'Sí');
+    expect(costos[2].sublist(0, 2), ['Pijama', 'El Sol']);
+    expect(double.parse(costos[2][2]), 22000);
+    expect(double.parse(costos[2][5]), 2000, reason: 'con El Sol subió de 20.000 a 22.000');
     await db.close();
   });
 

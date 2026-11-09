@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -695,7 +696,7 @@ class SupabaseService {
         final List<dynamic> cloudProducts = await client!.from('products').select();
         // Lo que la nube no guardaba antes (variantes, descripción) no se pierde al reescribir
         final localExtras = <String, Map<String, Object?>>{
-          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description']))
+          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description', 'supplier_id']))
             r['id'] as String: r,
         };
         for (final p in cloudProducts) {
@@ -710,6 +711,7 @@ class SupabaseService {
               'name': p['name'],
               'description': p['description'] ?? local?['description'],
               'has_variants': (p['has_variants'] == true || localHasVariants) ? 1 : 0,
+              'supplier_id': p.containsKey('supplier_id') ? p['supplier_id'] : local?['supplier_id'],
               'category': p['category'] ?? 'General',
               'purchase_price': (p['cost_price'] as num?)?.toDouble() ?? 0.0,
               'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
@@ -906,6 +908,31 @@ class SupabaseService {
         debugPrint('Error descargando ventas de Supabase: $e');
       }
 
+      // 5. Descargar proveedores y entradas de mercancía
+      try {
+        final List<dynamic> cloudSuppliers = await client!.from('suppliers').select();
+        for (final row in cloudSuppliers) {
+          await db.insert('suppliers', supplierLocalRow(Map<String, dynamic>.from(row as Map)),
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        final List<dynamic> cloudPurchases = await client!.from('purchases').select();
+        for (final row in cloudPurchases) {
+          await db.insert('purchases', purchaseLocalRow(Map<String, dynamic>.from(row as Map)),
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      } catch (e) {
+        debugPrint('Error descargando proveedores de Supabase: $e');
+      }
+      try {
+        final List<dynamic> cloudOrders = await client!.from('supplier_orders').select();
+        for (final row in cloudOrders) {
+          await db.insert('supplier_orders', orderLocalRow(Map<String, dynamic>.from(row as Map)),
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      } catch (e) {
+        debugPrint('Error descargando pedidos a proveedores: $e');
+      }
+
       return SyncResult(
         success: true,
         businessesCount: businessesCount,
@@ -1052,6 +1079,14 @@ class SupabaseService {
         var delete = db.from('product_variants').delete().eq('product_id', productId);
         if (keep.isNotEmpty) delete = delete.not('id', 'in', '(${keep.join(',')})');
         await delete;
+      case 'upsert_supplier':
+        await db.from('suppliers').upsert(supplierCloudRow(p), onConflict: 'id');
+      case 'delete_supplier':
+        await db.from('suppliers').delete().eq('id', p['id'] as String);
+      case 'upsert_purchase':
+        await db.from('purchases').upsert(purchaseCloudRow(p), onConflict: 'id');
+      case 'upsert_supplier_order':
+        await db.from('supplier_orders').upsert(orderCloudRow(p), onConflict: 'id');
       case 'adjust_variant_stock':
         await db.rpc('adjust_variant_stock', params: {'p_variant_id': p['id'], 'p_delta': p['delta']});
       case 'adjust_debt':
@@ -1224,7 +1259,7 @@ class SupabaseService {
 
     // El stock solo se fija al crear el producto; luego cambia con adjust_stock o update_stock
     final editedAt = p[_editedAtKey] as String?;
-    await _updateOrInsert(db, 'products', {
+    final row = <String, dynamic>{
       'id': p['id'],
       'business_id': p['business_id'],
       'name': p['name'],
@@ -1239,7 +1274,16 @@ class SupabaseService {
       'description': p['description'],
       'created_at': p['created_at'],
       if (editedAt != null) 'updated_at': editedAt,
-    }, keepColumns: ['current_stock', 'created_at']);
+      'supplier_id': p['supplier_id'],
+    };
+    try {
+      await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
+    } catch (e) {
+      // Nube sin la columna del proveedor todavía: se guarda el resto
+      if (!e.toString().contains('supplier_id') && !e.toString().contains('42703')) rethrow;
+      row.remove('supplier_id');
+      await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
+    }
   }
 
   /// Talla o color vendido, solo si la venta lo tiene
@@ -1299,6 +1343,139 @@ class SupabaseService {
   /// Deja las variantes del producto en la nube igual que en el dispositivo
   Future<void> replaceVariantsInCloud(String productId, String businessId, List<Map<String, dynamic>> variants) =>
       _write('replace_variants', {'id': productId, 'product_id': productId, 'business_id': businessId, 'variants': variants});
+
+  /// Crea o actualiza un proveedor
+  Future<void> upsertSupplierToCloud(Map<String, dynamic> row) => _write('upsert_supplier', row);
+
+  /// Borra un proveedor
+  Future<void> deleteSupplierFromCloud(String id) => _write('delete_supplier', {'id': id});
+
+  /// Guarda una entrada de mercancía (con sus renglones)
+  Future<void> upsertPurchaseToCloud(Map<String, dynamic> row) => _write('upsert_purchase', row);
+
+  /// Fila local de proveedor -> fila de la nube
+  static Map<String, dynamic> supplierCloudRow(Map<String, dynamic> r) => {
+        'id': r['id'],
+        'business_id': r['business_id'],
+        'name': r['name'],
+        'contact_name': r['contact_name'],
+        'phone': r['phone'],
+        'email': r['email'],
+        'tax_id': r['tax_id'],
+        'visit_day': r['visit_day'],
+        'delivery_days': r['delivery_days'],
+        'min_order': r['min_order'],
+        'payment_terms': r['payment_terms'] ?? 'CONTADO',
+        'credit_days': r['credit_days'],
+        'notes': r['notes'],
+        'is_active': (r['is_active'] as int? ?? 1) == 1,
+        'created_at': r['created_at'],
+        'updated_at': r['updated_at'],
+      };
+
+  /// Fila de la nube -> fila local de proveedor
+  static Map<String, dynamic> supplierLocalRow(Map<String, dynamic> r) => {
+        'id': r['id'],
+        'business_id': r['business_id'],
+        'name': r['name'],
+        'contact_name': r['contact_name'],
+        'phone': r['phone'],
+        'email': r['email'],
+        'tax_id': r['tax_id'],
+        'visit_day': r['visit_day'],
+        'delivery_days': (r['delivery_days'] as num?)?.toInt(),
+        'min_order': (r['min_order'] as num?)?.toDouble(),
+        'payment_terms': r['payment_terms'] ?? 'CONTADO',
+        'credit_days': (r['credit_days'] as num?)?.toInt(),
+        'notes': r['notes'],
+        'is_active': r['is_active'] == false ? 0 : 1,
+        'created_at': r['created_at'] ?? DateTime.now().toIso8601String(),
+        'updated_at': r['updated_at'] ?? DateTime.now().toIso8601String(),
+      };
+
+  /// Fila local de entrada de mercancía -> fila de la nube (renglones como JSON)
+  static Map<String, dynamic> purchaseCloudRow(Map<String, dynamic> r) {
+    final items = r['items'];
+    return {
+      'id': r['id'],
+      'business_id': r['business_id'],
+      'supplier_id': r['supplier_id'],
+      'supplier_name': r['supplier_name'],
+      'invoice_number': r['invoice_number'],
+      'purchase_date': r['date'],
+      'items': items is String ? jsonDecode(items) : (items ?? const []),
+      'total': (r['total'] as num?)?.toDouble() ?? 0.0,
+      'payment_terms': r['payment_terms'] ?? 'CONTADO',
+      'due_date': r['due_date'],
+      'is_paid': (r['is_paid'] as int? ?? 1) == 1,
+      'payments': r['payments'] is String ? jsonDecode(r['payments'] as String) : (r['payments'] ?? const []),
+      'photo_path': r['photo_path'],
+      'order_id': r['order_id'],
+      'notes': r['notes'],
+      'created_by': r['created_by'],
+      'created_at': r['created_at'],
+    };
+  }
+
+  /// Fila de la nube -> fila local de entrada de mercancía
+  static Map<String, dynamic> purchaseLocalRow(Map<String, dynamic> r) {
+    final items = r['items'];
+    return {
+      'id': r['id'],
+      'business_id': r['business_id'],
+      'supplier_id': r['supplier_id'],
+      'supplier_name': r['supplier_name'],
+      'invoice_number': r['invoice_number'],
+      'date': r['purchase_date'] ?? r['created_at'] ?? DateTime.now().toIso8601String(),
+      'items': items is String ? items : jsonEncode(items ?? const []),
+      'total': (r['total'] as num?)?.toDouble() ?? 0.0,
+      'payment_terms': r['payment_terms'] ?? 'CONTADO',
+      'due_date': r['due_date'],
+      'is_paid': r['is_paid'] == false ? 0 : 1,
+      'payments': r['payments'] is String ? r['payments'] : jsonEncode(r['payments'] ?? const []),
+      'photo_path': r['photo_path'],
+      'order_id': r['order_id'],
+      'notes': r['notes'],
+      'created_by': r['created_by'],
+      'created_at': r['created_at'] ?? DateTime.now().toIso8601String(),
+    };
+  }
+
+  /// Pedido a proveedor: fila local -> nube (renglones como JSON)
+  static Map<String, dynamic> orderCloudRow(Map<String, dynamic> r) {
+    final items = r['items'];
+    return {
+      'id': r['id'],
+      'business_id': r['business_id'],
+      'supplier_id': r['supplier_id'],
+      'supplier_name': r['supplier_name'],
+      'items': items is String ? jsonDecode(items) : (items ?? const []),
+      'status': r['status'] ?? 'ENVIADO',
+      'created_by': r['created_by'],
+      'created_at': r['created_at'],
+      'received_at': r['received_at'],
+      if (r[_editedAtKey] != null) 'updated_at': r[_editedAtKey],
+    };
+  }
+
+  /// Pedido a proveedor: nube -> fila local
+  static Map<String, dynamic> orderLocalRow(Map<String, dynamic> r) {
+    final items = r['items'];
+    return {
+      'id': r['id'],
+      'business_id': r['business_id'],
+      'supplier_id': r['supplier_id'],
+      'supplier_name': r['supplier_name'],
+      'items': items is String ? items : jsonEncode(items ?? const []),
+      'status': r['status'] ?? 'ENVIADO',
+      'created_by': r['created_by'],
+      'created_at': r['created_at'] ?? DateTime.now().toIso8601String(),
+      'received_at': r['received_at'],
+    };
+  }
+
+  /// Guarda o actualiza un pedido a proveedor
+  Future<void> upsertSupplierOrderToCloud(Map<String, dynamic> row) => _write('upsert_supplier_order', row);
 
   /// Venta o anulación de una variante: ajuste por diferencia
   Future<void> adjustVariantStockInCloud(String variantId, int delta) =>

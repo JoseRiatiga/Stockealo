@@ -13,6 +13,8 @@ import 'product_form_screen.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 import '../../../team/data/team_repository.dart';
+import '../../../suppliers/data/supplier_repository.dart';
+import '../../../suppliers/models/purchase.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -57,10 +59,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   bool get _withVariants => _product.hasVariants && _product.variants.isNotEmpty;
 
+  /// Último costo con cada proveedor, sacado de las entradas de mercancía
+  List<SupplierCost> _supplierCosts = const [];
+
   Future<void> _refreshProduct() async {
     try {
       final updated = await _repository.getProductById(_product.id, _product.businessId);
       if (updated != null && mounted) setState(() => _product = updated);
+      final costs = await SupplierRepository.instance.latestCosts(_product.businessId);
+      if (mounted) setState(() => _supplierCosts = costs[_product.id] ?? const []);
     } catch (e) {
       debugPrint('No se pudo recargar el producto: $e');
     }
@@ -298,6 +305,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ],
       const SizedBox(height: 14),
       _buildPricingCard(),
+      if (canViewCosts && _supplierCosts.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        _buildSupplierCostsCard(),
+      ],
       if (showValuation) ...[
         const SizedBox(height: 14),
         _buildValuationCard(),
@@ -730,6 +741,51 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ],
           ],
+        ],
+      ),
+    );
+  }
+
+  /// Lo que cobra cada proveedor por este producto (última compra), el más barato arriba
+  Widget _buildSupplierCostsCard() {
+    final c = context.colors;
+    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Costo por proveedor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink)),
+          Text('Según tus últimas entradas de mercancía', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+          const SizedBox(height: AppSpace.md),
+          for (final (i, s) in _supplierCosts.indexed)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(s.supplierName, style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: 13)),
+                        Text(
+                          '${s.date.day} ${months[s.date.month - 1]} ${s.date.year}'
+                          '${s.change == null || s.change == 0 ? '' : (s.change! > 0 ? ' · subió ${CurrencyFormatter.format(s.change!)}' : ' · bajó ${CurrencyFormatter.format(-s.change!)}')}',
+                          style: TextStyle(color: (s.change ?? 0) > 0 ? c.warning : c.inkMuted, fontSize: 11.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (i == 0 && _supplierCosts.length > 1)
+                    Container(
+                      margin: const EdgeInsets.only(right: AppSpace.sm),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: c.successSoft, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                      child: Text('Más barato', style: TextStyle(color: c.success, fontSize: 11, fontWeight: FontWeight.w600)),
+                    ),
+                  Text(CurrencyFormatter.format(s.unitCost), style: TextStyle(color: c.ink, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
         ],
       ),
     );

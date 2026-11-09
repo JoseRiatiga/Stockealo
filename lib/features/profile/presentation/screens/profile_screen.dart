@@ -147,7 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           SettingsRow.toggle(
             icon: Icons.inventory_2_outlined,
             title: 'Stock bajo',
-            subtitle: 'Cuando un producto llega a su mínimo o se agota',
+            subtitle: 'Cuando un producto llega a su mínimo o se agota, y el día que pasa tu proveedor',
             value: _stockAlerts,
             onChanged: (v) => _setAlert(true, v),
           ),

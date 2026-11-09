@@ -188,4 +188,20 @@ void main() {
       await expectLater(AppDatabase.upgradeSchema(db, 8, 9), completes);
     });
   });
+
+  group('upgradeSchema v9 -> v10', () {
+    test('agrega proveedores, entradas y el proveedor del producto sin tocar lo demás', () async {
+      await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY, name TEXT)');
+      await db.insert('products', {'id': 'p1', 'name': 'Arroz'});
+
+      await AppDatabase.upgradeSchema(db, 9, 10);
+      await expectLater(AppDatabase.upgradeSchema(db, 9, 10), completes);
+
+      final columns = (await db.rawQuery('PRAGMA table_info(products)')).map((c) => c['name']).toSet();
+      expect(columns, contains('supplier_id'));
+      expect((await db.query('products')).single['name'], 'Arroz');
+      expect(await db.query('suppliers'), isEmpty);
+      expect(await db.query('purchases'), isEmpty);
+    });
+  });
 }

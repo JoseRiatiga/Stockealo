@@ -132,7 +132,6 @@ class ProductImageService {
       };
 
   /// Tipo real de la imagen por sus primeros bytes; null si no es una imagen compatible
-  @visibleForTesting
   static String? imageTypeOf(Uint8List b) {
     if (b.length < 12) return null;
     if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return 'image/jpeg';

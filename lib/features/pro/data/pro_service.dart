@@ -7,20 +7,30 @@ import '../../../core/services/supabase_service.dart';
 class ProStatus {
   final bool active;
 
-  /// 'business' (Pro Negocio) o 'global' (Pro Global)
+  /// 'business' (Pro Negocio), 'global' (Pro Global) o 'services' (Pro Servicios)
   final String? kind;
 
   /// null con Pro activo = permanente
   final DateTime? endsAt;
 
-  const ProStatus({required this.active, this.kind, this.endsAt});
+  /// Tiene Pro Servicios: se ve la pestaña Servicios (incluye todo lo de Pro)
+  final bool services;
+
+  const ProStatus({required this.active, this.kind, this.endsAt, this.services = false});
 
   static const none = ProStatus(active: false);
 
   bool get lifetime => active && endsAt == null;
 
-  String get kindLabel => kind == 'global' ? 'Pro Global' : 'Pro Negocio';
+  String get kindLabel => proKindLabel(kind);
 }
+
+/// Nombre de cada plan para mostrar
+String proKindLabel(String? kind) => switch (kind) {
+      'global' => 'Pro Global',
+      'services' => 'Pro Servicios',
+      _ => 'Pro Negocio',
+    };
 
 /// Un plan con su precio en una moneda
 class ProPlan {
@@ -51,6 +61,8 @@ class ProPlan {
         regularPrice: (r['regular_price'] as num?)?.toDouble(),
         label: r['label'] as String?,
       );
+
+  String get kindLabel => proKindLabel(kind);
 
   String get periodLabel => switch (period) {
         'week' => 'Semanal',
@@ -127,6 +139,7 @@ class ProService {
         active: map['active'] == true,
         kind: map['kind'] as String?,
         endsAt: map['ends_at'] == null ? null : DateTime.tryParse(map['ends_at'] as String)?.toLocal(),
+        services: map['services'] == true,
       );
       if (_statusBusinessId == businessId) status.value = result;
       return result;
@@ -142,6 +155,9 @@ class ProService {
     final rows = await client.from('pro_plans').select().eq('currency', currency).order('sort');
     return [for (final r in rows) ProPlan.fromRow(r)];
   }
+
+  /// Precios y compra se muestran solo si el panel encendió «Mostrar precios y compra»
+  static bool pricingVisible(Map<String, String> settings) => settings['show_pricing'] == 'on';
 
   /// Número de Nequi, WhatsApp, aviso legal…
   Future<Map<String, String>> settings() async {

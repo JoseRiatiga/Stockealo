@@ -21,7 +21,13 @@ const proBenefits = [
   (Icons.notifications_active_outlined, 'Cobro automático de fiados', 'Recordatorios programados y estado de cuenta en PDF.'),
   (Icons.auto_awesome_mosaic_outlined, 'Catálogos personalizados', 'Más plantillas y colores, sin el pie "Hecho con Stockealo".'),
   (Icons.auto_awesome_rounded, 'Más preguntas a Stocky', '50 preguntas a la IA al día en vez de 10.'),
-  (Icons.badge_outlined, 'Empleados sin límite', 'Para lavaderos, barberías y talleres: todo tu equipo en el tablero.'),
+];
+
+/// Lo que suma Pro Servicios además de todo Pro
+const proServicesBenefits = [
+  (Icons.view_kanban_outlined, 'Módulo Servicios', 'Tablero de trabajos, cola por orden de llegada y asistencia del equipo.'),
+  (Icons.payments_outlined, 'Comisiones y liquidaciones', 'Lo que gana cada empleado por servicio, para pagar por día, semana o mes.'),
+  (Icons.support_agent_outlined, 'Soporte incluido', 'Te ayudamos a configurarlo para tu negocio.'),
 ];
 
 /// Stockealo Pro: estado del negocio, planes, pago por Nequi y canje de códigos
@@ -113,7 +119,7 @@ class _ProScreenState extends State<ProScreen> {
 
   Future<void> _sendReceipt(ProPlan plan, String whatsapp) async {
     final email = AuthRepository.instance.currentUser?.email ?? '';
-    final kind = plan.kind == 'global' ? 'Pro Global' : 'Pro Negocio';
+    final kind = plan.kindLabel;
     final message = 'Hola, pagué Stockealo $kind ${plan.periodLabel.toLowerCase()} '
         '(${_money(plan.price)}) para el negocio "${widget.business.name}". '
         'Mi cuenta es $email. Te adjunto el comprobante.';
@@ -129,7 +135,7 @@ class _ProScreenState extends State<ProScreen> {
     final email = AuthRepository.instance.currentUser?.email ?? '';
     final wanted = plan == null
         ? 'Stockealo Pro'
-        : 'Stockealo ${plan.kind == 'global' ? 'Pro Global' : 'Pro Negocio'} ${plan.periodLabel.toLowerCase()} (${_money(plan.price)})';
+        : 'Stockealo ${plan.kindLabel} ${plan.periodLabel.toLowerCase()} (${_money(plan.price)})';
     final message = 'Hola, quiero activar $wanted para el negocio "${widget.business.name}". '
         'Mi cuenta es $email. ¿Cómo puedo pagar?';
     final digits = whatsapp?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
@@ -150,8 +156,10 @@ class _ProScreenState extends State<ProScreen> {
       body: FutureBuilder<(List<ProPlan>, Map<String, String>)>(
         future: _data,
         builder: (context, snapshot) {
-          final plans = snapshot.data?.$1 ?? const <ProPlan>[];
           final settings = snapshot.data?.$2 ?? const <String, String>{};
+          // Con «Mostrar precios y compra» apagado en el panel no se ven planes ni pagos
+          final showPricing = ProService.pricingVisible(settings);
+          final plans = showPricing ? (snapshot.data?.$1 ?? const <ProPlan>[]) : const <ProPlan>[];
           final loading = snapshot.connectionState != ConnectionState.done;
           return ContentWidth(
             child: ListView(
@@ -170,8 +178,43 @@ class _ProScreenState extends State<ProScreen> {
                 ),
               ),
               const SizedBox(height: AppSpace.xl),
+              _section(c, 'Pro Servicios'),
+              _card(
+                c,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Para lavaderos, barberías, talleres y otros negocios de servicios: todo lo de Pro y además:',
+                      style: TextStyle(fontSize: 13, height: 1.35, color: c.inkMuted),
+                    ),
+                    const SizedBox(height: AppSpace.xs),
+                    for (final b in proServicesBenefits) _benefit(c, b.$1, b.$2, b.$3),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpace.xl),
               if (loading)
                 const Padding(padding: EdgeInsets.all(AppSpace.xl), child: Center(child: CircularProgressIndicator()))
+              else if (!showPricing)
+                _card(
+                  c,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Por ahora los planes se activan con un código. Escríbenos y te contamos cómo tener Pro o Pro Servicios en tu negocio.',
+                        style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+                      ),
+                      const SizedBox(height: AppSpace.md),
+                      OutlinedButton.icon(
+                        onPressed: () => _askForPro(null, settings['whatsapp']),
+                        icon: const Icon(Icons.chat_outlined, size: 18),
+                        label: Text(settings['whatsapp'] != null ? 'Escribir por WhatsApp' : 'Escribir por correo'),
+                      ),
+                    ],
+                  ),
+                )
               else if (plans.isEmpty)
                 _card(
                   c,
@@ -278,14 +321,16 @@ class _ProScreenState extends State<ProScreen> {
       );
 
   Widget _plans(StockealoColors c, List<ProPlan> all) {
+    // Pro Servicios aparece solo si su plan está encendido para esta moneda
+    final kinds = [for (final k in const ['business', 'global', 'services']) if (all.any((p) => p.kind == k)) k];
+    if (!kinds.contains(_kind) && kinds.isNotEmpty) _kind = kinds.first;
     final plans = all.where((p) => p.kind == _kind).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'business', label: Text('Pro Negocio')),
-            ButtonSegment(value: 'global', label: Text('Pro Global')),
+          segments: [
+            for (final k in kinds) ButtonSegment(value: k, label: Text(proKindLabel(k))),
           ],
           selected: {_kind},
           showSelectedIcon: false,
@@ -297,9 +342,11 @@ class _ProScreenState extends State<ProScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.sm, AppSpace.xs, AppSpace.md),
           child: Text(
-            _kind == 'business'
-                ? 'Para "${widget.business.name}" y todo su equipo.'
-                : 'Para todos los negocios donde eres dueño, también los que crees después.',
+            switch (_kind) {
+              'global' => 'Para todos los negocios donde eres dueño, también los que crees después.',
+              'services' => 'Para "${widget.business.name}": todo Pro más el módulo Servicios, con soporte.',
+              _ => 'Para "${widget.business.name}" y todo su equipo.',
+            },
             style: TextStyle(fontSize: 13, color: c.inkMuted),
           ),
         ),
@@ -514,7 +561,7 @@ class _ProScreenState extends State<ProScreen> {
       if (!mounted) return;
       if (approved == true) {
         await ProService.instance.refresh(widget.business.id);
-        if (mounted) AppToast.showSuccess(context, 'Listo: ya tienes ${plan.kind == 'global' ? 'Pro Global' : 'Pro'}.');
+        if (mounted) AppToast.showSuccess(context, 'Listo: ya tienes ${plan.kind == 'business' ? 'Pro' : plan.kindLabel}.');
       }
     } on ProCheckoutException catch (e) {
       if (mounted) AppToast.showError(context, e.message);

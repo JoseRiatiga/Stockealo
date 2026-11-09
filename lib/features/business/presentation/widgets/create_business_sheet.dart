@@ -133,8 +133,10 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
   late String _icon = widget.initial?.icon ?? kBusinessKinds.first.key;
   late String _colorKey = _colorKeyFor(widget.initial?.color);
   late bool _cashRegister = widget.initial?.cashRegisterEnabled ?? false;
-  late bool _services = widget.initial?.servicesEnabled ?? false;
-  late ServiceType _serviceType = ServiceType.of(widget.initial?.serviceType ?? ServiceType.lavaderoMotos.code);
+  // Los servicios ya no se encienden aquí: los trae el plan Pro Servicios (0.12.0).
+  // Se conserva lo que el negocio tenía para no borrarlo al guardar.
+  late final bool _services = widget.initial?.servicesEnabled ?? false;
+  late final ServiceType _serviceType = ServiceType.of(widget.initial?.serviceType ?? ServiceType.lavaderoMotos.code);
   Uint8List? _newLogoBytes;
   String? _newLogoMime;
   bool _removeLogo = false;
@@ -393,29 +395,6 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
                   title: const Text('Usar arqueo de caja'),
                   subtitle: const Text('Abre y cierra caja para cuadrar el efectivo del día'),
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _services,
-                  onChanged: (v) => setState(() => _services = v),
-                  title: const Text('Mi negocio ofrece servicios'),
-                  subtitle: const Text('Lavadero, barbería o taller: tablero de trabajos, empleados y servicios'),
-                ),
-                if (_services)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpace.sm),
-                    child: Wrap(
-                      spacing: AppSpace.sm,
-                      runSpacing: AppSpace.sm,
-                      children: [
-                        for (final t in ServiceType.values)
-                          ChoiceChip(
-                            label: Text(t.label),
-                            selected: _serviceType == t,
-                            onSelected: (_) => setState(() => _serviceType = t),
-                          ),
-                      ],
-                    ),
-                  ),
               ],
               const SizedBox(height: AppSpace.xxl),
               FilledButton(

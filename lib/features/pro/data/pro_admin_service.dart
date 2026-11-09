@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import 'pro_service.dart' show proKindLabel;
 
 DateTime? _date(Object? v) => v == null ? null : DateTime.tryParse(v as String)?.toLocal();
 int _int(Object? v) => (v as num?)?.toInt() ?? 0;
@@ -48,7 +49,7 @@ class ProCode {
         redeemedBy: r['redeemed_by'] as String?,
       );
 
-  String get kindLabel => kind == 'global' ? 'Pro Global' : 'Pro Negocio';
+  String get kindLabel => proKindLabel(kind);
 
   String get durationLabel => switch (days) {
         null => 'Permanente',
@@ -248,7 +249,7 @@ class AdminSubscription {
         active: r['active'] == true,
       );
 
-  String get kindLabel => kind == 'global' ? 'Pro Global' : 'Pro Negocio';
+  String get kindLabel => proKindLabel(kind);
 
   String get sourceLabel => switch (source) {
         'manual' => 'Dado a mano',
@@ -308,7 +309,7 @@ class AdminPayment {
   double get amount => amountInCents / 100;
 
   String get planLabel {
-    final plan = kind == 'global' ? 'Pro Global' : 'Pro Negocio';
+    final plan = proKindLabel(kind);
     final per = switch (period) {
       'week' => 'Semanal',
       'month' => 'Mensual',
@@ -371,7 +372,7 @@ class AdminPlan {
       );
 
   String get name =>
-      '${kind == 'global' ? 'Pro Global' : 'Pro Negocio'} · ${switch (period) {
+      '${proKindLabel(kind)} · ${switch (period) {
         'week' => 'Semanal',
         'month' => 'Mensual',
       'year' => 'Anual',
@@ -530,9 +531,9 @@ class ProAdminService {
           .map(AdminSubscription.fromRow)
           .toList();
 
-  /// Pro Negocio a mano; [days] null = permanente
-  Future<void> grantPro(String businessId, int? days) =>
-      _rpc('admin_grant_pro', {'p_business_id': businessId, 'p_days': days});
+  /// Pro Negocio o Pro Servicios a mano ([kind] 'business' o 'services'); [days] null = permanente
+  Future<void> grantPro(String businessId, int? days, {String kind = 'business'}) =>
+      _rpc('admin_grant_pro', {'p_business_id': businessId, 'p_days': days, 'p_kind': kind});
 
   Future<void> endSubscription(String id) => _rpc('admin_end_subscription', {'p_id': id});
 
@@ -608,7 +609,7 @@ class ProAdminService {
     if (serverMessage.contains('invalid_valid_days')) return 'El plazo para canjear debe ser de 1 a 3650 días.';
     if (serverMessage.contains('invalid_days')) return 'La duración debe ser de 1 a 3650 días.';
     if (serverMessage.contains('invalid_max_uses')) return 'Los usos por código deben ser de 1 a 1000.';
-    if (serverMessage.contains('invalid_kind')) return 'Elige Pro Negocio o Pro Global.';
+    if (serverMessage.contains('invalid_kind')) return 'Elige un plan válido: Pro Negocio, Pro Global o Pro Servicios.';
     if (serverMessage.contains('business_not_found')) return 'Ese negocio no existe o fue eliminado.';
     if (serverMessage.contains('invalid_price')) return 'Revisa el precio.';
     if (serverMessage.contains('invalid_setting')) return 'Ese ajuste no se puede cambiar desde aquí.';

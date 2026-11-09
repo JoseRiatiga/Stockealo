@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../../core/services/web_update_service.dart';
+import '../../../pro/data/pro_service.dart';
 import '../../../../core/design/glass_surface.dart';
 import '../../../../core/services/phone_alerts_service.dart';
 import '../../../backup/data/auto_backup_service.dart';
@@ -115,6 +116,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
           businessId: biz.id,
           onRemoteSale: () => SupabaseService.instance.syncFromCloud(user.id, user.email),
         );
+        // Estado Pro del negocio: decide si se ve el módulo Servicios (Pro Servicios)
+        ProService.instance.refresh(biz.id);
       }
       if (mounted) {
         setState(() {

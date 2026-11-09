@@ -18,6 +18,7 @@ import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
 import '../../../business/presentation/screens/business_info_screen.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
+import '../../../pro/data/pro_service.dart';
 import '../../../products/data/product_repository.dart';
 import '../../../products/presentation/screens/barcode_scanner_screen.dart';
 import '../../../products/presentation/screens/product_form_screen.dart';
@@ -441,11 +442,17 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                 ),
                 const SizedBox(height: AppSpace.xl),
 
-                // Negocios de servicios (lavadero, barbería): el tablero de trabajos
-                if (_activeBusiness?.servicesEnabled == true) ...[
-                  WorkBoardCard(key: ValueKey('board-${_activeBusiness!.id}'), business: _activeBusiness!),
-                  const SizedBox(height: AppSpace.xl),
-                ],
+                // Negocios con Pro Servicios: el tablero de trabajos
+                if (_activeBusiness != null)
+                  ValueListenableBuilder<ProStatus>(
+                    valueListenable: ProService.instance.status,
+                    builder: (context, pro, _) => pro.services
+                        ? Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpace.xl),
+                            child: WorkBoardCard(key: ValueKey('board-${_activeBusiness!.id}'), business: _activeBusiness!),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
 
                 // Acciones rápidas personalizables
                 Row(

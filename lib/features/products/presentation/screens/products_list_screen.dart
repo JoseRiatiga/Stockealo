@@ -1,3 +1,5 @@
+import '../../../suppliers/presentation/widgets/visit_today_banner.dart';
+import '../../../suppliers/presentation/screens/suppliers_screen.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../reports/data/report_export_service.dart';
 import '../../../store/presentation/screens/online_store_screen.dart';
@@ -293,6 +295,16 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     );
   }
 
+  Future<void> _openSuppliers() async {
+    if (_activeBusiness == null) return;
+    await SuppliersScreen.open(
+      context,
+      business: _activeBusiness!,
+      userName: AuthRepository.instance.currentUser?.displayName,
+    );
+    _loadData();
+  }
+
   void _openCatalogModal() {
     if (_activeBusiness == null) return;
     CatalogGeneratorModal.show(
@@ -458,6 +470,13 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                             caption: 'A proveedor',
                             onTap: _openRestockOrderModal,
                           ),
+                        if (canEditProducts)
+                          QuickAccessItem(
+                            icon: Icons.move_to_inbox_outlined,
+                            label: 'Proveedores',
+                            caption: 'Y entradas',
+                            onTap: _openSuppliers,
+                          ),
                         QuickAccessItem(
                           icon: Icons.table_chart_outlined,
                           label: 'Excel',
@@ -468,6 +487,17 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                     ),
                   ),
                 ),
+
+                // Hoy pasa un proveedor: recordatorio con el pedido a un toque
+                if (canEditProducts && _activeBusiness != null)
+                  SliverToBoxAdapter(
+                    child: VisitTodayBanner(
+                      key: ValueKey('visit-${_activeBusiness!.id}'),
+                      business: _activeBusiness!,
+                      userName: AuthRepository.instance.currentUser?.displayName,
+                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.lg, hPadding, 0),
+                    ),
+                  ),
 
                 // Buscador a todo el ancho
                 SliverToBoxAdapter(

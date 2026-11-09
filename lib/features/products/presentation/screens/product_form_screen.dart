@@ -1,3 +1,4 @@
+import '../../../suppliers/presentation/widgets/supplier_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,11 +29,20 @@ class ProductFormScreen extends StatefulWidget {
   final String businessId;
   final String? userRole;
 
+  /// Desde una entrada de mercancía: el producto se crea en 0 y las cantidades
+  /// escritas se devuelven aquí para sumarlas con la entrada (no se cuentan dos veces)
+  final ValueChanged<Product>? onCreatedForPurchase;
+
+  /// Proveedor ya elegido (el de la entrada)
+  final String? initialSupplierId;
+
   const ProductFormScreen({
     super.key,
     this.productToEdit,
     required this.businessId,
     this.userRole,
+    this.onCreatedForPurchase,
+    this.initialSupplierId,
   });
 
   @override
@@ -58,6 +68,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   /// antes de guardar el producto
   late final String _productId = widget.productToEdit?.id ?? const Uuid().v4();
   void Function()? _stopPasteListener;
+
+  /// La ventana de opciones de foto está abierta
+  bool _photoPickerOpen = false;
   String? _selectedCategory;
   List<Category> _categories = [];
   bool _isLoading = false;
@@ -65,6 +78,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   // Variantes (tallas y colores)
   bool _hasVariants = false;
   final _variants = VariantEditorController();
+
+  // Proveedor principal (opcional)
+  late String? _supplierId = widget.productToEdit?.supplierId ?? widget.initialSupplierId;
 
   bool get isEditing => widget.productToEdit != null;
 
@@ -103,7 +119,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _loadCategories();
     // En la web: pegar una imagen copiada (Ctrl+V) la pone como foto del producto
     _stopPasteListener = listenForPastedImages((image) {
-      if (mounted && !_isUploadingPhoto) _uploadPhotoBytes(image.bytes, image.mimeType);
+      if (!mounted || _isUploadingPhoto) return;
+      // La ventana de opciones de foto tapa el resultado: se cierra al pegar
+      if (_photoPickerOpen) {
+        Navigator.of(context, rootNavigator: true).popUntil((route) => route is! PopupRoute);
+        Navigator.of(context).popUntil((route) => route is! PopupRoute);
+      }
+      _uploadPhotoBytes(image.bytes, image.mimeType, pasted: true);
     });
   }
 
@@ -191,8 +213,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   String get _photoBusinessId => widget.productToEdit?.businessId ?? widget.businessId;
 
-  Future<void> _uploadPhotoBytes(Uint8List bytes, String? mimeType) async {
+  Future<void> _uploadPhotoBytes(Uint8List bytes, String? mimeType, {bool pasted = false}) async {
     setState(() => _isUploadingPhoto = true);
+    if (pasted) AppToast.showInfo(context, 'Pegando la foto...');
     try {
       final url = await ProductImageService.instance.uploadBytes(
         businessId: _photoBusinessId,
@@ -200,7 +223,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         bytes: bytes,
         mimeType: mimeType,
       );
-      if (mounted) setState(() => _photoPath = url);
+      if (mounted) {
+        setState(() => _photoPath = url);
+        AppToast.showSuccess(context, pasted ? 'Listo, pegamos la foto del producto.' : 'Listo, subimos la foto.');
+      }
     } on ProductImageException catch (e) {
       if (mounted) AppToast.showError(context, e.message);
     } finally {
@@ -229,8 +255,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
   }
 
-  void _showImagePickerModal() {
-    ImageSourcePickerModal.show(
+  Future<void> _showImagePickerModal() async {
+    _photoPickerOpen = true;
+    await ImageSourcePickerModal.show(
       context,
       title: 'Foto del Producto',
       subtitle: 'Elige cómo capturar o subir la imagen del producto',
@@ -246,6 +273,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         });
       },
     );
+    _photoPickerOpen = false;
   }
 
   Future<void> _scanBarcode() async {
@@ -348,11 +376,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       updatedAt: now,
       hasVariants: _hasVariants,
       variants: variants,
+      supplierId: _supplierId,
     );
 
     try {
+      final forPurchase = widget.onCreatedForPurchase;
       if (isEditing) {
         await _repository.updateProduct(product);
+      } else if (forPurchase != null) {
+        await _repository.insertProduct(product.copyWith(
+          stock: 0,
+          variants: [for (final v in variants) v.copyWith(stock: 0)],
+        ));
+        forPurchase(product);
       } else {
         await _repository.insertProduct(product);
       }
@@ -726,7 +762,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             controller: _stockController,
                             keyboardType: TextInputType.number,
                             decoration: InputDecoration(
-                              labelText: isEditing ? 'Stock Actual *' : 'Stock Inicial *',
+                              labelText: isEditing
+                                  ? 'Stock Actual *'
+                                  : (widget.onCreatedForPurchase != null ? 'Cantidad que llegó *' : 'Stock Inicial *'),
                               hintText: '0',
                               prefixIcon: const Icon(Icons.inventory_2_outlined, size: 20, color: Color(0xFF64748B)),
                               prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
@@ -826,8 +864,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     maxLines: 2,
                     decoration: const InputDecoration(
                       labelText: 'Descripción / Notas (Opcional)',
-                      hintText: 'Detalles adicionales, proveedor, ubicación...',
+                      hintText: 'Detalles adicionales, ubicación...',
                     ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 8. Proveedor opcional
+                  SupplierToggleField(
+                    businessId: widget.productToEdit?.businessId ?? widget.businessId,
+                    supplierId: _supplierId,
+                    onChanged: (id) => _supplierId = id,
                   ),
                   const SizedBox(height: 28),
 

@@ -12,6 +12,8 @@ import '../../features/customers/data/debt_reminder.dart';
 import '../../features/customers/data/debt_reminder_schedule.dart';
 import '../../features/dashboard/data/dashboard_repository.dart';
 import '../../features/products/data/product_repository.dart';
+import '../../features/suppliers/data/supplier_repository.dart';
+import '../../features/suppliers/models/supplier.dart';
 import '../database/app_database.dart';
 import '../utils/currency_formatter.dart';
 import 'data_events.dart';
@@ -19,6 +21,7 @@ import 'data_events.dart';
 /// Avisos en la barra del celular, aunque la app esté cerrada:
 /// • stock bajo: cuando un producto llega a su mínimo después de una venta
 /// • resumen del día: a la hora elegida, con las ventas del día en este celular
+/// • día de visita del proveedor (con el de stock bajo): "Hoy pasa X"
 /// • cobro de fiados (Pro): "Hoy toca cobrarle a X", con un botón que abre WhatsApp
 ///   con el mensaje listo (el dueño lo envía; nada sale solo)
 ///
@@ -121,6 +124,7 @@ class PhoneAlertsService {
       // Lo que ya está bajo no se avisa de golpe: solo lo que baje de aquí en adelante
       await _saveNotified(await _lowStockIds());
     }
+    await refreshVisitReminders();
     return true;
   }
 
@@ -265,6 +269,65 @@ class PhoneAlertsService {
       );
     } catch (e) {
       debugPrint('Resumen del día: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Día de visita del proveedor (va con el aviso de stock bajo)
+
+  static const _visitIdsKey = 'alerts_visit_ids';
+  static const visitHour = 7;
+  static const _visitChannel = AndroidNotificationDetails(
+    'supplier_visits',
+    'Visita del proveedor',
+    channelDescription: 'El día que pasa tu proveedor, para preparar el pedido',
+  );
+
+  /// Próxima vez que pasa el proveedor ([weekday] 1 = lunes), a las [hour]
+  @visibleForTesting
+  static DateTime nextVisit(DateTime now, int weekday, {int hour = visitHour}) {
+    var days = (weekday - now.weekday) % 7;
+    var when = DateTime(now.year, now.month, now.day + days, hour);
+    if (!when.isAfter(now)) when = DateTime(now.year, now.month, now.day + (days == 0 ? 7 : days + 7), hour);
+    return when;
+  }
+
+  /// Programa un aviso por proveedor con día de visita. Se llama al abrir la app
+  /// y al guardar un proveedor; los anteriores se cancelan primero.
+  Future<void> refreshVisitReminders({DateTime? now}) async {
+    if (!_ready) return;
+    try {
+      final previous = (await AppDatabase.instance.getSetting(_visitIdsKey) ?? '')
+          .split(',')
+          .map(int.tryParse)
+          .whereType<int>();
+      for (final id in previous) {
+        await _plugin.cancel(id);
+      }
+      await AppDatabase.instance.setSetting(_visitIdsKey, null);
+      final business = _business;
+      if (business == null || !await stockAlertsEnabled()) return;
+
+      final at = now ?? DateTime.now();
+      final ids = <int>[];
+      for (final s in await SupplierRepository.instance.getSuppliers(business.id)) {
+        final day = Supplier.weekDays.indexOf(s.visitDay ?? '');
+        if (day < 0) continue;
+        final id = 0x20000000 + (s.id.hashCode & 0x00ffffff);
+        final when = nextVisit(at, day + 1);
+        await _plugin.zonedSchedule(
+          id,
+          'Hoy pasa ${s.name}',
+          'Revisa qué pedirle en Inventario › Pedido.',
+          tz.TZDateTime.from(when.toUtc(), tz.UTC),
+          const NotificationDetails(android: _visitChannel),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+        ids.add(id);
+      }
+      if (ids.isNotEmpty) await AppDatabase.instance.setSetting(_visitIdsKey, ids.join(','));
+    } catch (e) {
+      debugPrint('Visitas de proveedores: $e');
     }
   }
 

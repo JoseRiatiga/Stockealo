@@ -1,39 +1,138 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../../core/design/color_swatch_dot.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
+import '../../../auth/data/auth_repository.dart';
+import '../../../suppliers/data/supplier_repository.dart';
+import '../../../suppliers/data/supplier_whatsapp.dart';
+import '../../../suppliers/models/supplier_order.dart';
+import '../../../suppliers/models/supplier.dart';
+import '../../../suppliers/presentation/widgets/supplier_picker.dart';
 import '../../data/product_repository.dart';
 import '../../models/product.dart';
+import '../../models/product_variant.dart';
 import 'product_image_view.dart';
 
+/// Un producto del pedido: cantidad total o, si tiene tallas y colores, una por cada una
 class RestockOrderItem {
   final Product product;
   int orderQty;
+  final Map<String, int> variantQty;
   bool isSelected;
 
   RestockOrderItem({
     required this.product,
-    required this.orderQty,
+    this.orderQty = 0,
+    Map<String, int>? variantQty,
     this.isSelected = true,
-  });
+  }) : variantQty = variantQty ?? {};
+
+  bool get withVariants => product.hasVariants && product.variants.isNotEmpty;
+
+  int get totalQty => withVariants ? variantQty.values.fold(0, (s, q) => s + q) : orderQty;
+
+  /// "M · Rojo: 2 / L · Azul: 1"
+  String get variantSummary => [
+        for (final v in product.variants)
+          if ((variantQty[v.id] ?? 0) > 0) '${v.label.isEmpty ? 'Sin nombre' : v.label}: ${variantQty[v.id]}',
+      ].join(' / ');
+
+  /// Renglones para guardar el pedido (uno por talla y color)
+  List<SupplierOrderItem> get orderItems => withVariants
+      ? [
+          for (final v in product.variants)
+            if ((variantQty[v.id] ?? 0) > 0)
+              SupplierOrderItem(
+                productId: product.id,
+                productName: product.name,
+                variantId: v.id,
+                variantName: v.label,
+                quantity: variantQty[v.id]!,
+              ),
+        ]
+      : [if (orderQty > 0) SupplierOrderItem(productId: product.id, productName: product.name, quantity: orderQty)];
+
+  /// Sugerencia: reponer hasta el doble del mínimo. Con tallas y colores, ese
+  /// objetivo se reparte entre las variantes y se pide lo que le falta a cada una.
+  static RestockOrderItem suggested(Product p) {
+    if (p.hasVariants && p.variants.isNotEmpty) {
+      final target = ((p.minStock * 2) / p.variants.length).ceil().clamp(2, 9999);
+      final qty = {for (final v in p.variants) v.id: (target - v.stock).clamp(0, 9999)};
+      if (qty.values.every((q) => q == 0)) {
+        for (final v in p.variants) {
+          if (v.stock <= 0) qty[v.id] = 1;
+        }
+      }
+      return RestockOrderItem(product: p, variantQty: qty);
+    }
+    final qty = p.minStock > 0 ? (p.minStock * 2 - p.stock).clamp(1, 9999) : (p.stock <= 0 ? 10 : 5);
+    return RestockOrderItem(product: p, orderQty: qty);
+  }
+
+  /// Hace falta pedir: el producto está bajo o alguna talla/color se agotó
+  static bool needsRestock(Product p) =>
+      p.isLowStock || p.isOutOfStock || (p.hasVariants && p.variants.any((v) => v.stock <= 0));
+}
+
+/// Texto del pedido para WhatsApp, con tallas y colores por producto
+String buildRestockOrderText({
+  required String businessName,
+  required List<RestockOrderItem> items,
+  String? sender,
+  Supplier? supplier,
+  DateTime? now,
+}) {
+  final selected = items.where((i) => i.isSelected && i.totalQty > 0).toList();
+  final date = DateFormat('dd/MM/yyyy hh:mm a').format(now ?? DateTime.now());
+  var units = 0;
+  var cost = 0.0;
+  final b = StringBuffer()
+    ..writeln('*PEDIDO - ${businessName.toUpperCase()}*')
+    ..writeln('Fecha: $date');
+  if (supplier != null) b.writeln('Para: ${supplier.contactName?.isNotEmpty == true ? '${supplier.contactName} (${supplier.name})' : supplier.name}');
+  if ((sender ?? '').isNotEmpty) b.writeln('Pide: $sender');
+  b
+    ..writeln('────────────────')
+    ..writeln('*PRODUCTOS:*');
+  for (final i in selected) {
+    final p = i.product;
+    final code = p.code.isNotEmpty ? ' (Cód: ${p.code})' : '';
+    if (i.withVariants) {
+      b.writeln('• ${p.name}$code — ${i.variantSummary}');
+    } else {
+      b.writeln('• ${i.orderQty} × ${p.name}$code');
+    }
+    units += i.totalQty;
+    if (p.purchasePrice > 0) cost += p.purchasePrice * i.totalQty;
+  }
+  b
+    ..writeln('────────────────')
+    ..writeln('Total: ${selected.length} ${selected.length == 1 ? 'producto' : 'productos'}, $units ${units == 1 ? 'unidad' : 'unidades'}');
+  if (cost > 0) b.writeln('Costo estimado: ${CurrencyFormatter.format(cost)}');
+  b
+    ..writeln('')
+    ..writeln('Por favor confirmar el pedido y la fecha de entrega. ¡Muchas gracias!');
+  return b.toString();
 }
 
 class RestockOrderModal extends StatefulWidget {
   final Business business;
   final String? userName;
+  final Supplier? supplier;
 
-  const RestockOrderModal({
-    super.key,
-    required this.business,
-    this.userName,
-  });
+  const RestockOrderModal({super.key, required this.business, this.userName, this.supplier});
 
   static Future<void> show(
     BuildContext context, {
     required Business business,
     String? userName,
+    Supplier? supplier,
   }) {
     return showModalBottomSheet(
       showDragHandle: false,
@@ -41,10 +140,7 @@ class RestockOrderModal extends StatefulWidget {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RestockOrderModal(
-        business: business,
-        userName: userName,
-      ),
+      builder: (_) => RestockOrderModal(business: business, userName: userName, supplier: supplier),
     );
   }
 
@@ -56,10 +152,17 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
   final _productRepo = ProductRepository();
   final _searchController = TextEditingController();
 
-  List<RestockOrderItem> _items = [];
+  /// Sugeridos de todo el negocio; la lista visible se filtra por proveedor
+  List<RestockOrderItem> _suggested = [];
+  final List<RestockOrderItem> _manual = [];
   List<Product> _allProducts = [];
   bool _isLoading = true;
   String _searchFilter = '';
+  late Supplier? _supplier = widget.supplier;
+
+  /// Un solo pedido por ventana: si se reenvía, se actualiza el mismo
+  final String _orderId = const Uuid().v4();
+  bool _orderSaved = false;
 
   @override
   void initState() {
@@ -75,120 +178,92 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
 
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
-    final restockProducts = await _productRepo.getRestockProducts(widget.business.id);
-    _allProducts = await _productRepo.getAllProducts(widget.business.id);
-
-    final List<RestockOrderItem> items = [];
-    for (final p in restockProducts) {
-      // Cálculo inteligente de sugerencia: reponer hasta el doble del stock mínimo
-      final suggested = p.minStock > 0
-          ? (p.minStock * 2 - p.stock).clamp(1, 9999)
-          : (p.stock <= 0 ? 10 : 5);
-
-      items.add(RestockOrderItem(
-        product: p,
-        orderQty: suggested,
-        isSelected: true,
-      ));
-    }
-
+    _allProducts = await _productRepo.searchProducts('', businessId: widget.business.id);
+    final suggested = [
+      for (final p in _allProducts)
+        if (RestockOrderItem.needsRestock(p)) RestockOrderItem.suggested(p),
+    ];
     if (mounted) {
       setState(() {
-        _items = items;
+        _suggested = suggested;
         _isLoading = false;
       });
     }
   }
 
+  /// Con proveedor elegido se ven sus productos (y los agregados a mano)
+  List<RestockOrderItem> get _items => [
+        ..._manual,
+        for (final i in _suggested)
+          if (_supplier == null || i.product.supplierId == _supplier!.id) i,
+      ];
+
+  Future<void> _pickSupplier() async {
+    final s = await SupplierPicker.pick(context, businessId: widget.business.id);
+    if (s != null && mounted) setState(() => _supplier = s);
+  }
+
   void _showAddOtherProductSheet() {
-    final available = _allProducts
-        .where((p) => !_items.any((item) => item.product.id == p.id))
-        .toList();
+    final c = context.colors;
+    final inList = _items.map((i) => i.product.id).toSet();
+    final available = _allProducts.where((p) => !inList.contains(p.id)).toList();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF1E293B)
-          : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      useSafeArea: true,
       builder: (ctx) {
         String query = '';
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final filtered = available
-                .where((p) =>
-                    p.name.toLowerCase().contains(query.toLowerCase()) ||
-                    p.code.toLowerCase().contains(query.toLowerCase()))
-                .toList();
-
-            return Container(
+            final q = query.toLowerCase();
+            final filtered =
+                available.where((p) => p.name.toLowerCase().contains(q) || p.code.toLowerCase().contains(q)).toList();
+            return SizedBox(
               height: MediaQuery.of(context).size.height * 0.7,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Agregar Producto del Catálogo',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      hintText: 'Buscar por nombre o código...',
-                      prefixIcon: Icon(Icons.search),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, MediaQuery.of(context).viewInsets.bottom),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Agregar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c.ink)),
+                    const SizedBox(height: AppSpace.md),
+                    TextField(
+                      autofocus: true,
+                      decoration: const InputDecoration(hintText: 'Buscar por nombre o código', prefixIcon: Icon(Icons.search)),
+                      onChanged: (val) => setModalState(() => query = val),
                     ),
-                    onChanged: (val) => setModalState(() => query = val),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: filtered.isEmpty
-                        ? const Center(child: Text('No se encontraron productos'))
-                        : ListView.separated(
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final p = filtered[index];
-                              return ListTile(
-                                leading: ProductImageView(
-                                  imagePath: p.photoPath,
-                                  width: 40,
-                                  height: 40,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                subtitle: Text('Stock actual: ${p.stock} • Cód: ${p.code}'),
-                                trailing: const Icon(Icons.add_circle_outline, color: Color(0xFF059669)),
-                                onTap: () {
-                                  setState(() {
-                                    _items.insert(
-                                      0,
-                                      RestockOrderItem(
-                                        product: p,
-                                        orderQty: p.minStock > 0 ? p.minStock : 5,
-                                        isSelected: true,
-                                      ),
-                                    );
-                                  });
-                                  Navigator.pop(ctx);
-                                },
-                              );
-                            },
-                          ),
-                  ),
-                ],
+                    const SizedBox(height: AppSpace.sm),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(child: Text('No se encontraron productos', style: TextStyle(color: c.inkMuted)))
+                          : ListView.separated(
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) => Divider(height: 1, color: c.line),
+                              itemBuilder: (context, index) {
+                                final p = filtered[index];
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: ProductImageView(
+                                    imagePath: p.photoPath,
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  title: Text(p.name, style: TextStyle(fontWeight: FontWeight.w600, color: c.ink)),
+                                  subtitle: Text('Hay ${p.stock} · Cód: ${p.code}', style: TextStyle(color: c.inkMuted)),
+                                  trailing: Icon(Icons.add_circle_outline, color: c.accent),
+                                  onTap: () {
+                                    final item = RestockOrderItem.suggested(p);
+                                    setState(() => _manual.insert(0, item));
+                                    Navigator.pop(ctx);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -197,199 +272,224 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
     );
   }
 
-  void _editQuantity(RestockOrderItem item) {
-    final controller = TextEditingController(text: '${item.orderQty}');
-    showDialog(
+  Future<void> _editQuantity(RestockOrderItem item) async {
+    final p = item.product;
+    final controllers = item.withVariants
+        ? {for (final v in p.variants) v.id: TextEditingController(text: '${item.variantQty[v.id] ?? 0}')}
+        : {'': TextEditingController(text: '${item.orderQty}')};
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(item.product.name, style: const TextStyle(fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Ingresa la cantidad a solicitar al proveedor:', style: TextStyle(fontSize: 13)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                labelText: 'Unidades a pedir',
-                suffixText: 'unid.',
+      builder: (ctx) {
+        final c = ctx.colors;
+        return AlertDialog(
+          title: Text(p.name, style: const TextStyle(fontSize: 16)),
+          content: SizedBox(
+            width: 360,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.withVariants ? '¿Cuántas pides de cada talla y color?' : '¿Cuántas unidades pides?',
+                    style: TextStyle(fontSize: 13, color: c.inkMuted),
+                  ),
+                  const SizedBox(height: AppSpace.md),
+                  if (item.withVariants)
+                    for (final v in p.variants)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpace.sm),
+                        child: Row(
+                          children: [
+                            if (ColorSwatchDot.hasSwatch(v.colorHex)) ...[
+                              ColorSwatchDot(hex: v.colorHex, hex2: v.colorHex2, size: 16),
+                              const SizedBox(width: AppSpace.sm),
+                            ],
+                            Expanded(
+                              child: Text('${v.label.isEmpty ? 'Sin nombre' : v.label}  ·  hay ${v.stock}',
+                                  style: TextStyle(color: c.ink, fontSize: 13)),
+                            ),
+                            SizedBox(width: 80, child: _qtyField(controllers[v.id]!)),
+                          ],
+                        ),
+                      )
+                  else
+                    _qtyField(controllers['']!, autofocus: true),
+                ],
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () {
-              final parsed = int.tryParse(controller.text.trim()) ?? 0;
-              if (parsed > 0) {
-                setState(() => item.orderQty = parsed);
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Aceptar'),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Aceptar')),
+          ],
+        );
+      },
     );
+    if (ok == true) {
+      setState(() {
+        if (item.withVariants) {
+          for (final e in controllers.entries) {
+            item.variantQty[e.key] = int.tryParse(e.value.text.trim()) ?? 0;
+          }
+        } else {
+          item.orderQty = int.tryParse(controllers['']!.text.trim()) ?? item.orderQty;
+        }
+      });
+    }
+    for (final c in controllers.values) {
+      c.dispose();
+    }
   }
 
-  String _buildOrderText() {
-    final selectedItems = _items.where((i) => i.isSelected && i.orderQty > 0).toList();
-    final dateStr = DateFormat('dd/MM/yyyy hh:mm a').format(DateTime.now());
-    final sender = widget.userName ?? 'Administrador';
+  Widget _qtyField(TextEditingController controller, {bool autofocus = false}) => TextField(
+        controller: controller,
+        autofocus: autofocus,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        textAlign: TextAlign.center,
+        decoration: const InputDecoration(isDense: true, suffixText: 'u.'),
+      );
 
-    int totalUnits = 0;
-    double estimatedCost = 0.0;
+  String _buildOrderText() => buildRestockOrderText(
+        businessName: widget.business.name,
+        items: _items,
+        sender: widget.userName,
+        supplier: _supplier,
+      );
 
-    final buffer = StringBuffer();
-    buffer.writeln('📦 *ORDEN DE PEDIDO A PROVEEDOR*');
-    buffer.writeln('🏪 *${widget.business.name.toUpperCase()}*');
-    buffer.writeln('📅 Fecha: $dateStr');
-    buffer.writeln('👤 Solicitado por: $sender');
-    buffer.writeln('────────────────────────');
-    buffer.writeln('*PRODUCTOS SOLICITADOS:*');
-
-    for (final item in selectedItems) {
-      final p = item.product;
-      final codeInfo = p.code.isNotEmpty ? ' (Cód: ${p.code})' : '';
-      buffer.writeln('• ${item.orderQty}x ${p.name}$codeInfo');
-      totalUnits += item.orderQty;
-      if (p.purchasePrice > 0) {
-        estimatedCost += (p.purchasePrice * item.orderQty);
+  /// Queda guardado para compararlo con lo que llegue en la entrada de mercancía
+  Future<void> _saveOrder() async {
+    final items = [
+      for (final i in _items)
+        if (i.isSelected) ...i.orderItems,
+    ];
+    if (items.isEmpty) return;
+    final first = !_orderSaved;
+    _orderSaved = true;
+    try {
+      await SupplierRepository.instance.saveOrder(SupplierOrder(
+        id: _orderId,
+        businessId: widget.business.id,
+        supplierId: _supplier?.id,
+        supplierName: _supplier?.name,
+        items: items,
+        createdBy: AuthRepository.instance.currentUser?.email,
+        createdAt: DateTime.now(),
+      ));
+      if (first && mounted) {
+        AppToast.showInfo(context, 'Pedido guardado. Cuando llegue, regístralo en Entrada de mercancía para ver si faltó algo.');
       }
+    } catch (e) {
+      debugPrint('No se pudo guardar el pedido: $e');
     }
-
-    buffer.writeln('────────────────────────');
-    buffer.writeln('📊 *RESUMEN:*');
-    buffer.writeln('• Total de productos: ${selectedItems.length}');
-    buffer.writeln('• Total de unidades: $totalUnits unid.');
-    if (estimatedCost > 0) {
-      buffer.writeln('• Costo estimado: ${CurrencyFormatter.format(estimatedCost)}');
-    }
-    buffer.writeln('');
-    buffer.writeln('💬 _Por favor confirmar recepción y tiempo estimado de entrega. ¡Muchas gracias!_');
-
-    return buffer.toString();
   }
 
-  Future<void> _shareViaWhatsApp() async {
-    final text = _buildOrderText();
-    await Share.share(text, subject: 'Orden de Pedido - ${widget.business.name}');
+  Future<void> _send() async {
+    await _saveOrder();
+    await SupplierWhatsApp.send(_supplier, _buildOrderText(), subject: 'Pedido - ${widget.business.name}');
   }
 
   void _copyOrderText() {
-    final text = _buildOrderText();
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('📋 Orden de pedido copiada al portapapeles.'),
-        backgroundColor: Color(0xFF059669),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    Clipboard.setData(ClipboardData(text: _buildOrderText()));
+    _saveOrder();
+    AppToast.showSuccess(context, 'Pedido copiado.');
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-
-    final selectedItems = _items.where((i) => i.isSelected && i.orderQty > 0).toList();
-    final int totalProductsSelected = selectedItems.length;
-    int totalUnitsSelected = 0;
-    double totalEstimatedInvestment = 0.0;
-
-    for (final item in selectedItems) {
-      totalUnitsSelected += item.orderQty;
-      if (item.product.purchasePrice > 0) {
-        totalEstimatedInvestment += (item.product.purchasePrice * item.orderQty);
-      }
-    }
-
-    final filteredItems = _items.where((i) {
-      if (_searchFilter.isEmpty) return true;
-      final query = _searchFilter.toLowerCase();
-      return i.product.name.toLowerCase().contains(query) ||
-          i.product.code.toLowerCase().contains(query);
-    }).toList();
+    final c = context.colors;
+    final items = _items;
+    final selected = items.where((i) => i.isSelected && i.totalQty > 0).toList();
+    final totalUnits = selected.fold(0, (s, i) => s + i.totalQty);
+    final totalCost = selected.fold(0.0, (s, i) => s + i.product.purchasePrice * i.totalQty);
+    final q = _searchFilter.toLowerCase();
+    final filtered = items
+        .where((i) => q.isEmpty || i.product.name.toLowerCase().contains(q) || i.product.code.toLowerCase().contains(q))
+        .toList();
+    final hasWhatsApp = SupplierWhatsApp.numberOf(_supplier) != null;
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.90,
+      height: MediaQuery.of(context).size.height * 0.92,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        color: c.paper,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
       ),
       child: Column(
         children: [
-          // Drag Handle
           const SizedBox(height: 10),
           Container(
             width: 40,
             height: 4,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
-              borderRadius: BorderRadius.circular(2),
-            ),
+            decoration: BoxDecoration(color: c.lineStrong, borderRadius: BorderRadius.circular(2)),
           ),
-          const SizedBox(height: 12),
-
-          // Header
+          const SizedBox(height: AppSpace.md),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.local_shipping_outlined,
-                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                    size: 24,
-                  ),
+                  decoration: BoxDecoration(color: c.successSoft, borderRadius: BorderRadius.circular(AppRadius.control)),
+                  child: Icon(Icons.local_shipping_outlined, color: c.success, size: 22),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Pedido a Proveedor',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'Generador inteligente de reposición',
-                        style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                      ),
+                      Text('Pedido a proveedor', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.ink)),
+                      Text('Lo que se está acabando, por talla y color',
+                          style: TextStyle(fontSize: 12, color: c.inkMuted)),
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-
-          // Search & Action Controls
+          const SizedBox(height: AppSpace.md),
+          // Proveedor
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Material(
+              color: c.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                side: BorderSide(color: c.line),
+              ),
+              child: ListTile(
+                dense: true,
+                leading: Icon(Icons.storefront_outlined, color: c.inkMuted),
+                title: Text(
+                  _supplier == null ? 'Todos los proveedores' : _supplier!.name,
+                  style: TextStyle(color: c.ink, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  _supplier == null
+                      ? 'Elige uno para ver solo sus productos y enviarle el pedido'
+                      : (hasWhatsApp ? 'Se envía directo a su WhatsApp' : 'Sin WhatsApp: se comparte el pedido'),
+                  style: TextStyle(color: c.inkMuted, fontSize: 12),
+                ),
+                trailing: _supplier == null
+                    ? Text('Elegir', style: TextStyle(color: c.accent, fontWeight: FontWeight.w600))
+                    : IconButton(
+                        tooltip: 'Ver todos',
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        onPressed: () => setState(() => _supplier = null),
+                      ),
+                onTap: _pickSupplier,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpace.md),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
                 Expanded(
                   child: SizedBox(
-                    height: 40,
+                    height: 42,
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
@@ -410,295 +510,124 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpace.sm),
                 OutlinedButton.icon(
                   onPressed: _showAddOtherProductSheet,
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('Agregar'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF059669),
-                    side: const BorderSide(color: Color(0xFF059669)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
-
-          // Select All / Deselect All Bar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${_items.length} sugeridos para reposición',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                Expanded(
+                  child: Text(
+                    '${items.length} ${items.length == 1 ? 'producto' : 'productos'} para reponer',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.inkMuted),
+                  ),
                 ),
                 TextButton(
-                  onPressed: () {
-                    final allSelected = _items.every((i) => i.isSelected);
-                    setState(() {
-                      for (final i in _items) {
-                        i.isSelected = !allSelected;
-                      }
-                    });
-                  },
-                  child: Text(
-                    _items.every((i) => i.isSelected) ? 'Deseleccionar todo' : 'Seleccionar todo',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                  ),
+                  onPressed: items.isEmpty
+                      ? null
+                      : () {
+                          final all = items.every((i) => i.isSelected);
+                          setState(() {
+                            for (final i in items) {
+                              i.isSelected = !all;
+                            }
+                          });
+                        },
+                  child: Text(items.isNotEmpty && items.every((i) => i.isSelected) ? 'Quitar todos' : 'Marcar todos'),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1),
-
-          // Items List
+          Divider(height: 1, color: c.line),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
-                : _items.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : items.isEmpty
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(32),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.check_circle_outline, size: 64, color: Color(0xFF059669)),
-                              const SizedBox(height: 16),
-                              const Text(
-                                '¡Inventario en orden!',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'No hay productos agotados ni con stock bajo según sus niveles mínimos.',
+                              Icon(Icons.check_circle_outline, size: 56, color: c.success),
+                              const SizedBox(height: AppSpace.lg),
+                              Text('Inventario en orden',
+                                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: c.ink)),
+                              const SizedBox(height: AppSpace.sm),
+                              Text(
+                                _supplier == null
+                                    ? 'No hay productos agotados ni bajos de stock.'
+                                    : 'No hay productos de ${_supplier!.name} por reponer.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                                style: TextStyle(fontSize: 13, color: c.inkMuted),
                               ),
                               const SizedBox(height: 20),
-                              ElevatedButton.icon(
+                              FilledButton.tonalIcon(
                                 onPressed: _showAddOtherProductSheet,
                                 icon: const Icon(Icons.add),
-                                label: const Text('Agregar productos manualmente'),
+                                label: const Text('Agregar productos'),
                               ),
                             ],
                           ),
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        itemCount: filteredItems.length,
-                        itemBuilder: (context, index) {
-                          final item = filteredItems[index];
-                          final p = item.product;
-                          final isOutOfStock = p.isOutOfStock;
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            decoration: BoxDecoration(
-                              color: cardBg,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: item.isSelected ? const Color(0xFF059669).withOpacity(0.5) : borderColor,
-                                width: item.isSelected ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  // Checkbox
-                                  Checkbox(
-                                    value: item.isSelected,
-                                    activeColor: const Color(0xFF059669),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                    onChanged: (val) {
-                                      setState(() => item.isSelected = val ?? false);
-                                    },
-                                  ),
-                                  const SizedBox(width: 4),
-
-                                  // Foto del producto
-                                  ProductImageView(
-                                    imagePath: p.photoPath,
-                                    width: 44,
-                                    height: 44,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  const SizedBox(width: 10),
-
-                                  // Product details
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          p.name,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            // Stock pill
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: isOutOfStock
-                                                    ? (isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEE2E2))
-                                                    : (isDark ? const Color(0xFF78350F).withOpacity(0.4) : const Color(0xFFFEF3C7)),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                isOutOfStock ? 'Agotado (0)' : 'Stock: ${p.stock} / Mín: ${p.minStock}',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: isOutOfStock
-                                                      ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626))
-                                                      : (isDark ? const Color(0xFFFCD34D) : const Color(0xFFD97706)),
-                                                ),
-                                              ),
-                                            ),
-                                            if (p.purchasePrice > 0) ...[
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'Costo: ${CurrencyFormatter.format(p.purchasePrice)}',
-                                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Stepper Controls
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline, size: 22),
-                                        color: const Color(0xFF64748B),
-                                        onPressed: () {
-                                          if (item.orderQty > 1) {
-                                            setState(() => item.orderQty--);
-                                          }
-                                        },
-                                      ),
-                                      InkWell(
-                                        onTap: () => _editQuantity(item),
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            '${item.orderQty}',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                          ),
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.add_circle_outline, size: 22),
-                                        color: const Color(0xFF059669),
-                                        onPressed: () {
-                                          setState(() => item.orderQty++);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: 10),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) => _itemCard(filtered[index]),
                       ),
           ),
-
-          // Bottom Bar (Summary & WhatsApp Order Button)
           Container(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              14,
-              20,
-              MediaQuery.of(context).padding.bottom + 16,
-            ),
-            decoration: BoxDecoration(
-              color: cardBg,
-              border: Border(top: BorderSide(color: borderColor)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
+            padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).padding.bottom + 16),
+            decoration: BoxDecoration(color: c.surface, border: Border(top: BorderSide(color: c.line))),
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$totalProductsSelected productos seleccionados',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        Text(
-                          '$totalUnitsSelected unidades en total',
-                          style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${selected.length} ${selected.length == 1 ? 'producto' : 'productos'}',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: c.ink)),
+                          Text('$totalUnits unidades', style: TextStyle(fontSize: 11, color: c.inkMuted)),
+                        ],
+                      ),
                     ),
-                    if (totalEstimatedInvestment > 0)
+                    if (totalCost > 0)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Text(
-                            'Inversión estimada:',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                          ),
-                          Text(
-                            CurrencyFormatter.format(totalEstimatedInvestment),
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                          ),
+                          Text('Costo estimado', style: TextStyle(fontSize: 11, color: c.inkMuted)),
+                          Text(CurrencyFormatter.format(totalCost),
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: c.ink)),
                         ],
                       ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpace.md),
                 Row(
                   children: [
-                    // Botón Copiar
                     IconButton.filledTonal(
-                      onPressed: selectedItems.isEmpty ? null : _copyOrderText,
+                      onPressed: selected.isEmpty ? null : _copyOrderText,
                       icon: const Icon(Icons.copy_outlined, size: 20),
-                      tooltip: 'Copiar orden de pedido',
+                      tooltip: 'Copiar pedido',
                     ),
-                    const SizedBox(width: 8),
-
-                    // Botón Enviar WhatsApp
+                    const SizedBox(width: AppSpace.sm),
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: selectedItems.isEmpty ? null : _shareViaWhatsApp,
-                        icon: const Icon(Icons.share, size: 20),
-                        label: const Text(
-                          'Enviar Pedido por WhatsApp',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF059669),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: FilledButton.icon(
+                        onPressed: selected.isEmpty ? null : _send,
+                        icon: Icon(hasWhatsApp ? Icons.send_rounded : Icons.share, size: 18),
+                        label: Text(
+                          hasWhatsApp ? 'Enviar a ${_supplier!.name}' : 'Compartir pedido',
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
@@ -708,6 +637,137 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _itemCard(RestockOrderItem item) {
+    final c = context.colors;
+    final p = item.product;
+    final out = p.isOutOfStock;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: item.isSelected ? c.accent.withOpacity(0.5) : c.line, width: item.isSelected ? 1.5 : 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Checkbox(
+                  value: item.isSelected,
+                  onChanged: (val) => setState(() => item.isSelected = val ?? false),
+                ),
+                ProductImageView(imagePath: p.photoPath, width: 42, height: 42, borderRadius: BorderRadius.circular(10)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(p.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink)),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: AppSpace.sm,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: out ? c.dangerSoft : c.warningSoft,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              out ? 'Agotado' : 'Hay ${p.stock} / mín. ${p.minStock}',
+                              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: out ? c.danger : c.warning),
+                            ),
+                          ),
+                          if (p.purchasePrice > 0)
+                            Text('Costo ${CurrencyFormatter.format(p.purchasePrice)}',
+                                style: TextStyle(fontSize: 11, color: c.inkMuted)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (!item.withVariants) ...[
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline, size: 22),
+                    color: c.inkMuted,
+                    onPressed: () {
+                      if (item.orderQty > 1) setState(() => item.orderQty--);
+                    },
+                  ),
+                  _qtyChip('${item.orderQty}', () => _editQuantity(item)),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline, size: 22),
+                    color: c.accent,
+                    onPressed: () => setState(() => item.orderQty++),
+                  ),
+                ] else
+                  _qtyChip('${item.totalQty}', () => _editQuantity(item)),
+              ],
+            ),
+            if (item.withVariants)
+              Padding(
+                padding: const EdgeInsets.only(left: 48, top: 6),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final v in p.variants)
+                      if ((item.variantQty[v.id] ?? 0) > 0 || v.stock <= 0) _variantChip(v, item.variantQty[v.id] ?? 0, () => _editQuantity(item)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _qtyChip(String text, VoidCallback onTap) {
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(8)),
+        child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink)),
+      ),
+    );
+  }
+
+  Widget _variantChip(ProductVariant v, int qty, VoidCallback onTap) {
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        decoration: BoxDecoration(
+          color: qty > 0 ? c.successSoft : c.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(color: c.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (ColorSwatchDot.hasSwatch(v.colorHex)) ...[
+              ColorSwatchDot(hex: v.colorHex, hex2: v.colorHex2, size: 12),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              '${v.label.isEmpty ? 'Sin nombre' : v.label}: $qty',
+              style: TextStyle(fontSize: 12, color: c.ink, fontWeight: qty > 0 ? FontWeight.w600 : FontWeight.normal),
+            ),
+          ],
+        ),
       ),
     );
   }

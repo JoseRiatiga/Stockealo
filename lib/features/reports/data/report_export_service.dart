@@ -1,3 +1,4 @@
+import '../../suppliers/models/purchase.dart';
 import 'dart:io';
 
 import 'package:excel/excel.dart';
@@ -17,14 +18,16 @@ enum ReportSection {
   sales('Ventas', 'Cada venta del periodo, con su talla o color'),
   customers('Clientes y fiados', 'Clientes con su teléfono y lo que deben'),
   movements('Movimientos', 'Entradas, ajustes y anulaciones del inventario en el periodo'),
-  profit('Ganancias', 'Lo vendido y ganado por producto en el periodo');
+  profit('Ganancias', 'Lo vendido y ganado por producto en el periodo'),
+  purchases('Compras', 'Mercancía que llegó en el periodo, con proveedor, factura y lo que falta pagar'),
+  supplierCosts('Costos por proveedor', 'Último costo de cada producto con cada proveedor');
 
   final String label;
   final String description;
   const ReportSection(this.label, this.description);
 
   /// Si depende del periodo elegido
-  bool get usesPeriod => this == sales || this == movements || this == profit;
+  bool get usesPeriod => this == sales || this == movements || this == profit || this == purchases;
 }
 
 /// Periodo del reporte. Sin fechas = todo el historial.
@@ -162,6 +165,8 @@ class ReportExportService {
         ReportSection.customers => 'Clientes',
         ReportSection.movements => 'Movimientos',
         ReportSection.profit => 'Ganancias',
+        ReportSection.purchases => 'Compras',
+        ReportSection.supplierCosts => 'Costos_por_proveedor',
       };
 
   /// encode() y no save(): en la web save() además descarga solo un "FlutterExcel.xlsx"
@@ -178,7 +183,95 @@ class ReportExportService {
         ReportSection.customers => _customers(sheet, db, b),
         ReportSection.movements => _movements(sheet, db, b, p),
         ReportSection.profit => _profit(sheet, db, b, p),
+        ReportSection.purchases => _purchases(sheet, db, b, p),
+        ReportSection.supplierCosts => _supplierCosts(sheet, db, b),
       };
+
+  /// Entradas de mercancía del negocio; vacío si la base aún no tiene la tabla
+  Future<List<Purchase>> _purchasesOf(DatabaseExecutor db, Business b) async {
+    try {
+      final rows = await db.query('purchases', where: 'business_id = ?', whereArgs: [b.id], orderBy: 'date ASC');
+      return rows.map(Purchase.fromMap).toList();
+    } on DatabaseException {
+      return const [];
+    }
+  }
+
+  Future<void> _purchases(Sheet sheet, DatabaseExecutor db, Business b, ReportPeriod p) async {
+    final cur = b.currency;
+    sheet.appendRow(_header([
+      'Fecha', 'Proveedor', 'Factura', 'Producto', 'Variante', 'Cantidad', 'Costo unitario ($cur)',
+      'Subtotal ($cur)', 'Forma de pago', 'Estado del pago', 'Falta pagar ($cur)',
+    ]));
+    var units = 0;
+    var total = 0.0, owed = 0.0;
+    for (final purchase in await _purchasesOf(db, b)) {
+      if (!p.contains(purchase.date)) continue;
+      final payState = !purchase.isCredit
+          ? 'Pagada'
+          : (purchase.isPaid ? 'Pagada' : (purchase.isOverdue() ? 'Vencida' : 'Por pagar'));
+      for (final (index, i) in purchase.items.indexed) {
+        units += i.quantity;
+        total += i.subtotal;
+        sheet.appendRow([
+          TextCellValue(DateFormat('dd/MM/yyyy').format(purchase.date)),
+          TextCellValue(purchase.supplierName ?? ''),
+          TextCellValue(purchase.invoiceNumber ?? ''),
+          TextCellValue(i.productName),
+          TextCellValue(i.variantName ?? ''),
+          IntCellValue(i.quantity),
+          DoubleCellValue(i.unitCost),
+          DoubleCellValue(i.subtotal),
+          TextCellValue(purchase.isCredit ? 'Crédito' : 'Contado'),
+          TextCellValue(payState),
+          // Lo que se debe va una sola vez por entrada, en su primer renglón
+          DoubleCellValue(index == 0 ? purchase.balance : 0),
+        ]);
+      }
+      owed += purchase.balance;
+    }
+    sheet.appendRow([]);
+    sheet.appendRow([
+      TextCellValue('TOTAL (${p.label})'),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      TextCellValue(''),
+      IntCellValue(units),
+      TextCellValue(''),
+      DoubleCellValue(total),
+      TextCellValue(''),
+      TextCellValue(''),
+      DoubleCellValue(owed),
+    ]);
+  }
+
+  Future<void> _supplierCosts(Sheet sheet, DatabaseExecutor db, Business b) async {
+    final cur = b.currency;
+    sheet.appendRow(_header([
+      'Producto', 'Proveedor', 'Último costo ($cur)', 'Fecha', 'Costo anterior ($cur)', 'Cambio ($cur)', 'Más barato',
+    ]));
+    final purchases = await _purchasesOf(db, b);
+    final names = <String, String>{
+      for (final p in purchases)
+        for (final i in p.items) i.productId: i.productName,
+    };
+    final costs = SupplierCost.latestByProduct(purchases);
+    final products = costs.keys.toList()..sort((a, b) => (names[a] ?? '').toLowerCase().compareTo((names[b] ?? '').toLowerCase()));
+    for (final id in products) {
+      for (final (index, c) in costs[id]!.indexed) {
+        sheet.appendRow([
+          TextCellValue(names[id] ?? 'Producto'),
+          TextCellValue(c.supplierName),
+          DoubleCellValue(c.unitCost),
+          TextCellValue(DateFormat('dd/MM/yyyy').format(c.date)),
+          if (c.previousCost == null) TextCellValue('') else DoubleCellValue(c.previousCost!),
+          if (c.change == null) TextCellValue('') else DoubleCellValue(c.change!),
+          TextCellValue(index == 0 && costs[id]!.length > 1 ? 'Sí' : ''),
+        ]);
+      }
+    }
+  }
 
   static List<TextCellValue> _header(List<String> titles) => [for (final t in titles) TextCellValue(t)];
 

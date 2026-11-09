@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 9;
+  static const int _schemaVersion = 10;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -147,6 +147,69 @@ class AppDatabase {
 
   static const String _createActivityIndex =
       'CREATE INDEX IF NOT EXISTS activity_log_business_created ON activity_log (business_id, created_at)';
+
+  /// Proveedores del negocio (opcional: quien no los usa no ve nada)
+  static const String _createSuppliers = '''
+    CREATE TABLE IF NOT EXISTS suppliers (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      contact_name TEXT,
+      phone TEXT,
+      email TEXT,
+      tax_id TEXT,
+      visit_day TEXT,
+      delivery_days INTEGER,
+      min_order REAL,
+      payment_terms TEXT NOT NULL DEFAULT 'CONTADO',
+      credit_days INTEGER,
+      notes TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  /// Entradas de mercancía; los renglones van en `items` (JSON)
+  static const String _createPurchases = '''
+    CREATE TABLE IF NOT EXISTS purchases (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      supplier_id TEXT,
+      supplier_name TEXT,
+      invoice_number TEXT,
+      date TEXT NOT NULL,
+      items TEXT NOT NULL,
+      total REAL NOT NULL DEFAULT 0,
+      payment_terms TEXT NOT NULL DEFAULT 'CONTADO',
+      due_date TEXT,
+      is_paid INTEGER NOT NULL DEFAULT 1,
+      payments TEXT,
+      photo_path TEXT,
+      order_id TEXT,
+      notes TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  /// Pedidos enviados a proveedores; se comparan con lo que llega
+  static const String _createSupplierOrders = '''
+    CREATE TABLE IF NOT EXISTS supplier_orders (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      supplier_id TEXT,
+      supplier_name TEXT,
+      items TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ENVIADO',
+      created_by TEXT,
+      created_at TEXT NOT NULL,
+      received_at TEXT,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
 
   static const String _createAppSettings = '''
     CREATE TABLE IF NOT EXISTS app_settings (
@@ -331,6 +394,16 @@ class AppDatabase {
       }
       await repairVariantFlags(db);
     }
+    if (oldVersion < 10 && newVersion >= 10) {
+      // Proveedores y entradas de mercancía
+      await db.execute(_createSuppliers);
+      await db.execute(_createPurchases);
+      await _addColumnIfMissing(db, 'products', 'supplier_id', 'TEXT');
+      await _addColumnIfMissing(db, 'purchases', 'payments', 'TEXT');
+      await _addColumnIfMissing(db, 'purchases', 'photo_path', 'TEXT');
+      await _addColumnIfMissing(db, 'purchases', 'order_id', 'TEXT');
+      await db.execute(_createSupplierOrders);
+    }
   }
 
   /// La descarga de la nube reescribía los productos sin `has_variants` y sus
@@ -350,6 +423,9 @@ class AppDatabase {
     await db.execute(_createCashSessions);
     await db.execute(_createActivityLog);
     await db.execute(_createActivityIndex);
+    await db.execute(_createSuppliers);
+    await db.execute(_createPurchases);
+    await db.execute(_createSupplierOrders);
 
     // 1. Tabla de Usuarios (Cuentas)
     await db.execute('''
@@ -430,6 +506,7 @@ class AppDatabase {
         updated_at TEXT NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,
         has_variants INTEGER NOT NULL DEFAULT 0,
+        supplier_id TEXT,
         FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
       )
     ''');

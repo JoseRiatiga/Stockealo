@@ -69,17 +69,23 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Reportes en Excel
-            - Nueva pantalla de Reportes: elige qué descargar (inventario con tallas y colores, ventas, clientes y fiados, movimientos y ganancias).
-            - Escoge el periodo: hoy, esta semana, este mes, unas fechas o todo.
-            - Descárgalo en un solo Excel o en un archivo por cada parte.
+            ### Proveedores y entrada de mercancía
+            - Nueva sección Inventario › Proveedores: ficha de cada proveedor con WhatsApp, día en que pasa, forma de pago y notas.
+            - En cada producto puedes indicar su proveedor (es opcional).
+            - Entrada de mercancía: lo que llega suma al inventario, también por talla y color, con factura, foto de la factura y borrador.
+            - Si el costo cambió, la app te avisa y te deja actualizarlo.
 
-            ### Tallas y colores en el detalle del producto
-            - Al ver un producto ahora aparecen sus tallas y colores con la cantidad de cada uno.
-            - Ajustar el stock de un producto con variantes se hace talla por talla y color por color; el total se calcula solo.
-            - El detalle del producto tiene el diseño nuevo.
+            ### Pedidos al proveedor
+            - El pedido sale por talla y color y se envía directo al WhatsApp del proveedor.
+            - Al recibir la mercancía ves qué faltó y puedes pedirlo de nuevo.
+            - El día que pasa tu proveedor la app te lo recuerda.
+
+            ### Cuentas por pagar y costos
+            - Compras a crédito con abonos y aviso de las vencidas.
+            - En cada producto ves cuánto te cobra cada proveedor y cuál es el más barato.
+            - Reportes en Excel de compras y de costos por proveedor.
 
             ### Correcciones
-            - La pantalla de mantenimiento ya no se queda en gris.
+            - Al pegar la foto de un producto ahora ves que quedó lista.
           draft: false
           prerelease: false

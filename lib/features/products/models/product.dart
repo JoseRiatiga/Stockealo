@@ -19,6 +19,9 @@ class Product {
   final bool hasVariants;
   final List<ProductVariant> variants;
 
+  /// Proveedor principal (opcional)
+  final String? supplierId;
+
   Product({
     required this.id,
     required this.businessId,
@@ -37,6 +40,7 @@ class Product {
     this.isSynced = false,
     this.hasVariants = false,
     this.variants = const [],
+    this.supplierId,
   });
 
   /// Ganancia neta por unidad
@@ -81,6 +85,8 @@ class Product {
     bool? isSynced,
     bool? hasVariants,
     List<ProductVariant>? variants,
+    String? supplierId,
+    bool clearSupplier = false,
   }) {
     return Product(
       id: id ?? this.id,
@@ -100,6 +106,7 @@ class Product {
       isSynced: isSynced ?? this.isSynced,
       hasVariants: hasVariants ?? this.hasVariants,
       variants: variants ?? this.variants,
+      supplierId: clearSupplier ? null : (supplierId ?? this.supplierId),
     );
   }
 
@@ -121,6 +128,7 @@ class Product {
       'updated_at': updatedAt.toIso8601String(),
       'is_synced': isSynced ? 1 : 0,
       'has_variants': hasVariants ? 1 : 0,
+      'supplier_id': supplierId,
     };
   }
 
@@ -143,6 +151,7 @@ class Product {
       isSynced: (map['is_synced'] as int?) == 1,
       hasVariants: (map['has_variants'] as int?) == 1,
       variants: variants,
+      supplierId: map['supplier_id'] as String?,
     );
   }
 }

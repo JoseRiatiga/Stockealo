@@ -1,4 +1,3 @@
-import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/design/phone_field.dart';
 import '../../../../core/design/pro_crown.dart';
@@ -594,11 +593,6 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red));
     }
-  }
-
-    Future<void> _exportToExcel() async {
-    if (_activeBusiness == null || _user == null) return;
-    await ReportsScreen.open(context, business: _activeBusiness!, userId: _user!.id, userEmail: _user!.email);
   }
 
   void _openExcelImport() {
@@ -1225,12 +1219,6 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
             title: 'Importar inventario',
             subtitle: 'Carga productos desde un archivo de Excel',
             onTap: _openExcelImport,
-          ),
-          SettingsRow(
-            icon: Icons.file_download_outlined,
-            title: 'Reportes en Excel',
-            subtitle: 'Elige qué descargar: inventario, ventas, clientes, movimientos o ganancias',
-            onTap: _exportToExcel,
           ),
         ]),
         if (AutoBackupService.instance.isSupported)

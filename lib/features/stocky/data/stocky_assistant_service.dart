@@ -767,10 +767,10 @@ class StockyAssistantService {
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '📊 **Cómo exportar tus reportes a Excel:**\n\n'
-            '1. Entra al módulo de **Historial de Ventas**.\n'
-            '2. En los botones superiores, toca **Excel (.xlsx)**.\n'
+            '1. Abre la pestaña **Reportes** del menú.\n'
+            '2. Elige qué descargar: inventario, ventas, clientes, movimientos o ganancias.\n'
             '3. Selecciona el periodo (hoy, este mes, rango personalizado).\n'
-            '4. Se generará una planilla completa con fecha, cliente, medio de pago, totales y margen de ganancia lista para compartir o abrir en Excel.',
+            '4. Se genera un archivo de Excel (.xlsx) listo para compartir o abrir.',
         timestamp: DateTime.now(),
         type: StockyMessageType.text,
         actions: const [

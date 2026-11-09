@@ -1,5 +1,3 @@
-import '../../../reports/presentation/screens/reports_screen.dart';
-import '../../../reports/data/report_export_service.dart';
 import '../widgets/sales_summary_card.dart';
 import '../widgets/quotations_list_modal.dart';
 import '../../../../core/design/app_pagination.dart';
@@ -230,22 +228,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     }
   }
 
-    Future<void> _exportToExcel() async {
-    final biz = ActiveBusinessScope.read(context);
-    final user = AuthRepository.instance.currentUser;
-    if (biz == null || user == null) {
-      AppToast.showWarning(context, 'No hay una empresa activa seleccionada.');
-      return;
-    }
-    await ReportsScreen.open(
-      context,
-      business: biz,
-      userId: user.id,
-      userEmail: user.email,
-      initial: const {ReportSection.sales, ReportSection.profit},
-    );
-  }
-
   Future<void> _openCashRegister() async {
     final bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
     if (bizId == null) return;
@@ -438,12 +420,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                             caption: 'Ganancias',
                             onTap: () => ProfitReportScreen.open(context, business),
                           ),
-                        QuickAccessItem(
-                          icon: Icons.table_chart_outlined,
-                          label: 'Excel',
-                          caption: 'Exportar',
-                          onTap: _exportToExcel,
-                        ),
                       ],
                     ),
                   ),

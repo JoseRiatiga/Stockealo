@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import '../../../../core/services/web_update_service.dart';
 import '../../../../core/design/glass_surface.dart';
 import '../../../../core/services/phone_alerts_service.dart';
 import '../../../backup/data/auto_backup_service.dart';
@@ -55,6 +58,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   late final AppLifecycleListener _lifecycle;
 
+  /// Web: revisa cada cierto tiempo si se publicó una versión nueva
+  Timer? _webUpdateTimer;
+  bool _webUpdateShown = false;
+
   @override
   void initState() {
     super.initState();
@@ -67,7 +74,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     _lifecycle = AppLifecycleListener(onResume: () {
       AutoBackupService.instance.runIfDue();
       _refreshPhoneAlerts();
+      if (kIsWeb) _checkWebUpdate();
     });
+    if (kIsWeb) {
+      _webUpdateTimer = Timer.periodic(WebUpdateService.checkEvery, (_) => _checkWebUpdate());
+    }
   }
 
   /// Prepara los avisos del celular y pone al día el resumen programado
@@ -82,6 +93,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   @override
   void dispose() {
     _lifecycle.dispose();
+    _webUpdateTimer?.cancel();
     NotificationService.instance.stopRealtimeSalesListening();
     super.dispose();
   }
@@ -126,6 +138,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   void _checkAppUpdateSilently() {
     Future.delayed(const Duration(seconds: 4), () async {
+      if (kIsWeb) {
+        _checkWebUpdate();
+        return;
+      }
       try {
         final update = await UpdateService.instance.checkForUpdate();
         if (update.hasUpdate && mounted) {
@@ -133,6 +149,42 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         }
       } catch (_) {}
     });
+  }
+
+  /// Web: si hay una versión publicada más nueva, muestra un aviso fijo arriba
+  Future<void> _checkWebUpdate() async {
+    if (_webUpdateShown) return;
+    final latest = await WebUpdateService.instance.checkForNewVersion();
+    if (latest == null || !mounted || _webUpdateShown) return;
+    _webUpdateShown = true;
+    final c = context.colors;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showMaterialBanner(
+      MaterialBanner(
+        backgroundColor: c.infoSoft,
+        leading: Icon(Icons.system_update_alt_rounded, color: c.info),
+        content: Text(
+          latest.isEmpty
+              ? 'Hay una versión nueva de Stockealo. Toca Actualizar para usarla.'
+              : 'Hay una versión nueva de Stockealo ($latest). Toca Actualizar para usarla.',
+          style: TextStyle(color: c.ink),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              messenger.hideCurrentMaterialBanner();
+              // Se vuelve a ofrecer en la siguiente revisión
+              _webUpdateShown = false;
+            },
+            child: const Text('Más tarde'),
+          ),
+          FilledButton(
+            onPressed: () => WebUpdateService.instance.reloadToLatest(),
+            child: const Text('Actualizar'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _navigateToTab(int index) {

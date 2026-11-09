@@ -63,13 +63,6 @@ const List<QuickActionDef> kAvailableQuickActions = [
     color: Color(0xFF0D9488),
   ),
   QuickActionDef(
-    id: 'excel_export',
-    label: 'Excel',
-    description: 'Exportar catálogo, ventas y clientes en .xlsx',
-    icon: Icons.file_download_outlined,
-    color: Color(0xFF16A34A),
-  ),
-  QuickActionDef(
     id: 'profit_report',
     label: 'Reportes',
     description: 'Ganancias y pérdidas por periodo',

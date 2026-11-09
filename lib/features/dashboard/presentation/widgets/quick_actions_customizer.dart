@@ -7,7 +7,8 @@ class QuickActionsCustomizer {
   /// Devuelve la nueva selección, o null si el usuario canceló.
   static Future<List<String>?> show(BuildContext context, {required List<String> current}) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedIds = List<String>.from(current);
+    // Ignora acciones guardadas que ya no existen (p. ej. 'excel_export')
+    final selectedIds = current.where((id) => kAvailableQuickActions.any((a) => a.id == id)).toList();
 
     final saved = await showModalBottomSheet<bool>(
       showDragHandle: false,

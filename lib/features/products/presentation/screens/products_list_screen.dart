@@ -1,7 +1,5 @@
 import '../../../suppliers/presentation/widgets/visit_today_banner.dart';
 import '../../../suppliers/presentation/screens/suppliers_screen.dart';
-import '../../../reports/presentation/screens/reports_screen.dart';
-import '../../../reports/data/report_export_service.dart';
 import '../../../store/presentation/screens/online_store_screen.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/design/app_card.dart';
@@ -265,18 +263,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     }
   }
 
-    Future<void> _exportToExcel() async {
-    final user = AuthRepository.instance.currentUser;
-    if (_activeBusiness == null || user == null) return;
-    await ReportsScreen.open(
-      context,
-      business: _activeBusiness!,
-      userId: user.id,
-      userEmail: user.email,
-      initial: const {ReportSection.inventory},
-    );
-  }
-
   Future<void> _openManageCategories() async {
     if (_activeBusiness == null) return;
     final changed = await ManageCategoriesModal.show(context, _activeBusiness!.id);
@@ -477,12 +463,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                             caption: 'Y entradas',
                             onTap: _openSuppliers,
                           ),
-                        QuickAccessItem(
-                          icon: Icons.table_chart_outlined,
-                          label: 'Excel',
-                          caption: 'Exportar',
-                          onTap: _exportToExcel,
-                        ),
                       ],
                     ),
                   ),

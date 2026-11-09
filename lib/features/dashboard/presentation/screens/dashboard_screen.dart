@@ -1,5 +1,4 @@
 import '../../../services/presentation/widgets/work_board_card.dart';
-import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../../core/design/skeleton.dart';
 import '../../../reports/presentation/screens/profit_report_screen.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -166,12 +165,6 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
 
   bool get canViewProfits => _userRole == 'OWNER' || _userRole == 'ADMIN';
 
-    Future<void> _exportExcelDirectly() async {
-    final user = _authRepo.currentUser;
-    if (_activeBusiness == null || user == null) return;
-    await ReportsScreen.open(context, business: _activeBusiness!, userId: user.id, userEmail: user.email);
-  }
-
   Future<void> _openCustomizeQuickActionsModal() async {
     if (_activeBusiness == null) return;
     final selectedIds = await QuickActionsCustomizer.show(context, current: _quickActionIds);
@@ -239,9 +232,6 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
         break;
       case 'sales_history':
         widget.onNavigateToSales();
-        break;
-      case 'excel_export':
-        _exportExcelDirectly();
         break;
       case 'profit_report':
         // Muestra costos y márgenes: el cajero no lo ve
@@ -539,7 +529,10 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
 
     final List<QuickActionDef> activeDefs = [];
     for (final id in _quickActionIds) {
-      final found = kAvailableQuickActions.firstWhere((a) => a.id == id, orElse: () => kAvailableQuickActions.first);
+      // Acciones que ya no existen (p. ej. 'excel_export', quitada en la 0.12.0) se ignoran
+      final matches = kAvailableQuickActions.where((a) => a.id == id);
+      if (matches.isEmpty) continue;
+      final found = matches.first;
       if (!activeDefs.any((a) => a.id == found.id)) activeDefs.add(found);
     }
     if (activeDefs.isEmpty) activeDefs.addAll(kAvailableQuickActions.take(4));

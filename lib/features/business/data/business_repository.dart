@@ -181,6 +181,8 @@ class BusinessRepository extends ChangeNotifier {
     String? color,
     String? logoUrl,
     bool? cashRegisterEnabled,
+    bool? servicesEnabled,
+    String? serviceType,
   }) async {
     final db = await _dbProvider.database;
     final Map<String, dynamic> updateData = {
@@ -192,6 +194,8 @@ class BusinessRepository extends ChangeNotifier {
       if (color != null) 'color': color,
       if (logoUrl != null) 'logo_url': logoUrl,
       if (cashRegisterEnabled != null) 'cash_register_enabled': cashRegisterEnabled ? 1 : 0,
+      if (servicesEnabled != null) 'services_enabled': servicesEnabled ? 1 : 0,
+      if (serviceType != null) 'service_type': serviceType,
     };
 
     await db.update(

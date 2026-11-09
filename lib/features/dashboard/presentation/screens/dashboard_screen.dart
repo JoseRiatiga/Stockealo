@@ -1,3 +1,4 @@
+import '../../../services/presentation/widgets/work_board_card.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../../core/design/skeleton.dart';
 import '../../../reports/presentation/screens/profit_report_screen.dart';
@@ -449,6 +450,12 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                   onDebtsTap: () => _executeQuickAction('customers'),
                 ),
                 const SizedBox(height: AppSpace.xl),
+
+                // Negocios de servicios (lavadero, barbería): el tablero de trabajos
+                if (_activeBusiness?.servicesEnabled == true) ...[
+                  WorkBoardCard(key: ValueKey('board-${_activeBusiness!.id}'), business: _activeBusiness!),
+                  const SizedBox(height: AppSpace.xl),
+                ],
 
                 // Acciones rápidas personalizables
                 Row(

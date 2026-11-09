@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 10;
+  static const int _schemaVersion = 11;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -207,6 +207,66 @@ class AppDatabase {
       created_by TEXT,
       created_at TEXT NOT NULL,
       received_at TEXT,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  /// Servicios que ofrece el negocio (lavado, corte...): precio, duración y comisión
+  static const String _createServices = '''
+    CREATE TABLE IF NOT EXISTS services (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      price REAL NOT NULL DEFAULT 0,
+      duration_min INTEGER,
+      commission_pct REAL NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  /// Empleados: personas que hacen los servicios (no necesitan cuenta en la app)
+  static const String _createStaff = '''
+    CREATE TABLE IF NOT EXISTS staff (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      phone TEXT,
+      document TEXT,
+      commission_pct REAL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      member_email TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  /// Tablero de órdenes (motos en el lavadero, clientes en la barbería...)
+  static const String _createWorkOrders = '''
+    CREATE TABLE IF NOT EXISTS work_orders (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      number TEXT NOT NULL,
+      plate TEXT,
+      vehicle TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      status TEXT NOT NULL DEFAULT 'ESPERA',
+      lines TEXT NOT NULL,
+      notes TEXT,
+      status_times TEXT,
+      total REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      tip REAL NOT NULL DEFAULT 0,
+      payment_method TEXT,
+      sale_ids TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
       FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
     )
   ''';
@@ -404,6 +464,17 @@ class AppDatabase {
       await _addColumnIfMissing(db, 'purchases', 'order_id', 'TEXT');
       await db.execute(_createSupplierOrders);
     }
+    if (oldVersion < 11 && newVersion >= 11) {
+      // Negocios de servicios: lavaderos, barberías, talleres
+      await _addColumnIfMissing(db, 'businesses', 'services_enabled', 'INTEGER NOT NULL DEFAULT 0');
+      await _addColumnIfMissing(db, 'businesses', 'service_type', 'TEXT');
+      for (final column in ['service_id', 'work_order_id', 'staff_ids']) {
+        await _addColumnIfMissing(db, 'sales', column, 'TEXT');
+      }
+      await db.execute(_createServices);
+      await db.execute(_createStaff);
+      await db.execute(_createWorkOrders);
+    }
   }
 
   /// La descarga de la nube reescribía los productos sin `has_variants` y sus
@@ -426,6 +497,9 @@ class AppDatabase {
     await db.execute(_createSuppliers);
     await db.execute(_createPurchases);
     await db.execute(_createSupplierOrders);
+    await db.execute(_createServices);
+    await db.execute(_createStaff);
+    await db.execute(_createWorkOrders);
 
     // 1. Tabla de Usuarios (Cuentas)
     await db.execute('''
@@ -452,6 +526,8 @@ class AppDatabase {
         color TEXT,
         logo_url TEXT,
         cash_register_enabled INTEGER NOT NULL DEFAULT 0,
+        services_enabled INTEGER NOT NULL DEFAULT 0,
+        service_type TEXT,
         description TEXT,
         created_at TEXT NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,
@@ -573,6 +649,9 @@ class AppDatabase {
         discount_amount REAL DEFAULT 0.0,
         variant_id TEXT,
         variant_name TEXT,
+        service_id TEXT,
+        work_order_id TEXT,
+        staff_ids TEXT,
         created_at TEXT NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE,

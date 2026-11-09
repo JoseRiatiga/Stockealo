@@ -7,7 +7,7 @@ import '../../data/activity_repository.dart';
 /// Grupos de acciones para filtrar el registro
 enum _ActivityFilter {
   all('Todo', {}),
-  sales('Ventas', {ActivityAction.sale, ActivityAction.saleCancel}),
+  sales('Ventas', {ActivityAction.sale, ActivityAction.saleCancel, ActivityAction.serviceSale}),
   inventory('Inventario', {
     ActivityAction.productCreate,
     ActivityAction.productUpdate,
@@ -26,6 +26,7 @@ enum _ActivityFilter {
     ActivityAction.cashClose,
   }),
   team('Equipo', {
+    ActivityAction.staffChange,
     ActivityAction.memberJoin,
     ActivityAction.memberAdd,
     ActivityAction.memberRemove,
@@ -76,6 +77,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
         ActivityAction.purchase => (Icons.local_shipping_outlined, (c) => c.success),
         ActivityAction.supplierChange => (Icons.storefront_outlined, (c) => c.inkMuted),
         ActivityAction.supplierPayment => (Icons.payments_outlined, (c) => c.warning),
+        ActivityAction.serviceSale => (Icons.local_car_wash_outlined, (c) => c.success),
+        ActivityAction.staffChange => (Icons.badge_outlined, (c) => c.inkMuted),
         ActivityAction.debtPayment => (Icons.payments_outlined, (c) => c.success),
         ActivityAction.customerDelete => (Icons.person_remove_outlined, (c) => c.danger),
         ActivityAction.cashOpen => (Icons.lock_open_rounded, (c) => c.accent),

@@ -94,6 +94,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Ahora no'), findsNothing);
 
+    await tester.ensureVisible(find.text('Descargar la versión gratis'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Descargar la versión gratis'));
     await tester.pumpAndSettle();
     expect(result, ProUpsellResult.alternative);

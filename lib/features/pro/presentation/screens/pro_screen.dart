@@ -21,6 +21,7 @@ const proBenefits = [
   (Icons.notifications_active_outlined, 'Cobro automático de fiados', 'Recordatorios programados y estado de cuenta en PDF.'),
   (Icons.auto_awesome_mosaic_outlined, 'Catálogos personalizados', 'Más plantillas y colores, sin el pie "Hecho con Stockealo".'),
   (Icons.auto_awesome_rounded, 'Más preguntas a Stocky', '50 preguntas a la IA al día en vez de 10.'),
+  (Icons.badge_outlined, 'Empleados sin límite', 'Para lavaderos, barberías y talleres: todo tu equipo en el tablero.'),
 ];
 
 /// Stockealo Pro: estado del negocio, planes, pago por Nequi y canje de códigos

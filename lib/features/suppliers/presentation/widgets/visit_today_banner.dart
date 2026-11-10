@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_tokens.dart';
 import '../../../business/models/business.dart';
-import '../../../products/presentation/widgets/restock_order_modal.dart';
+import '../screens/suppliers_screen.dart';
 import '../../data/supplier_repository.dart';
 import '../../models/supplier.dart';
 
@@ -69,13 +69,9 @@ class _VisitTodayBannerState extends State<VisitTodayBanner> {
               ),
             ),
             TextButton(
-              onPressed: () => RestockOrderModal.show(
-                context,
-                business: widget.business,
-                userName: widget.userName,
-                supplier: _today.first,
-              ),
-              child: const Text('Hacer pedido'),
+              // El pedido vive en Proveedores y entradas: el aviso solo lleva allá
+              onPressed: () => SuppliersScreen.open(context, business: widget.business, userName: widget.userName),
+              child: const Text('Ver proveedor'),
             ),
           ],
         ),

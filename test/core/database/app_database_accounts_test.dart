@@ -83,10 +83,11 @@ void main() {
         containsAll(['is_deleted', 'deleted_at', 'description', 'country', 'icon', 'color', 'logo_url', 'cash_register_enabled']),
       );
       expect(await columnsOf('app_settings'), isNotEmpty);
-      expect(await db.getVersion(), 11);
-      expect(await columnsOf('services'), containsAll(['price', 'commission_pct', 'duration_min']));
+      expect(await db.getVersion(), 12);
+      expect(await columnsOf('services'), containsAll(['price', 'commission_pct', 'duration_min', 'prices', 'staff_ids']));
+      expect(await columnsOf('staff_attendance'), containsAll(['staff_id', 'day', 'status', 'pauses']));
       expect(await columnsOf('staff'), containsAll(['name', 'commission_pct', 'member_email']));
-      expect(await columnsOf('work_orders'), containsAll(['plate', 'status', 'lines', 'tip', 'sale_ids']));
+      expect(await columnsOf('work_orders'), containsAll(['plate', 'status', 'lines', 'tip', 'sale_ids', 'vehicle_kind']));
       expect(await columnsOf('sales'), containsAll(['service_id', 'work_order_id', 'staff_ids']));
       expect(await columnsOf('businesses'), containsAll(['services_enabled', 'service_type']));
       expect(await columnsOf('suppliers'), containsAll(['name', 'phone', 'payment_terms', 'credit_days']));

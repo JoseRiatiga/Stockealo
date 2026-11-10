@@ -1,50 +1,8 @@
 import 'dart:convert';
 
-/// Tipo de negocio de servicios: cambia textos, ejemplos y si se pide la placa
-enum ServiceType {
-  lavaderoMotos('LAVADERO_MOTOS', 'Lavadero de motos', 'Moto', 'Lavando'),
-  barberia('BARBERIA', 'Barbería / peluquería', 'Cliente', 'Atendiendo'),
-  taller('TALLER', 'Taller', 'Vehículo', 'En reparación'),
-  otro('OTRO', 'Otro', 'Orden', 'En proceso');
+import 'service_template.dart';
 
-  final String code;
-  final String label;
-
-  /// Cómo se le dice a cada orden ("Moto", "Cliente"...)
-  final String unit;
-
-  /// Nombre del estado en proceso ("Lavando", "Atendiendo"...)
-  final String inProgress;
-
-  const ServiceType(this.code, this.label, this.unit, this.inProgress);
-
-  /// Lavaderos y talleres trabajan por placa
-  bool get usesPlate => this == lavaderoMotos || this == taller;
-
-  static ServiceType of(String? code) =>
-      ServiceType.values.firstWhere((t) => t.code == code, orElse: () => ServiceType.otro);
-
-  /// Servicios de ejemplo al activar el módulo: (nombre, precio COP, minutos, % comisión)
-  List<(String, double, int, double)> get examples => switch (this) {
-        lavaderoMotos => const [
-            ('Lavado sencillo', 10000, 20, 40),
-            ('Lavado completo', 15000, 35, 40),
-            ('Lavado y polichado', 25000, 50, 40),
-            ('Desengrase de motor', 12000, 25, 40),
-            ('Lavado de casco', 5000, 10, 40),
-          ],
-        barberia => const [
-            ('Corte', 15000, 30, 50),
-            ('Corte y barba', 22000, 45, 50),
-            ('Barba', 10000, 20, 50),
-          ],
-        taller => const [
-            ('Cambio de aceite', 15000, 30, 30),
-            ('Revisión general', 30000, 60, 30),
-          ],
-        otro => const [],
-      };
-}
+export 'service_template.dart';
 
 /// Un servicio del catálogo
 class ShopService {
@@ -58,6 +16,13 @@ class ShopService {
   final double commissionPct;
   final bool isActive;
   final int sortOrder;
+
+  /// Precio por tipo de vehículo (lavadero). Vacío = se usa [price] para todo.
+  /// Un tipo que no aparece no se ofrece (por ejemplo, el lavado de casco en carro).
+  final Map<String, double> prices;
+
+  /// Empleados que pueden hacer este servicio. Vacío = cualquiera (servicios de la 0.11.0)
+  final List<String> staffIds;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -70,9 +35,23 @@ class ShopService {
     this.commissionPct = 0,
     this.isActive = true,
     this.sortOrder = 0,
+    this.prices = const {},
+    this.staffIds = const [],
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// Precio para un tipo de vehículo; null si el servicio no se ofrece para ese tipo
+  double? priceFor(String? vehicleKind) {
+    if (prices.isEmpty) return price;
+    if (vehicleKind == null) return null;
+    return prices[vehicleKind];
+  }
+
+  bool offeredFor(String? vehicleKind) => priceFor(vehicleKind) != null;
+
+  /// ¿Este empleado puede hacerlo?
+  bool doneBy(String staffId) => staffIds.isEmpty || staffIds.contains(staffId);
 
   ShopService copyWith({
     String? name,
@@ -81,6 +60,8 @@ class ShopService {
     double? commissionPct,
     bool? isActive,
     int? sortOrder,
+    Map<String, double>? prices,
+    List<String>? staffIds,
     DateTime? updatedAt,
   }) =>
       ShopService(
@@ -92,6 +73,8 @@ class ShopService {
         commissionPct: commissionPct ?? this.commissionPct,
         isActive: isActive ?? this.isActive,
         sortOrder: sortOrder ?? this.sortOrder,
+        prices: prices ?? this.prices,
+        staffIds: staffIds ?? this.staffIds,
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -105,6 +88,8 @@ class ShopService {
         'commission_pct': commissionPct,
         'is_active': isActive ? 1 : 0,
         'sort_order': sortOrder,
+        'prices': jsonEncode(prices),
+        'staff_ids': jsonEncode(staffIds),
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };
@@ -118,9 +103,28 @@ class ShopService {
         commissionPct: (m['commission_pct'] as num?)?.toDouble() ?? 0,
         isActive: m['is_active'] == true || m['is_active'] == 1,
         sortOrder: (m['sort_order'] as num?)?.toInt() ?? 0,
+        prices: {
+          for (final e in Map<String, dynamic>.from(decodeJson(m['prices'], const {}) as Map).entries)
+            if (e.value is num) e.key: (e.value as num).toDouble(),
+        },
+        staffIds: [for (final id in decodeJson(m['staff_ids'], const []) as List) id.toString()],
         createdAt: DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now(),
         updatedAt: DateTime.tryParse(m['updated_at'] as String? ?? '') ?? DateTime.now(),
       );
+}
+
+/// JSON guardado como texto (en el equipo) o ya decodificado (de la nube)
+dynamic decodeJson(Object? raw, Object fallback) {
+  if (raw == null) return fallback;
+  if (raw is String) {
+    if (raw.trim().isEmpty) return fallback;
+    try {
+      return jsonDecode(raw);
+    } catch (_) {
+      return fallback;
+    }
+  }
+  return raw;
 }
 
 /// Empleado: una persona que hace los servicios. No necesita cuenta en la app.
@@ -208,13 +212,21 @@ class StaffMember {
       );
 }
 
-/// Un servicio dentro de una orden, con quién lo hace
+/// Un servicio dentro de una orden, con quién lo hace y en qué va.
+/// Cada servicio avanza por separado: Pendiente → En proceso → Terminado.
 class WorkOrderLine {
+  static const pending = 'PENDIENTE';
+  static const inProgress = 'PROCESO';
+  static const done = 'TERMINADO';
+
   final String serviceId;
   final String name;
   final double price;
   final double commissionPct;
   final List<String> staffIds;
+  final String status;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
 
   const WorkOrderLine({
     required this.serviceId,
@@ -222,14 +234,32 @@ class WorkOrderLine {
     required this.price,
     this.commissionPct = 0,
     this.staffIds = const [],
+    this.status = pending,
+    this.startedAt,
+    this.finishedAt,
   });
 
-  WorkOrderLine copyWith({double? price, List<String>? staffIds}) => WorkOrderLine(
+  bool get isPending => status == pending;
+  bool get isInProgress => status == inProgress;
+  bool get isDone => status == done;
+
+  WorkOrderLine copyWith({
+    double? price,
+    List<String>? staffIds,
+    String? status,
+    DateTime? startedAt,
+    DateTime? finishedAt,
+    bool clearTimes = false,
+  }) =>
+      WorkOrderLine(
         serviceId: serviceId,
         name: name,
         price: price ?? this.price,
         commissionPct: commissionPct,
         staffIds: staffIds ?? this.staffIds,
+        status: status ?? this.status,
+        startedAt: clearTimes ? null : (startedAt ?? this.startedAt),
+        finishedAt: clearTimes ? null : (finishedAt ?? this.finishedAt),
       );
 
   Map<String, dynamic> toJson() => {
@@ -238,14 +268,26 @@ class WorkOrderLine {
         'price': price,
         'commission_pct': commissionPct,
         'staff_ids': staffIds,
+        'status': status,
+        if (startedAt != null) 'started_at': startedAt!.toIso8601String(),
+        if (finishedAt != null) 'finished_at': finishedAt!.toIso8601String(),
       };
 
-  factory WorkOrderLine.fromJson(Map<String, dynamic> j) => WorkOrderLine(
+  /// [orderStatus] completa el estado de las líneas de la 0.11.0, que no lo guardaban
+  factory WorkOrderLine.fromJson(Map<String, dynamic> j, {String? orderStatus}) => WorkOrderLine(
         serviceId: j['service_id'] as String? ?? '',
         name: j['name'] as String? ?? 'Servicio',
         price: (j['price'] as num?)?.toDouble() ?? 0,
         commissionPct: (j['commission_pct'] as num?)?.toDouble() ?? 0,
         staffIds: [for (final s in (j['staff_ids'] as List? ?? const [])) s as String],
+        status: j['status'] as String? ??
+            switch (orderStatus) {
+              WorkOrder.ready || WorkOrder.delivered => done,
+              WorkOrder.inProgress => inProgress,
+              _ => pending,
+            },
+        startedAt: DateTime.tryParse('${j['started_at']}'),
+        finishedAt: DateTime.tryParse('${j['finished_at']}'),
       );
 }
 
@@ -267,6 +309,9 @@ class WorkOrder {
   final String number;
   final String? plate;
   final String? vehicle;
+
+  /// Tipo de vehículo del lavadero (MOTO, CARRO, CAMIONETA); define los precios
+  final String? vehicleKind;
   final String? customerName;
   final String? customerPhone;
   final String status;
@@ -290,6 +335,7 @@ class WorkOrder {
     required this.number,
     this.plate,
     this.vehicle,
+    this.vehicleKind,
     this.customerName,
     this.customerPhone,
     this.status = waiting,
@@ -313,6 +359,21 @@ class WorkOrder {
   /// Todos los empleados que trabajan en la orden
   Set<String> get staffIds => {for (final l in lines) ...l.staffIds};
 
+  /// Todos sus servicios están terminados
+  bool get allDone => lines.isNotEmpty && lines.every((l) => l.isDone);
+
+  /// Algunos servicios terminados y otros esperando, sin ninguno en proceso
+  bool get isPartial =>
+      status == waiting && lines.any((l) => l.isDone) && lines.any((l) => l.isPending) && !lines.any((l) => l.isInProgress);
+
+  /// Estado que corresponde según sus servicios (las órdenes entregadas o canceladas no cambian)
+  String get derivedStatus {
+    if (status == delivered || status == cancelled) return status;
+    if (lines.any((l) => l.isInProgress)) return inProgress;
+    if (allDone) return ready;
+    return waiting;
+  }
+
   /// Desde cuándo está en el estado actual
   DateTime get since => statusTimes[status] ?? createdAt;
 
@@ -322,12 +383,13 @@ class WorkOrder {
     return i < 0 || i >= flow.length - 1 ? null : flow[i + 1];
   }
 
-  static String statusLabel(String status, ServiceType type) => switch (status) {
-        waiting => 'En espera',
-        inProgress => type.inProgress,
-        ready => 'Lista',
-        delivered => 'Entregada',
-        cancelled => 'Cancelada',
+  /// Nombre del estado con las palabras de la plantilla del negocio
+  String statusLabelFor(ServiceTemplate t) => switch (status) {
+        waiting => isPartial ? t.partialLabel : t.waitingLabel,
+        inProgress => t.inProgress,
+        ready => t.readyLabel,
+        delivered => t.deliveredLabel,
+        cancelled => t.feminine ? 'Cancelada' : 'Cancelado',
         _ => status,
       };
 
@@ -340,6 +402,7 @@ class WorkOrder {
   WorkOrder copyWith({
     String? plate,
     String? vehicle,
+    String? vehicleKind,
     String? customerName,
     String? customerPhone,
     String? status,
@@ -359,6 +422,7 @@ class WorkOrder {
         number: number,
         plate: plate ?? this.plate,
         vehicle: vehicle ?? this.vehicle,
+        vehicleKind: vehicleKind ?? this.vehicleKind,
         customerName: customerName ?? this.customerName,
         customerPhone: customerPhone ?? this.customerPhone,
         status: status ?? this.status,
@@ -381,6 +445,7 @@ class WorkOrder {
         'number': number,
         'plate': plate,
         'vehicle': vehicle,
+        'vehicle_kind': vehicleKind,
         'customer_name': customerName,
         'customer_phone': customerPhone,
         'status': status,
@@ -411,6 +476,7 @@ class WorkOrder {
 
   factory WorkOrder.fromMap(Map<String, dynamic> m) {
     final lines = _json(m['lines'], const []) as List;
+    final status = m['status'] as String? ?? waiting;
     final times = Map<String, dynamic>.from(_json(m['status_times'], const {}) as Map);
     final sales = _json(m['sale_ids'], const []) as List;
     return WorkOrder(
@@ -419,10 +485,11 @@ class WorkOrder {
       number: m['number'] as String? ?? '',
       plate: m['plate'] as String?,
       vehicle: m['vehicle'] as String?,
+      vehicleKind: m['vehicle_kind'] as String?,
       customerName: m['customer_name'] as String?,
       customerPhone: m['customer_phone'] as String?,
-      status: m['status'] as String? ?? waiting,
-      lines: [for (final l in lines) WorkOrderLine.fromJson(Map<String, dynamic>.from(l as Map))],
+      status: status,
+      lines: [for (final l in lines) WorkOrderLine.fromJson(Map<String, dynamic>.from(l as Map), orderStatus: status)],
       notes: m['notes'] as String?,
       statusTimes: {
         for (final e in times.entries)
@@ -438,4 +505,98 @@ class WorkOrder {
       updatedAt: DateTime.tryParse(m['updated_at'] as String? ?? '') ?? DateTime.now(),
     );
   }
+}
+
+
+/// Asistencia de un empleado en un día: llegó o no vino, salida y pausas
+class StaffAttendance {
+  static const arrived = 'LLEGO';
+  static const absent = 'NO_VINO';
+
+  final String id;
+  final String businessId;
+  final String staffId;
+
+  /// Día en formato AAAA-MM-DD (hora del equipo)
+  final String day;
+  final String status;
+  final DateTime? arrivedAt;
+  final DateTime? leftAt;
+
+  /// Pausas del día; la última sin fin es una pausa en curso
+  final List<(DateTime, DateTime?)> pauses;
+  final DateTime updatedAt;
+
+  const StaffAttendance({
+    required this.id,
+    required this.businessId,
+    required this.staffId,
+    required this.day,
+    required this.status,
+    this.arrivedAt,
+    this.leftAt,
+    this.pauses = const [],
+    required this.updatedAt,
+  });
+
+  static String dayOf(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  bool get isAbsent => status == absent;
+  bool get hasLeft => leftAt != null;
+  bool get onPause => pauses.isNotEmpty && pauses.last.$2 == null;
+
+  /// Puede recibir trabajo: llegó, no ha salido y no está en pausa
+  bool get canWork => status == arrived && !hasLeft && !onPause;
+
+  StaffAttendance copyWith({
+    String? status,
+    DateTime? arrivedAt,
+    DateTime? leftAt,
+    bool clearLeft = false,
+    List<(DateTime, DateTime?)>? pauses,
+    DateTime? updatedAt,
+  }) =>
+      StaffAttendance(
+        id: id,
+        businessId: businessId,
+        staffId: staffId,
+        day: day,
+        status: status ?? this.status,
+        arrivedAt: arrivedAt ?? this.arrivedAt,
+        leftAt: clearLeft ? null : (leftAt ?? this.leftAt),
+        pauses: pauses ?? this.pauses,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'business_id': businessId,
+        'staff_id': staffId,
+        'day': day,
+        'status': status,
+        'arrived_at': arrivedAt?.toIso8601String(),
+        'left_at': leftAt?.toIso8601String(),
+        'pauses': jsonEncode([
+          for (final (start, end) in pauses)
+            {'start': start.toIso8601String(), if (end != null) 'end': end.toIso8601String()}
+        ]),
+        'updated_at': updatedAt.toIso8601String(),
+      };
+
+  factory StaffAttendance.fromMap(Map<String, dynamic> m) => StaffAttendance(
+        id: m['id'] as String,
+        businessId: m['business_id'] as String,
+        staffId: m['staff_id'] as String,
+        day: m['day'] as String,
+        status: m['status'] as String? ?? arrived,
+        arrivedAt: DateTime.tryParse('${m['arrived_at']}'),
+        leftAt: DateTime.tryParse('${m['left_at']}'),
+        pauses: [
+          for (final p in decodeJson(m['pauses'], const []) as List)
+            if (p is Map && DateTime.tryParse('${p['start']}') != null)
+              (DateTime.parse('${p['start']}'), DateTime.tryParse('${p['end']}')),
+        ],
+        updatedAt: DateTime.tryParse('${m['updated_at']}') ?? DateTime.now(),
+      );
 }

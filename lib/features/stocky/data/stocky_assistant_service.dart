@@ -468,7 +468,7 @@ class StockyAssistantService {
       timestamp: DateTime.now(),
       type: StockyMessageType.text,
       actions: const [
-        StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+        StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
         StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
       ],
     );
@@ -573,7 +573,7 @@ class StockyAssistantService {
           const StockyAction(label: '⚠️ Ver Stock Crítico', actionType: 'query_stock'),
         if (totalDebt > 0)
           const StockyAction(label: '👥 Cobrar Fiados', actionType: 'query_debts'),
-        const StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+        const StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
         const StockyAction(label: 'Ver Historial', actionType: 'navigate_sales'),
       ],
     );
@@ -693,7 +693,7 @@ class StockyAssistantService {
       timestamp: DateTime.now(),
       type: StockyMessageType.text,
       actions: const [
-        StockyAction(label: 'Ver Clientes', actionType: 'navigate_customers'),
+        StockyAction(label: 'Ir a Ventas › Clientes y fiados', actionType: 'navigate_customers'),
         StockyAction(label: 'Fiados Pendientes', actionType: 'query_debts'),
       ],
     );
@@ -719,7 +719,7 @@ class StockyAssistantService {
         timestamp: DateTime.now(),
         type: StockyMessageType.text,
         actions: const [
-          StockyAction(label: '+ Registrar Venta Ahora', actionType: 'quick_sale'),
+          StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
           StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
         ],
       );
@@ -757,7 +757,7 @@ class StockyAssistantService {
         type: StockyMessageType.text,
         actions: const [
           StockyAction(label: 'Ver Fiados Pendientes', actionType: 'query_debts'),
-          StockyAction(label: 'Ir a Clientes', actionType: 'navigate_customers'),
+          StockyAction(label: 'Ir a Ventas › Clientes y fiados', actionType: 'navigate_customers'),
         ],
       );
     }
@@ -767,10 +767,10 @@ class StockyAssistantService {
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '📊 **Cómo exportar tus reportes a Excel:**\n\n'
-            '1. Entra al módulo de **Historial de Ventas**.\n'
-            '2. En los botones superiores, toca **Excel (.xlsx)**.\n'
+            '1. Abre la pestaña **Reportes** del menú.\n'
+            '2. Elige qué descargar: inventario, ventas, clientes, movimientos o ganancias.\n'
             '3. Selecciona el periodo (hoy, este mes, rango personalizado).\n'
-            '4. Se generará una planilla completa con fecha, cliente, medio de pago, totales y margen de ganancia lista para compartir o abrir en Excel.',
+            '4. Se genera un archivo de Excel (.xlsx) listo para compartir o abrir.',
         timestamp: DateTime.now(),
         type: StockyMessageType.text,
         actions: const [
@@ -844,7 +844,7 @@ class StockyAssistantService {
         timestamp: DateTime.now(),
         type: StockyMessageType.salesSummary,
         actions: const [
-          StockyAction(label: 'Registrar Venta Rápida', actionType: 'quick_sale'),
+          StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
           StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
         ],
         data: {'total': 0.0, 'count': 0, 'profit': 0.0},
@@ -868,7 +868,7 @@ class StockyAssistantService {
       type: StockyMessageType.salesSummary,
       actions: const [
         StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
-        StockyAction(label: '+ Nueva Venta', actionType: 'quick_sale'),
+        StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
       ],
       data: {
         'total': total,
@@ -942,7 +942,7 @@ class StockyAssistantService {
         timestamp: DateTime.now(),
         type: StockyMessageType.text,
         actions: const [
-          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+          StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
         ],
       );
     }
@@ -1020,7 +1020,7 @@ class StockyAssistantService {
       timestamp: DateTime.now(),
       type: StockyMessageType.lowStockAlert,
       actions: const [
-        StockyAction(label: '📦 Pedido al Proveedor', actionType: 'restock_modal'),
+        StockyAction(label: 'Ir a Inventario › Proveedores y entradas', actionType: 'restock_modal'),
         StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
       ],
       data: {
@@ -1046,7 +1046,7 @@ class StockyAssistantService {
         timestamp: DateTime.now(),
         type: StockyMessageType.debtList,
         actions: const [
-          StockyAction(label: 'Ver Clientes', actionType: 'navigate_customers'),
+          StockyAction(label: 'Ir a Ventas › Clientes y fiados', actionType: 'navigate_customers'),
         ],
       );
     }
@@ -1082,7 +1082,7 @@ class StockyAssistantService {
         ),
       );
     }
-    actions.add(const StockyAction(label: 'Ver Todos los Clientes', actionType: 'navigate_customers'));
+    actions.add(const StockyAction(label: 'Ir a Ventas › Clientes y fiados', actionType: 'navigate_customers'));
 
     return StockyAssistantMessage(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -1120,7 +1120,7 @@ class StockyAssistantService {
         timestamp: DateTime.now(),
         type: StockyMessageType.topProducts,
         actions: const [
-          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+          StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
         ],
       );
     }
@@ -1226,7 +1226,7 @@ class StockyAssistantService {
         timestamp: DateTime.now(),
         type: StockyMessageType.businessAdvice,
         actions: const [
-          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+          StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
           StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
         ],
       );
@@ -1246,7 +1246,7 @@ class StockyAssistantService {
         type: StockyMessageType.businessAdvice,
         actions: const [
           StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
-          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+          StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
         ],
       );
     }
@@ -1264,7 +1264,7 @@ class StockyAssistantService {
         timestamp: DateTime.now(),
         type: StockyMessageType.businessAdvice,
         actions: const [
-          StockyAction(label: '👥 Cobrar Fiados', actionType: 'navigate_customers'),
+          StockyAction(label: 'Ir a Ventas › Clientes y fiados', actionType: 'navigate_customers'),
         ],
       );
     }
@@ -1301,8 +1301,8 @@ class StockyAssistantService {
         timestamp: DateTime.now(),
         type: StockyMessageType.businessAdvice,
         actions: const [
-          StockyAction(label: '👥 Directorio de Clientes', actionType: 'navigate_customers'),
-          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+          StockyAction(label: 'Ir a Ventas › Clientes y fiados', actionType: 'navigate_customers'),
+          StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
         ],
       );
     }
@@ -1321,7 +1321,7 @@ class StockyAssistantService {
         type: StockyMessageType.businessAdvice,
         actions: const [
           StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
-          StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+          StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
         ],
       );
     }
@@ -1341,7 +1341,7 @@ class StockyAssistantService {
           'Tienes **${outOfStock + lowStock} productos en estado crítico**. Cada día que un cliente pide un producto agotado y no lo encuentra, existe un 60% de probabilidad de que lo compre en otro negocio.\n\n'
           '👉 **Acción recomendada hoy:** Usa la herramienta de "Pedido al Proveedor" de Stockealo para consolidar la lista y enviarla directamente por WhatsApp a tus distribuidores.';
       actions = const [
-        StockyAction(label: '📦 Pedido al Proveedor', actionType: 'restock_modal'),
+        StockyAction(label: 'Ir a Inventario › Proveedores y entradas', actionType: 'restock_modal'),
         StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
       ];
     } else if (totalDebt > 100000) {
@@ -1349,13 +1349,13 @@ class StockyAssistantService {
           'Tienes **${CurrencyFormatter.formatCOP(totalDebt)}** detenidos en fiados. Ese dinero es tu propio capital de trabajo necesario para pagar proveedores.\n\n'
           '👉 **Acción recomendada:** Dedica 10 minutos por la mañana a enviar recordatorios por WhatsApp. Los clientes aprecian los mensajes cordiales y recuperarás liquidez de inmediato.';
       actions = const [
-        StockyAction(label: '👥 Cobrar Fiados', actionType: 'navigate_customers'),
+        StockyAction(label: 'Ir a Ventas › Clientes y fiados', actionType: 'navigate_customers'),
       ];
     } else if (todayCount > 0) {
       advice = '💡 **Consejo para Aumentar tu Ticket Promedio:**\n\n'
           '¡Llevas buen ritmo hoy! Una técnica probada en comercios es la **venta cruzada**: cuando un cliente compre un producto, sugiérele de inmediato un accesorio o complemento diciendo "¿Llevas también el paquete de acompañamiento por solo \$2.000 más?". Aumentarás tu venta total hasta un 25% sin gastar más.';
       actions = const [
-        StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+        StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
         StockyAction(label: 'Ver Historial', actionType: 'navigate_sales'),
       ];
     } else {
@@ -1365,7 +1365,7 @@ class StockyAssistantService {
           '2. Súbelas a tu Estado de WhatsApp con el precio visible y la frase *"¡Llegaron hoy! Pide el tuyo con entrega inmediata"*\n'
           '3. Saluda a 5 clientes frecuentes preguntándoles si necesitan reposición de lo habitual.';
       actions = const [
-        StockyAction(label: '+ Registrar Venta', actionType: 'quick_sale'),
+        StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
       ];
     }
 
@@ -1427,7 +1427,7 @@ class StockyAssistantService {
       type: StockyMessageType.productLookup,
       actions: const [
         StockyAction(label: 'Ver en Inventario', actionType: 'navigate_inventory'),
-        StockyAction(label: '+ Vender este Producto', actionType: 'quick_sale'),
+        StockyAction(label: 'Ir a Ventas', actionType: 'quick_sale'),
       ],
       data: {'product': p},
     );

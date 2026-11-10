@@ -6,6 +6,7 @@ import '../core/design/primary_action_button.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_toast.dart';
 import '../features/pro/data/pro_admin_service.dart';
+import '../features/pro/data/pro_service.dart' show proKindLabel;
 import 'admin_widgets.dart';
 
 /// Negocios con Pro: quién, qué plan y hasta cuándo. Permite dar Pro a mano y terminarlo.
@@ -171,6 +172,9 @@ class _GrantDialogState extends State<_GrantDialog> {
   List<AdminBusiness> _results = const [];
   AdminBusiness? _selected;
   int? _days = 30;
+
+  /// 'business' (Pro Negocio) o 'services' (Pro Servicios: Pro + módulo Servicios)
+  String _kind = 'business';
   bool _searching = false;
   bool _searched = false;
   bool _saving = false;
@@ -224,9 +228,9 @@ class _GrantDialogState extends State<_GrantDialog> {
     if (b == null) return;
     setState(() => _saving = true);
     try {
-      await ProAdminService.instance.grantPro(b.id, _days);
+      await ProAdminService.instance.grantPro(b.id, _days, kind: _kind);
       if (!mounted) return;
-      AppToast.show(context, message: '${b.name} ahora tiene Pro', type: ToastType.success);
+      AppToast.show(context, message: '${b.name} ahora tiene ${proKindLabel(_kind)}', type: ToastType.success);
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) AppToast.show(context, message: '$e', type: ToastType.error);
@@ -239,15 +243,31 @@ class _GrantDialogState extends State<_GrantDialog> {
   Widget build(BuildContext context) {
     final c = context.colors;
     return AlertDialog(
-      title: const Text('Dar Pro Negocio'),
+      title: const Text('Dar Pro'),
       content: SizedBox(
         width: 460,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Para compensar un fallo, una cortesía o un pago recibido. Los días se suman al Pro que ya tenga.',
+            Text('Para compensar un fallo, una cortesía o un pago recibido. Los días se suman a lo que ya tenga de ese plan.',
                 style: TextStyle(fontSize: 13, color: c.inkMuted)),
+            const SizedBox(height: AppSpace.md),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'business', label: Text('Pro Negocio')),
+                ButtonSegment(value: 'services', label: Text('Pro Servicios')),
+              ],
+              selected: {_kind},
+              showSelectedIcon: false,
+              onSelectionChanged: (v) => setState(() => _kind = v.first),
+            ),
+            if (_kind == 'services')
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpace.xs),
+                child: Text('Todo Pro más el módulo Servicios (lavaderos, barberías, talleres), con soporte.',
+                    style: TextStyle(fontSize: 12, color: c.inkMuted)),
+              ),
             const SizedBox(height: AppSpace.md),
             TextField(
               autofocus: true,
@@ -289,7 +309,7 @@ class _GrantDialogState extends State<_GrantDialog> {
             ),
             const SizedBox(height: AppSpace.sm),
             Text(
-              _selected == null ? 'Elige el negocio en la lista.' : 'Le darás Pro a ${_selected!.name}.',
+              _selected == null ? 'Elige el negocio en la lista.' : 'Le darás ${proKindLabel(_kind)} a ${_selected!.name}.',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _selected == null ? c.warning : c.ink),
             ),
             const SizedBox(height: AppSpace.md),

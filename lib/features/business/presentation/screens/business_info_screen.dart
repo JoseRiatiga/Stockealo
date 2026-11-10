@@ -8,15 +8,10 @@ import '../active_business_scope.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../core/database/app_database.dart';
 import '../../../../core/services/supabase_service.dart';
-import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../team/data/team_repository.dart';
-import '../../../team/models/business_member.dart';
-import '../../../team/presentation/screens/activity_screen.dart';
-import '../../../team/presentation/screens/employees_screen.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
 import '../widgets/business_selector_modal.dart';
@@ -42,12 +37,6 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
 
   String _userRole = 'OWNER';
   bool _isLoadingMetrics = true;
-  int _productsCount = 0;
-  int _salesCount = 0;
-  double _salesTotalAmount = 0.0;
-  int _customersCount = 0;
-  List<BusinessMember> _members = [];
-  bool _isCloudSync = false;
 
   @override
   void initState() {
@@ -76,38 +65,6 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
         isCloud = true;
       }
 
-      // Auditoría y métricas desde SQLite local
-      final db = await AppDatabase.instance.database;
-
-      final prodRes = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM products WHERE business_id = ? AND is_active = 1',
-        [_business.id],
-      );
-      final productsCount = (prodRes.first['count'] as num?)?.toInt() ?? 0;
-
-      final salesRes = await db.rawQuery(
-        'SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total_sum FROM sales WHERE business_id = ?',
-        [_business.id],
-      );
-      final salesCount = (salesRes.first['count'] as num?)?.toInt() ?? 0;
-      final salesTotal = (salesRes.first['total_sum'] as num?)?.toDouble() ?? 0.0;
-
-      final custRes = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM customers WHERE business_id = ?',
-        [_business.id],
-      );
-      final customersCount = (custRes.first['count'] as num?)?.toInt() ?? 0;
-
-      if (mounted) {
-        setState(() {
-          _isCloudSync = isCloud || members.length > 1;
-          _members = members;
-          _productsCount = productsCount;
-          _salesCount = salesCount;
-          _salesTotalAmount = salesTotal;
-          _customersCount = customersCount;
-        });
-      }
     } catch (e) {
       debugPrint('Error cargando información del negocio: $e');
     } finally {
@@ -132,33 +89,6 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
 
     final saved = await CreateBusinessSheet.edit(context, _business);
     if (saved != null && mounted) setState(() => _business = saved);
-  }
-
-  void _copyInviteCode() {
-    if (!_canEdit) {
-      AppToast.show(
-        context,
-        message: 'Solo el dueño o administrador pueden ver o compartir el código de invitación.',
-        type: ToastType.warning,
-      );
-      return;
-    }
-    Clipboard.setData(ClipboardData(text: _business.inviteCode));
-    AppToast.show(
-      context,
-      message: 'Código de invitación ${_business.inviteCode} copiado al portapapeles',
-      type: ToastType.info,
-    );
-  }
-
-  Future<void> _openEmployeesScreen() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EmployeesScreen(business: _business),
-      ),
-    );
-    _loadAllInfo();
   }
 
   Future<void> _switchBusiness() async {
@@ -277,32 +207,6 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
                             children: [
                               _identityCard(c),
                               const SizedBox(height: AppSpace.xl),
-                              SettingsPanel(label: 'Resumen', child: _metrics(c)),
-                              SettingsGroup(label: 'Equipo', children: [
-                                SettingsRow(
-                                  icon: Icons.qr_code_2_rounded,
-                                  title: 'Código de invitación',
-                                  subtitle: _canEdit
-                                      ? '${_business.inviteCode} · toca para copiarlo'
-                                      : 'Solo el dueño o un administrador lo comparte',
-                                  onTap: _copyInviteCode,
-                                  trailing: _canEdit ? Icon(Icons.copy_rounded, size: 20, color: c.inkFaint) : null,
-                                ),
-                                SettingsRow(
-                                  icon: Icons.groups_rounded,
-                                  title: 'Miembros y permisos',
-                                  subtitle: _members.length == 1 ? 'Solo tú' : '${_members.length} personas',
-                                  onTap: _openEmployeesScreen,
-                                ),
-                                // Control del dueño: el cajero no ve la actividad del equipo
-                                if (_canEdit)
-                                  SettingsRow(
-                                    icon: Icons.history_rounded,
-                                    title: 'Actividad del equipo',
-                                    subtitle: 'Quién vendió, cambió precios o ajustó el stock',
-                                    onTap: () => ActivityScreen.open(context, _business),
-                                  ),
-                              ]),
                               SettingsGroup(label: 'Detalles', children: [
                                 SettingsRow(
                                   icon: Icons.event_rounded,
@@ -428,47 +332,6 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _metrics(StockealoColors c) {
-    Widget tile(IconData icon, String value, String label, {Color? color}) => Container(
-          padding: const EdgeInsets.all(AppSpace.md),
-          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.control)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SettingsIcon(icon, color: color),
-              const SizedBox(height: AppSpace.sm),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.amount(context, size: 18, weight: FontWeight.w800, color: c.ink),
-              ),
-              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
-            ],
-          ),
-        );
-
-    final tiles = [
-      tile(Icons.inventory_2_outlined, '$_productsCount', _productsCount == 1 ? 'Producto activo' : 'Productos activos'),
-      tile(Icons.receipt_long_outlined, CurrencyFormatter.format(_salesTotalAmount),
-          _salesCount == 1 ? '1 venta' : '$_salesCount ventas'),
-      tile(Icons.people_outline_rounded, '$_customersCount', _customersCount == 1 ? 'Cliente' : 'Clientes'),
-      tile(
-        _isCloudSync ? Icons.cloud_done_outlined : Icons.phone_android_rounded,
-        _isCloudSync ? 'En la nube' : 'Local',
-        _isCloudSync ? 'Respaldo automático' : 'Solo en este equipo',
-        color: _isCloudSync ? c.success : c.inkMuted,
-      ),
-    ];
-    return Column(
-      children: [
-        Row(children: [Expanded(child: tiles[0]), const SizedBox(width: AppSpace.sm), Expanded(child: tiles[1])]),
-        const SizedBox(height: AppSpace.sm),
-        Row(children: [Expanded(child: tiles[2]), const SizedBox(width: AppSpace.sm), Expanded(child: tiles[3])]),
-      ],
     );
   }
 }

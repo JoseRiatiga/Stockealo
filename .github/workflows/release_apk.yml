@@ -69,20 +69,34 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Negocios de servicios: lavaderos, barberías y talleres
-            - Activa "Mi negocio ofrece servicios" al editar tu negocio y elige el tipo; te dejamos servicios de ejemplo para empezar.
-            - Tablero de trabajos: cada moto pasa por En espera, Lavando, Lista y Entregada, con placa y quién la atiende.
-            - Avisa al cliente por WhatsApp cuando su moto está lista.
-            - Cobra con descuento, propina para el empleado y fiado; cada servicio queda en tus ventas.
-            - Historial por placa: cuántas veces vino, qué se le hizo y cuánto ha gastado.
-            - Empleados sin cuenta en la app (2 gratis; sin límite con Pro).
+            ### Todo en su lugar
+            - Cada cosa tiene un solo lugar y los accesos se ven sin deslizar. La primera vez te mostramos «Dónde quedó cada cosa».
+            - Inicio es el resumen del día: toca cada cifra para ir a su lugar.
+            - Ventas: Clientes y fiados, Cotizaciones y Caja. Inventario: Catálogo, Tienda, Proveedores y entradas e Importar desde Excel.
+            - Reportes reúne Ganancias y Descargar Excel.
+            - Ajustes › Tu negocio: datos, equipo, actividad, Módulos y Stockealo Pro, a un toque.
+            - El buscador también encuentra funciones: escribe «caja» o «proveedores».
 
-            ### Reportes en su propia pestaña
-            - Reportes ahora está en el menú principal, junto a Inicio, Inventario, Ventas y Ajustes.
+            ### Importar desde Excel, paso a paso
+            - Trae tus productos aunque tu Excel tenga títulos más abajo, varias hojas o precios como «$12.500».
+            - Confirmas qué es cada columna, ves cómo quedan y eliges si actualizar o sumar el stock. También .csv y una plantilla.
+
+            ### Caja mejorada
+            - Entradas y salidas con motivo, propinas por entregar y mercancía de contado.
+            - Cierre por forma de pago, conteo por billetes y monedas, nota si no cuadra y comprobante por WhatsApp.
+            - El estado de la caja se ve en Inicio y te avisa si cobras en efectivo con la caja cerrada. Se enciende en Ajustes › Módulos.
+
+            ### Pro Servicios: lavaderos, barberías, talleres y más
+            - Pestaña Servicios con tablero, asistencia, historial, comisiones, catálogo y mensajes.
+            - Plantillas por tipo de negocio y precio según el vehículo (moto, carro, camioneta).
+            - Nadie empieza un servicio sin haber llegado y estar libre; cola por orden de llegada con turno y espera estimada.
+            - Comisiones por servicio y liquidaciones con detalle por WhatsApp. Mensajes por fase para avisar al cliente.
+
+            ### Ayuda
+            - Ajustes › Ayuda › Sugerencias y fallos: cuéntanos qué no funciona o qué te gustaría, y mira nuestra respuesta.
 
             ### Correcciones
-            - El logo del negocio ya se sube desde la web.
-            - La ventana para elegir una foto tiene el diseño nuevo.
-            - Al anular la venta de una talla o color, esa variante recupera su unidad.
+            - En la web te avisamos cuando hay una versión nueva.
+            - La ventana Equipo tiene el diseño nuevo.
           draft: false
           prerelease: false

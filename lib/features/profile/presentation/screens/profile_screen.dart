@@ -1,4 +1,3 @@
-import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/design/phone_field.dart';
 import '../../../../core/design/pro_crown.dart';
@@ -21,9 +20,13 @@ import '../../../auth/models/app_user.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
 import '../../../business/presentation/screens/business_info_screen.dart';
+import '../../../business/presentation/screens/modules_screen.dart';
+import '../../../home/presentation/widgets/where_things_moved_sheet.dart';
+import '../../../feedback/presentation/feedback_screen.dart';
+import '../../../team/presentation/screens/activity_screen.dart';
+import '../../../team/presentation/screens/employees_screen.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
-import '../../../reports/presentation/widgets/excel_import_modal.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/services/update_service.dart';
@@ -596,27 +599,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     }
   }
 
-    Future<void> _exportToExcel() async {
-    if (_activeBusiness == null || _user == null) return;
-    await ReportsScreen.open(context, business: _activeBusiness!, userId: _user!.id, userEmail: _user!.email);
-  }
 
-  void _openExcelImport() {
-    if (_activeBusiness == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona una empresa primero para importar inventario.'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    ExcelImportModal.show(
-      context,
-      businessId: _activeBusiness!.id,
-      onImportCompleted: () {
-        if (mounted) setState(() {});
-      },
-    );
-  }
 
   /// Opción A: Confirmación para purgar únicamente los datos en la nube
   Future<void> _showPurgeCloudDialog() async {
@@ -808,19 +791,41 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                         ),
                       ),
                     _profileGroup(c),
-                    SettingsGroup(children: [
-                      SettingsRow.toggle(
-                        icon: Theme.of(context).brightness == Brightness.dark
-                            ? Icons.dark_mode_outlined
-                            : Icons.light_mode_outlined,
-                        title: 'Modo oscuro',
-                        subtitle: 'Toca para cambiar el ambiente',
-                        value: Theme.of(context).brightness == Brightness.dark,
-                        onChanged: (v) => theme.setThemeMode(v ? ThemeMode.dark : ThemeMode.light),
-                      ),
-                    ]),
-                    if (_activeBusiness != null)
-                      SettingsGroup(children: [
+                    // Tu negocio a un toque (0.12.0). El modo oscuro vive en Personalización › Apariencia
+                    SettingsGroup(label: 'Tu negocio', children: [
+                      if (_activeBusiness != null) ...[
+                        SettingsRow(
+                          leading: BusinessAvatar(business: _activeBusiness!, size: 36),
+                          title: _activeBusiness!.name,
+                          subtitle: '$_roleLabel · Datos del negocio',
+                          onTap: _openBusinessInfo,
+                        ),
+                        SettingsRow(
+                          icon: Icons.groups_2_outlined,
+                          title: 'Equipo',
+                          subtitle: 'Miembros, permisos e invitación',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => EmployeesScreen(business: _activeBusiness!)),
+                          ),
+                        ),
+                        if (_currentBusinessRole.toUpperCase() != 'CASHIER')
+                          SettingsRow(
+                            icon: Icons.history_rounded,
+                            title: 'Actividad del equipo',
+                            subtitle: 'Quién vendió, cambió precios o ajustó el stock',
+                            onTap: () => ActivityScreen.open(context, _activeBusiness!),
+                          ),
+                        SettingsRow(
+                          icon: Icons.widgets_outlined,
+                          title: 'Módulos',
+                          subtitle: 'Lo que ofrece Stockealo y dónde está',
+                          onTap: () => ModulesScreen.open(
+                            context,
+                            business: _activeBusiness!,
+                            canEdit: _currentBusinessRole.toUpperCase() != 'CASHIER',
+                          ),
+                        ),
                         ValueListenableBuilder<ProStatus>(
                           valueListenable: ProService.instance.status,
                           builder: (context, pro, _) => SettingsRow(
@@ -842,16 +847,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                             onTap: () => ProScreen.open(context, _activeBusiness!),
                           ),
                         ),
-                      ]),
-                    SettingsGroup(label: 'Tu negocio', children: [
-                      if (_activeBusiness != null)
-                        SettingsRow(
-                          leading: BusinessAvatar(business: _activeBusiness!, size: 36),
-                          title: _activeBusiness!.name,
-                          subtitle: '$_roleLabel · Información, equipo y auditoría',
-                          onTap: _openBusinessInfo,
-                        )
-                      else
+                      ] else
                         SettingsRow(
                           icon: Icons.storefront_outlined,
                           title: 'Elegir un negocio',
@@ -912,6 +908,14 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                         onTap: _openDeletion,
                       ),
                     ]),
+                    SettingsGroup(label: 'Ayuda', children: [
+                      SettingsRow(
+                        icon: Icons.feedback_outlined,
+                        title: 'Sugerencias y fallos',
+                        subtitle: 'Cuéntanos qué no funciona o qué te gustaría',
+                        onTap: () => FeedbackScreen.open(context, business: _activeBusiness),
+                      ),
+                    ]),
                     SettingsGroup(label: 'Acerca de', children: [
                       if (!kIsWeb)
                         SettingsRow(
@@ -923,6 +927,12 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                               : null,
                         ),
+                      SettingsRow(
+                        icon: Icons.explore_outlined,
+                        title: 'Dónde quedó cada cosa',
+                        subtitle: 'Lo que cambió de lugar en la 0.12.0',
+                        onTap: () => WhereThingsMovedSheet.show(context),
+                      ),
                       SettingsRow(
                         icon: Icons.logout_rounded,
                         title: 'Cerrar sesión',
@@ -1218,20 +1228,6 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                   : null,
             ),
-        ]),
-        SettingsGroup(label: 'Excel', children: [
-          SettingsRow(
-            icon: Icons.file_upload_outlined,
-            title: 'Importar inventario',
-            subtitle: 'Carga productos desde un archivo de Excel',
-            onTap: _openExcelImport,
-          ),
-          SettingsRow(
-            icon: Icons.file_download_outlined,
-            title: 'Reportes en Excel',
-            subtitle: 'Elige qué descargar: inventario, ventas, clientes, movimientos o ganancias',
-            onTap: _exportToExcel,
-          ),
         ]),
         if (AutoBackupService.instance.isSupported)
           SettingsGroup(label: 'Copias automáticas', children: [

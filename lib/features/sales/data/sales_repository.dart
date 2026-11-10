@@ -1,3 +1,4 @@
+import '../../services/data/commissions_repository.dart';
 import '../../services/models/service_models.dart';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
@@ -397,6 +398,9 @@ class SalesRepository {
     String? customerName,
     double discountAmount = 0,
     Map<String, String> staffNames = const {},
+
+    /// Propina para quienes atendieron (se reparte en partes iguales)
+    double tipAmount = 0,
     DateTime? now,
   }) async {
     final lines = order.lines;
@@ -418,6 +422,7 @@ class SalesRepository {
     final cleanCustomer = (customerName ?? '').trim().isEmpty ? null : customerName!.trim();
 
     final created = <Sale>[];
+    final charged = <ChargedLine>[];
     String? customerId;
     var customerIsNew = false;
 
@@ -461,6 +466,9 @@ class SalesRepository {
         ].join(' · ');
         final saleId = const Uuid().v4();
         final staffJson = jsonEncode(line.staffIds);
+        // La comisión de quienes lo hicieron es el costo del servicio
+        final commission = CommissionsRepository.commissionOf(lineTotal, line.commissionPct, line.staffIds);
+        charged.add((saleId: saleId, total: lineTotal, line: line));
         await txn.insert('sales', {
           'id': saleId,
           'business_id': businessId,
@@ -472,9 +480,8 @@ class SalesRepository {
           'seller_name': seller,
           'date': at.toIso8601String(),
           'total': lineTotal,
-          // La comisión del empleado se descuenta como costo desde la 0.11.1
-          'total_cost': 0.0,
-          'net_profit': lineTotal,
+          'total_cost': commission,
+          'net_profit': lineTotal - commission,
           'payment_method': paymentMethod,
           'payment_status': paymentMethod == 'FIADO' ? 'PENDIENTE' : 'PAGADO',
           'notes': note.isEmpty ? null : note,
@@ -493,9 +500,9 @@ class SalesRepository {
           productName: line.name,
           quantity: 1,
           unitPrice: lineTotal,
-          unitCost: 0,
+          unitCost: commission,
           totalAmount: lineTotal,
-          netProfit: lineTotal,
+          netProfit: lineTotal - commission,
           paymentMethod: paymentMethod,
           customerName: cleanCustomer,
           sellerName: seller,
@@ -511,6 +518,7 @@ class SalesRepository {
     for (final sale in created) {
       SupabaseService.instance.insertSaleToCloud({...sale.toMap(), 'notes': null});
     }
+    await CommissionsRepository.instance.recordForOrder(order: order, charged: charged, tip: tipAmount, now: at);
     final what = lines.length == 1 ? lines.first.name : '${lines.length} servicios';
     ActivityRepository.instance.log(
       businessId: businessId,
@@ -683,36 +691,46 @@ class SalesRepository {
 
     final List<Map<String, dynamic>> maps = await db.rawQuery(sql, args);
 
-    return maps.map((map) {
-      final photoPath = map['resolved_photo'] as String? ?? map['product_photo_path'] as String?;
-      return Sale(
-        id: map['id'] as String,
-        businessId: map['business_id'] as String? ?? businessId,
-        productId: map['product_id'] as String? ?? '',
-        productName: map['product_name'] as String,
-        productPhotoPath: photoPath,
-        quantity: (map['quantity'] as num).toInt(),
-        unitPrice: (map['quantity'] as num).toInt() > 0
-            ? ((map['total'] as num).toDouble()) / ((map['quantity'] as num).toInt())
-            : 0.0,
-        unitCost: (map['quantity'] as num).toInt() > 0
-            ? ((map['total_cost'] as num).toDouble()) / ((map['quantity'] as num).toInt())
-            : 0.0,
-        totalAmount: (map['total'] as num).toDouble(),
-        netProfit: (map['net_profit'] as num).toDouble(),
-        paymentMethod: map['payment_method'] as String,
-        customerName: map['customer_name'] as String?,
-        sellerName: map['seller_name'] as String?,
-        date: DateTime.parse(map['date'] as String),
-        isSynced: (map['is_synced'] as int?) == 1,
-        // Sin la talla, anular la venta no le devolvía la unidad a la variante
-        variantId: map['variant_id'] as String?,
-        variantName: map['variant_name'] as String?,
-        serviceId: map['service_id'] as String?,
-        workOrderId: map['work_order_id'] as String?,
-        staffIds: map['staff_ids'] as String?,
-      );
-    }).toList();
+    return maps.map((map) => saleFromRow(map, businessId: businessId)).toList();
+  }
+
+  /// Una venta por su id (para anular el cobro de un servicio); null si no existe
+  Future<Sale?> getSaleById(String id) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query('sales', where: 'id = ?', whereArgs: [id], limit: 1);
+    return rows.isEmpty ? null : saleFromRow(rows.first);
+  }
+
+  /// Fila de la tabla sales -> Sale (la tabla guarda total y total_cost, no precios unitarios)
+  static Sale saleFromRow(Map<String, dynamic> map, {String? businessId}) {
+    final photoPath = map['resolved_photo'] as String? ?? map['product_photo_path'] as String?;
+    return Sale(
+      id: map['id'] as String,
+      businessId: map['business_id'] as String? ?? businessId ?? 'default_business',
+      productId: map['product_id'] as String? ?? '',
+      productName: map['product_name'] as String,
+      productPhotoPath: photoPath,
+      quantity: (map['quantity'] as num).toInt(),
+      unitPrice: (map['quantity'] as num).toInt() > 0
+          ? ((map['total'] as num).toDouble()) / ((map['quantity'] as num).toInt())
+          : 0.0,
+      unitCost: (map['quantity'] as num).toInt() > 0
+          ? ((map['total_cost'] as num).toDouble()) / ((map['quantity'] as num).toInt())
+          : 0.0,
+      totalAmount: (map['total'] as num).toDouble(),
+      netProfit: (map['net_profit'] as num).toDouble(),
+      paymentMethod: map['payment_method'] as String,
+      customerName: map['customer_name'] as String?,
+      sellerName: map['seller_name'] as String?,
+      date: DateTime.parse(map['date'] as String),
+      isSynced: (map['is_synced'] as int?) == 1,
+      // Sin la talla, anular la venta no le devolvía la unidad a la variante
+      variantId: map['variant_id'] as String?,
+      variantName: map['variant_name'] as String?,
+      serviceId: map['service_id'] as String?,
+      workOrderId: map['work_order_id'] as String?,
+      staffIds: map['staff_ids'] as String?,
+    );
   }
 
   /// Obtiene el resumen de ventas del día actual de la empresa
@@ -835,6 +853,8 @@ class SalesRepository {
     });
 
     DataEvents.instance.salesChanged();
+    // Un servicio anulado no deja comisión (si ya se pagó, queda un ajuste)
+    if (sale.serviceId != null) await CommissionsRepository.instance.onSaleCancelled(sale.id);
     ActivityRepository.instance.log(
       businessId: sale.businessId,
       action: ActivityAction.saleCancel,

@@ -187,6 +187,12 @@ void main() {
         home: ReportsTab(userRole: role),
       ));
       expect(ReportsTab.allowed(role), sees);
+      // La pestaña reúne Ganancias y Descargar Excel (0.12.0)
+      if (sees) {
+        expect(find.text('Ganancias'), findsOneWidget);
+        await tester.tap(find.text('Descargar Excel'));
+        await tester.pump();
+      }
       expect(find.text('1. ¿Qué incluir?'), sees ? findsOneWidget : findsNothing);
       expect(find.text('Solo el dueño o un administrador pueden descargar reportes.'), sees ? findsNothing : findsOneWidget);
       // Es una pestaña: no tiene botón de volver

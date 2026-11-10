@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Business {
   final String id;
   final String userId;
@@ -20,8 +22,11 @@ class Business {
   /// El negocio ofrece servicios (lavadero, barbería, taller): tablero y empleados
   final bool servicesEnabled;
 
-  /// Tipo de negocio de servicios: ver ServiceType
+  /// Plantilla de servicios del negocio: ver ServiceTemplate
   final String? serviceType;
+
+  /// Mensajes por fase de Servicios (JSON); null = los de la plantilla
+  final String? serviceMessages;
   final String? description;
   final DateTime createdAt;
   final bool isSynced;
@@ -40,6 +45,7 @@ class Business {
     this.cashRegisterEnabled = false,
     this.servicesEnabled = false,
     this.serviceType,
+    this.serviceMessages,
     this.description,
     required this.createdAt,
     this.isSynced = false,
@@ -76,6 +82,7 @@ class Business {
     bool? cashRegisterEnabled,
     bool? servicesEnabled,
     String? serviceType,
+    String? serviceMessages,
     String? description,
     DateTime? createdAt,
     bool? isSynced,
@@ -94,6 +101,7 @@ class Business {
       cashRegisterEnabled: cashRegisterEnabled ?? this.cashRegisterEnabled,
       servicesEnabled: servicesEnabled ?? this.servicesEnabled,
       serviceType: serviceType ?? this.serviceType,
+      serviceMessages: serviceMessages ?? this.serviceMessages,
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       isSynced: isSynced ?? this.isSynced,
@@ -115,6 +123,7 @@ class Business {
       'cash_register_enabled': cashRegisterEnabled ? 1 : 0,
       'services_enabled': servicesEnabled ? 1 : 0,
       'service_type': serviceType,
+      'service_messages': serviceMessages,
       'description': description,
       'created_at': createdAt.toIso8601String(),
       'is_synced': isSynced ? 1 : 0,
@@ -137,6 +146,9 @@ class Business {
       cashRegisterEnabled: map['cash_register_enabled'] == true || map['cash_register_enabled'] == 1,
       servicesEnabled: map['services_enabled'] == true || map['services_enabled'] == 1,
       serviceType: map['service_type'] as String?,
+      serviceMessages: map['service_messages'] is String || map['service_messages'] == null
+          ? map['service_messages'] as String?
+          : jsonEncode(map['service_messages']),
       description: map['description'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       isSynced: (map['is_synced'] as int?) == 1,

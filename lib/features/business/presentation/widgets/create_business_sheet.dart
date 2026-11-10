@@ -13,8 +13,6 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
 import '../business_identity.dart';
-import '../../../services/data/services_repository.dart';
-import '../../../services/models/service_models.dart';
 
 /// Datos elegidos en la hoja "Nuevo negocio"
 class NewBusinessData {
@@ -33,9 +31,6 @@ class NewBusinessData {
   final bool removeLogo;
   final bool cashRegisterEnabled;
 
-  /// El negocio ofrece servicios (lavadero, barbería, taller) y de qué tipo
-  final bool servicesEnabled;
-  final String? serviceType;
 
   const NewBusinessData({
     required this.name,
@@ -48,8 +43,6 @@ class NewBusinessData {
     this.newLogoMime,
     this.removeLogo = false,
     this.cashRegisterEnabled = false,
-    this.servicesEnabled = false,
-    this.serviceType,
   });
 }
 
@@ -101,21 +94,11 @@ class CreateBusinessSheet extends StatefulWidget {
       icon: data.icon,
       color: data.color,
       logoUrl: logoUrl,
-      cashRegisterEnabled: data.cashRegisterEnabled,
-      servicesEnabled: data.servicesEnabled,
-      serviceType: data.serviceType,
     );
-    // Al activar los servicios por primera vez se proponen los de ejemplo del tipo
-    var seeded = 0;
-    if (data.servicesEnabled && !business.servicesEnabled) {
-      seeded = await ServicesRepository.instance.seedExamples(business.id, ServiceType.of(data.serviceType));
-    }
     if (context.mounted) {
       AppToast.showSuccess(
         context,
-        seeded > 0
-            ? 'Listo. Agregamos $seeded servicios de ejemplo: cámbiales el precio en Inicio › Tablero › Servicios.'
-            : 'Datos del negocio guardados',
+        'Datos del negocio guardados',
       );
     }
     return saved;
@@ -132,9 +115,8 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
   late String _currency = widget.initial?.currency ?? _country.currency;
   late String _icon = widget.initial?.icon ?? kBusinessKinds.first.key;
   late String _colorKey = _colorKeyFor(widget.initial?.color);
-  late bool _cashRegister = widget.initial?.cashRegisterEnabled ?? false;
-  late bool _services = widget.initial?.servicesEnabled ?? false;
-  late ServiceType _serviceType = ServiceType.of(widget.initial?.serviceType ?? ServiceType.lavaderoMotos.code);
+  // La caja se enciende en Ajustes › Módulos (0.12.0); aquí se conserva lo que había
+  late final bool _cashRegister = widget.initial?.cashRegisterEnabled ?? false;
   Uint8List? _newLogoBytes;
   String? _newLogoMime;
   bool _removeLogo = false;
@@ -200,8 +182,6 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
         newLogoMime: _newLogoMime,
         removeLogo: _removeLogo,
         cashRegisterEnabled: _cashRegister,
-        servicesEnabled: _services,
-        serviceType: _services ? _serviceType.code : widget.initial?.serviceType,
       ),
     );
   }
@@ -385,37 +365,6 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
                     hintText: 'Abarrotes, papelería y regalos',
                   ),
                 ),
-                const SizedBox(height: AppSpace.md),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _cashRegister,
-                  onChanged: (v) => setState(() => _cashRegister = v),
-                  title: const Text('Usar arqueo de caja'),
-                  subtitle: const Text('Abre y cierra caja para cuadrar el efectivo del día'),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _services,
-                  onChanged: (v) => setState(() => _services = v),
-                  title: const Text('Mi negocio ofrece servicios'),
-                  subtitle: const Text('Lavadero, barbería o taller: tablero de trabajos, empleados y servicios'),
-                ),
-                if (_services)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpace.sm),
-                    child: Wrap(
-                      spacing: AppSpace.sm,
-                      runSpacing: AppSpace.sm,
-                      children: [
-                        for (final t in ServiceType.values)
-                          ChoiceChip(
-                            label: Text(t.label),
-                            selected: _serviceType == t,
-                            onSelected: (_) => setState(() => _serviceType = t),
-                          ),
-                      ],
-                    ),
-                  ),
               ],
               const SizedBox(height: AppSpace.xxl),
               FilledButton(

@@ -1,6 +1,7 @@
 import '../../../../core/design/color_swatch_dot.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/active_business_scope.dart';
+import '../../../cash/presentation/widgets/cash_status_card.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -582,16 +583,22 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
         customerName: _customerController.text.trim().isNotEmpty ? _customerController.text.trim() : null,
         discountAmount: _calculatedDiscount,
       );
+      // Cobro en efectivo con la caja cerrada: se avisa, sin bloquear la venta
+      final cashClosed = await isCashClosedFor(biz, _paymentMethod);
 
       if (mounted) {
         final nav = Navigator.of(context);
         nav.pop(true);
 
-        AppToast.show(
-          context,
-          message: 'Venta registrada',
-          type: ToastType.success,
-        );
+        if (cashClosed) {
+          AppToast.showWarning(context, kCashClosedWarning);
+        } else {
+          AppToast.show(
+            context,
+            message: 'Venta registrada',
+            type: ToastType.success,
+          );
+        }
 
         DigitalTicketModal.show(
           context,

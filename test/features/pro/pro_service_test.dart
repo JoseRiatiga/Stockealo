@@ -43,4 +43,38 @@ void main() {
     expect(lifetime.kindLabel, 'Pro Global');
     expect(ProStatus.none.lifetime, isFalse);
   });
+
+  group('Pro Servicios (0.12.0)', () {
+    test('cada plan tiene su nombre', () {
+      expect(proKindLabel('business'), 'Pro Negocio');
+      expect(proKindLabel('global'), 'Pro Global');
+      expect(proKindLabel('services'), 'Pro Servicios');
+      expect(proKindLabel(null), 'Pro Negocio');
+      expect(const ProStatus(active: true, kind: 'services', services: true).kindLabel, 'Pro Servicios');
+    });
+
+    test('sin Pro Servicios no hay módulo Servicios', () {
+      expect(ProStatus.none.services, isFalse);
+      expect(const ProStatus(active: true, kind: 'global').services, isFalse);
+    });
+
+    test('precios y compra solo se ven con el interruptor encendido', () {
+      expect(ProService.pricingVisible({'show_pricing': 'on'}), isTrue);
+      expect(ProService.pricingVisible({'show_pricing': 'off'}), isFalse);
+      // Sin el ajuste (migración sin aplicar) quedan ocultos
+      expect(ProService.pricingVisible({}), isFalse);
+    });
+
+    test('el plan de Pro Servicios se lee de su fila', () {
+      final plan = ProPlan.fromRow({
+        'id': 'services_month_cop',
+        'kind': 'services',
+        'period': 'month',
+        'currency': 'COP',
+        'price': 40000,
+      });
+      expect(plan.kindLabel, 'Pro Servicios');
+      expect(plan.periodLabel, 'Mensual');
+    });
+  });
 }

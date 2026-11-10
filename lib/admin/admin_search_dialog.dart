@@ -8,6 +8,7 @@ import '../features/pro/data/pro_admin_service.dart';
 import 'admin_shell.dart';
 import 'admin_user_detail.dart';
 import 'admin_widgets.dart';
+import '../features/pro/data/pro_service.dart' show proKindLabel;
 
 /// Búsqueda global del panel: cuentas, negocios, códigos Pro y pagos en un solo lugar
 class AdminSearchDialog extends StatefulWidget {
@@ -143,7 +144,7 @@ class _AdminSearchDialogState extends State<AdminSearchDialog> {
                       item(
                         Icons.confirmation_number_outlined,
                         '${k['code']}',
-                        '${k['kind'] == 'global' ? 'Pro Global' : 'Pro Negocio'} · '
+                        '${proKindLabel(k['kind'] as String?)} · '
                             '${k['days'] == null ? 'permanente' : '${k['days']} días'} · ${k['uses']}/${k['max_uses']} usos'
                             '${(k['note'] ?? '').toString().isEmpty ? '' : ' · ${k['note']}'}',
                         () => adminCopy(context, '${k['code']}', 'Código'),

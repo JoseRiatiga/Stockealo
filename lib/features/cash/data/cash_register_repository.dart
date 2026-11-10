@@ -1,15 +1,23 @@
+import 'package:sqflite/sqflite.dart' show DatabaseException;
 import 'package:uuid/uuid.dart';
+
 import '../../../core/database/app_database.dart';
+import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../team/data/activity_repository.dart';
 import '../models/cash_session.dart';
 
-/// Arqueo de caja por negocio. Solo cuenta el efectivo: las ventas y abonos en
-/// efectivo registrados desde que se abrió el turno. Las ventas anuladas ya no
-/// existen en la tabla, así que no se cuentan.
+/// Arqueo de caja por negocio (0.12.0: con movimientos, propinas, cierre por forma
+/// de pago y en la nube).
+///
+/// El efectivo esperado es: base + ventas y abonos en efectivo + propinas cobradas
+/// en efectivo − propinas entregadas + entradas − salidas − mercancía de contado.
+/// Las ventas anuladas ya no existen en la tabla, así que no se cuentan.
 class CashRegisterRepository {
   static final CashRegisterRepository instance = CashRegisterRepository();
   final AppDatabase _dbProvider = AppDatabase.instance;
+  final _cloud = SupabaseService.instance;
 
   static const String _cash = 'EFECTIVO';
 
@@ -25,10 +33,22 @@ class CashRegisterRepository {
     return rows.isEmpty ? null : CashSession.fromMap(rows.first);
   }
 
+  Future<void> _store(CashSession s, {bool insert = false}) async {
+    final db = await _dbProvider.database;
+    final row = s.toMap();
+    if (insert) {
+      await db.insert('cash_sessions', row);
+    } else {
+      await db.update('cash_sessions', row, where: 'id = ?', whereArgs: [s.id]);
+    }
+    _cloud.upsertCashSessionToCloud(row);
+  }
+
   Future<CashSession> openSession({
     required String businessId,
     required double openingAmount,
     required String openedBy,
+    DateTime? now,
   }) async {
     if (openingAmount < 0) {
       throw Exception('La base inicial no puede ser negativa.');
@@ -36,14 +56,16 @@ class CashRegisterRepository {
     if (await getOpenSession(businessId) != null) {
       throw Exception('Ya hay una caja abierta. Ciérrala antes de abrir otra.');
     }
+    final at = now ?? DateTime.now();
     final session = CashSession(
       id: const Uuid().v4(),
       businessId: businessId,
       openedBy: openedBy,
-      openedAt: DateTime.now(),
+      openedAt: at,
       openingAmount: openingAmount,
+      updatedAt: at,
     );
-    await (await _dbProvider.database).insert('cash_sessions', session.toMap());
+    await _store(session, insert: true);
     ActivityRepository.instance.log(
       businessId: businessId,
       action: ActivityAction.cashOpen,
@@ -53,70 +75,183 @@ class CashRegisterRepository {
     return session;
   }
 
-  /// Efectivo que entró desde la apertura (o entre apertura y cierre)
-  Future<CashSummary> summarize(CashSession session) async {
-    final db = await _dbProvider.database;
-    final from = session.openedAt.toIso8601String();
-    final to = (session.closedAt ?? DateTime.now()).toIso8601String();
+  // ---------------------------------------------------------------------------
+  // Movimientos
+  // ---------------------------------------------------------------------------
 
+  Future<CashMovement> addMovement({
+    required CashSession session,
+    required String kind,
+    required String reason,
+    required double amount,
+    String? note,
+    DateTime? now,
+  }) async {
+    if (!session.isOpen) throw StateError('La caja ya está cerrada.');
+    if (amount <= 0) throw StateError('Escribe un valor mayor que cero.');
+    final m = CashMovement(
+      id: const Uuid().v4(),
+      businessId: session.businessId,
+      sessionId: session.id,
+      kind: kind,
+      reason: reason,
+      amount: amount,
+      note: (note ?? '').trim().isEmpty ? null : note!.trim(),
+      createdBy: AuthRepository.instance.currentUser?.email,
+      date: now ?? DateTime.now(),
+    );
+    final db = await _dbProvider.database;
+    final row = m.toMap();
+    await db.insert('cash_movements', row);
+    _cloud.upsertCashMovementToCloud(row);
+    ActivityRepository.instance.log(
+      businessId: session.businessId,
+      action: 'cash_movement',
+      summary: '${m.isExit ? 'Sacó' : 'Metió'} ${CurrencyFormatter.format(amount)} de la caja: '
+          '${m.reasonLabel.toLowerCase()}${m.note == null ? '' : ' (${m.note})'}',
+      data: {'session_id': session.id, 'movement_id': m.id},
+    );
+    return m;
+  }
+
+  Future<List<CashMovement>> movements(CashSession session) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query('cash_movements', where: 'session_id = ?', whereArgs: [session.id], orderBy: 'date ASC');
+    return rows.map(CashMovement.fromMap).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resumen
+  // ---------------------------------------------------------------------------
+
+  /// Lo que pasó entre la apertura y el cierre (o ahora)
+  Future<CashSummary> summarize(CashSession session, {DateTime? until}) async {
+    final db = await _dbProvider.database;
+    final fromAt = session.openedAt;
+    final toAt = session.closedAt ?? until ?? DateTime.now();
+    final from = fromAt.toIso8601String();
+    final to = toAt.toIso8601String();
+    final biz = session.businessId;
+
+    // Ventas y abonos por forma de pago
+    final byMethod = <String, double>{};
+    var cashSales = 0.0;
+    var cashSalesCount = 0;
     final sales = await db.rawQuery('''
-      SELECT COALESCE(SUM(total), 0) AS amount, COUNT(*) AS count FROM sales
-      WHERE business_id = ? AND payment_method = ? AND date >= ? AND date <= ?
-    ''', [session.businessId, _cash, from, to]);
+      SELECT payment_method AS method, COALESCE(SUM(total), 0) AS amount, COUNT(*) AS count FROM sales
+      WHERE business_id = ? AND date >= ? AND date <= ? GROUP BY payment_method
+    ''', [biz, from, to]);
+    for (final r in sales) {
+      final method = '${r['method'] ?? 'OTRO'}'.toUpperCase();
+      final amount = (r['amount'] as num).toDouble();
+      byMethod[method] = (byMethod[method] ?? 0) + amount;
+      if (method == _cash) {
+        cashSales += amount;
+        cashSalesCount += (r['count'] as num).toInt();
+      }
+    }
+    var cashPayments = 0.0;
     final payments = await db.rawQuery('''
-      SELECT COALESCE(SUM(amount), 0) AS amount FROM customer_payments
-      WHERE business_id = ? AND payment_method = ? AND date >= ? AND date <= ?
-    ''', [session.businessId, _cash, from, to]);
+      SELECT payment_method AS method, COALESCE(SUM(amount), 0) AS amount FROM customer_payments
+      WHERE business_id = ? AND date >= ? AND date <= ? GROUP BY payment_method
+    ''', [biz, from, to]);
+    for (final r in payments) {
+      final method = '${r['method'] ?? 'OTRO'}'.toUpperCase();
+      final amount = (r['amount'] as num).toDouble();
+      byMethod['ABONO_$method'] = (byMethod['ABONO_$method'] ?? 0) + amount;
+      if (method == _cash) cashPayments += amount;
+    }
+
+    // Propinas cobradas en efectivo (trabajos de servicios entregados en el turno)
+    var tipsIn = 0.0;
+    try {
+      final tips = await db.rawQuery('''
+        SELECT COALESCE(SUM(tip), 0) AS amount FROM work_orders
+        WHERE business_id = ? AND payment_method = ? AND status = 'ENTREGADA' AND tip > 0
+          AND updated_at >= ? AND updated_at <= ?
+      ''', [biz, _cash, from, to]);
+      tipsIn = (tips.first['amount'] as num).toDouble();
+    } on DatabaseException {
+      tipsIn = 0;
+    }
+
+    // Entradas y salidas a mano
+    var entries = 0.0, exits = 0.0, tipsOut = 0.0;
+    for (final m in await movements(session)) {
+      if (!m.isExit) {
+        entries += m.amount;
+      } else if (m.reason == 'PROPINA') {
+        tipsOut += m.amount;
+      } else {
+        exits += m.amount;
+      }
+    }
+
+    // Mercancía que llegó pagada de contado
+    var cashPurchases = 0.0;
+    try {
+      final purchases = await db.rawQuery('''
+        SELECT COALESCE(SUM(total), 0) AS amount FROM purchases
+        WHERE business_id = ? AND payment_terms = 'CONTADO' AND date >= ? AND date <= ?
+      ''', [biz, from, to]);
+      cashPurchases = (purchases.first['amount'] as num).toDouble();
+    } on DatabaseException {
+      cashPurchases = 0;
+    }
 
     return CashSummary(
       openingAmount: session.openingAmount,
-      cashSales: (sales.first['amount'] as num).toDouble(),
-      cashSalesCount: (sales.first['count'] as num).toInt(),
-      cashPayments: (payments.first['amount'] as num).toDouble(),
+      cashSales: cashSales,
+      cashSalesCount: cashSalesCount,
+      cashPayments: cashPayments,
+      tipsIn: tipsIn,
+      tipsOut: tipsOut,
+      entries: entries,
+      exits: exits,
+      cashPurchases: cashPurchases,
+      byMethod: byMethod,
     );
   }
 
+  /// Cierra el turno. Si el conteo no cuadra con lo esperado, la nota es obligatoria.
   Future<CashSession> closeSession({
     required CashSession session,
     required double countedAmount,
     String? notes,
+    Map<int, int> denominations = const {},
+    Map<String, dynamic> extra = const {},
+    DateTime? now,
   }) async {
     if (countedAmount < 0) {
       throw Exception('El efectivo contado no puede ser negativo.');
     }
-    final closedAt = DateTime.now();
-    final summary = await summarize(CashSession(
-      id: session.id,
-      businessId: session.businessId,
-      openedBy: session.openedBy,
-      openedAt: session.openedAt,
-      openingAmount: session.openingAmount,
+    final closedAt = now ?? DateTime.now();
+    final summary = await summarize(session.copyWith(closedAt: closedAt));
+    final difference = countedAmount - summary.expected;
+    final cleanNotes = (notes ?? '').trim();
+    if (difference.abs() >= 1 && cleanNotes.isEmpty) {
+      throw StateError('La caja no cuadra: escribe una nota que explique la diferencia.');
+    }
+    final closed = session.copyWith(
       closedAt: closedAt,
-    ));
-    final closed = CashSession(
-      id: session.id,
-      businessId: session.businessId,
-      openedBy: session.openedBy,
-      openedAt: session.openedAt,
-      openingAmount: session.openingAmount,
-      closedAt: closedAt,
+      closedBy: AuthRepository.instance.currentUser?.email,
       expectedAmount: summary.expected,
       countedAmount: countedAmount,
-      notes: notes?.trim().isNotEmpty == true ? notes!.trim() : null,
+      notes: cleanNotes.isEmpty ? null : cleanNotes,
+      summary: {
+        ...summary.toJson(),
+        if (denominations.isNotEmpty) 'denominations': {for (final e in denominations.entries) '${e.key}': e.value},
+        ...extra,
+      },
+      updatedAt: closedAt,
     );
-    await (await _dbProvider.database).update(
-      'cash_sessions',
-      closed.toMap(),
-      where: 'id = ?',
-      whereArgs: [session.id],
-    );
-    final difference = countedAmount - summary.expected;
+    await _store(closed);
     ActivityRepository.instance.log(
       businessId: session.businessId,
       action: ActivityAction.cashClose,
       summary: 'Cerró la caja: contó ${CurrencyFormatter.format(countedAmount)} y se esperaban '
           '${CurrencyFormatter.format(summary.expected)}'
-          '${difference == 0 ? ' (cuadró)' : difference > 0 ? ' (sobran ${CurrencyFormatter.format(difference)})' : ' (faltan ${CurrencyFormatter.format(-difference)})'}',
+          '${difference.abs() < 1 ? ' (cuadró)' : difference > 0 ? ' (sobran ${CurrencyFormatter.format(difference)})' : ' (faltan ${CurrencyFormatter.format(-difference)})'}',
       data: {'session_id': session.id, 'difference': difference},
     );
     return closed;
@@ -132,5 +267,55 @@ class CashRegisterRepository {
       limit: limit,
     );
     return rows.map(CashSession.fromMap).toList();
+  }
+
+  /// Nombre de cada forma de pago en el resumen
+  static String methodLabel(String code) => switch (code) {
+        'EFECTIVO' => 'Efectivo',
+        'TRANSFERENCIA' => 'Transferencia',
+        'TARJETA' => 'Tarjeta',
+        'FIADO' => 'Fiado',
+        'ABONO_EFECTIVO' => 'Abonos en efectivo',
+        'ABONO_TRANSFERENCIA' => 'Abonos por transferencia',
+        _ when code.startsWith('ABONO_') => 'Abonos (${code.substring(6).toLowerCase()})',
+        _ => code[0] + code.substring(1).toLowerCase(),
+      };
+
+  /// Comprobante del cierre para enviar por WhatsApp
+  static String receipt({
+    required String businessName,
+    required CashSession session,
+    required CashSummary summary,
+    List<String> servicesLines = const [],
+  }) {
+    String hour(DateTime d) {
+      final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+      return '${d.day}/${d.month} $h:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'a. m.' : 'p. m.'}';
+    }
+
+    final diff = session.difference ?? 0;
+    return [
+      'Cierre de caja · $businessName',
+      'Abrió: ${hour(session.openedAt)}${session.closedAt == null ? '' : ' · Cerró: ${hour(session.closedAt!)}'}',
+      '',
+      'Base: ${CurrencyFormatter.format(summary.openingAmount)}',
+      for (final e in summary.byMethod.entries) '${methodLabel(e.key)}: ${CurrencyFormatter.format(e.value)}',
+      if (summary.tipsIn > 0) 'Propinas en efectivo: ${CurrencyFormatter.format(summary.tipsIn)}',
+      if (summary.tipsOut > 0) 'Propinas entregadas: ${CurrencyFormatter.format(summary.tipsOut)}',
+      if (summary.entries > 0) 'Entradas: ${CurrencyFormatter.format(summary.entries)}',
+      if (summary.exits > 0) 'Salidas: ${CurrencyFormatter.format(summary.exits)}',
+      if (summary.cashPurchases > 0) 'Mercancía de contado: ${CurrencyFormatter.format(summary.cashPurchases)}',
+      '',
+      'Efectivo esperado: ${CurrencyFormatter.format(summary.expected)}',
+      if (session.countedAmount != null) 'Efectivo contado: ${CurrencyFormatter.format(session.countedAmount!)}',
+      if (session.countedAmount != null)
+        diff.abs() < 1
+            ? 'Cuadró'
+            : diff > 0
+                ? 'Sobran ${CurrencyFormatter.format(diff)}'
+                : 'Faltan ${CurrencyFormatter.format(-diff)}',
+      if ((session.notes ?? '').isNotEmpty) 'Nota: ${session.notes}',
+      if (servicesLines.isNotEmpty) ...['', ...servicesLines],
+    ].join('\n');
   }
 }

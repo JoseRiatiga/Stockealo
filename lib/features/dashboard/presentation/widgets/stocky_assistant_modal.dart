@@ -10,9 +10,6 @@ import '../../../stocky/data/stocky_ai_service.dart';
 import '../../../stocky/data/stocky_assistant_service.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../auth/presentation/widgets/stocky_mascot.dart';
-import '../../../customers/presentation/screens/customers_screen.dart';
-import '../../../products/presentation/widgets/restock_order_modal.dart';
-import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 
 class StockyAssistantModal extends StatefulWidget {
   final String? businessId;
@@ -318,7 +315,6 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
 
   void _handleActionTap(StockyAction action) async {
     HapticFeedback.selectionClick();
-    final activeBiz = ActiveBusinessScope.read(context);
 
     switch (action.actionType) {
       case 'ask_ai':
@@ -350,27 +346,16 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
         }
         break;
 
+      // Stocky solo lleva a donde vive cada cosa (0.12.0): no abre copias
       case 'navigate_customers':
-        if (activeBiz != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CustomersScreen(businessId: activeBiz.id),
-            ),
-          );
-        }
-        break;
-
       case 'quick_sale':
         Navigator.pop(context);
-        QuickSaleDialog.show(context);
+        widget.onNavigateToTab?.call(2);
         break;
 
       case 'restock_modal':
-        if (activeBiz != null) {
-          Navigator.pop(context);
-          RestockOrderModal.show(context, business: activeBiz, userName: _userName);
-        }
+        Navigator.pop(context);
+        widget.onNavigateToTab?.call(1);
         break;
 
       case 'whatsapp_debtor':

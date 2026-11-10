@@ -223,4 +223,30 @@ void main() {
       expect(await db.query('work_orders'), isEmpty);
     });
   });
+
+  group('upgradeSchema v11 -> v12', () {
+    test('agrega precio por vehículo, quién hace cada servicio, tipo de vehículo y asistencia', () async {
+      await db.execute("CREATE TABLE businesses (id TEXT PRIMARY KEY, name TEXT)");
+      await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, product_id TEXT, total REAL)');
+      await db.insert('businesses', {'id': 'b1', 'name': 'Lavadero'});
+      await AppDatabase.upgradeSchema(db, 10, 11);
+      await db.insert('services', {
+        'id': 's1', 'business_id': 'b1', 'name': 'Lavado', 'price': 10000,
+        'created_at': '2026-11-01', 'updated_at': '2026-11-01',
+      });
+
+      await AppDatabase.upgradeSchema(db, 11, 12);
+      await expectLater(AppDatabase.upgradeSchema(db, 11, 12), completes);
+
+      Future<Set<Object?>> cols(String t) async => (await db.rawQuery('PRAGMA table_info($t)')).map((c) => c['name']).toSet();
+      expect(await cols('services'), containsAll(['prices', 'staff_ids']));
+      expect(await cols('work_orders'), contains('vehicle_kind'));
+      expect(await cols('staff_attendance'), containsAll(['staff_id', 'day', 'status', 'arrived_at', 'left_at', 'pauses']));
+      expect(await cols('commissions'), containsAll(['staff_id', 'sale_id', 'amount', 'payout_id']));
+      expect(await cols('staff_payouts'), containsAll(['staff_id', 'total', 'paid_at']));
+      expect(await cols('cash_sessions'), containsAll(['closed_by', 'summary', 'updated_at']));
+      expect(await cols('cash_movements'), containsAll(['session_id', 'kind', 'reason', 'amount']));
+      expect((await db.query('services')).single['price'], 10000);
+    });
+  });
 }

@@ -11,6 +11,9 @@ class AppSidebarPro extends StatefulWidget {
   final Business? activeBusiness;
   final String userName;
   final String userRole;
+
+  /// Con Pro Servicios aparece Servicios después de Ventas
+  final bool showServices;
   final VoidCallback onSelectBusiness;
   final VoidCallback onLogout;
 
@@ -21,6 +24,7 @@ class AppSidebarPro extends StatefulWidget {
     required this.activeBusiness,
     required this.userName,
     required this.userRole,
+    this.showServices = false,
     required this.onSelectBusiness,
     required this.onLogout,
   });
@@ -37,13 +41,16 @@ class _AppSidebarProState extends State<AppSidebarPro> {
     (index: 0, icon: Icons.space_dashboard_outlined, selectedIcon: Icons.space_dashboard_rounded, label: 'Inicio'),
     (index: 1, icon: Icons.inventory_2_outlined, selectedIcon: Icons.inventory_2_rounded, label: 'Inventario'),
     (index: 2, icon: Icons.point_of_sale_outlined, selectedIcon: Icons.point_of_sale_rounded, label: 'Ventas'),
+    (index: 5, icon: Icons.view_kanban_outlined, selectedIcon: Icons.view_kanban_rounded, label: 'Servicios'),
     (index: 4, icon: Icons.insert_chart_outlined_rounded, selectedIcon: Icons.insert_chart_rounded, label: 'Reportes'),
     (index: 3, icon: Icons.settings_outlined, selectedIcon: Icons.settings_rounded, label: 'Ajustes'),
   ];
 
   List<({int index, IconData icon, IconData selectedIcon, String label})> get _items => [
         for (final item in _allItems)
-          if (item.index != 4 || widget.userRole == 'OWNER' || widget.userRole == 'ADMIN') item,
+          if ((item.index != 4 || widget.userRole == 'OWNER' || widget.userRole == 'ADMIN') &&
+              (item.index != 5 || widget.showServices))
+            item,
       ];
 
   String get _roleLabel => switch (widget.userRole) {

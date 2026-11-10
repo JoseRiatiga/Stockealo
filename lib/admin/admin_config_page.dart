@@ -31,7 +31,30 @@ class _AdminConfigPageState extends State<AdminConfigPage> {
   AdminConfig? _config;
   bool _loading = true;
   bool _saving = false;
+  bool _savingPricing = false;
   String? _error;
+
+  /// «Mostrar precios y compra en la app» (pro_settings.show_pricing = 'on' / 'off')
+  bool get _showPricing => _config?.settings['show_pricing'] == 'on';
+
+  Future<void> _setShowPricing(bool on) async {
+    setState(() => _savingPricing = true);
+    try {
+      await ProAdminService.instance.setSetting('show_pricing', on ? 'on' : 'off');
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: on ? 'Los precios y la compra ya se ven en la app.' : 'Precios y compra ocultos en la app.',
+          type: ToastType.success,
+        );
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) AppToast.show(context, message: '$e', type: ToastType.error);
+    } finally {
+      if (mounted) setState(() => _savingPricing = false);
+    }
+  }
 
   @override
   void initState() {
@@ -101,6 +124,23 @@ class _AdminConfigPageState extends State<AdminConfigPage> {
       children: state.blocking
           ? [state]
           : [
+              AdminCard(
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _showPricing,
+                  onChanged: _savingPricing ? null : _setShowPricing,
+                  title: Text('Mostrar precios y compra en la app',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+                  subtitle: Text(
+                    _showPricing
+                        ? 'Los clientes ven los planes encendidos con su precio y pueden pagar.'
+                        : 'Apagado: la app muestra lo que incluye cada plan y el canje de códigos, sin precios ni pagos. '
+                            'Los planes se dan con «Dar Pro» o con códigos.',
+                    style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpace.lg),
               AdminCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

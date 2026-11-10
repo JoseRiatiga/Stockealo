@@ -189,6 +189,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
           segments: const [
             ButtonSegment(value: 'business', label: Text('Pro Negocio')),
             ButtonSegment(value: 'global', label: Text('Pro Global')),
+            ButtonSegment(value: 'services', label: Text('Pro Servicios')),
           ],
           selected: {_kind},
           onSelectionChanged: (v) => setState(() => _kind = v.first),

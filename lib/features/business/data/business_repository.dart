@@ -173,8 +173,8 @@ class BusinessRepository extends ChangeNotifier {
   /// Actualiza los datos de una empresa. Los campos opcionales en null no cambian.
   Future<Business?> updateBusiness({
     required String id,
-    required String name,
-    required String currency,
+    String? name,
+    String? currency,
     String? description,
     String? country,
     String? icon,
@@ -183,11 +183,12 @@ class BusinessRepository extends ChangeNotifier {
     bool? cashRegisterEnabled,
     bool? servicesEnabled,
     String? serviceType,
+    String? serviceMessages,
   }) async {
     final db = await _dbProvider.database;
     final Map<String, dynamic> updateData = {
-      'name': name.trim(),
-      'currency': currency,
+      if (name != null) 'name': name.trim(),
+      if (currency != null) 'currency': currency,
       if (description != null) 'description': description.trim(),
       if (country != null) 'country': country,
       if (icon != null) 'icon': icon,
@@ -196,6 +197,7 @@ class BusinessRepository extends ChangeNotifier {
       if (cashRegisterEnabled != null) 'cash_register_enabled': cashRegisterEnabled ? 1 : 0,
       if (servicesEnabled != null) 'services_enabled': servicesEnabled ? 1 : 0,
       if (serviceType != null) 'service_type': serviceType,
+      if (serviceMessages != null) 'service_messages': serviceMessages,
     };
 
     await db.update(

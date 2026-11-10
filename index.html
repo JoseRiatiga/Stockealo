@@ -93,7 +93,7 @@
         </div>
         <p class="muted" id="kind-help">Para un negocio y todo su equipo.</p>
         <div class="plans" id="plans"><p class="muted">Cargando precios…</p></div>
-        <p class="muted" style="font-size:14px;margin-top:16px">
+        <p class="muted" id="pay-note" style="font-size:14px;margin-top:16px;display:none">
           <svg width="16" height="16" style="vertical-align:-3px"><use href="#i-lock"/></svg>
           Paga dentro de la app con Nequi, PSE, tarjeta o Bancolombia a través de Wompi. Precios en pesos colombianos.
         </p>
@@ -118,7 +118,7 @@
             quién les debe, sin complicaciones y sin pagar por lo básico. Lo construimos escuchando a dueños de negocio y
             mejorándolo con cada versión.</p>
         </div>
-        <div class="card">
+        <div class="card" id="wompi-card" style="display:none">
           <span class="eyebrow">Aliados</span>
           <h3 style="margin-top:8px">Pagos seguros con Wompi</h3>
           <p class="muted">Los pagos de Stockealo Pro se procesan con Wompi (Grupo Cibest). Stockealo no guarda datos de tarjetas ni
@@ -190,7 +190,14 @@
       var plans = data.plans.filter(function (p) { return p.kind === kind; });
       document.getElementById('kind-help').textContent = kind === 'global'
         ? 'Para todos los negocios del dueño.' : 'Para un negocio y todo su equipo.';
-      if (!plans.length) { box.innerHTML = '<p class="muted">Consulta los precios en la app.</p>'; return; }
+      // Precios y pago en línea solo si el panel los encendió (show_pricing)
+      var showPay = data.showPricing && data.plans.length > 0;
+      document.getElementById('pay-note').style.display = showPay ? '' : 'none';
+      document.getElementById('wompi-card').style.display = showPay ? '' : 'none';
+      if (!plans.length) {
+        box.innerHTML = '<p class="muted">Escríbenos por WhatsApp y te contamos cómo activar Pro en tu negocio.</p>';
+        return;
+      }
       box.innerHTML = plans.map(function (p) {
         var featured = p.period === 'month';
         return '<div class="card plan' + (featured ? ' featured' : '') + '">' +
@@ -246,7 +253,7 @@
     fetch(API, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' }, body: '{}' })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function (json) {
-        data = { plans: json.plans || [], stores: json.stores || [] };
+        data = { plans: json.plans || [], stores: json.stores || [], showPricing: json.show_pricing === true };
         setWhatsApp(json.whatsapp);
       })
       .catch(function () {})

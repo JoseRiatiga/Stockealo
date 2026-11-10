@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 11;
+  static const int _schemaVersion = 12;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -126,6 +126,25 @@ class AppDatabase {
       expected_amount REAL,
       counted_amount REAL,
       notes TEXT,
+      closed_by TEXT,
+      summary TEXT,
+      updated_at TEXT,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  /// Entradas y salidas de efectivo a mano durante un turno de caja (0.12.0)
+  static const String _createCashMovements = '''
+    CREATE TABLE IF NOT EXISTS cash_movements (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      amount REAL NOT NULL,
+      note TEXT,
+      created_by TEXT,
+      date TEXT NOT NULL,
       FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
     )
   ''';
@@ -222,6 +241,8 @@ class AppDatabase {
       commission_pct REAL NOT NULL DEFAULT 0,
       is_active INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
+      prices TEXT,
+      staff_ids TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
@@ -253,6 +274,7 @@ class AppDatabase {
       number TEXT NOT NULL,
       plate TEXT,
       vehicle TEXT,
+      vehicle_kind TEXT,
       customer_name TEXT,
       customer_phone TEXT,
       status TEXT NOT NULL DEFAULT 'ESPERA',
@@ -267,6 +289,60 @@ class AppDatabase {
       created_by TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  /// Asistencia del día de cada empleado: llegó o no vino, salida y pausas (0.12.0)
+  static const String _createStaffAttendance = '''
+    CREATE TABLE IF NOT EXISTS staff_attendance (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      staff_id TEXT NOT NULL,
+      day TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'LLEGO',
+      arrived_at TEXT,
+      left_at TEXT,
+      pauses TEXT,
+      updated_at TEXT NOT NULL,
+      UNIQUE (business_id, staff_id, day),
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  /// Comisiones por servicio cobrado, propinas y ajustes (0.12.0)
+  static const String _createCommissions = '''
+    CREATE TABLE IF NOT EXISTS commissions (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      staff_id TEXT NOT NULL,
+      work_order_id TEXT,
+      sale_id TEXT,
+      kind TEXT NOT NULL DEFAULT 'SERVICIO',
+      label TEXT NOT NULL,
+      base REAL NOT NULL DEFAULT 0,
+      pct REAL NOT NULL DEFAULT 0,
+      amount REAL NOT NULL DEFAULT 0,
+      date TEXT NOT NULL,
+      payout_id TEXT,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
+    )
+  ''';
+
+  /// Liquidaciones: lo que se le pagó a cada persona (0.12.0)
+  static const String _createStaffPayouts = '''
+    CREATE TABLE IF NOT EXISTS staff_payouts (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      staff_id TEXT NOT NULL,
+      from_date TEXT NOT NULL,
+      to_date TEXT NOT NULL,
+      commissions REAL NOT NULL DEFAULT 0,
+      tips REAL NOT NULL DEFAULT 0,
+      total REAL NOT NULL DEFAULT 0,
+      paid_at TEXT NOT NULL,
+      paid_by TEXT,
       FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
     )
   ''';
@@ -475,6 +551,25 @@ class AppDatabase {
       await db.execute(_createStaff);
       await db.execute(_createWorkOrders);
     }
+    if (oldVersion < 12 && newVersion >= 12) {
+      // Módulo Servicios (0.12.0): precio por tipo de vehículo, quién hace cada
+      // servicio, tipo de vehículo de cada trabajo y asistencia del día
+      await _addColumnIfMissing(db, 'services', 'prices', 'TEXT');
+      await _addColumnIfMissing(db, 'businesses', 'service_messages', 'TEXT');
+      await _addColumnIfMissing(db, 'services', 'staff_ids', 'TEXT');
+      await _addColumnIfMissing(db, 'work_orders', 'vehicle_kind', 'TEXT');
+      await db.execute(_createStaffAttendance);
+      await db.execute(_createCommissions);
+      await db.execute(_createStaffPayouts);
+      // Arqueo de caja mejorado: quién cerró, resumen del cierre y movimientos
+      await db.execute(_createCashSessions);
+      await _addColumnIfMissing(db, 'cash_sessions', 'closed_by', 'TEXT');
+      await _addColumnIfMissing(db, 'cash_sessions', 'summary', 'TEXT');
+      await _addColumnIfMissing(db, 'cash_sessions', 'updated_at', 'TEXT');
+      await db.execute(_createCashMovements);
+      // Quien ya usaba la app ve una vez «Dónde quedó cada cosa» (las instalaciones nuevas no)
+      await db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('where_moved_pending', '1')");
+    }
   }
 
   /// La descarga de la nube reescribía los productos sin `has_variants` y sus
@@ -500,6 +595,10 @@ class AppDatabase {
     await db.execute(_createServices);
     await db.execute(_createStaff);
     await db.execute(_createWorkOrders);
+    await db.execute(_createStaffAttendance);
+    await db.execute(_createCommissions);
+    await db.execute(_createStaffPayouts);
+    await db.execute(_createCashMovements);
 
     // 1. Tabla de Usuarios (Cuentas)
     await db.execute('''
@@ -528,6 +627,7 @@ class AppDatabase {
         cash_register_enabled INTEGER NOT NULL DEFAULT 0,
         services_enabled INTEGER NOT NULL DEFAULT 0,
         service_type TEXT,
+        service_messages TEXT,
         description TEXT,
         created_at TEXT NOT NULL,
         is_synced INTEGER NOT NULL DEFAULT 0,

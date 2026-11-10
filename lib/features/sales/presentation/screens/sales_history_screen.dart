@@ -25,7 +25,8 @@ import '../../../../core/services/supabase_service.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
 import '../../../cash/presentation/screens/cash_register_screen.dart';
-import '../../../reports/presentation/screens/profit_report_screen.dart';
+import '../../../business/models/business.dart';
+import '../../../business/presentation/screens/modules_screen.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -385,15 +386,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                   ),
                 ),
 
-                // Arqueo de caja: solo si el negocio lo activó
-                if (business?.cashRegisterEnabled == true)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.sm, hPadding, 0),
-                      child: _buildCashStrip(),
-                    ),
-                  ),
-
                 // Accesos rápidos
                 SliverToBoxAdapter(
                   child: Padding(
@@ -402,8 +394,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                       items: [
                         QuickAccessItem(
                           icon: Icons.people_alt_outlined,
-                          label: 'Clientes',
-                          caption: 'Fiados y abonos',
+                          label: 'Clientes y fiados',
+                          caption: 'Deudas y abonos',
                           onTap: _navigateToCustomers,
                         ),
                         QuickAccessItem(
@@ -412,14 +404,17 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                           caption: 'Proformas',
                           onTap: _openQuotations,
                         ),
-                        // Muestra costos y márgenes: solo dueño y administrador
-                        if (canViewCosts && business != null)
-                          QuickAccessItem(
-                            icon: Icons.insights_rounded,
-                            label: 'Reportes',
-                            caption: 'Ganancias',
-                            onTap: () => ProfitReportScreen.open(context, business),
-                          ),
+                        // Caja siempre visible: si está apagada explica y lleva a Módulos
+                        QuickAccessItem(
+                          icon: Icons.point_of_sale_rounded,
+                          label: 'Caja',
+                          caption: business?.cashRegisterEnabled != true
+                              ? 'Apagada'
+                              : (_openCash == null
+                                  ? 'Cerrada'
+                                  : 'Abierta desde ${DateFormat('h:mm a', 'es_CO').format(_openCash!.openedAt)}'),
+                          onTap: business?.cashRegisterEnabled == true ? _openCashRegister : () => _explainCash(business),
+                        ),
                       ],
                     ),
                   ),
@@ -545,39 +540,31 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     if (mounted) _loadSales();
   }
 
-  /// Franja del arqueo de caja: estado de la caja y acceso a abrirla o cerrarla
-  Widget _buildCashStrip() {
-    final c = context.colors;
-    final open = _openCash;
-    final text = open == null
-        ? 'Caja cerrada'
-        : 'Caja abierta desde ${DateFormat('h:mm a', 'es_CO').format(open.openedAt)}';
-    return Material(
-      color: open == null ? c.surface : c.successSoft,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.control),
-        side: BorderSide(color: open == null ? c.line : Colors.transparent),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.control),
-        onTap: _openCashRegister,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.md),
-          child: Row(
-            children: [
-              Icon(Icons.point_of_sale_rounded, size: 20, color: open == null ? c.inkMuted : c.success),
-              const SizedBox(width: AppSpace.sm),
-              Expanded(
-                child: Text(text, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: open == null ? c.ink : c.success)),
-              ),
-              Text(open == null ? 'Abrir caja' : 'Cerrar caja', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.accent)),
-              Icon(Icons.chevron_right_rounded, color: c.accent),
-            ],
-          ),
+  /// La caja está apagada: qué hace y dónde se enciende (Ajustes › Módulos)
+  Future<void> _explainCash(Business? business) async {
+    if (business == null) return;
+    final canEdit = (_userRole ?? widget.userRole) != 'CASHIER';
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Caja (arqueo)'),
+        content: Text(
+          'Abre el turno con una base, registra entradas y salidas y cierra contando el dinero para saber si cuadra.\n\n'
+          '${canEdit ? 'Se enciende en Ajustes › Módulos.' : 'El dueño o un administrador la enciende en Ajustes › Módulos.'}',
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cerrar')),
+          if (canEdit) FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ir a Módulos')),
+        ],
       ),
     );
+    if (go == true && mounted) {
+      await ModulesScreen.open(context, business: business, canEdit: canEdit);
+      if (mounted) _loadSales();
+    }
   }
+
+
 
   String get _dateLabel => switch (_selectedDateFilter) {
         'today' => 'Hoy',

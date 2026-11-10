@@ -324,6 +324,26 @@ Pruebas:
 - la ventana sale una sola vez por mantenimiento;
 - los administradores siguen entrando.
 
+## 7d. Sugerencias y fallos (pedido del dueño, 10 nov)
+
+**En la app: Ajustes › Ayuda › Sugerencias y fallos.**
+- Tipo: *Algo no funciona*, *Tengo una idea* o *Tengo una pregunta*.
+- En qué parte de la app pasó: Inicio, Inventario, Ventas, Servicios, Reportes, Ajustes u Otra.
+- El mensaje (obligatorio) y, si la persona quiere, su WhatsApp para que la contacten.
+- Se adjuntan solos: versión de la app, equipo (web, Android…), negocio y rol. Nada más.
+- «Lo que he enviado»: cada mensaje con su estado y la respuesta del equipo de Stockealo.
+
+**En el panel admin: sección «Sugerencias y fallos».**
+- Lista con filtros por estado y tipo.
+- Estados: Nuevo, En revisión, Resuelto o Descartado.
+- Responder: la respuesta se ve en la app de quien escribió.
+- Escribirle por WhatsApp si dio su número.
+
+**Seguridad:**
+- Se envía solo por una función del servidor, con un máximo de 10 mensajes al día por cuenta y 2000 letras por mensaje.
+- Cada persona ve solo lo suyo; solo los administradores ven todo.
+- Cada cambio del panel queda en el registro de acciones de los administradores.
+
 ## 8. Datos (migraciones de Supabase, se aplican solo con permiso)
 
 - `services.staff_ids`: empleados habilitados para cada servicio.

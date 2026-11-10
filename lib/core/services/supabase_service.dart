@@ -581,6 +581,9 @@ class SupabaseService {
               'cash_register_enabled': b['cash_register_enabled'] == true ? 1 : 0,
               'services_enabled': b['services_enabled'] == true ? 1 : 0,
               'service_type': b['service_type'],
+              'service_messages': b['service_messages'] == null
+                  ? null
+                  : (b['service_messages'] is String ? b['service_messages'] : jsonEncode(b['service_messages'])),
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
               'deleted_at': b['deleted_at'],
               'created_at': b['created_at'] ?? DateTime.now().toIso8601String(),
@@ -944,6 +947,11 @@ class SupabaseService {
         ('services', ['is_active']),
         ('staff', ['is_active']),
         ('work_orders', <String>[]),
+        ('staff_attendance', <String>[]),
+        ('commissions', <String>[]),
+        ('staff_payouts', <String>[]),
+        ('cash_sessions', <String>[]),
+        ('cash_movements', <String>[]),
       ]) {
         try {
           final List<dynamic> rows = await client!.from(table).select();
@@ -951,7 +959,14 @@ class SupabaseService {
             final map = Map<String, dynamic>.from(row as Map);
             await db.insert(
               table,
-              table == 'work_orders' ? workOrderLocalRow(map) : intRow(map, bools),
+              switch (table) {
+                'work_orders' => workOrderLocalRow(map),
+                'services' => serviceLocalRow(map),
+                'staff_attendance' => attendanceLocalRow(map),
+                'cash_sessions' => cashSessionLocalRow(map),
+                'cash_movements' => cashMovementLocalRow(map),
+                _ => intRow(map, bools),
+              },
               conflictAlgorithm: ConflictAlgorithm.replace,
             );
           }
@@ -1113,7 +1128,19 @@ class SupabaseService {
       case 'upsert_purchase':
         await db.from('purchases').upsert(purchaseCloudRow(p), onConflict: 'id');
       case 'upsert_service':
-        await db.from('services').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
+        await db.from('services').upsert(serviceCloudRow(p), onConflict: 'id');
+      case 'upsert_attendance':
+        await db.from('staff_attendance').upsert(attendanceCloudRow(p), onConflict: 'id');
+      case 'upsert_commission':
+        await db.from('commissions').upsert(boolRow(p, const []), onConflict: 'id');
+      case 'delete_commission':
+        await db.from('commissions').delete().eq('id', p['id'] as String);
+      case 'upsert_payout':
+        await db.from('staff_payouts').upsert(boolRow(p, const []), onConflict: 'id');
+      case 'upsert_cash_session':
+        await db.from('cash_sessions').upsert(cashSessionCloudRow(p), onConflict: 'id');
+      case 'upsert_cash_movement':
+        await db.from('cash_movements').upsert(boolRow(p, const []), onConflict: 'id');
       case 'upsert_staff':
         await db.from('staff').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
       case 'upsert_work_order':
@@ -1240,6 +1267,8 @@ class SupabaseService {
         if (b['service_type'] != null || b['services_enabled'] == 1 || b['services_enabled'] == true) ...{
           'services_enabled': b['services_enabled'] == 1 || b['services_enabled'] == true,
           'service_type': b['service_type'],
+          if (b['service_messages'] != null)
+            'service_messages': b['service_messages'] is String ? jsonDecode(b['service_messages'] as String) : b['service_messages'],
         },
         'is_deleted': (b['is_deleted'] as int?) ?? 0,
       };
@@ -1525,6 +1554,12 @@ class SupabaseService {
   Future<void> upsertServiceToCloud(Map<String, dynamic> row) => _write('upsert_service', row);
   Future<void> upsertStaffToCloud(Map<String, dynamic> row) => _write('upsert_staff', row);
   Future<void> upsertWorkOrderToCloud(Map<String, dynamic> row) => _write('upsert_work_order', row);
+  Future<void> upsertAttendanceToCloud(Map<String, dynamic> row) => _write('upsert_attendance', row);
+  Future<void> upsertCommissionToCloud(Map<String, dynamic> row) => _write('upsert_commission', row);
+  Future<void> deleteCommissionFromCloud(String id) => _write('delete_commission', {'id': id});
+  Future<void> upsertPayoutToCloud(Map<String, dynamic> row) => _write('upsert_payout', row);
+  Future<void> upsertCashSessionToCloud(Map<String, dynamic> row) => _write('upsert_cash_session', row);
+  Future<void> upsertCashMovementToCloud(Map<String, dynamic> row) => _write('upsert_cash_movement', row);
 
   /// Fila local -> nube: quita lo interno de la cola y pasa 0/1 a booleano en [boolColumns]
   static Map<String, dynamic> boolRow(Map<String, dynamic> r, List<String> boolColumns) => {
@@ -1547,6 +1582,65 @@ class SupabaseService {
     row['sale_ids'] = json(r['sale_ids'], const []);
     return row;
   }
+
+  /// Servicio del catálogo: precios por vehículo y empleados como JSON en la nube
+  static Map<String, dynamic> serviceCloudRow(Map<String, dynamic> r) {
+    dynamic json(Object? v, Object fallback) => v is String ? (v.isEmpty ? fallback : jsonDecode(v)) : (v ?? fallback);
+    final row = boolRow(r, const ['is_active']);
+    row['prices'] = json(r['prices'], const {});
+    row['staff_ids'] = json(r['staff_ids'], const []);
+    return row;
+  }
+
+  /// Servicio del catálogo: nube -> local (JSON como texto, booleanos a 0/1)
+  static Map<String, dynamic> serviceLocalRow(Map<String, dynamic> r) {
+    String text(Object? v, Object fallback) => v is String ? v : jsonEncode(v ?? fallback);
+    return {
+      ...intRow(r, const ['is_active']),
+      'prices': text(r['prices'], const {}),
+      'staff_ids': text(r['staff_ids'], const []),
+    };
+  }
+
+  /// Turno de caja: el resumen del cierre como JSON en la nube
+  static Map<String, dynamic> cashSessionCloudRow(Map<String, dynamic> r) {
+    final row = boolRow(r, const []);
+    final summary = r['summary'];
+    row['summary'] = summary is String ? (summary.isEmpty ? const {} : jsonDecode(summary)) : (summary ?? const {});
+    return row;
+  }
+
+  /// Turno de caja: nube -> local (resumen como texto)
+  static Map<String, dynamic> cashSessionLocalRow(Map<String, dynamic> r) => {
+        ...r,
+        for (final k in const ['opened_at', 'closed_at', 'updated_at']) k: localIso(r[k]),
+        'summary': r['summary'] is String ? r['summary'] : jsonEncode(r['summary'] ?? const {}),
+      };
+
+  /// Movimiento de caja: nube -> local con la hora del equipo (se compara como texto)
+  static Map<String, dynamic> cashMovementLocalRow(Map<String, dynamic> r) => {...r, 'date': localIso(r['date'])};
+
+  /// Fecha de la nube (UTC) en la hora del equipo, como la guarda la app
+  static String? localIso(Object? v) {
+    if (v == null) return null;
+    final d = DateTime.tryParse('$v');
+    return d == null ? '$v' : d.toLocal().toIso8601String();
+  }
+
+  /// Asistencia: pausas como JSON en la nube
+  static Map<String, dynamic> attendanceCloudRow(Map<String, dynamic> r) {
+    final row = boolRow(r, const []);
+    final pauses = r['pauses'];
+    row['pauses'] = pauses is String ? (pauses.isEmpty ? const [] : jsonDecode(pauses)) : (pauses ?? const []);
+    return row;
+  }
+
+  /// Asistencia: nube -> local (día como texto AAAA-MM-DD y pausas como texto)
+  static Map<String, dynamic> attendanceLocalRow(Map<String, dynamic> r) => {
+        ...r,
+        'day': '${r['day']}'.split('T').first,
+        'pauses': r['pauses'] is String ? r['pauses'] : jsonEncode(r['pauses'] ?? const []),
+      };
 
   /// Orden del tablero: nube -> local (JSON como texto)
   static Map<String, dynamic> workOrderLocalRow(Map<String, dynamic> r) {

@@ -1,4 +1,3 @@
-import 'package:sqflite/sqflite.dart';
 import '../../../core/database/app_database.dart';
 
 class DashboardRepository {
@@ -393,44 +392,5 @@ class DashboardRepository {
       'topProducts': topProducts,
       'recentTransactions': recentTransactions,
     };
-  }
-
-  /// Lista predeterminada de acciones rápidas para el dashboard
-  static const List<String> defaultQuickActions = [
-    'sell',
-    'add_product',
-    'customers',
-    'alerts',
-  ];
-
-  /// Obtiene las acciones rápidas preferidas por el usuario para una empresa
-  Future<List<String>> getQuickActions(String businessId) async {
-    try {
-      final db = await _dbProvider.database;
-      final key = 'quick_actions_$businessId';
-      final res = await db.query(
-        'app_settings',
-        where: 'key = ?',
-        whereArgs: [key],
-      );
-      if (res.isNotEmpty && res.first['value'] != null) {
-        final val = res.first['value'] as String;
-        final list = val.split(',').where((s) => s.trim().isNotEmpty).toList();
-        if (list.isNotEmpty) return list;
-      }
-    } catch (_) {}
-    return List.from(defaultQuickActions);
-  }
-
-  /// Guarda la personalización de acciones rápidas seleccionadas por el usuario
-  Future<void> saveQuickActions(String businessId, List<String> actions) async {
-    final db = await _dbProvider.database;
-    final key = 'quick_actions_$businessId';
-    final val = actions.join(',');
-    await db.insert(
-      'app_settings',
-      {'key': key, 'value': val},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
   }
 }

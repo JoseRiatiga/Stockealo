@@ -1,6 +1,3 @@
-import '../../../auth/data/auth_repository.dart';
-import '../../../reports/data/report_export_service.dart';
-import '../../../reports/presentation/screens/reports_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/app_card.dart';
@@ -434,23 +431,6 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
       backgroundColor: c.paper,
       appBar: AppBar(
         title: const Text('Entradas de mercancía'),
-        actions: [
-          IconButton(
-            tooltip: 'Reporte de compras en Excel',
-            icon: const Icon(Icons.table_chart_outlined),
-            onPressed: () {
-              final user = AuthRepository.instance.currentUser;
-              if (user == null) return;
-              ReportsScreen.open(
-                context,
-                business: widget.business,
-                userId: user.id,
-                userEmail: user.email,
-                initial: const {ReportSection.purchases, ReportSection.supplierCosts},
-              );
-            },
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {

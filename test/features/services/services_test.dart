@@ -14,8 +14,7 @@ import 'package:stockealo/features/sales/data/sales_repository.dart';
 import 'package:stockealo/features/services/data/order_whatsapp.dart';
 import 'package:stockealo/features/services/data/services_repository.dart';
 import 'package:stockealo/features/services/models/service_models.dart';
-import 'package:stockealo/features/services/presentation/screens/services_setup_screen.dart';
-import 'package:stockealo/features/services/presentation/screens/work_board_screen.dart';
+import 'package:stockealo/features/services/presentation/screens/services_tab.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -32,7 +31,7 @@ void main() {
     userId: 'u1',
     name: 'Lavadero El Brillo',
     servicesEnabled: true,
-    serviceType: ServiceType.lavaderoMotos.code,
+    serviceType: ServiceTemplate.lavadero.code,
     createdAt: now,
   );
 
@@ -70,22 +69,13 @@ void main() {
   });
 
   test('los servicios de ejemplo del lavadero se agregan una sola vez', () async {
-    expect(await repo.seedExamples(businessId, ServiceType.lavaderoMotos), 5);
-    expect(await repo.seedExamples(businessId, ServiceType.lavaderoMotos), 0);
+    // Desde la 0.12.0 el lavadero usa la plantilla de motos y carros
+    expect(await repo.seedTemplate(businessId, ServiceTemplate.lavadero), ServiceTemplate.lavadero.examples.length);
+    expect(await repo.seedTemplate(businessId, ServiceTemplate.lavadero), 0);
     final list = await repo.getServices(businessId);
     expect(list.first.name, 'Lavado sencillo');
     expect(list.first.commissionPct, 40);
-  });
-
-  test('sin Pro caben 2 empleados activos', () async {
-    await repo.saveStaff(repo.newStaff(businessId, 'Juan'));
-    expect(await repo.canActivateStaff(businessId, hasPro: false), isTrue);
-    final pedro = repo.newStaff(businessId, 'Pedro');
-    await repo.saveStaff(pedro);
-    expect(await repo.canActivateStaff(businessId, hasPro: false), isFalse);
-    expect(await repo.canActivateStaff(businessId, hasPro: true), isTrue);
-    // Editar a uno que ya está activo no cuenta como uno más
-    expect(await repo.canActivateStaff(businessId, hasPro: false, exceptId: pedro.id), isTrue);
+    expect(list.first.priceFor('CARRO'), 20000);
   });
 
   test('la orden avanza por el tablero, guarda las horas y numera por día', () async {
@@ -156,60 +146,100 @@ void main() {
     expect((await db.query('customers')).single['debt_balance'], 13500);
   });
 
-  test('el aviso de moto lista lleva placa, nombre y total', () {
-    final order = WorkOrder(
-      id: 'o', businessId: businessId, number: '3', plate: 'ABC12D', customerName: 'Carlos Pérez',
-      lines: const [WorkOrderLine(serviceId: 's', name: 'Lavado', price: 15000)], createdAt: now, updatedAt: now,
-    );
+  test('el aviso de listo usa las palabras de la plantilla', () {
+    WorkOrder order(String? kind) => WorkOrder(
+          id: 'o', businessId: businessId, number: '3', plate: 'ABC12D', vehicleKind: kind, customerName: 'Carlos Pérez',
+          lines: const [WorkOrderLine(serviceId: 's', name: 'Lavado', price: 15000)], createdAt: now, updatedAt: now,
+        );
     expect(
-      OrderWhatsApp.readyMessage(order, business),
+      OrderWhatsApp.readyMessage(order('MOTO'), business),
       'Hola Carlos, te saluda Lavadero El Brillo: tu moto ABC12D ya está lista. Total: \$15.000. ¡Te esperamos!',
     );
+    expect(OrderWhatsApp.readyMessage(order('CARRO'), business), contains('tu carro ABC12D ya está listo'));
+    final barberia = business.copyWith(serviceType: ServiceTemplate.barberia.code);
+    final msg = OrderWhatsApp.readyMessage(order(null), barberia);
+    expect(msg, contains('tu servicio ya está listo'));
+    expect(msg.toLowerCase(), isNot(contains('moto')));
+  });
+
+  Future<void> settle(WidgetTester tester, Finder until) async {
+    for (var i = 0; i < 30 && until.evaluate().isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+    }
+  }
+
+  testWidgets('la primera vez se elige la plantilla del negocio', (tester) async {
+    final nuevo = business.copyWith(servicesEnabled: false);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.build(Brightness.light),
+      home: ServicesTab(business: Business.fromMap({...nuevo.toMap(), 'service_type': null}), userRole: 'OWNER'),
+    ));
+    await tester.pump();
+    expect(find.text('¿Qué tipo de negocio es?'), findsOneWidget);
+    expect(find.text('Lavadero de motos y carros'), findsOneWidget);
+    expect(find.text('Barbería o peluquería'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   for (final width in [360.0, 1200.0]) {
-    testWidgets('tablero, nueva moto y servicios se ven bien a ${width.toInt()} px', (tester) async {
+    testWidgets('pestaña Servicios: tablero, recibir, asistencia, historial y catálogo a ${width.toInt()} px', (tester) async {
       tester.view.physicalSize = Size(width, 1800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.runAsync(() async {
-        await repo.seedExamples(businessId, ServiceType.lavaderoMotos);
+        await repo.seedTemplate(businessId, ServiceTemplate.lavadero);
         final juan = repo.newStaff(businessId, 'Juan Gómez');
         await repo.saveStaff(juan);
+        final completo = (await repo.getServices(businessId)).firstWhere((s) => s.name == 'Lavado completo');
         await repo.createOrder(
           businessId: businessId,
           plate: 'ABC12D',
-          vehicle: 'Pulsar negra',
-          lines: [WorkOrderLine(serviceId: 'x', name: 'Lavado completo', price: 15000, staffIds: [juan.id])],
+          vehicleKind: 'MOTO',
+          lines: [WorkOrderLine(serviceId: completo.id, name: completo.name, price: 15000)],
         );
       });
 
-      Future<void> settle(Finder until) async {
-        for (var i = 0; i < 20 && until.evaluate().isEmpty; i++) {
-          await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-          await tester.pump();
-        }
-      }
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.build(Brightness.light),
+        home: ServicesTab(business: business, userRole: 'OWNER'),
+      ));
+      await settle(tester, find.text('ABC12D'));
 
-      await tester.pumpWidget(MaterialApp(theme: AppTheme.build(Brightness.light), home: WorkBoardScreen(business: business)));
-      await settle(find.text('ABC12D'));
+      // Tablero: el trabajo con su servicio pendiente y el aviso de marcar asistencia
       expect(find.text('ABC12D'), findsOneWidget);
-      expect(find.text('Atiende: Juan Gómez'), findsOneWidget);
       expect(find.text('Empezar'), findsOneWidget);
+      expect(find.textContaining('Marca quién vino hoy'), findsOneWidget);
+      expect(find.text('Juan · Sin marcar'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      await tester.tap(find.text('Nueva moto'));
-      await settle(find.text('Lavado sencillo · \$10.000'));
-      expect(find.text('Lavado sencillo · \$10.000'), findsOneWidget);
+      // Recibir: los precios cambian según el tipo de vehículo
+      await tester.tap(find.text('Recibir').first);
+      await settle(tester, find.text('Tipo de vehículo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Carro'));
+      await settle(tester, find.text('Lavado completo · \$30.000'));
+      expect(find.text('Lavado completo · \$30.000'), findsOneWidget);
+      expect(find.textContaining('Lavado de casco'), findsNothing, reason: 'el casco es solo para motos');
       expect(tester.takeException(), isNull);
-
-      await tester.pumpWidget(MaterialApp(key: UniqueKey(), theme: AppTheme.build(Brightness.light), home: ServicesSetupScreen(business: business)));
-      await settle(find.text('Lavado completo'));
-      expect(find.text('Lavado completo'), findsOneWidget);
-      await tester.tap(find.text('Empleados'));
+      await tester.tapAt(const Offset(5, 5));
       await tester.pumpAndSettle();
 
-      expect(find.text('Juan Gómez'), findsOneWidget);
+      await tester.tap(find.text('Asistencia'));
+      await settle(tester, find.text('Juan Gómez'));
+      expect(find.text('Llegó'), findsOneWidget);
+      expect(find.text('No vino'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Historial'));
+      await settle(tester, find.textContaining('ABC12D'));
+      expect(find.textContaining('ABC12D'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Catálogo y precios'));
+      await settle(tester, find.textContaining('Camioneta'));
+      expect(find.text('Moto \$15.000 · Carro \$30.000 · Camioneta \$35.000'), findsOneWidget);
+      expect(find.text('Moto \$5.000'), findsOneWidget, reason: 'lavado de casco');
       expect(tester.takeException(), isNull);
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
     });

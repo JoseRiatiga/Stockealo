@@ -1,11 +1,12 @@
+import '../../../../core/theme/app_tokens.dart';
+import '../../../pro/data/pro_service.dart';
+import '../../data/app_functions.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../products/data/product_repository.dart';
 import '../../../products/models/product.dart';
 import '../../../products/presentation/screens/product_detail_screen.dart';
-import '../../../products/presentation/screens/product_form_screen.dart';
-import '../../../products/presentation/widgets/catalog_generator_modal.dart';
 import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../../products/presentation/widgets/stock_status_badge.dart';
 import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
@@ -179,11 +180,38 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
               Expanded(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B5CF6)))
-                    : _searchController.text.trim().isEmpty
-                        ? _buildQuickShortcuts(isDark, cardBg, borderColor, textMain, textMuted)
-                        : _results.isEmpty
-                            ? _buildEmptyResults(textMuted)
-                            : _buildResultsList(isDark, cardBg, borderColor, textMain, textMuted),
+                    : Builder(builder: (context) {
+                        // Funciones de la app: el buscador lleva a su único lugar (0.12.0)
+                        final query = _searchController.text.trim();
+                        final functions = findFunctions(
+                          query,
+                          role: widget.userRole ?? 'CASHIER',
+                          services: ProService.instance.status.value.services,
+                        );
+                        if (query.isEmpty) {
+                          return _buildQuickShortcuts(functions, isDark, cardBg, borderColor, textMain, textMuted);
+                        }
+                        if (_results.isEmpty && functions.isEmpty) return _buildEmptyResults(textMuted);
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (functions.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                                child: Column(
+                                  children: [
+                                    for (final f in functions.take(3)) ...[
+                                      _functionTile(f, isDark, cardBg, borderColor, textMain),
+                                      const SizedBox(height: 8),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            if (_results.isNotEmpty)
+                              Expanded(child: _buildResultsList(isDark, cardBg, borderColor, textMain, textMuted)),
+                          ],
+                        );
+                      }),
               ),
             ],
           ),
@@ -192,7 +220,9 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
     );
   }
 
+  /// Sin escribir: todas las funciones de la app y dónde viven
   Widget _buildQuickShortcuts(
+    List<AppFunction> functions,
     bool isDark,
     Color cardBg,
     Color borderColor,
@@ -205,7 +235,7 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 10),
           child: Text(
-            'ACCIONES RÁPIDAS',
+            'DÓNDE ESTÁ CADA COSA',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -214,82 +244,28 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
             ),
           ),
         ),
-        _buildShortcutTile(
-          icon: Icons.inventory_2_rounded,
-          iconColor: const Color(0xFF10B981),
-          title: 'Ir a Catálogo de Inventario',
-          subtitle: 'Consulta y gestiona todos tus productos',
-          onTap: () {
-            Navigator.pop(context);
-            widget.onNavigateToTab?.call(1);
-          },
-          isDark: isDark,
-          cardBg: cardBg,
-          borderColor: borderColor,
-          textMain: textMain,
-        ),
-        const SizedBox(height: 8),
-        _buildShortcutTile(
-          icon: Icons.point_of_sale_rounded,
-          iconColor: const Color(0xFF38BDF8),
-          title: 'Ir al Historial de Ventas',
-          subtitle: 'Revisa las transacciones y pagos registrados',
-          onTap: () {
-            Navigator.pop(context);
-            widget.onNavigateToTab?.call(2);
-          },
-          isDark: isDark,
-          cardBg: cardBg,
-          borderColor: borderColor,
-          textMain: textMain,
-        ),
-        if (widget.userRole != 'CASHIER') ...[
+        for (final f in functions) ...[
+          _functionTile(f, isDark, cardBg, borderColor, textMain),
           const SizedBox(height: 8),
-          _buildShortcutTile(
-            icon: Icons.add_circle_outline_rounded,
-            iconColor: const Color(0xFF8B5CF6),
-            title: 'Registrar Nuevo Producto',
-            subtitle: 'Añade un nuevo artículo al catálogo',
-            onTap: () async {
-              final biz = ActiveBusinessScope.read(context);
-              if (biz == null) return;
-              Navigator.pop(context);
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProductFormScreen(
-                    businessId: biz.id,
-                    userRole: widget.userRole,
-                  ),
-                ),
-              );
-            },
-            isDark: isDark,
-            cardBg: cardBg,
-            borderColor: borderColor,
-            textMain: textMain,
-          ),
         ],
-        const SizedBox(height: 8),
-        _buildShortcutTile(
-          icon: Icons.picture_as_pdf_rounded,
-          iconColor: const Color(0xFFEF4444),
-          title: 'Generar Catálogo en PDF',
-          subtitle: 'Exporta tu catálogo comercial para clientes',
-          onTap: () {
-            final biz = ActiveBusinessScope.read(context);
-            if (biz == null) return;
-            Navigator.pop(context);
-            CatalogGeneratorModal.show(context: context, business: biz);
-          },
-          isDark: isDark,
-          cardBg: cardBg,
-          borderColor: borderColor,
-          textMain: textMain,
-        ),
       ],
     );
   }
+
+  Widget _functionTile(AppFunction f, bool isDark, Color cardBg, Color borderColor, Color textMain) => _buildShortcutTile(
+        icon: f.icon,
+        iconColor: context.colors.accent,
+        title: f.title,
+        subtitle: 'Está en ${f.where}',
+        onTap: () {
+          Navigator.pop(context);
+          widget.onNavigateToTab?.call(f.tab);
+        },
+        isDark: isDark,
+        cardBg: cardBg,
+        borderColor: borderColor,
+        textMain: textMain,
+      );
 
   Widget _buildShortcutTile({
     required IconData icon,

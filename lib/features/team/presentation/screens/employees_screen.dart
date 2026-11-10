@@ -12,6 +12,8 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/modern_dialog.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
+import '../../../pro/data/pro_service.dart';
+import '../../../services/presentation/widgets/staff_section.dart';
 import '../../data/team_repository.dart';
 import '../../models/business_member.dart';
 
@@ -740,6 +742,17 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                         _memberCard(member),
                         const SizedBox(height: AppSpace.sm),
                       ],
+
+                    // Con Pro Servicios: quienes hacen los servicios (sin cuenta en la app)
+                    ValueListenableBuilder<ProStatus>(
+                      valueListenable: ProService.instance.status,
+                      builder: (context, pro, _) => pro.services
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: AppSpace.xl),
+                              child: StaffSection(business: widget.business, canEdit: canInvite),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                   ],
                 ),
               ),

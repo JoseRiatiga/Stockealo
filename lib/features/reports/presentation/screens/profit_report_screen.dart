@@ -13,7 +13,10 @@ class ProfitReportScreen extends StatefulWidget {
   /// Fecha de referencia de los periodos (solo para pruebas); por defecto, ahora
   final DateTime? now;
 
-  const ProfitReportScreen({super.key, required this.business, this.now});
+  /// Dentro de la pestaña Reportes (sin botón de volver)
+  final bool embedded;
+
+  const ProfitReportScreen({super.key, required this.business, this.now, this.embedded = false});
 
   static Future<void> open(BuildContext context, Business business) {
     return Navigator.push(context, MaterialPageRoute(builder: (_) => ProfitReportScreen(business: business)));
@@ -55,8 +58,10 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
                   padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, AppSpace.sm),
                   child: Row(
                     children: [
-                      _BackButton(onTap: () => Navigator.pop(context)),
-                      const SizedBox(width: AppSpace.md),
+                      if (!widget.embedded) ...[
+                        _BackButton(onTap: () => Navigator.pop(context)),
+                        const SizedBox(width: AppSpace.md),
+                      ],
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

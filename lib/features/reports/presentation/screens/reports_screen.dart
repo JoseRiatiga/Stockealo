@@ -6,7 +6,9 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
 import '../../../business/presentation/active_business_scope.dart';
+import '../../../pro/data/pro_service.dart';
 import '../../data/report_export_service.dart';
+import 'profit_report_screen.dart';
 
 /// Reportes: el dueño elige qué descargar, de qué periodo y si va todo en un solo
 /// Excel (una hoja por parte) o en un archivo por cada parte.
@@ -48,7 +50,9 @@ class ReportsScreen extends StatefulWidget {
 enum _PeriodChoice { today, week, month, all, custom }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  late final Set<ReportSection> _sections = {...widget.initial};
+  /// Servicios y Comisiones solo aparecen con Pro Servicios
+  List<ReportSection> get _available => ReportSection.available(services: ProService.instance.status.value.services);
+  late final Set<ReportSection> _sections = {...widget.initial.where(_available.contains)};
   _PeriodChoice _choice = _PeriodChoice.month;
   DateTimeRange? _custom;
   bool _singleFile = true;
@@ -114,7 +118,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           padding: const EdgeInsets.fromLTRB(0, AppSpace.lg, 0, AppSpace.sm),
           child: Text(t, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
         );
-    final allChecked = _sections.length == ReportSection.values.length;
+    final allChecked = _sections.length == _available.length;
 
     // En el computador la pestaña ya tiene su título arriba; en el celular, la
     // barra de abajo pasa por encima del final de la lista
@@ -154,12 +158,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     value: allChecked,
                     onChanged: (v) => setState(() {
                       _sections.clear();
-                      if (v == true) _sections.addAll(ReportSection.values);
+                      if (v == true) _sections.addAll(_available);
                     }),
                     title: const Text('Todo', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                   Divider(height: 1, color: c.line),
-                  for (final s in ReportSection.values)
+                  for (final s in _available)
                     CheckboxListTile(
                       value: _sections.contains(s),
                       onChanged: (v) => setState(() => v == true ? _sections.add(s) : _sections.remove(s)),
@@ -244,12 +248,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
 }
 
 /// Pestaña Reportes del menú principal: usa el negocio activo y la cuenta en sesión
-class ReportsTab extends StatelessWidget {
+/// Pestaña Reportes (0.12.0): reúne Ganancias y Descargar Excel. Es el único
+/// lugar de los reportes; Ventas e Inicio ya no tienen accesos propios.
+class ReportsTab extends StatefulWidget {
   final String userRole;
   const ReportsTab({super.key, required this.userRole});
 
-  /// Solo el dueño y los administradores descargan reportes (tienen costos y ganancias)
+  /// Solo el dueño y los administradores ven reportes (tienen costos y ganancias)
   static bool allowed(String role) => role == 'OWNER' || role == 'ADMIN';
+
+  @override
+  State<ReportsTab> createState() => _ReportsTabState();
+}
+
+class _ReportsTabState extends State<ReportsTab> {
+  bool _excel = false;
+
+  String get userRole => widget.userRole;
+  static bool allowed(String role) => ReportsTab.allowed(role);
 
   @override
   Widget build(BuildContext context) {
@@ -273,12 +289,40 @@ class ReportsTab extends StatelessWidget {
         ),
       );
     }
-    return ReportsScreen(
-      key: ValueKey('reports-${business.id}'),
-      business: business,
-      userId: user.id,
-      userEmail: user.email,
-      embedded: true,
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, 0),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: false, icon: Icon(Icons.insights_rounded), label: Text('Ganancias')),
+                    ButtonSegment(value: true, icon: Icon(Icons.table_chart_outlined), label: Text('Descargar Excel')),
+                  ],
+                  selected: {_excel},
+                  onSelectionChanged: (v) => setState(() => _excel = v.first),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _excel
+                ? ReportsScreen(
+                    key: ValueKey('reports-${business.id}'),
+                    business: business,
+                    userId: user.id,
+                    userEmail: user.email,
+                    embedded: true,
+                  )
+                : ProfitReportScreen(key: ValueKey('profit-${business.id}'), business: business, embedded: true),
+          ),
+        ],
+      ),
     );
   }
 }

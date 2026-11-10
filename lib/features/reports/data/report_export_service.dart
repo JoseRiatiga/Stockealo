@@ -10,6 +10,8 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../business/models/business.dart';
+import '../../services/models/commission_models.dart';
+import '../../services/models/service_models.dart';
 import '../../team/data/team_repository.dart';
 
 /// Partes que se pueden descargar desde Reportes
@@ -20,14 +22,24 @@ enum ReportSection {
   movements('Movimientos', 'Entradas, ajustes y anulaciones del inventario en el periodo'),
   profit('Ganancias', 'Lo vendido y ganado por producto en el periodo'),
   purchases('Compras', 'Mercancía que llegó en el periodo, con proveedor, factura y lo que falta pagar'),
-  supplierCosts('Costos por proveedor', 'Último costo de cada producto con cada proveedor');
+  supplierCosts('Costos por proveedor', 'Último costo de cada producto con cada proveedor'),
+  services('Servicios', 'Cada trabajo del periodo: servicios, quién los hizo, propina y forma de pago'),
+  commissions('Comisiones', 'Lo que ganó cada persona por servicio y propina, pagado o pendiente');
 
   final String label;
   final String description;
   const ReportSection(this.label, this.description);
 
   /// Si depende del periodo elegido
-  bool get usesPeriod => this == sales || this == movements || this == profit || this == purchases;
+  bool get usesPeriod =>
+      this == sales || this == movements || this == profit || this == purchases || this == services || this == commissions;
+
+  /// Solo para negocios con Pro Servicios
+  bool get needsServices => this == services || this == commissions;
+
+  /// Lo que puede descargar el negocio
+  static List<ReportSection> available({required bool services}) =>
+      [for (final s in values) if (services || !s.needsServices) s];
 }
 
 /// Periodo del reporte. Sin fechas = todo el historial.
@@ -167,6 +179,8 @@ class ReportExportService {
         ReportSection.profit => 'Ganancias',
         ReportSection.purchases => 'Compras',
         ReportSection.supplierCosts => 'Costos_por_proveedor',
+        ReportSection.services => 'Servicios',
+        ReportSection.commissions => 'Comisiones',
       };
 
   /// encode() y no save(): en la web save() además descarga solo un "FlutterExcel.xlsx"
@@ -185,7 +199,125 @@ class ReportExportService {
         ReportSection.profit => _profit(sheet, db, b, p),
         ReportSection.purchases => _purchases(sheet, db, b, p),
         ReportSection.supplierCosts => _supplierCosts(sheet, db, b),
+        ReportSection.services => _services(sheet, db, b, p),
+        ReportSection.commissions => _commissions(sheet, db, b, p),
       };
+
+  /// Nombres de las personas que hacen los servicios
+  Future<Map<String, String>> _staffNames(DatabaseExecutor db, Business b) async {
+    try {
+      final rows = await db.query('staff', columns: ['id', 'name'], where: 'business_id = ?', whereArgs: [b.id]);
+      return {for (final r in rows) r['id'] as String: r['name'] as String};
+    } on DatabaseException {
+      return const {};
+    }
+  }
+
+  Future<void> _services(Sheet sheet, DatabaseExecutor db, Business b, ReportPeriod p) async {
+    final cur = b.currency;
+    final t = ServiceTemplate.of(b.serviceType);
+    sheet.appendRow(_header([
+      'Fecha', 'Número', if (t.usesIdentifier) t.identifierLabel!, if (t.usesVehicleKinds) 'Tipo de vehículo',
+      'Cliente', 'Teléfono', 'Servicios', 'Quién lo hizo', 'Estado', 'Total ($cur)', 'Descuento ($cur)',
+      'Propina ($cur)', 'Forma de pago',
+    ]));
+    final names = await _staffNames(db, b);
+    List<Map<String, Object?>> rows;
+    try {
+      rows = await db.query('work_orders', where: 'business_id = ?', whereArgs: [b.id], orderBy: 'created_at ASC');
+    } on DatabaseException {
+      rows = const [];
+    }
+    var count = 0;
+    var total = 0.0, discount = 0.0, tips = 0.0;
+    for (final o in rows.map(WorkOrder.fromMap)) {
+      if (!p.contains(o.createdAt)) continue;
+      count++;
+      final paid = o.status == WorkOrder.delivered;
+      final amount = paid ? o.total : o.subtotal;
+      if (paid) {
+        total += o.total;
+        discount += o.discount;
+        tips += o.tip;
+      }
+      sheet.appendRow([
+        TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(o.createdAt)),
+        TextCellValue(o.number),
+        if (t.usesIdentifier) TextCellValue(o.plate ?? ''),
+        if (t.usesVehicleKinds) TextCellValue(o.vehicleKind == null ? '' : t.vehicleLabel(o.vehicleKind)),
+        TextCellValue(o.customerName ?? ''),
+        TextCellValue(o.customerPhone ?? ''),
+        TextCellValue(o.lines.map((l) => l.name).join(', ')),
+        TextCellValue({for (final id in o.staffIds) names[id] ?? 'Empleado'}.join(', ')),
+        TextCellValue(o.statusLabelFor(t)),
+        DoubleCellValue(amount),
+        DoubleCellValue(o.discount),
+        DoubleCellValue(o.tip),
+        TextCellValue(o.paymentMethod ?? ''),
+      ]);
+    }
+    sheet.appendRow([]);
+    sheet.appendRow([
+      TextCellValue('COBRADO (${p.label})'),
+      TextCellValue('$count trabajos'),
+      if (t.usesIdentifier) TextCellValue(''),
+      if (t.usesVehicleKinds) TextCellValue(''),
+      for (var i = 0; i < 5; i++) TextCellValue(''),
+      DoubleCellValue(total),
+      DoubleCellValue(discount),
+      DoubleCellValue(tips),
+      TextCellValue(''),
+    ]);
+  }
+
+  Future<void> _commissions(Sheet sheet, DatabaseExecutor db, Business b, ReportPeriod p) async {
+    final cur = b.currency;
+    sheet.appendRow(_header([
+      'Fecha', 'Persona', 'Tipo', 'Concepto', 'Base ($cur)', '%', 'Valor ($cur)', 'Estado', 'Pagado el',
+    ]));
+    final names = await _staffNames(db, b);
+    List<Map<String, Object?>> rows;
+    Map<String, DateTime> paidAt;
+    try {
+      rows = await db.query('commissions', where: 'business_id = ?', whereArgs: [b.id], orderBy: 'date ASC');
+      final payouts = await db.query('staff_payouts', columns: ['id', 'paid_at'], where: 'business_id = ?', whereArgs: [b.id]);
+      paidAt = {
+        for (final r in payouts)
+          if (DateTime.tryParse('${r['paid_at']}') != null) r['id'] as String: DateTime.parse('${r['paid_at']}').toLocal(),
+      };
+    } on DatabaseException {
+      rows = const [];
+      paidAt = const {};
+    }
+    var paidTotal = 0.0, pendingTotal = 0.0;
+    for (final c in rows.map(Commission.fromMap)) {
+      if (!p.contains(c.date)) continue;
+      if (c.isPaid) {
+        paidTotal += c.amount;
+      } else {
+        pendingTotal += c.amount;
+      }
+      final when = c.payoutId == null ? null : paidAt[c.payoutId];
+      sheet.appendRow([
+        TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(c.date)),
+        TextCellValue(names[c.staffId] ?? 'Persona eliminada'),
+        TextCellValue(switch (c.kind) {
+          Commission.kindTip => 'Propina',
+          Commission.kindAdjustment => 'Ajuste',
+          _ => 'Servicio',
+        }),
+        TextCellValue(c.label),
+        DoubleCellValue(c.base),
+        DoubleCellValue(c.pct),
+        DoubleCellValue(c.amount),
+        TextCellValue(c.isPaid ? 'Pagado' : 'Pendiente'),
+        TextCellValue(when == null ? '' : DateFormat('dd/MM/yyyy').format(when)),
+      ]);
+    }
+    sheet.appendRow([]);
+    sheet.appendRow([TextCellValue('PAGADO (${p.label})'), for (var i = 0; i < 5; i++) TextCellValue(''), DoubleCellValue(paidTotal)]);
+    sheet.appendRow([TextCellValue('PENDIENTE (${p.label})'), for (var i = 0; i < 5; i++) TextCellValue(''), DoubleCellValue(pendingTotal)]);
+  }
 
   /// Entradas de mercancía del negocio; vacío si la base aún no tiene la tabla
   Future<List<Purchase>> _purchasesOf(DatabaseExecutor db, Business b) async {

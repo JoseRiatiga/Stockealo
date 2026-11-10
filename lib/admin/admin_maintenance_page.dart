@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/services/maintenance_service.dart';
 import '../core/theme/app_tokens.dart';
+import '../core/utils/maintenance_text.dart';
 import '../core/widgets/app_toast.dart';
 import '../core/widgets/maintenance_gate.dart';
 import '../features/pro/data/pro_admin_service.dart';
@@ -23,20 +25,50 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
   int _level = 2;
   final Set<String> _scopes = {'app', 'stores'};
   bool _startNow = true;
-  DateTime _startsAt = DateTime.now().add(const Duration(hours: 2));
-  Duration _duration = const Duration(hours: 1);
-  int _noticeHours = 2;
+
+  /// Inicio y fin programados: se eligen en hora de Colombia (se guardan como instantes)
+  DateTime _startsAt = _roundedHour(DateTime.now().add(const Duration(hours: 2)));
+  DateTime _endsAt = _roundedHour(DateTime.now().add(const Duration(hours: 5)));
+
+  /// Con «Ahora»: cuánto dura
+  Duration _nowDuration = const Duration(hours: 1);
+
+  /// Horas antes del inicio en que empieza el aviso; -1 = desde ya
+  int _noticeHours = 24;
   final _message = TextEditingController();
   final _confirm = TextEditingController();
 
-  static const _durations = [
+  static DateTime _roundedHour(DateTime d) => DateTime(d.year, d.month, d.day, d.hour);
+
+  static const _nowDurations = [
     Duration(minutes: 30),
     Duration(hours: 1),
     Duration(hours: 2),
+    Duration(hours: 3),
     Duration(hours: 4),
     Duration(hours: 8),
-    Duration(hours: 24),
   ];
+
+  static const _noticeOptions = <int, String>{
+    0: 'al empezar',
+    2: '2 h antes',
+    12: '12 h antes',
+    24: '1 día antes',
+    48: '2 días antes',
+    72: '3 días antes',
+    168: '1 semana antes',
+    -1: 'desde ya',
+  };
+
+  DateTime get _starts => _startNow ? DateTime.now() : _startsAt;
+  DateTime get _ends => _startNow ? DateTime.now().add(_nowDuration) : _endsAt;
+
+  /// Horas de aviso que se envían al servidor («desde ya» = hasta que empiece)
+  int get _noticeToSend {
+    if (_startNow) return 0;
+    if (_noticeHours >= 0) return _noticeHours;
+    return (_startsAt.difference(DateTime.now()).inMinutes / 60).ceil().clamp(0, 720);
+  }
 
   @override
   void initState() {
@@ -69,23 +101,60 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
   Map<String, dynamic> get _public => Map<String, dynamic>.from((_current?['public'] as Map?) ?? const {});
   String get _state => '${_public['state'] ?? 'none'}';
 
-  Future<void> _pickStart() async {
-    final now = DateTime.now();
-    final day = await showDatePicker(
+  /// Elegir fecha y hora en hora de Colombia
+  Future<DateTime?> _pickColombia(DateTime current, {bool timeOnly = false}) async {
+    final co = MaintenanceText.colombiaWall(current);
+    var day = DateTime(co.year, co.month, co.day);
+    if (!timeOnly) {
+      final now = MaintenanceText.colombiaWall(DateTime.now());
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: day.isBefore(DateTime(now.year, now.month, now.day)) ? DateTime(now.year, now.month, now.day) : day,
+        firstDate: DateTime(now.year, now.month, now.day),
+        lastDate: DateTime(now.year, now.month, now.day).add(const Duration(days: 30)),
+        helpText: 'Fecha (hora Colombia)',
+      );
+      if (picked == null || !mounted) return null;
+      day = picked;
+    }
+    final time = await showTimePicker(
       context: context,
-      initialDate: _startsAt,
-      firstDate: DateTime(now.year, now.month, now.day),
-      lastDate: now.add(const Duration(days: 30)),
+      initialTime: TimeOfDay(hour: co.hour, minute: co.minute),
+      helpText: 'Hora de Colombia',
     );
-    if (day == null || !mounted) return;
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(_startsAt));
-    if (time == null) return;
-    setState(() => _startsAt = DateTime(day.year, day.month, day.day, time.hour, time.minute));
+    if (time == null) return null;
+    return MaintenanceText.fromColombia(day.year, day.month, day.day, time.hour, time.minute).toLocal();
+  }
+
+  Future<void> _pickStart() async {
+    final picked = await _pickColombia(_startsAt);
+    if (picked == null) return;
+    final length = _endsAt.difference(_startsAt);
+    setState(() {
+      _startsAt = picked;
+      // Conserva la duración que había
+      _endsAt = picked.add(length.isNegative || length == Duration.zero ? const Duration(hours: 3) : length);
+    });
+  }
+
+  /// La hora de fin: si queda antes del inicio, es al día siguiente (cruza la medianoche)
+  Future<void> _pickEnd() async {
+    final picked = await _pickColombia(_endsAt, timeOnly: true);
+    if (picked == null) return;
+    final startCo = MaintenanceText.colombiaWall(_startsAt);
+    final endCo = MaintenanceText.colombiaWall(picked);
+    var end = MaintenanceText.fromColombia(startCo.year, startCo.month, startCo.day, endCo.hour, endCo.minute).toLocal();
+    if (!end.isAfter(_startsAt)) end = end.add(const Duration(days: 1));
+    setState(() => _endsAt = end);
   }
 
   Future<void> _save() async {
-    final starts = _startNow ? DateTime.now() : _startsAt;
-    final ends = starts.add(_duration);
+    final starts = _starts;
+    final ends = _ends;
+    if (ends.difference(starts) > const Duration(hours: 48)) {
+      AppToast.show(context, message: 'Un mantenimiento dura como máximo 48 horas.', type: ToastType.warning);
+      return;
+    }
     setState(() => _saving = true);
     try {
       await ProAdminService.instance.setMaintenance(
@@ -94,13 +163,15 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
         startsAt: starts,
         endsAt: ends,
         message: _message.text.trim(),
-        noticeHours: _noticeHours,
+        noticeHours: _noticeToSend,
         confirm: _confirm.text,
       );
       if (!mounted) return;
       AppToast.show(
         context,
-        message: _startNow ? 'Mantenimiento activado hasta ${MaintenanceGate.when(ends)}.' : 'Mantenimiento programado.',
+        message: _startNow
+            ? 'Mantenimiento activado hasta ${MaintenanceGate.when(ends)}.'
+            : 'Mantenimiento programado ${MaintenanceText.describe(starts, ends)}.',
         type: ToastType.success,
       );
       _confirm.clear();
@@ -186,6 +257,66 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
     );
   }
 
+  /// "5 de diciembre a las 11:00 p. m." en hora de Colombia
+  static String _coLabel(DateTime d) {
+    final co = MaintenanceText.colombiaWall(d);
+    return MaintenanceGate.when(DateTime(co.year, co.month, co.day, co.hour, co.minute),
+        now: MaintenanceText.colombiaWall(DateTime.now()).copyWith(isUtc: false));
+  }
+
+  /// La franja y la ventana tal como las verán los usuarios
+  Widget _preview(StockealoColors c, DateTime starts, DateTime ends) {
+    final s = MaintenanceState(
+      state: _startNow ? 'active' : 'notice',
+      level: _level,
+      scopes: _scopes,
+      message: _message.text.trim(),
+      startsAt: starts,
+      endsAt: ends,
+    );
+    // Vista como la de alguien en Colombia
+    final banner = MaintenanceText.banner(s, isAdmin: false, deviceOffset: MaintenanceText.colombiaOffset);
+    final dialog = MaintenanceText.noticeDialog(s, deviceOffset: MaintenanceText.colombiaOffset);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (banner != null)
+          Container(
+            padding: const EdgeInsets.all(AppSpace.sm),
+            decoration: BoxDecoration(color: c.warningSoft, borderRadius: BorderRadius.circular(AppRadius.control)),
+            child: Row(
+              children: [
+                Icon(Icons.construction_rounded, size: 18, color: c.warning),
+                const SizedBox(width: AppSpace.sm),
+                Expanded(child: Text(banner, style: TextStyle(fontSize: 12.5, color: c.ink))),
+              ],
+            ),
+          )
+        else
+          Text('Sin «App y web» marcada, la app no muestra franja.', style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+        if (_scopes.contains('app')) ...[
+          const SizedBox(height: AppSpace.sm),
+          Container(
+            padding: const EdgeInsets.all(AppSpace.md),
+            decoration: BoxDecoration(
+              color: c.surface,
+              border: Border.all(color: c.line),
+              borderRadius: BorderRadius.circular(AppRadius.card),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Ventana (sale una vez): ${dialog.title}', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+                const SizedBox(height: AppSpace.xs),
+                Text(dialog.body, style: TextStyle(fontSize: 13, color: c.ink)),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   static String _levelName(int level) => switch (level) {
         1 => 'solo aviso',
         2 => 'nube en pausa',
@@ -197,7 +328,8 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
           padding: const EdgeInsets.only(top: AppSpace.lg, bottom: AppSpace.sm),
           child: Text(t, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
         );
-    final ends = (_startNow ? DateTime.now() : _startsAt).add(_duration);
+    final starts = _starts;
+    final ends = _ends;
     return AdminCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +363,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
               onChanged: (v) => setState(() => v == true ? _scopes.add(key) : _scopes.remove(key)),
               title: Text(title),
             ),
-          label('3. Cuándo'),
+          label('3. Cuándo (hora Colombia)'),
           SegmentedButton<bool>(
             segments: const [
               ButtonSegment(value: true, label: Text('Ahora')),
@@ -240,49 +372,82 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
             selected: {_startNow},
             onSelectionChanged: (v) => setState(() => _startNow = v.first),
           ),
-          if (!_startNow) ...[
-            const SizedBox(height: AppSpace.sm),
-            OutlinedButton.icon(
-              onPressed: _pickStart,
-              icon: const Icon(Icons.event_rounded, size: 18),
-              label: Text('Empieza ${MaintenanceGate.when(_startsAt)}'),
+          const SizedBox(height: AppSpace.sm),
+          if (_startNow)
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('Dura', style: TextStyle(color: c.inkMuted)),
+                for (final d in _nowDurations)
+                  ChoiceChip(
+                    label: Text(MaintenanceText.duration(d)),
+                    selected: _nowDuration == d,
+                    onSelected: (_) => setState(() => _nowDuration = d),
+                  ),
+              ],
+            )
+          else ...[
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickStart,
+                  icon: const Icon(Icons.event_rounded, size: 18),
+                  label: Text('Empieza ${_coLabel(_startsAt)}'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _pickEnd,
+                  icon: const Icon(Icons.schedule_rounded, size: 18),
+                  label: Text('Termina ${_coLabel(_endsAt)}'),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpace.sm),
             Row(children: [
-              Text('Avisar desde ', style: TextStyle(color: c.inkMuted)),
+              Text('Avisar ', style: TextStyle(color: c.inkMuted)),
               DropdownButton<int>(
                 value: _noticeHours,
-                items: [for (final h in const [0, 1, 2, 6, 12, 24]) DropdownMenuItem(value: h, child: Text(h == 0 ? 'el inicio' : '$h h antes'))],
-                onChanged: (v) => setState(() => _noticeHours = v ?? 2),
+                items: [for (final e in _noticeOptions.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
+                onChanged: (v) => setState(() => _noticeHours = v ?? 24),
               ),
             ]),
           ],
-          const SizedBox(height: AppSpace.sm),
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpace.sm),
+            child: Text(
+              'Dura ${MaintenanceText.duration(ends.difference(starts))} · termina solo, aunque se te olvide.',
+              style: TextStyle(fontSize: 12.5, color: ends.difference(starts) > const Duration(hours: 48) ? c.danger : c.inkMuted),
+            ),
+          ),
+          label('4. Mensaje'),
           Wrap(
             spacing: AppSpace.sm,
             runSpacing: AppSpace.sm,
-            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('Dura', style: TextStyle(color: c.inkMuted)),
-              for (final d in _durations)
-                ChoiceChip(
-                  label: Text(d.inMinutes < 60 ? '${d.inMinutes} min' : '${d.inHours} h'),
-                  selected: _duration == d,
-                  onSelected: (_) => setState(() => _duration = d),
+              for (final (title, text) in MaintenanceText.presets)
+                ActionChip(
+                  label: Text(title),
+                  onPressed: () => setState(() {
+                    final current = _message.text.trim();
+                    _message.text = current.isEmpty ? text : '$current $text';
+                  }),
                 ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpace.sm),
-            child: Text('Termina solo ${MaintenanceGate.when(ends)}, aunque se te olvide.',
-                style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
-          ),
-          label('4. Mensaje (opcional)'),
+          const SizedBox(height: AppSpace.sm),
           TextField(
             controller: _message,
-            maxLength: 200,
-            decoration: const InputDecoration(hintText: 'Ej. Estamos mejorando la velocidad de la app.'),
+            maxLength: 300,
+            maxLines: 3,
+            minLines: 1,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(hintText: 'Ej. Te recomendamos no agregar productos durante ese horario.'),
           ),
+          label('Vista previa: así lo verán'),
+          _preview(c, starts, ends),
           if (_level == 3) ...[
             label('5. Confirma el cierre total'),
             TextField(

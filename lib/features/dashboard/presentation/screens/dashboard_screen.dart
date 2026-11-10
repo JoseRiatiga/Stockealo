@@ -1,38 +1,23 @@
-import '../../../services/presentation/widgets/work_board_card.dart';
+import '../../../cash/presentation/widgets/cash_status_card.dart';
 import '../../../../core/design/skeleton.dart';
-import '../../../reports/presentation/screens/profit_report_screen.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/business_identity.dart';
-import '../widgets/quick_actions_customizer.dart';
 import '../widgets/cloud_sync_reminder.dart';
 import '../widgets/dashboard_desktop_charts.dart';
 import '../widgets/top_products_section.dart';
 import '../widgets/dashboard_metrics_grid.dart';
-import '../widgets/quick_actions_catalog.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
-import '../../../business/presentation/screens/business_info_screen.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
-import '../../../pro/data/pro_service.dart';
-import '../../../products/data/product_repository.dart';
-import '../../../products/presentation/screens/barcode_scanner_screen.dart';
-import '../../../products/presentation/screens/product_form_screen.dart';
-import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 import '../../../team/data/team_repository.dart';
-import '../../../team/presentation/screens/employees_screen.dart';
-import '../../../customers/presentation/screens/customers_screen.dart';
-import '../../../products/presentation/widgets/restock_order_modal.dart';
-import '../../../products/presentation/widgets/catalog_generator_modal.dart';
 import '../../data/dashboard_repository.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../widgets/spline_area_chart.dart';
 import '../widgets/segmented_progress_card.dart';
-import '../widgets/recent_transactions_card.dart';
 import '../../../../core/services/data_events.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../home/presentation/widgets/notifications_modal.dart';
@@ -63,11 +48,9 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
   final _businessRepo = BusinessRepository.instance;
   final _authRepo = AuthRepository.instance;
   final _teamRepo = TeamRepository.instance;
-  final _productRepo = ProductRepository();
 
   Business? _activeBusiness;
   Map<String, dynamic> _summary = {};
-  List<String> _quickActionIds = List.from(DashboardRepository.defaultQuickActions);
   String _userRole = 'OWNER';
   bool _isLoading = true;
   String _selectedPeriod = 'today'; // 'today' | 'week' | 'month' | 'all'
@@ -149,11 +132,9 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
         _activeBusiness!.id,
         period: _selectedPeriod,
       );
-      final quickActions = await _dashboardRepo.getQuickActions(_activeBusiness!.id);
       if (mounted) {
         setState(() {
           _summary = data;
-          _quickActionIds = quickActions;
           _isLoading = false;
         });
       }
@@ -165,147 +146,6 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
   }
 
   bool get canViewProfits => _userRole == 'OWNER' || _userRole == 'ADMIN';
-
-  Future<void> _openCustomizeQuickActionsModal() async {
-    if (_activeBusiness == null) return;
-    final selectedIds = await QuickActionsCustomizer.show(context, current: _quickActionIds);
-    if (selectedIds != null && _activeBusiness != null) {
-      await _dashboardRepo.saveQuickActions(_activeBusiness!.id, selectedIds);
-      setState(() {
-        _quickActionIds = selectedIds;
-      });
-      if (mounted) {
-        AppToast.show(
-          context,
-          message: 'Acciones rápidas guardadas con éxito',
-          type: ToastType.success,
-        );
-      }
-    }
-  }
-
-  Future<void> _executeQuickAction(String actionId) async {
-    final int lowStock = _summary['lowStock'] ?? 0;
-    final int outOfStock = _summary['outOfStock'] ?? 0;
-    final int alertTotal = lowStock + outOfStock;
-
-    switch (actionId) {
-      case 'sell':
-        _openQuickSale();
-        break;
-      case 'scan':
-        _scanToSell();
-        break;
-      case 'add_product':
-        if (_activeBusiness == null) return;
-        final created = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),
-          ),
-        );
-        if (created == true) _loadData();
-        break;
-      case 'customers':
-        if (_activeBusiness == null) return;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CustomersScreen(businessId: _activeBusiness!.id),
-          ),
-        );
-        _loadData();
-        break;
-      case 'alerts':
-        if (_activeBusiness != null && alertTotal > 0) {
-          final user = _authRepo.currentUser;
-          RestockOrderModal.show(
-            context,
-            business: _activeBusiness!,
-            userName: user?.displayName,
-          );
-        } else {
-          widget.onNavigateToInventory();
-        }
-        break;
-      case 'inventory':
-        widget.onNavigateToInventory();
-        break;
-      case 'sales_history':
-        widget.onNavigateToSales();
-        break;
-      case 'profit_report':
-        // Muestra costos y márgenes: el cajero no lo ve
-        if (!canViewProfits) {
-          AppToast.showPermission(context, 'Los reportes de ganancias solo los ven el dueño y los administradores.');
-        } else if (_activeBusiness != null) {
-          ProfitReportScreen.open(context, _activeBusiness!);
-        }
-        break;
-      case 'catalog_pdf':
-        if (_activeBusiness != null) {
-          CatalogGeneratorModal.show(
-            context: context,
-            business: _activeBusiness!,
-          );
-        }
-        break;
-      case 'team':
-        if (_activeBusiness == null) return;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => EmployeesScreen(business: _activeBusiness!),
-          ),
-        );
-        _loadData();
-        break;
-      case 'biz_info':
-        if (_activeBusiness == null) return;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BusinessInfoScreen(
-              business: _activeBusiness!,
-              onLogout: widget.onLogout,
-            ),
-          ),
-        );
-        _loadData();
-        break;
-    }
-  }
-
-  Future<void> _openQuickSale() async {
-    final sold = await QuickSaleDialog.show(context);
-    if (sold == true) {
-      _loadData();
-    }
-  }
-
-  Future<void> _scanToSell() async {
-    if (_activeBusiness == null) return;
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
-    );
-    if (code != null && code.isNotEmpty) {
-      final product = await _productRepo.getProductByCode(code, _activeBusiness!.id);
-      if (product != null && mounted) {
-        final sold = await QuickSaleDialog.show(context, product);
-        if (sold == true) {
-          _loadData();
-        }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No se encontró ningún producto con el código "$code"'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -430,6 +270,14 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                   canManage: _userRole == 'OWNER' || _userRole == 'ADMIN',
                 ),
 
+                // Estado de la caja (solo si el negocio usa el arqueo); la caja vive en Ventas
+                if (_activeBusiness?.cashRegisterEnabled == true)
+                  CashStatusCard(
+                    key: ValueKey('cash-${_activeBusiness!.id}'),
+                    business: _activeBusiness!,
+                    onTap: widget.onNavigateToSales,
+                  ),
+
                 _buildPeriodSelector(),
                 const SizedBox(height: AppSpace.lg),
 
@@ -438,44 +286,14 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                   period: _selectedPeriod,
                   showProfit: canViewProfits,
                   onInventoryTap: widget.onNavigateToInventory,
-                  onDebtsTap: () => _executeQuickAction('customers'),
+                  onDebtsTap: widget.onNavigateToSales,
                 ),
-                const SizedBox(height: AppSpace.xl),
-
-                // Negocios con Pro Servicios: el tablero de trabajos
-                if (_activeBusiness != null)
-                  ValueListenableBuilder<ProStatus>(
-                    valueListenable: ProService.instance.status,
-                    builder: (context, pro, _) => pro.services
-                        ? Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpace.xl),
-                            child: WorkBoardCard(key: ValueKey('board-${_activeBusiness!.id}'), business: _activeBusiness!),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-
-                // Acciones rápidas personalizables
-                Row(
-                  children: [
-                    Expanded(child: Text('Acciones rápidas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink))),
-                    TextButton.icon(
-                      onPressed: _openCustomizeQuickActionsModal,
-                      icon: const Icon(Icons.tune_rounded, size: 18),
-                      label: const Text('Personalizar'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpace.sm),
-                _buildQuickActions(),
                 const SizedBox(height: AppSpace.xl),
 
                 if (isWide)
                   DashboardDesktopCharts(summary: _summary, period: _selectedPeriod)
                 else
                   _buildSalesPerformanceChart(),
-                const SizedBox(height: AppSpace.xl),
-
-                _buildRecentTransactionsSection(),
                 const SizedBox(height: AppSpace.xl),
 
                 TopProductsSection(summary: _summary),
@@ -527,63 +345,6 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
         setState(() => _selectedPeriod = s.first);
         _loadData();
       },
-    );
-  }
-
-  Widget _buildQuickActions() {
-    final c = context.colors;
-    final int alertTotal = (_summary['lowStock'] ?? 0) + (_summary['outOfStock'] ?? 0);
-
-    final List<QuickActionDef> activeDefs = [];
-    for (final id in _quickActionIds) {
-      // Acciones que ya no existen (p. ej. 'excel_export', quitada en la 0.12.0) se ignoran
-      final matches = kAvailableQuickActions.where((a) => a.id == id);
-      if (matches.isEmpty) continue;
-      final found = matches.first;
-      if (!activeDefs.any((a) => a.id == found.id)) activeDefs.add(found);
-    }
-    if (activeDefs.isEmpty) activeDefs.addAll(kAvailableQuickActions.take(4));
-
-    return Row(
-      children: [
-        for (final action in activeDefs)
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: Material(
-                color: c.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  side: BorderSide(color: c.line),
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  onTap: () => _executeQuickAction(action.id),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpace.md, horizontal: AppSpace.xs),
-                    child: Column(
-                      children: [
-                        Badge(
-                          isLabelVisible: action.id == 'alerts' && alertTotal > 0,
-                          label: Text('$alertTotal'),
-                          backgroundColor: c.danger,
-                          child: Icon(action.icon, color: c.accent, size: 24),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          action.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.ink),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 
@@ -644,31 +405,6 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                 ],
         ),
       ],
-    );
-  }
-
-  Widget _buildRecentTransactionsSection() {
-    final List<dynamic> rawTxs = _summary['recentTransactions'] ?? [];
-    final List<TransactionItem> items = rawTxs.map((t) {
-      DateTime dt;
-      try {
-        dt = DateTime.parse(t['date']);
-      } catch (_) {
-        dt = DateTime.now();
-      }
-      return TransactionItem(
-        id: t['id'] as String? ?? '',
-        title: t['title'] as String? ?? 'Venta',
-        subtitle: t['subtitle'] as String? ?? '',
-        amount: (t['amount'] as num?)?.toDouble() ?? 0.0,
-        paymentMethod: t['payment_method'] as String? ?? 'EFECTIVO',
-        date: dt,
-      );
-    }).toList();
-
-    return RecentTransactionsCard(
-      transactions: items,
-      onSeeAll: widget.onNavigateToSales,
     );
   }
 

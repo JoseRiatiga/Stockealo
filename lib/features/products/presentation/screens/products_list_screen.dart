@@ -1,3 +1,4 @@
+import '../../../reports/presentation/screens/guided_import_screen.dart';
 import '../../../suppliers/presentation/widgets/visit_today_banner.dart';
 import '../../../suppliers/presentation/screens/suppliers_screen.dart';
 import '../../../store/presentation/screens/online_store_screen.dart';
@@ -24,12 +25,10 @@ import '../widgets/product_card.dart';
 import 'barcode_scanner_screen.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
-import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
 import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../auth/data/auth_repository.dart';
-import '../widgets/restock_order_modal.dart';
 import '../widgets/catalog_generator_modal.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/services/data_events.dart';
@@ -187,6 +186,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
       filteredProducts = filteredProducts.where((p) => p.isLowStock && !p.isOutOfStock).toList();
     } else if (_stockFilterOption == 'out_of_stock') {
       filteredProducts = filteredProducts.where((p) => p.isOutOfStock).toList();
+    } else if (_stockFilterOption == 'to_restock') {
+      filteredProducts = filteredProducts.where((p) => p.isLowStock || p.isOutOfStock).toList();
     }
 
     // Criterio de ordenamiento (Predeterminado: A a la Z)
@@ -271,15 +272,14 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     }
   }
 
-  void _openRestockOrderModal() {
+  /// Inventario › Importar desde Excel
+  Future<void> _openExcelImport() async {
     if (_activeBusiness == null) return;
-    final user = AuthRepository.instance.currentUser;
-    RestockOrderModal.show(
-      context,
-      business: _activeBusiness!,
-      userName: user?.displayName,
-    );
+    final imported = await GuidedImportScreen.open(context, businessId: _activeBusiness!.id);
+    if (imported == true) _loadData();
   }
+
+
 
   Future<void> _openSuppliers() async {
     if (_activeBusiness == null) return;
@@ -328,11 +328,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     _loadData();
   }
 
-  Future<void> _sellProduct(Product product) async {
-    final sold = await QuickSaleDialog.show(context, product);
-    if (sold == true) _loadData();
-  }
-
   void _goToPage(int page) {
     setState(() => _currentPage = page);
     if (_scrollController.hasClients) {
@@ -354,7 +349,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
         canAdjustStock: canEditProducts,
         onTap: () => _openProduct(product),
         onAdjustStock: canEditProducts ? () => QuickStockDialog.show(context, product: product, onSaved: _loadData) : null,
-        onSale: () => _sellProduct(product),
       );
 
   @override
@@ -445,23 +439,24 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                         if (canEditProducts)
                           QuickAccessItem(
                             icon: Icons.storefront_outlined,
-                            label: 'Tienda',
-                            caption: 'En línea',
+                            label: 'Tienda en línea',
+                            caption: 'Tu catálogo con carrito',
+                            pro: true,
                             onTap: () => OnlineStoreScreen.open(context, _activeBusiness!),
                           ),
                         if (canEditProducts)
                           QuickAccessItem(
-                            icon: Icons.local_shipping_outlined,
-                            label: 'Pedido',
-                            caption: 'A proveedor',
-                            onTap: _openRestockOrderModal,
+                            icon: Icons.move_to_inbox_outlined,
+                            label: 'Proveedores y entradas',
+                            caption: 'Pedidos y lo que llega',
+                            onTap: _openSuppliers,
                           ),
                         if (canEditProducts)
                           QuickAccessItem(
-                            icon: Icons.move_to_inbox_outlined,
-                            label: 'Proveedores',
-                            caption: 'Y entradas',
-                            onTap: _openSuppliers,
+                            icon: Icons.upload_file_outlined,
+                            label: 'Importar desde Excel',
+                            caption: 'Trae tus productos',
+                            onTap: _openExcelImport,
                           ),
                       ],
                     ),
@@ -713,7 +708,11 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
               borderRadius: BorderRadius.circular(AppRadius.control),
               child: InkWell(
                 borderRadius: BorderRadius.circular(AppRadius.control),
-                onTap: _openRestockOrderModal,
+                // El pedido vive en Proveedores y entradas: aquí solo se filtran los que faltan
+                onTap: () {
+                  setState(() => _stockFilterOption = 'to_restock');
+                  _loadData();
+                },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
                   child: Row(
@@ -722,7 +721,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                       const SizedBox(width: AppSpace.sm),
                       Expanded(
                         child: Text(
-                          '${lowStock + outOfStock} por reponer · Generar pedido',
+                          '${lowStock + outOfStock} por reponer · Ver cuáles',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.warning),
                         ),
                       ),

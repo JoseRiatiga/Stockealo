@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_tokens.dart';
+import 'admin_feedback_page.dart';
 import 'admin_codes_screen.dart';
 import 'admin_config_page.dart';
 import 'admin_payments_page.dart';
@@ -23,6 +24,7 @@ enum AdminSection {
   subscriptions('Suscripciones', Icons.workspace_premium_outlined),
   payments('Pagos', Icons.payments_outlined),
   codes('Códigos', Icons.confirmation_number_outlined),
+  feedback('Sugerencias y fallos', Icons.feedback_outlined),
   maintenance('Mantenimiento', Icons.construction_rounded),
   team('Equipo y registro', Icons.badge_outlined),
   config('Configuración', Icons.tune_rounded);
@@ -57,6 +59,7 @@ class _AdminShellState extends State<AdminShell> {
         AdminSection.subscriptions => const AdminSubscriptionsPage(),
         AdminSection.payments => const AdminPaymentsPage(),
         AdminSection.codes => const AdminCodesPage(),
+        AdminSection.feedback => const AdminFeedbackPage(),
         AdminSection.maintenance => const AdminMaintenancePage(),
         AdminSection.team => const AdminTeamPage(),
         AdminSection.config => const AdminConfigPage(),

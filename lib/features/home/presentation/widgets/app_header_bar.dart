@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_tokens.dart';
-import '../../../../core/theme/theme_controller.dart';
 import '../../../dashboard/presentation/widgets/stocky_face_button.dart';
 
 /// Encabezado de la versión de escritorio y web: título de la sección, buscador
@@ -31,7 +30,6 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       height: 72,
@@ -122,15 +120,6 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
             const SizedBox(width: AppSpace.md),
           ],
 
-          if (onQuickSale != null) ...[
-            FilledButton.icon(
-              onPressed: onQuickSale,
-              icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
-              label: const Text('Venta rápida'),
-            ),
-            const SizedBox(width: AppSpace.sm),
-          ],
-
           // Avisos
           IconButton(
             tooltip: alertCount > 0 ? '$alertCount avisos' : 'Avisos',
@@ -141,13 +130,6 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
               label: Text(alertCount > 99 ? '99+' : '$alertCount'),
               child: Icon(Icons.notifications_outlined, size: 22, color: c.inkMuted),
             ),
-          ),
-
-          // Modo claro u oscuro (se guarda al instante)
-          IconButton(
-            tooltip: isDark ? 'Modo claro' : 'Modo oscuro',
-            onPressed: () => ThemeController.instance.toggleTheme(),
-            icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 22, color: c.inkMuted),
           ),
         ],
       ),

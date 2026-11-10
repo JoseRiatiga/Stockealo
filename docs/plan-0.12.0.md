@@ -1,6 +1,7 @@
 # Plan de la 0.12.0: módulo Servicios, planes nuevos y pendientes de prioridad alta
 
 > **Estado:** **aprobado** por el dueño el 10 nov 2026, con el pedido de ordenarlo por prioridad (ver «Orden de trabajo»).
+> **Avance (10 nov):** pasos 1 a 8 y «Sugerencias y fallos» programados, probados y con sus migraciones aplicadas. Versión 0.12.0+37. Falta publicar (PR, fusión y etiqueta) y probar en la app real con un negocio tipo lavadero.
 > Todo sale en **una sola actualización** (0.12.0). Rama de trabajo: `feat/0.12.0`, creada desde `main`.
 
 ## Orden de trabajo (por prioridad)

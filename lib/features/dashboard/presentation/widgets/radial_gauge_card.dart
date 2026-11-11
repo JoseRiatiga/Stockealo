@@ -36,13 +36,13 @@ class RadialGaugeCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isDark
-                ? primaryColor.withOpacity(0.25)
+                ? primaryColor.withValues(alpha: 0.25)
                 : const Color(0xFFE2E8F0),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: primaryColor.withOpacity(isDark ? 0.08 : 0.04),
+              color: primaryColor.withValues(alpha: isDark ? 0.08 : 0.04),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -77,7 +77,7 @@ class RadialGaugeCard extends StatelessWidget {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.12),
+                      color: primaryColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(icon, size: 15, color: primaryColor),

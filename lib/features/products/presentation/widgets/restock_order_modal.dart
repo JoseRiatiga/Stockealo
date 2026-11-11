@@ -650,7 +650,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
       decoration: BoxDecoration(
         color: c.surface,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: item.isSelected ? c.accent.withOpacity(0.5) : c.line, width: item.isSelected ? 1.5 : 1),
+        border: Border.all(color: item.isSelected ? c.accent.withValues(alpha: 0.5) : c.line, width: item.isSelected ? 1.5 : 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(10),

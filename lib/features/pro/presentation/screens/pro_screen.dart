@@ -289,7 +289,7 @@ class _ProScreenState extends State<ProScreen> {
                     Text(status.active ? 'Tienes Pro' : 'Stockealo Pro',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: status.active ? c.onAccent : c.ink)),
                     const SizedBox(height: 2),
-                    Text(text, style: TextStyle(fontSize: 13.5, color: status.active ? c.onAccent.withOpacity(0.9) : c.inkMuted)),
+                    Text(text, style: TextStyle(fontSize: 13.5, color: status.active ? c.onAccent.withValues(alpha: 0.9) : c.inkMuted)),
                   ],
                 ),
               ),
@@ -360,7 +360,7 @@ class _ProScreenState extends State<ProScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpace.sm),
       child: Material(
-        color: selected ? c.accent.withOpacity(0.08) : c.surface,
+        color: selected ? c.accent.withValues(alpha: 0.08) : c.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.card),
           side: BorderSide(color: selected ? c.accent : c.line, width: selected ? 1.6 : 1),
@@ -383,7 +383,7 @@ class _ProScreenState extends State<ProScreen> {
                         const SizedBox(width: AppSpace.sm),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: c.warning.withOpacity(0.15), borderRadius: BorderRadius.circular(AppRadius.pill)),
+                          decoration: BoxDecoration(color: c.warning.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(AppRadius.pill)),
                           child: Text(p.label!, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c.warning)),
                         ),
                       ],
@@ -604,7 +604,7 @@ class _ProScreenState extends State<ProScreen> {
               width: 22,
               height: 22,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: c.accent.withOpacity(0.12), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.12), shape: BoxShape.circle),
               child: Text(n, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: c.accent)),
             ),
             const SizedBox(width: AppSpace.sm + 2),

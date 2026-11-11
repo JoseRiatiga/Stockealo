@@ -1,8 +1,10 @@
+import '../../../../core/widgets/theme_mode_button.dart';
 import '../../../cash/presentation/widgets/cash_status_card.dart';
 import '../../../../core/design/skeleton.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/business_identity.dart';
 import '../widgets/cloud_sync_reminder.dart';
+import '../widgets/quick_actions_section.dart';
 import '../widgets/dashboard_desktop_charts.dart';
 import '../widgets/top_products_section.dart';
 import '../widgets/dashboard_metrics_grid.dart';
@@ -28,12 +30,16 @@ class DashboardScreen extends StatefulWidget {
   final VoidCallback onNavigateToSales;
   final VoidCallback onLogout;
 
+  /// Lleva a otra pestaña (lo usan los accesos rápidos)
+  final ValueChanged<int>? onNavigateToTab;
+
   const DashboardScreen({
     super.key,
     required this.userId,
     required this.onNavigateToInventory,
     required this.onNavigateToSales,
     required this.onLogout,
+    this.onNavigateToTab,
   });
 
   @override
@@ -212,6 +218,8 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                     );
                   },
                 ),
+                // Acceso rápido a claro u oscuro, al lado de la campana
+                const ThemeModeButton(),
                 const SizedBox(width: AppSpace.xs),
               ],
             ),
@@ -277,6 +285,19 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                     business: _activeBusiness!,
                     onTap: widget.onNavigateToSales,
                   ),
+
+                // Accesos rápidos a las funciones (personalizables por negocio)
+                if (_activeBusiness != null) ...[
+                  QuickActionsSection(
+                    key: ValueKey('quick-${_activeBusiness!.id}-$_userRole'),
+                    business: _activeBusiness!,
+                    role: _userRole,
+                    userName: userName,
+                    onNavigateToTab: (i) => widget.onNavigateToTab?.call(i),
+                    onReturn: _loadData,
+                  ),
+                  const SizedBox(height: AppSpace.xl),
+                ],
 
                 _buildPeriodSelector(),
                 const SizedBox(height: AppSpace.lg),

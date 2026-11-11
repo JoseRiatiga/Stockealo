@@ -171,31 +171,35 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.ink),
                 ),
                 const SizedBox(height: AppSpace.sm),
-                RadioListTile<String>(
-                  value: 'CASHIER',
+                RadioGroup<String>(
                   groupValue: selectedRole,
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: c.accent,
-                  title: Text('Cajero o vendedor',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: c.ink)),
-                  subtitle: Text(
-                    'Solo registra ventas. Los precios de compra y los costos quedan protegidos.',
-                    style: TextStyle(fontSize: 11.5, color: c.inkMuted),
-                  ),
                   onChanged: (val) => setDialogState(() => selectedRole = val!),
-                ),
-                RadioListTile<String>(
-                  value: 'ADMIN',
-                  groupValue: selectedRole,
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: c.accent,
-                  title: Text('Administrador',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: c.ink)),
-                  subtitle: Text(
-                    'Puede ingresar inventario, cambiar precios y ver márgenes.',
-                    style: TextStyle(fontSize: 11.5, color: c.inkMuted),
+                  child: Column(
+                    children: [
+                    RadioListTile<String>(
+                      value: 'CASHIER',
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: c.accent,
+                      title: Text('Cajero o vendedor',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: c.ink)),
+                      subtitle: Text(
+                        'Solo registra ventas. Los precios de compra y los costos quedan protegidos.',
+                        style: TextStyle(fontSize: 11.5, color: c.inkMuted),
+                      ),
+                    ),
+                    RadioListTile<String>(
+                      value: 'ADMIN',
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: c.accent,
+                      title: Text('Administrador',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: c.ink)),
+                      subtitle: Text(
+                        'Puede ingresar inventario, cambiar precios y ver márgenes.',
+                        style: TextStyle(fontSize: 11.5, color: c.inkMuted),
+                      ),
+                    ),
+                    ],
                   ),
-                  onChanged: (val) => setDialogState(() => selectedRole = val!),
                 ),
               ],
             ),

@@ -103,7 +103,7 @@ class _BarcodeModalState extends State<BarcodeModal> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),

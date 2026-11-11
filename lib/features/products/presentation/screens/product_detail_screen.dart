@@ -670,7 +670,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       decoration: BoxDecoration(
         color: out ? c.dangerSoft : c.surfaceMuted,
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: out ? c.danger.withOpacity(0.3) : c.line),
+        border: Border.all(color: out ? c.danger.withValues(alpha: 0.3) : c.line),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

@@ -1,3 +1,4 @@
+import '../../../../core/widgets/theme_mode_button.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../dashboard/presentation/widgets/stocky_face_button.dart';
@@ -131,6 +132,8 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
               child: Icon(Icons.notifications_outlined, size: 22, color: c.inkMuted),
             ),
           ),
+          // Acceso rápido a claro u oscuro, al lado de la campana
+          const ThemeModeButton(),
         ],
       ),
     );

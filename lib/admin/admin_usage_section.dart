@@ -157,7 +157,7 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
                           margin: const EdgeInsets.symmetric(horizontal: 2),
                           height: 4 + 56 * (((d['count'] as num?)?.toInt() ?? 0) / maxDay),
                           decoration: BoxDecoration(
-                            color: c.accent.withOpacity(0.7),
+                            color: c.accent.withValues(alpha: 0.7),
                             borderRadius: BorderRadius.circular(3),
                           ),
                         ),

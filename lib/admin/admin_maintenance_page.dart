@@ -336,20 +336,26 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
         children: [
           Text('Nuevo mantenimiento', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
           label('1. Nivel'),
-          for (final (lvl, title, detail) in const [
-            (1, 'Solo aviso', 'Se muestra una franja con el horario. Todo sigue funcionando.'),
-            (2, 'Nube en pausa', 'La app sigue funcionando en cada equipo: venden y editan, y todo sube al terminar. '
-                'Las tiendas en línea muestran "en mantenimiento".'),
-            (3, 'Cierre total', 'La app y la web muestran la pantalla de mantenimiento. Tú sigues entrando para probar.'),
-          ])
-            RadioListTile<int>(
-              contentPadding: EdgeInsets.zero,
-              value: lvl,
-              groupValue: _level,
-              onChanged: (v) => setState(() => _level = v ?? 2),
-              title: Text(title),
-              subtitle: Text(detail, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+          RadioGroup<int>(
+            groupValue: _level,
+            onChanged: (v) => setState(() => _level = v ?? 2),
+            child: Column(
+              children: [
+                for (final (lvl, title, detail) in const [
+                  (1, 'Solo aviso', 'Se muestra una franja con el horario. Todo sigue funcionando.'),
+                  (2, 'Nube en pausa', 'La app sigue funcionando en cada equipo: venden y editan, y todo sube al terminar. '
+                      'Las tiendas en línea muestran "en mantenimiento".'),
+                  (3, 'Cierre total', 'La app y la web muestran la pantalla de mantenimiento. Tú sigues entrando para probar.'),
+                ])
+                  RadioListTile<int>(
+                    contentPadding: EdgeInsets.zero,
+                    value: lvl,
+                    title: Text(title),
+                    subtitle: Text(detail, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                  ),
+              ],
             ),
+          ),
           label('2. Qué entra en mantenimiento'),
           for (final (key, title) in const [
             ('app', 'App y web (inventario, ventas…)'),

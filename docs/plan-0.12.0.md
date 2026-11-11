@@ -172,10 +172,12 @@ Cada plantilla define:
 
 > **Aprobada el 10 nov.** El dueño deja el diseño de los módulos, nuevos y existentes, a criterio de quien programa: lo que se vea mejor y sea más intuitivo.
 
-**Regla principal (pedido del dueño, 10 nov; mapa aprobado el 10 nov, incluidos Inicio sin accesos rápidos, encabezado sin «Venta rápida» y sin vender desde Inventario): nada duplicado.** Cada función tiene **un solo lugar** en un módulo o sub-módulo. No hay un segundo botón, acceso rápido o pantalla que haga lo mismo desde otro lado. Solo se permiten tres cosas que llevan a ese lugar sin repetirlo:
+**Regla principal (pedido del dueño, 10 nov; mapa aprobado el 10 nov, incluidos Inicio sin accesos rápidos, encabezado sin «Venta rápida» y sin vender desde Inventario): nada duplicado.** Cada función tiene **un solo lugar** en un módulo o sub-módulo. No hay un segundo botón, acceso rápido o pantalla que haga lo mismo desde otro lado. Solo se permiten estas cosas que llevan a ese lugar sin repetirlo:
 - el **buscador** del encabezado;
 - los **avisos** (la campana);
 - **Stocky**, que responde dónde está algo y ofrece «Ir a…».
+
+> **Cambio del 10 nov (0.12.1, pedido del dueño):** vuelven los **accesos rápidos de Inicio**, personalizables por negocio (hasta 8). Salen de la misma lista del buscador (`app_functions.dart`): **cada función o módulo nuevo se registra ahí y aparece solo en el buscador y en los accesos**. Cada acceso abre la pantalla única de la función, no una copia. También vuelve el botón de claro u oscuro junto a la campana.
 
 Las tres llevan al lugar de la función; ninguna abre una copia.
 

@@ -5,6 +5,7 @@ import 'package:stockealo/core/database/app_database.dart';
 import 'package:stockealo/core/design/quick_access_row.dart';
 import 'package:stockealo/core/theme/app_theme.dart';
 import 'package:stockealo/features/home/data/app_functions.dart';
+import 'package:stockealo/features/home/presentation/widgets/global_search_dialog.dart';
 
 /// «Nada duplicado» (0.12.0): cada función tiene un solo lugar y el buscador lleva a él
 void main() {
@@ -71,4 +72,55 @@ void main() {
     final row = await db.query('app_settings', where: 'key = ?', whereArgs: ['where_moved_pending']);
     expect(row.single['value'], '1');
   });
+
+  group('accesos rápidos de Inicio (0.12.1)', () {
+    test('cada función tiene un identificador único', () {
+      final ids = kAppFunctions.map((f) => f.id).toList();
+      expect(ids.toSet().length, ids.length);
+    });
+
+    test('sin personalizar, Inicio trae los accesos de siempre', () {
+      final list = resolveShortcuts(const [], role: 'OWNER', services: false);
+      expect(list.map((f) => f.id), kDefaultShortcutIds);
+    });
+
+    test('los nombres de antes de la 0.12.0 se respetan, sin repetir', () {
+      final list = resolveShortcuts(const ['sell', 'catalog_pdf', 'new_sale', 'inventory'], role: 'OWNER', services: false);
+      expect(list.map((f) => f.id), ['new_sale', 'catalog']);
+    });
+
+    test('el cajero no ve accesos de dueño ni Servicios sin el plan', () {
+      final list = resolveShortcuts(const ['profits', 'services', 'new_sale'], role: 'CASHIER', services: false);
+      expect(list.map((f) => f.id), ['new_sale']);
+      final withPlan = resolveShortcuts(const ['services'], role: 'CASHIER', services: true);
+      expect(withPlan.map((f) => f.id), ['services']);
+    });
+
+    test('no pasan del máximo', () {
+      final all = kAppFunctions.map((f) => f.id).toList();
+      expect(resolveShortcuts(all, role: 'OWNER', services: true).length, kMaxShortcuts);
+    });
+  });
+
+  group('buscador en diseño V1 (0.12.1)', () {
+    for (final size in const [Size(360, 800), Size(1200, 800)]) {
+      for (final b in Brightness.values) {
+        testWidgets('se ve sin errores a ${size.width.toInt()} px en ${b.name}', (tester) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(MaterialApp(
+            theme: AppTheme.build(b),
+            home: const Scaffold(body: GlobalSearchDialog(userRole: 'OWNER')),
+          ));
+          await tester.pump();
+          expect(find.text('Dónde está cada cosa'), findsOneWidget);
+          expect(find.text('Busca un producto o una función'), findsOneWidget);
+          expect(find.text('Cerrar'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  });
 }
+

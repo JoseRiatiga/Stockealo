@@ -266,7 +266,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF78350F).withOpacity(0.4) : context.colors.warningSoft,
+                  color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.4) : context.colors.warningSoft,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: isDark ? context.colors.warning : const Color(0xFFFDE68A),
@@ -306,7 +306,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                   padding: const EdgeInsets.all(10),
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF7F1D1D).withOpacity(0.4) : context.colors.dangerSoft,
+                    color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : context.colors.dangerSoft,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isDark ? context.colors.danger : const Color(0xFFFECACA),

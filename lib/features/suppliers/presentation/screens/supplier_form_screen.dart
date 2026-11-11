@@ -189,7 +189,8 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
                   const SizedBox(height: AppSpace.md),
                   DropdownButtonFormField<String?>(
                     isExpanded: true,
-                    value: _visitDay,
+                    key: ValueKey(_visitDay),
+initialValue: _visitDay,
                     decoration: const InputDecoration(labelText: 'Día en que pasa', prefixIcon: Icon(Icons.event_outlined)),
                     items: [
                       const DropdownMenuItem<String?>(value: null, child: Text('No tiene día fijo')),

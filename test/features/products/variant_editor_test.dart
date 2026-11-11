@@ -280,7 +280,7 @@ void main() {
       final left = PhotoColorPicker.sampleAround(rgba, 4, 1, 0, 0, radius: 0);
       expect(left, const Color(0xFFC80000));
       final middle = PhotoColorPicker.sampleAround(rgba, 4, 1, 1, 0, radius: 1);
-      expect(middle.red, greaterThan(middle.blue)); // 2 rojos y 1 azul
+      expect(middle.r, greaterThan(middle.b)); // 2 rojos y 1 azul
     });
 
     testWidgets('"Más colores" deja elegir con las barras sin escribir códigos', (tester) async {

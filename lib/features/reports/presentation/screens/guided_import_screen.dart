@@ -194,14 +194,16 @@ class _GuidedImportScreenState extends State<GuidedImportScreen> {
               step('2', 'Confirma qué es cada columna'),
               if (_tables.length > 1)
                 DropdownButtonFormField<ImportTable>(
-                  value: _table,
+                  key: ValueKey(_table),
+initialValue: _table,
                   decoration: const InputDecoration(labelText: 'Hoja con los productos'),
                   items: [for (final t in _tables) DropdownMenuItem(value: t, child: Text(t.name))],
                   onChanged: (t) => setState(() => _selectTable(t)),
                 ),
               const SizedBox(height: AppSpace.sm),
               DropdownButtonFormField<int>(
-                value: _headerRow,
+                key: ValueKey(_headerRow),
+initialValue: _headerRow,
                 decoration: const InputDecoration(labelText: 'Fila de los títulos'),
                 items: [
                   for (var i = 0; i < _table!.rows.length && i < 15; i++)

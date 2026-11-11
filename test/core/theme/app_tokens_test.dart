@@ -12,7 +12,7 @@ double contrast(Color a, Color b) {
     return s <= 0.03928 ? s / 12.92 : math.pow((s + 0.055) / 1.055, 2.4).toDouble();
   }
 
-  double luminance(Color c) => 0.2126 * channel(c.red) + 0.7152 * channel(c.green) + 0.0722 * channel(c.blue);
+  double luminance(Color c) => 0.2126 * channel((c.r * 255).round()) + 0.7152 * channel((c.g * 255).round()) + 0.0722 * channel((c.b * 255).round());
   final la = luminance(a);
   final lb = luminance(b);
   return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05);

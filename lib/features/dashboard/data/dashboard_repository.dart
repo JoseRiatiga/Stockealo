@@ -1,3 +1,4 @@
+import 'package:sqflite/sqflite.dart';
 import '../../../core/database/app_database.dart';
 
 class DashboardRepository {
@@ -392,5 +393,25 @@ class DashboardRepository {
       'topProducts': topProducts,
       'recentTransactions': recentTransactions,
     };
+  }
+
+  /// Accesos rápidos que eligió el negocio (identificadores de `kAppFunctions`).
+  /// Vacío si nunca los personalizó.
+  Future<List<String>> getQuickActions(String businessId) async {
+    try {
+      final db = await _dbProvider.database;
+      final res = await db.query('app_settings', where: 'key = ?', whereArgs: ['quick_actions_$businessId']);
+      if (res.isNotEmpty && res.first['value'] != null) {
+        return (res.first['value'] as String).split(',').where((s) => s.trim().isNotEmpty).toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  /// Guarda los accesos rápidos elegidos, en orden
+  Future<void> saveQuickActions(String businessId, List<String> actions) async {
+    final db = await _dbProvider.database;
+    await db.insert('app_settings', {'key': 'quick_actions_$businessId', 'value': actions.join(',')},
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }

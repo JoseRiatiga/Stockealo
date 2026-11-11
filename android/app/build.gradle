@@ -13,23 +13,20 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.stockealo.stockealo"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         // flutter_local_notifications usa APIs de fecha de Java 8+ también en Android viejos
         coreLibraryDesugaringEnabled true
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
-    }
 
     defaultConfig {
         applicationId = "com.stockealo.stockealo"
-        minSdk = 21
+        minSdkVersion = flutter.minSdkVersion
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -57,4 +54,11 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"
+}
+
+// Kotlin 2.2 ya no acepta kotlinOptions dentro de android { }
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
 }

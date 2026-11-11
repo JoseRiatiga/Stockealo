@@ -461,7 +461,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.04),
+                                  color: Colors.black.withValues(alpha: 0.04),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -495,7 +495,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             Positioned.fill(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.35),
+                                  color: Colors.black.withValues(alpha: 0.35),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: const Center(
@@ -582,7 +582,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             icon: const Icon(Icons.add),
                             tooltip: 'Nueva categoría',
                             style: IconButton.styleFrom(
-                              backgroundColor: context.colors.accent.withOpacity(0.12),
+                              backgroundColor: context.colors.accent.withValues(alpha: 0.12),
                               foregroundColor: context.colors.accent,
                               padding: const EdgeInsets.all(14),
                             ),
@@ -667,7 +667,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       decoration: BoxDecoration(
                         color: margin >= 0
                             ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
-                            : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7F1D1D).withOpacity(0.4) : const Color(0xFFFEE2E2)),
+                            : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : const Color(0xFFFEE2E2)),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: margin >= 0

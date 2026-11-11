@@ -242,7 +242,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                 height: 26,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: c.accent.withOpacity(0.12),
+                  color: c.accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text('$n', style: TextStyle(fontWeight: FontWeight.w700, color: c.accent)),
@@ -364,7 +364,8 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
         ),
         const SizedBox(height: AppSpace.lg),
         DropdownButtonFormField<String>(
-          value: _country.code,
+          key: ValueKey(_country.code),
+initialValue: _country.code,
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'País'),
           items: [
@@ -385,7 +386,8 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
             SizedBox(
               width: 130,
               child: DropdownButtonFormField<String>(
-                value: _currency,
+                key: ValueKey(_currency),
+initialValue: _currency,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Moneda'),
                 items: [
@@ -473,7 +475,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                   Container(
                     width: 44,
                     height: 44,
-                    decoration: BoxDecoration(color: c.accent.withOpacity(0.12), borderRadius: BorderRadius.circular(13)),
+                    decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(13)),
                     child: Icon(Icons.qr_code_scanner_rounded, color: c.accent),
                   ),
                   const SizedBox(width: AppSpace.md),

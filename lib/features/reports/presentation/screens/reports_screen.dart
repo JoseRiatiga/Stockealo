@@ -146,12 +146,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
               style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
             ),
             title('1. ¿Qué incluir?'),
-            Container(
-              decoration: BoxDecoration(
-                color: c.surface,
+            // Material y no Container: las casillas dibujan su toque sobre él (Flutter 3.47 lo exige)
+            Material(
+              color: c.surface,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: c.line),
+                side: BorderSide(color: c.line),
               ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
                   CheckboxListTile(

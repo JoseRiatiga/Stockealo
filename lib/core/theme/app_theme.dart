@@ -78,7 +78,7 @@ class AppTheme {
         ),
         iconTheme: IconThemeData(color: c.ink),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
         color: c.surface,
@@ -162,7 +162,7 @@ class AppTheme {
         color: c.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 6,
-        shadowColor: Colors.black.withOpacity(0.12),
+        shadowColor: Colors.black.withValues(alpha: 0.12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.control),
           side: BorderSide(color: c.line),
@@ -170,7 +170,7 @@ class AppTheme {
         textStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, color: c.ink),
         labelTextStyle: WidgetStatePropertyAll(TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, color: c.ink)),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: c.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -192,7 +192,7 @@ class AppTheme {
         helpTextStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 15, fontWeight: FontWeight.w700, color: c.ink),
         hourMinuteShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
         hourMinuteColor: WidgetStateColor.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? Color.alphaBlend(accent.withOpacity(0.14), c.surface) : c.surfaceMuted,
+          (states) => states.contains(WidgetState.selected) ? Color.alphaBlend(accent.withValues(alpha: 0.14), c.surface) : c.surfaceMuted,
         ),
         hourMinuteTextColor: WidgetStateColor.resolveWith(
           (states) => states.contains(WidgetState.selected) ? accent : c.ink,

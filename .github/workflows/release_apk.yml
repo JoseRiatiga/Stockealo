@@ -25,7 +25,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
+          flutter-version: '3.47.9'
           channel: 'stable'
           cache: true
 
@@ -69,34 +69,21 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Todo en su lugar
-            - Cada cosa tiene un solo lugar y los accesos se ven sin deslizar. La primera vez te mostramos «Dónde quedó cada cosa».
-            - Inicio es el resumen del día: toca cada cifra para ir a su lugar.
-            - Ventas: Clientes y fiados, Cotizaciones y Caja. Inventario: Catálogo, Tienda, Proveedores y entradas e Importar desde Excel.
-            - Reportes reúne Ganancias y Descargar Excel.
-            - Ajustes › Tu negocio: datos, equipo, actividad, Módulos y Stockealo Pro, a un toque.
-            - El buscador también encuentra funciones: escribe «caja» o «proveedores».
+            ### Más rápido y estable
+            - Actualizamos el motor de la app. La versión web ya no llena la consola de avisos al mostrar fotos y aprovecha mejor la memoria.
+            - Desde esta versión, la app necesita Android 6.0 o más nuevo.
 
-            ### Importar desde Excel, paso a paso
-            - Trae tus productos aunque tu Excel tenga títulos más abajo, varias hojas o precios como «$12.500».
-            - Confirmas qué es cada columna, ves cómo quedan y eliges si actualizar o sumar el stock. También .csv y una plantilla.
+            ### Modo claro u oscuro, a un toque
+            - En Ajustes › Apariencia hay un solo interruptor, «Modo oscuro», que se guarda al instante.
+            - Botón de sol o luna junto a la campana para cambiarlo rápido.
 
-            ### Caja mejorada
-            - Entradas y salidas con motivo, propinas por entregar y mercancía de contado.
-            - Cierre por forma de pago, conteo por billetes y monedas, nota si no cuadra y comprobante por WhatsApp.
-            - El estado de la caja se ve en Inicio y te avisa si cobras en efectivo con la caja cerrada. Se enciende en Ajustes › Módulos.
-
-            ### Pro Servicios: lavaderos, barberías, talleres y más
-            - Pestaña Servicios con tablero, asistencia, historial, comisiones, catálogo y mensajes.
-            - Plantillas por tipo de negocio y precio según el vehículo (moto, carro, camioneta).
-            - Nadie empieza un servicio sin haber llegado y estar libre; cola por orden de llegada con turno y espera estimada.
-            - Comisiones por servicio y liquidaciones con detalle por WhatsApp. Mensajes por fase para avisar al cliente.
-
-            ### Ayuda
-            - Ajustes › Ayuda › Sugerencias y fallos: cuéntanos qué no funciona o qué te gustaría, y mira nuestra respuesta.
+            ### Accesos rápidos en Inicio
+            - Vuelven los accesos rápidos: toca «Personalizar» y elige hasta 8 funciones, en el orden que quieras.
+            - Cada acceso abre la función directamente: nueva venta, caja, nuevo producto, proveedores, ganancias…
 
             ### Correcciones
-            - En la web te avisamos cuando hay una versión nueva.
-            - La ventana Equipo tiene el diseño nuevo.
+            - Inventario: «Ver cuáles» de los productos por reponer ahora baja a la lista ya filtrada y muestra el filtro con su ✕.
+            - El buscador tiene el diseño de la app, en claro y en oscuro, y separa funciones y productos.
+            - Ver o vender un producto desde el buscador ya no puede fallar.
           draft: false
           prerelease: false

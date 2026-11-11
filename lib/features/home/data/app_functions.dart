@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 /// Una función de la app con su único lugar (0.12.0, «nada duplicado»).
-/// El buscador y Stocky solo llevan a la pestaña donde vive; no abren copias.
+/// Esta lista alimenta el buscador y los accesos rápidos de Inicio (0.12.1):
+/// **al añadir una función o un módulo nuevo, se agrega aquí** y aparece sola
+/// en los dos. El buscador lleva a la pestaña; el acceso rápido abre la función.
 class AppFunction {
+  /// Identificador fijo: con él se guardan los accesos rápidos de Inicio
+  final String id;
   final String title;
 
   /// Dónde vive, con las palabras de la app ("Ventas › Caja")
@@ -20,6 +24,7 @@ class AppFunction {
   final bool needsServices;
 
   const AppFunction({
+    required this.id,
     required this.title,
     required this.where,
     required this.tab,
@@ -31,40 +36,40 @@ class AppFunction {
 }
 
 const kAppFunctions = <AppFunction>[
-  AppFunction(title: 'Nueva venta', where: 'Ventas', tab: 2, icon: Icons.point_of_sale_rounded,
+  AppFunction(id: 'new_sale', title: 'Nueva venta', where: 'Ventas', tab: 2, icon: Icons.point_of_sale_rounded,
       keywords: ['venta', 'vender', 'cobrar', 'factura']),
-  AppFunction(title: 'Clientes y fiados', where: 'Ventas › Clientes y fiados', tab: 2, icon: Icons.people_alt_outlined,
+  AppFunction(id: 'customers', title: 'Clientes y fiados', where: 'Ventas › Clientes y fiados', tab: 2, icon: Icons.people_alt_outlined,
       keywords: ['cliente', 'fiado', 'deuda', 'abono', 'debe']),
-  AppFunction(title: 'Cotizaciones', where: 'Ventas › Cotizaciones', tab: 2, icon: Icons.request_quote_outlined,
+  AppFunction(id: 'quotes', title: 'Cotizaciones', where: 'Ventas › Cotizaciones', tab: 2, icon: Icons.request_quote_outlined,
       keywords: ['cotizacion', 'proforma', 'presupuesto']),
-  AppFunction(title: 'Caja', where: 'Ventas › Caja', tab: 2, icon: Icons.point_of_sale_outlined,
+  AppFunction(id: 'cash', title: 'Caja', where: 'Ventas › Caja', tab: 2, icon: Icons.point_of_sale_outlined,
       keywords: ['caja', 'arqueo', 'efectivo', 'cierre', 'base', 'turno']),
-  AppFunction(title: 'Nuevo producto', where: 'Inventario', tab: 1, icon: Icons.add_box_outlined,
+  AppFunction(id: 'new_product', title: 'Nuevo producto', where: 'Inventario', tab: 1, icon: Icons.add_box_outlined,
       keywords: ['producto', 'agregar', 'stock', 'inventario', 'existencia']),
-  AppFunction(title: 'Importar desde Excel', where: 'Inventario › Importar desde Excel', tab: 1, icon: Icons.upload_file_outlined,
+  AppFunction(id: 'import_excel', title: 'Importar desde Excel', where: 'Inventario › Importar desde Excel', tab: 1, icon: Icons.upload_file_outlined,
       keywords: ['importar', 'excel', 'cargar', 'subir', 'plantilla'], managersOnly: true),
-  AppFunction(title: 'Proveedores y entradas', where: 'Inventario › Proveedores y entradas', tab: 1,
+  AppFunction(id: 'suppliers', title: 'Proveedores y entradas', where: 'Inventario › Proveedores y entradas', tab: 1,
       icon: Icons.move_to_inbox_outlined, keywords: ['proveedor', 'pedido', 'entrada', 'mercancia', 'compra', 'pagar'],
       managersOnly: true),
-  AppFunction(title: 'Catálogo', where: 'Inventario › Catálogo', tab: 1, icon: Icons.menu_book_rounded,
+  AppFunction(id: 'catalog', title: 'Catálogo', where: 'Inventario › Catálogo', tab: 1, icon: Icons.menu_book_rounded,
       keywords: ['catalogo', 'pdf', 'historia', 'compartir']),
-  AppFunction(title: 'Tienda en línea', where: 'Inventario › Tienda en línea', tab: 1, icon: Icons.storefront_outlined,
+  AppFunction(id: 'online_store', title: 'Tienda en línea', where: 'Inventario › Tienda en línea', tab: 1, icon: Icons.storefront_outlined,
       keywords: ['tienda', 'online', 'web', 'carrito', 'pedido en linea'], managersOnly: true),
-  AppFunction(title: 'Ganancias', where: 'Reportes › Ganancias', tab: 4, icon: Icons.insights_rounded,
+  AppFunction(id: 'profits', title: 'Ganancias', where: 'Reportes › Ganancias', tab: 4, icon: Icons.insights_rounded,
       keywords: ['ganancia', 'perdida', 'utilidad', 'reporte', 'margen'], managersOnly: true),
-  AppFunction(title: 'Descargar Excel', where: 'Reportes › Descargar Excel', tab: 4, icon: Icons.table_chart_outlined,
+  AppFunction(id: 'excel', title: 'Descargar Excel', where: 'Reportes › Descargar Excel', tab: 4, icon: Icons.table_chart_outlined,
       keywords: ['excel', 'descargar', 'exportar', 'reporte', 'xlsx'], managersOnly: true),
-  AppFunction(title: 'Servicios', where: 'Servicios', tab: 5, icon: Icons.view_kanban_outlined,
+  AppFunction(id: 'services', title: 'Servicios', where: 'Servicios', tab: 5, icon: Icons.view_kanban_outlined,
       keywords: ['servicio', 'tablero', 'lavado', 'turno', 'cola', 'asistencia', 'comision', 'placa'], needsServices: true),
-  AppFunction(title: 'Equipo', where: 'Ajustes › Equipo', tab: 3, icon: Icons.groups_2_outlined,
+  AppFunction(id: 'team', title: 'Equipo', where: 'Ajustes › Equipo', tab: 3, icon: Icons.groups_2_outlined,
       keywords: ['equipo', 'empleado', 'cajero', 'invitar', 'permiso', 'rol']),
-  AppFunction(title: 'Módulos', where: 'Ajustes › Módulos', tab: 3, icon: Icons.widgets_outlined,
+  AppFunction(id: 'modules', title: 'Módulos', where: 'Ajustes › Módulos', tab: 3, icon: Icons.widgets_outlined,
       keywords: ['modulo', 'activar', 'encender', 'funciones']),
-  AppFunction(title: 'Stockealo Pro', where: 'Ajustes › Stockealo Pro', tab: 3, icon: Icons.workspace_premium_outlined,
+  AppFunction(id: 'pro', title: 'Stockealo Pro', where: 'Ajustes › Stockealo Pro', tab: 3, icon: Icons.workspace_premium_outlined,
       keywords: ['pro', 'plan', 'codigo', 'canjear', 'suscripcion']),
-  AppFunction(title: 'Apariencia', where: 'Ajustes › Apariencia', tab: 3, icon: Icons.palette_outlined,
+  AppFunction(id: 'appearance', title: 'Apariencia', where: 'Ajustes › Apariencia', tab: 3, icon: Icons.palette_outlined,
       keywords: ['oscuro', 'claro', 'color', 'tema', 'letra', 'apariencia']),
-  AppFunction(title: 'Nube y respaldo', where: 'Ajustes › Nube y respaldo', tab: 3, icon: Icons.cloud_outlined,
+  AppFunction(id: 'cloud', title: 'Nube y respaldo', where: 'Ajustes › Nube y respaldo', tab: 3, icon: Icons.cloud_outlined,
       keywords: ['nube', 'respaldo', 'copia', 'sincronizar', 'backup']),
 ];
 
@@ -91,4 +96,38 @@ List<AppFunction> findFunctions(String query, {required String role, required bo
           (q.isEmpty || _fold(f.title).contains(q) || f.keywords.any((k) => k.contains(q) || (k.length >= 4 && q.contains(k)))))
         f,
   ];
+}
+
+/// Accesos rápidos que trae Inicio la primera vez
+const kDefaultShortcutIds = ['new_sale', 'new_product', 'customers', 'catalog'];
+
+/// Máximo de accesos en Inicio, para que no se llene la pantalla
+const kMaxShortcuts = 8;
+
+/// Nombres de los accesos de antes de la 0.12.0, para no perder lo que eligió cada negocio
+const _legacyShortcutIds = {
+  'sell': 'new_sale',
+  'add_product': 'new_product',
+  'alerts': 'suppliers',
+  'sales_history': 'new_sale',
+  'excel_export': 'excel',
+  'profit_report': 'profits',
+  'catalog_pdf': 'catalog',
+};
+
+/// Convierte lo guardado en funciones que la persona puede ver (sin repetir y en orden)
+List<AppFunction> resolveShortcuts(List<String> saved, {required String role, required bool services}) {
+  final allowed = {for (final f in findFunctions('', role: role, services: services)) f.id: f};
+  final out = <AppFunction>[];
+  for (final raw in saved) {
+    final f = allowed[_legacyShortcutIds[raw] ?? raw];
+    if (f != null && !out.contains(f) && out.length < kMaxShortcuts) out.add(f);
+  }
+  if (out.isEmpty) {
+    for (final id in kDefaultShortcutIds) {
+      final f = allowed[id];
+      if (f != null) out.add(f);
+    }
+  }
+  return out;
 }

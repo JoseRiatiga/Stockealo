@@ -151,10 +151,10 @@ class _SquirrelPainter extends CustomPainter {
     required this.celebrate,
   });
 
-  static Paint _fill(Color color, [double opacity = 1]) => Paint()..color = color.withOpacity(opacity);
+  static Paint _fill(Color color, [double opacity = 1]) => Paint()..color = color.withValues(alpha: opacity);
 
   static Paint _stroke(Color color, double width, [double opacity = 1]) => Paint()
-    ..color = color.withOpacity(opacity)
+    ..color = color.withValues(alpha: opacity)
     ..style = PaintingStyle.stroke
     ..strokeWidth = width
     ..strokeCap = StrokeCap.round

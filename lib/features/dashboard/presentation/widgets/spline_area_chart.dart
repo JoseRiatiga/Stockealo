@@ -275,8 +275,8 @@ class _SplineChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          primaryColor.withOpacity(isDark ? 0.35 : 0.22),
-          primaryColor.withOpacity(0.0),
+          primaryColor.withValues(alpha: isDark ? 0.35 : 0.22),
+          primaryColor.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromLTWH(0, topPadding, chartWidth, chartHeight));
 
@@ -295,7 +295,7 @@ class _SplineChartPainter extends CustomPainter {
     if (hoveredIndex != null && hoveredIndex! < points.length) {
       final hp = points[hoveredIndex!];
       final crosshairPaint = Paint()
-        ..color = primaryColor.withOpacity(0.5)
+        ..color = primaryColor.withValues(alpha: 0.5)
         ..strokeWidth = 1.5;
 
       // Línea punteada o continua vertical
@@ -319,7 +319,7 @@ class _SplineChartPainter extends CustomPainter {
       canvas.drawCircle(
         p,
         isHovered ? 9 : 5.5,
-        Paint()..color = (isHovered ? primaryColor : primaryColor).withOpacity(isHovered ? 0.35 : 0.2),
+        Paint()..color = (isHovered ? primaryColor : primaryColor).withValues(alpha: isHovered ? 0.35 : 0.2),
       );
       // Punto interior blanco con borde
       canvas.drawCircle(

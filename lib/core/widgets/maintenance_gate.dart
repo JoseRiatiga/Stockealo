@@ -121,7 +121,7 @@ class _MaintenanceGateState extends State<MaintenanceGate> {
     return Stack(
       children: [
         content,
-        Positioned.fill(child: ColoredBox(color: Colors.black.withOpacity(0.4))),
+        Positioned.fill(child: ColoredBox(color: Colors.black.withValues(alpha: 0.4))),
         Center(
           child: Padding(
             padding: const EdgeInsets.all(AppSpace.lg),

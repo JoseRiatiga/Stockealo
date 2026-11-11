@@ -108,7 +108,7 @@ class FormattedChangelogView extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 2, right: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withOpacity(0.12),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -152,7 +152,7 @@ class FormattedChangelogView extends StatelessWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF10B981).withOpacity(0.4),
+                        color: const Color(0xFF10B981).withValues(alpha: 0.4),
                         blurRadius: 4,
                       ),
                     ],

@@ -81,10 +81,10 @@ class ModernDialog extends StatelessWidget {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(isDark ? 0.2 : 0.12),
+                        color: primaryColor.withValues(alpha: isDark ? 0.2 : 0.12),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: primaryColor.withOpacity(0.3),
+                          color: primaryColor.withValues(alpha: 0.3),
                           width: 1.2,
                         ),
                       ),

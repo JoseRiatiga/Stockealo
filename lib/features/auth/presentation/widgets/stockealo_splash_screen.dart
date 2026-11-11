@@ -57,7 +57,7 @@ class _StockealoSplashScreenState extends State<StockealoSplashScreen> with Sing
                 height: 132,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: c.accent.withOpacity(0.08 + 0.06 * _pulse.value),
+                  color: c.accent.withValues(alpha: 0.08 + 0.06 * _pulse.value),
                 ),
                 child: Center(
                   child: Transform.scale(scale: 0.96 + 0.06 * _pulse.value, child: child),

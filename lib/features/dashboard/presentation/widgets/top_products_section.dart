@@ -155,7 +155,7 @@ class TopProductsSection extends StatelessWidget {
         boxShadow: rank < 3
             ? [
                 BoxShadow(
-                  color: badgeColor.withOpacity(0.35),
+                  color: badgeColor.withValues(alpha: 0.35),
                   blurRadius: 4,
                   offset: const Offset(0, 1),
                 )

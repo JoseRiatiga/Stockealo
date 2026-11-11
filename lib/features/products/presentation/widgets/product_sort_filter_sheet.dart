@@ -17,6 +17,7 @@ class ProductSortFilterSheet {
     'all': 'Todos',
     'low_stock': 'Stock bajo',
     'out_of_stock': 'Agotados',
+    'to_restock': 'Por reponer',
   };
 
   /// Devuelve la selección aplicada, o null si el usuario cerró sin aplicar.

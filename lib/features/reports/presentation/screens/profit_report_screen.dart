@@ -247,7 +247,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
               if (change != null)
                 _pill(
                   '${up ? '↑' : '↓'} ${change.abs().toStringAsFixed(0)}% vs ${_period.compareLabel}',
-                  (up ? c.success : c.danger).withOpacity(0.12),
+                  (up ? c.success : c.danger).withValues(alpha: 0.12),
                   up ? c.success : c.danger,
                 ),
             ],

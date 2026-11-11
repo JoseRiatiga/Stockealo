@@ -38,9 +38,9 @@ class GlassSurface extends StatelessWidget {
     final glass = useGlassEffect(context);
     // Sin cristal, el fondo es opaco para no perder legibilidad
     final background = tint != null
-        ? tint!.withOpacity(glass ? 0.84 : 1)
+        ? tint!.withValues(alpha: glass ? 0.84 : 1)
         : (glass ? c.glass : c.surface);
-    final borderColor = tint != null ? Colors.white.withOpacity(0.28) : c.line;
+    final borderColor = tint != null ? Colors.white.withValues(alpha: 0.28) : c.line;
 
     final content = DecoratedBox(
       decoration: BoxDecoration(

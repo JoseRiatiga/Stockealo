@@ -36,7 +36,7 @@ class QuickSaleDialog extends StatefulWidget {
     if (isDesktop) {
       return showDialog<bool>(
         context: context,
-        barrierColor: Colors.black.withOpacity(0.65),
+        barrierColor: Colors.black.withValues(alpha: 0.65),
         builder: (_) => Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.all(24),
@@ -270,7 +270,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: context.colors.inkMuted.withOpacity(0.4),
+                    color: context.colors.inkMuted.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -363,8 +363,8 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isAvailable
-                              ? context.colors.accent.withOpacity(0.4)
-                              : context.colors.inkMuted.withOpacity(0.3),
+                              ? context.colors.accent.withValues(alpha: 0.4)
+                              : context.colors.inkMuted.withValues(alpha: 0.3),
                           width: 1.2,
                         ),
                       ),
@@ -715,7 +715,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                     Container(
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: context.colors.accent.withOpacity(0.18),
+                        color: context.colors.accent.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(Icons.point_of_sale_rounded, color: context.colors.accent, size: 18),
@@ -983,12 +983,12 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: _calculatedDiscount > 0
-                        ? context.colors.accent.withOpacity(0.12)
-                        : (isDark ? const Color(0xFF1E1B4B).withOpacity(0.4) : context.colors.surfaceMuted),
+                        ? context.colors.accent.withValues(alpha: 0.12)
+                        : (isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.4) : context.colors.surfaceMuted),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: _calculatedDiscount > 0
-                          ? context.colors.accent.withOpacity(0.4)
+                          ? context.colors.accent.withValues(alpha: 0.4)
                           : borderColor,
                     ),
                   ),
@@ -1059,7 +1059,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                                 'Máx. sin pérdida (-${_maxSafePercent.toStringAsFixed(0)}%)',
                                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.colors.accent),
                               ),
-                              backgroundColor: context.colors.accent.withOpacity(0.12),
+                              backgroundColor: context.colors.accent.withValues(alpha: 0.12),
                               side: BorderSide(color: context.colors.accent, width: 0.8),
                               onPressed: _applyMaxSafeDiscount,
                             ),
@@ -1118,9 +1118,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: context.colors.danger.withOpacity(0.12),
+                            color: context.colors.danger.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: context.colors.danger.withOpacity(0.4)),
+                            border: Border.all(color: context.colors.danger.withValues(alpha: 0.4)),
                           ),
                           child: Row(
                             children: [
@@ -1142,9 +1142,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: context.colors.accent.withOpacity(0.1),
+                            color: context.colors.accent.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: context.colors.accent.withOpacity(0.3)),
+                            border: Border.all(color: context.colors.accent.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
@@ -1172,9 +1172,9 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1B4B).withOpacity(0.3) : context.colors.successSoft,
+                  color: isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.3) : context.colors.successSoft,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: context.colors.accent.withOpacity(0.3)),
+                  border: Border.all(color: context.colors.accent.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   children: [
@@ -1318,7 +1318,7 @@ class _QuickSaleDialogState extends State<QuickSaleDialog> {
     return ChoiceChip(
       label: Text(label, style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
       selected: isSelected,
-      selectedColor: context.colors.accent.withOpacity(0.2),
+      selectedColor: context.colors.accent.withValues(alpha: 0.2),
       onSelected: (_) => _applyQuickPercent(percent),
     );
   }

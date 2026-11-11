@@ -161,3 +161,38 @@ Con Pro Servicios, el dueño también puede **aprobar a distancia**: le llega un
    - **Cada autorización queda registrada**: quién pidió, quién autorizó, con qué rol, en qué sede y qué se hizo. El dueño recibe un aviso.
 
 No quedan preguntas abiertas en este plan. Falta que el dueño lo apruebe.
+
+## 8. Diseño de la pantalla de roles (referencia del dueño, 10 nov)
+
+El dueño mostró un video de referencia: una **matriz de roles y permisos con interruptores**. La pantalla **Ajustes › Equipo › Roles** seguirá esta idea, hecha por nosotros y sin copiar el código de la referencia. **Aprobado por el dueño el 10 nov.**
+
+> **No se hace con el diseño V1:** el dueño planea cambiar el diseño de la app. Esta pantalla se dibuja con el diseño nuevo cuando esté definido. Lo que queda fijo es **cómo funciona**: matriz, interruptores, contador, «Seleccionar todo», Dueño bloqueado, cambios marcados y barra para guardar.
+
+**En el computador (matriz):**
+- **Encabezado:** título «Roles y permisos», una frase («Define qué puede hacer cada rol; los cambios se aplican a todo el equipo») y, a la derecha, un **contador grande**: «17/32 permisos activos».
+- **Una columna por rol.** Cada columna tiene:
+  - el ícono del rol y su nombre (Dueño, Administrador, Cajero y los personalizados);
+  - **una barra de puntos** que muestra cuántos permisos tiene («6/8»);
+  - un botón **«Seleccionar todo»**, que cambia a «Quitar todo» cuando ya los tiene todos.
+- **Filas agrupadas por módulo,** con el nombre del grupo en letra pequeña (VENTAS, CAJA, INVENTARIO…). Cada permiso lleva su nombre y una frase debajo («Anular venta · Deshacer una venta y devolver el stock»).
+- **Interruptores grandes de un color por rol.** El encendido muestra un ✓ y tiene un pequeño rebote al cambiar.
+- **El Dueño tiene todo encendido y bloqueado** (candado y «Siempre todo»): no se puede cambiar.
+- **Ayudas al pasar el mouse:**
+  - la fila y la columna se iluminan, para saber qué cruce se está tocando;
+  - **un punto naranja junto a cada interruptor cambiado** que aún no se ha guardado.
+- **Barra flotante abajo** cuando hay cambios: «● 4 cambios · Descartar · **Guardar**». Al guardar, el botón muestra que está trabajando y la barra se va.
+- **Pie con leyenda:** ● cambios sin guardar · 🔒 bloqueado · teclas para moverse con el teclado (flechas y espacio).
+
+**En el celular** (la matriz completa no cabe a 360 px):
+- Arriba, **un rol a la vez**: chips para elegir el rol (Administrador, Cajero, Vendedor…), con su barra de puntos y «Seleccionar todo».
+- Debajo, la misma lista agrupada por módulo, con un interruptor por permiso.
+- Arriba a la derecha, el contador «17/32», y abajo la misma barra flotante de cambios y «Guardar».
+- Si se prefiere ver todo junto en el celular, la matriz se puede deslizar de lado, con la columna de permisos fija a la izquierda.
+
+**Del plan que se suma a este diseño:**
+- Los permisos con **límite** (descuento máximo, fiado máximo) muestran un pequeño campo de número al encender el interruptor (Pro).
+- Si un permiso depende de otro («Anular» necesita «Vender»), al encenderlo se enciende el otro y se avisa en una línea.
+- **Botón «Ver como»** en cada columna.
+- **Solo el dueño** ve esta pantalla con interruptores. Un administrador la ve **solo para leer**.
+- Cada cambio guardado queda en **Actividad del equipo**.
+

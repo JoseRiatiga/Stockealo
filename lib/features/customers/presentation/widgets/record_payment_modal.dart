@@ -3,12 +3,14 @@ import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/utils/countries.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/customer_repository.dart';
 import '../../models/customer.dart';
+import '../../../../core/design/status_pill.dart';
+import '../../../sales/models/payment_method.dart';
+import '../../../sales/presentation/widgets/sale_document.dart';
 
 class RecordPaymentModal extends StatefulWidget {
   final Customer customer;
@@ -133,81 +135,33 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
     buffer.writeln('Comprobante emitido con Stockealo 📦');
 
     final receiptText = buffer.toString();
+    final business = ActiveBusinessScope.read(context);
+    final paidOff = result.remainingDebt <= 0.01;
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: context.colors.accent, size: 24),
-            const SizedBox(width: 10),
-            const Text('Abono Registrado', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Se descontaron ${CurrencyFormatter.formatCOP(result.payment.amount)} de la cuenta de ${result.customer.name}.',
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).brightness == Brightness.dark ? context.colors.lineStrong : context.colors.ink,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark ? context.colors.ink : context.colors.surfaceMuted,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: Theme.of(context).brightness == Brightness.dark ? context.colors.ink : context.colors.line,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Nuevo saldo deudor:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).brightness == Brightness.dark ? context.colors.inkMuted : context.colors.inkMuted,
-                    ),
-                  ),
-                  Text(
-                    CurrencyFormatter.formatCOP(result.remainingDebt),
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: result.remainingDebt > 0 ? context.colors.warning : context.colors.accent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cerrar'),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF25D366),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              Share.share(receiptText, subject: 'Recibo de Abono - $storeName');
-            },
-            icon: const Icon(Icons.share, size: 18),
-            label: const Text('Enviar WhatsApp'),
-          ),
-        ],
+    // El abono como tiquete (bloque 5): sello ABONO con lo que queda, o CUENTA AL DÍA
+    TicketViewer.show(
+      context,
+      business: business,
+      businessName: storeName,
+      headline: 'Abono registrado',
+      headlineTone: AppTone.success,
+      subline: '${CurrencyFormatter.format(result.payment.amount)} de ${result.customer.name}',
+      text: receiptText,
+      doc: SaleDocument(
+        title: 'Abono',
+        number: 'AB-${DateFormat('yyMMdd-HHmm').format(result.payment.date)}',
+        date: result.payment.date,
+        lines: const [],
+        total: result.payment.amount,
+        totalLabel: 'Abonado',
+        paymentMethod: PaymentMethod.label(result.payment.paymentMethod),
+        customerName: result.customer.name,
+        before: [TicketRow('Saldo anterior', CurrencyFormatter.format(result.previousDebt))],
+        after: [TicketRow('Saldo pendiente', CurrencyFormatter.format(result.remainingDebt), bold: true)],
+        closing: '¡Muchas gracias por tu pago!',
+        stamp: paidOff
+            ? const TicketStamp('CUENTA AL DÍA', tone: AppTone.success)
+            : TicketStamp('ABONO', detail: 'Debe ${CurrencyFormatter.format(result.remainingDebt)}', tone: AppTone.accent),
       ),
     );
   }
@@ -215,7 +169,6 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
   @override
   Widget build(BuildContext context) {
     final customer = widget.customer;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = context.colors.surface;
     final textMain = context.colors.ink;
     final textMuted = context.colors.inkMuted;
@@ -246,16 +199,16 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                     children: [
                       Text(
                         'Registrar Abono a Fiado',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain),
+                        style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.bold, color: textMain),
                       ),
                       Text(
                         'Cliente: ${customer.name}',
-                        style: TextStyle(fontSize: 13, color: textMuted, fontWeight: FontWeight.w500),
+                        style: TextStyle(fontSize: AppText.sizeSmall, color: textMuted, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: textMuted),
+                    icon: Icon(Icons.close_outlined, color: textMuted),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -266,10 +219,10 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.4) : context.colors.warningSoft,
+                  color: context.colors.warningSoft,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isDark ? context.colors.warning : const Color(0xFFFDE68A),
+                    color: context.colors.warningSoft,
                   ),
                 ),
                 child: Row(
@@ -280,20 +233,20 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                       children: [
                         Text(
                           'Deuda Pendiente Actual',
-                          style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFFDE68A) : context.colors.warning),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.warning),
                         ),
                         Text(
                           'Saldo por cobrar',
-                          style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFFFCD34D) : context.colors.warning),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.warning),
                         ),
                       ],
                     ),
                     Text(
                       CurrencyFormatter.formatCOP(customer.debtBalance),
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: AppText.sizeHeading,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFFCD34D) : context.colors.warning,
+                        color: context.colors.warning,
                       ),
                     ),
                   ],
@@ -306,15 +259,15 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                   padding: const EdgeInsets.all(10),
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : context.colors.dangerSoft,
+                    color: context.colors.dangerSoft,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: isDark ? context.colors.danger : const Color(0xFFFECACA),
+                      color: context.colors.dangerSoft,
                     ),
                   ),
                   child: Text(
                     _errorMessage!,
-                    style: TextStyle(color: isDark ? const Color(0xFFFCA5A5) : context.colors.danger, fontSize: 12),
+                    style: TextStyle(color: context.colors.danger, fontSize: AppText.sizeCaption),
                   ),
                 ),
               ],
@@ -328,7 +281,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                 decoration: InputDecoration(
                   labelText: 'Monto a Abonar (\$)',
                   hintText: 'Ej. 20000',
-                  prefixIcon: Icon(Icons.attach_money, color: context.colors.accent),
+                  prefixIcon: Icon(Icons.attach_money_outlined, color: context.colors.accent),
                 ),
               ),
               const SizedBox(height: 10),
@@ -338,23 +291,23 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                 spacing: 8,
                 children: [
                   ActionChip(
-                    avatar: Icon(Icons.done_all, size: 16, color: context.colors.accent),
-                    label: const Text('Pagar Todo', style: TextStyle(fontSize: 12)),
+                    avatar: Icon(Icons.done_all_outlined, size: 16, color: context.colors.accent),
+                    label: const Text('Pagar Todo', style: TextStyle(fontSize: AppText.sizeCaption)),
                     onPressed: () => _setAmount(customer.debtBalance),
                   ),
                   if (customer.debtBalance > 2000)
                     ActionChip(
-                      label: const Text('50%', style: TextStyle(fontSize: 12)),
+                      label: const Text('50%', style: TextStyle(fontSize: AppText.sizeCaption)),
                       onPressed: () => _setAmount(customer.debtBalance / 2),
                     ),
                   if (customer.debtBalance >= 10000)
                     ActionChip(
-                      label: const Text('\$10.000', style: TextStyle(fontSize: 12)),
+                      label: const Text('\$10.000', style: TextStyle(fontSize: AppText.sizeCaption)),
                       onPressed: () => _setAmount(10000),
                     ),
                   if (customer.debtBalance >= 20000)
                     ActionChip(
-                      label: const Text('\$20.000', style: TextStyle(fontSize: 12)),
+                      label: const Text('\$20.000', style: TextStyle(fontSize: AppText.sizeCaption)),
                       onPressed: () => _setAmount(20000),
                     ),
                 ],
@@ -362,7 +315,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
               const SizedBox(height: 16),
 
               // Medio de Pago
-              Text('Medio de Pago:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textMain)),
+              Text('Medio de Pago:', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.bold, color: textMain)),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -374,17 +327,17 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                           Icon(
                             Icons.payments_outlined,
                             size: 14,
-                            color: _paymentMethod == 'EFECTIVO' ? (isDark ? const Color(0xFF34D399) : context.colors.accent) : textMuted,
+                            color: _paymentMethod == 'EFECTIVO' ? (context.colors.accent) : textMuted,
                           ),
                           const SizedBox(width: 4),
                           const Text('Efectivo'),
                         ],
                       ),
                       selected: _paymentMethod == 'EFECTIVO',
-                      selectedColor: isDark ? const Color(0xFF064E3B) : context.colors.successSoft,
+                      selectedColor: context.colors.successSoft,
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: _paymentMethod == 'EFECTIVO' ? (isDark ? const Color(0xFF34D399) : context.colors.accent) : textMuted,
+                        color: _paymentMethod == 'EFECTIVO' ? (context.colors.accent) : textMuted,
                       ),
                       onSelected: (val) {
                         if (val) setState(() => _paymentMethod = 'EFECTIVO');
@@ -400,17 +353,17 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                           Icon(
                             Icons.account_balance_outlined,
                             size: 14,
-                            color: _paymentMethod == 'TRANSFERENCIA' ? (isDark ? const Color(0xFF60A5FA) : context.colors.info) : textMuted,
+                            color: _paymentMethod == 'TRANSFERENCIA' ? (context.colors.info) : textMuted,
                           ),
                           const SizedBox(width: 4),
                           const Text('Transferencia'),
                         ],
                       ),
                       selected: _paymentMethod == 'TRANSFERENCIA',
-                      selectedColor: isDark ? const Color(0xFF1E3A8A) : context.colors.infoSoft,
+                      selectedColor: context.colors.infoSoft,
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: _paymentMethod == 'TRANSFERENCIA' ? (isDark ? const Color(0xFF60A5FA) : context.colors.info) : textMuted,
+                        color: _paymentMethod == 'TRANSFERENCIA' ? (context.colors.info) : textMuted,
                       ),
                       onSelected: (val) {
                         if (val) setState(() => _paymentMethod = 'TRANSFERENCIA');
@@ -439,8 +392,8 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                   onPressed: _isLoading ? null : _submitPayment,
                   icon: _isLoading
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.check_circle_outline, size: 20),
-                  label: const Text('Registrar Abono y Generar Recibo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      : const Icon(Icons.check_circle_outline_outlined, size: 20),
+                  label: const Text('Registrar Abono y Generar Recibo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.colors.accent,
                     foregroundColor: Colors.white,

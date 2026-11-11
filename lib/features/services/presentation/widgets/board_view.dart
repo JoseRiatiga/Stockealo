@@ -13,6 +13,7 @@ import '../../models/phase_messages.dart';
 import '../../models/service_models.dart';
 import 'checkout_sheet.dart';
 import 'receive_sheet.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Servicios › Tablero: los trabajos del día por columna, cada servicio con su
 /// estado y quién lo hace. Aplica las reglas de [ServiceBoard].
@@ -87,14 +88,14 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
     }
     final send = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('¿Le escribes por WhatsApp? · ${phase.label}'),
-        content: Text(text),
-        actions: [
+      builder: (ctx) => AppDialog(
+title: '¿Le escribes por WhatsApp? · ${phase.label}',
+content: Text(text),
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Enviar')),
         ],
-      ),
+),
     );
     if (send == true) await OrderWhatsApp.send(order, widget.business, text);
   }
@@ -164,14 +165,14 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
       final turn = board.turnOf(next.order);
       final go = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('${board.staffOf(id)?.name ?? 'Alguien'} quedó libre'),
-          content: Text('¿Empieza ${line.name} de ${next.order.title}${turn == null ? '' : ' (turno $turn)'}?'),
-          actions: [
+        builder: (ctx) => AppDialog(
+title: '${board.staffOf(id)?.name ?? 'Alguien'} quedó libre',
+content: Text('¿Empieza ${line.name} de ${next.order.title}${turn == null ? '' : ' (turno $turn)'}?'),
+actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Ahora no')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Empezar')),
           ],
-        ),
+),
       );
       if (go == true) await _run(() => _repo.startLine(next.order, next.index, [id], board: board));
     }
@@ -201,9 +202,9 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('Retroceder un servicio'),
-          content: Column(
+        builder: (ctx, setLocal) => AppDialog(
+title: 'Retroceder un servicio',
+content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -230,11 +231,11 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
               ),
             ],
           ),
-          actions: [
+actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Retroceder')),
           ],
-        ),
+),
       ),
     );
     final text = note.text;
@@ -249,14 +250,14 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
     }
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('¿Cancelar ${order.title}?'),
-        content: const Text('Sale del tablero sin cobrar nada.'),
-        actions: [
+      builder: (ctx) => AppDialog(
+title: '¿Cancelar ${order.title}?',
+content: const Text('Sale del tablero sin cobrar nada.'),
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Volver')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancelar trabajo')),
         ],
-      ),
+),
     );
     if (ok == true) await _run(() => _repo.cancel(order));
   }
@@ -287,14 +288,14 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
       ];
       await showDialog<void>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Nadie libre para este servicio'),
-          content: Text(
+        builder: (ctx) => AppDialog(
+title: 'Nadie libre para este servicio',
+content: Text(
             reasons.isEmpty
                 ? 'Agrega a las personas que hacen los servicios en Ajustes › Equipo.'
                 : '${line.name} queda en cola y se le sugiere a quien se libere primero.\n\n${reasons.join('\n')}',
           ),
-          actions: [
+actions: [
             if (widget.onOpenAttendance != null)
               TextButton(
                 onPressed: () {
@@ -305,7 +306,7 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
               ),
             FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Entendido')),
           ],
-        ),
+),
       );
       return null;
     }
@@ -323,9 +324,9 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('¿Quién hace ${line.name}?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.ink)),
+                  Text('¿Quién hace ${line.name}?', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
                   Text('Solo aparecen quienes vinieron, están libres y hacen este servicio.',
-                      style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                   const SizedBox(height: AppSpace.sm),
                   for (final s in eligible)
                     CheckboxListTile(
@@ -391,7 +392,7 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
                             child: Text('Marca quién vino hoy en Asistencia: sin eso nadie puede empezar servicios.',
                                 style: TextStyle(color: c.ink)),
                           ),
-                          Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                          Icon(Icons.chevron_right_outlined, color: c.inkFaint),
                         ],
                       ),
                     ),
@@ -416,7 +417,7 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
                           Icon(Icons.view_kanban_outlined, size: 48, color: c.inkFaint),
                           const SizedBox(height: AppSpace.md),
                           Text('No hay ${_t.unitPlural.toLowerCase()} en el tablero',
-                              style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: 15)),
+                              style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: AppText.sizeBodyLarge)),
                           const SizedBox(height: AppSpace.xs),
                           Text('Toca «Recibir» cuando llegue un cliente.', style: TextStyle(color: c.inkMuted)),
                           if (deliveredToday > 0) ...[
@@ -449,7 +450,7 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
                     Padding(
                       padding: const EdgeInsets.only(top: AppSpace.sm),
                       child: Text('Hoy se entregaron $deliveredToday. Míralos en Historial.',
-                          style: TextStyle(color: c.inkMuted, fontSize: 12.5)),
+                          style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall)),
                     ),
                 ],
               );
@@ -495,7 +496,7 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
               child: Text(
                 '${s.name.split(' ').first} · ${state.label}'
                 '${active == null ? '' : ' (${active.order.title})'}',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: fg),
+                style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: fg),
               ),
             );
           }),
@@ -511,7 +512,7 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
         Padding(
           padding: const EdgeInsets.fromLTRB(AppSpace.xs, 0, 0, AppSpace.sm),
           child: Text('${title.toUpperCase()} · ${orders.length}',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: c.inkFaint)),
+              style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: c.inkFaint)),
         ),
         for (final o in orders) ...[
           _orderCard(board, o),
@@ -545,8 +546,8 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(o.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
-                    Text(subtitle, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                    Text(o.title, style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
+                    Text(subtitle, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                   ],
                 ),
               ),
@@ -588,9 +589,9 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
     final l = o.lines[i];
     final delay = board.delayOf(l, DateTime.now());
     final (icon, color, status) = switch (l.status) {
-      WorkOrderLine.inProgress => (Icons.timelapse_rounded, c.info, '${_t.inProgress} · ${_names(l.staffIds)}'),
-      WorkOrderLine.done => (Icons.check_circle_rounded, c.success, 'Terminado · ${_names(l.staffIds)}'),
-      _ => (Icons.radio_button_unchecked_rounded, c.inkFaint, 'Pendiente'),
+      WorkOrderLine.inProgress => (Icons.timelapse_outlined, c.info, '${_t.inProgress} · ${_names(l.staffIds)}'),
+      WorkOrderLine.done => (Icons.check_circle_outlined, c.success, 'Terminado · ${_names(l.staffIds)}'),
+      _ => (Icons.radio_button_unchecked_outlined, c.inkFaint, 'Pendiente'),
     };
     return Padding(
       padding: const EdgeInsets.only(right: AppSpace.sm),
@@ -602,11 +603,11 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(l.name, style: TextStyle(fontSize: 13.5, color: c.ink, fontWeight: FontWeight.w600)),
-                Text(status, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                Text(l.name, style: TextStyle(fontSize: AppText.sizeBody, color: c.ink, fontWeight: FontWeight.w600)),
+                Text(status, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                 if (delay != null)
                   Text('Demorado: lleva $delay min más de lo estimado',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.danger)),
+                      style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: c.danger)),
               ],
             ),
           ),

@@ -47,7 +47,7 @@ class ProductSortFilterSheet {
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Orden y filtros', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+                          child: Text('Orden y filtros', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
                         ),
                         TextButton(
                           onPressed: () => setModalState(() {
@@ -81,7 +81,7 @@ class ProductSortFilterSheet {
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(e.value),
-                        trailing: tempSort == e.key ? Icon(Icons.check_rounded, color: c.accent) : null,
+                        trailing: tempSort == e.key ? Icon(Icons.check_outlined, color: c.accent) : null,
                         onTap: () => setModalState(() => tempSort = e.key),
                       ),
                     const SizedBox(height: AppSpace.lg),

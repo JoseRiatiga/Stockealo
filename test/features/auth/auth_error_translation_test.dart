@@ -6,6 +6,12 @@ void main() {
   String translate(Object e) => AuthRepository.translateAuthError(e);
 
   group('translateAuthError', () {
+    test('la base del dispositivo no abre: mensaje claro, nunca el error crudo', () {
+      final msg = translate(_DbError());
+      expect(msg, startsWith('No pudimos abrir los datos guardados en este dispositivo.'));
+      expect(msg, isNot(contains('getDatabasesPath')));
+    });
+
     test('credenciales inválidas', () {
       expect(
         translate(const AuthException('Invalid login credentials', code: 'invalid_credentials')),
@@ -75,4 +81,10 @@ void main() {
       expect(AuthRepository.isUnknownAccountError(Exception('otp_disabled')), isFalse);
     });
   });
+}
+
+/// Igual a como se ve el error real de sqflite al no abrir la base en la web
+class _DbError implements Exception {
+  @override
+  String toString() => 'DatabaseException(getDatabasesPath is null)';
 }

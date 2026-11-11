@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../models/product.dart';
+import '../../../../core/theme/app_tokens.dart';
 
 class BarcodeModal extends StatefulWidget {
   final Product product;
@@ -28,12 +29,11 @@ class _BarcodeModalState extends State<BarcodeModal> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        color: context.colors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
@@ -43,7 +43,7 @@ class _BarcodeModalState extends State<BarcodeModal> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF334155) : Colors.grey.shade300,
+              color: context.colors.lineStrong,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -52,17 +52,17 @@ class _BarcodeModalState extends State<BarcodeModal> {
             widget.product.name,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: AppText.sizeHeading,
               fontWeight: FontWeight.bold,
-              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+              color: context.colors.ink,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             'Código: ${widget.product.code}',
             style: TextStyle(
-              fontSize: 14,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              fontSize: AppText.sizeBody,
+              color: context.colors.inkMuted,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -74,12 +74,12 @@ class _BarcodeModalState extends State<BarcodeModal> {
               ButtonSegment<bool>(
                 value: false,
                 label: Text('Código de Barras'),
-                icon: Icon(Icons.line_weight),
+                icon: Icon(Icons.line_weight_outlined),
               ),
               ButtonSegment<bool>(
                 value: true,
                 label: Text('Código QR'),
-                icon: Icon(Icons.qr_code_2),
+                icon: Icon(Icons.qr_code_2_outlined),
               ),
             ],
             selected: {_showQr},
@@ -98,12 +98,12 @@ class _BarcodeModalState extends State<BarcodeModal> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isDark ? const Color(0xFF475569) : Colors.grey.shade200,
+                color: context.colors.line,
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -123,7 +123,7 @@ class _BarcodeModalState extends State<BarcodeModal> {
                     height: 90,
                     drawText: true,
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: AppText.sizeBody,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 2,
                     ),
@@ -143,7 +143,7 @@ class _BarcodeModalState extends State<BarcodeModal> {
               icon: const Icon(Icons.share_outlined),
               label: const Text('Compartir Código'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
+                backgroundColor: context.colors.accent,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(

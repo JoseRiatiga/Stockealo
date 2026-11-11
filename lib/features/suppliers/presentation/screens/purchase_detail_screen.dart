@@ -12,6 +12,7 @@ import '../../../products/data/product_image_service.dart';
 import '../../data/invoice_photo_service.dart';
 import '../../data/supplier_repository.dart';
 import '../../models/purchase.dart';
+import '../../../../core/design/app_dialog.dart';
 
 String purchaseDateLabel(DateTime d) {
   const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -65,9 +66,9 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
       context: context,
       builder: (ctx) {
         final c = ctx.colors;
-        return AlertDialog(
-          title: const Text('Registrar abono'),
-          content: Column(
+        return AppDialog(
+title: 'Registrar abono',
+content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -87,11 +88,11 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
               ),
             ],
           ),
-          actions: [
+actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar abono')),
           ],
-        );
+);
       },
     );
     final value = double.tryParse(amount.text.trim()) ?? 0;
@@ -113,14 +114,14 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
   Future<void> _markPaid() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Marcar como pagada?'),
-        content: Text('Se registra un pago de ${CurrencyFormatter.format(_p.balance)}, lo que faltaba.'),
-        actions: [
+      builder: (ctx) => AppDialog(
+title: '¿Marcar como pagada?',
+content: Text('Se registra un pago de ${CurrencyFormatter.format(_p.balance)}, lo que faltaba.'),
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Marcar pagada')),
         ],
-      ),
+),
     );
     if (ok != true) return;
     setState(() => _busy = true);
@@ -208,7 +209,7 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
                           ? 'A crédito${p.dueDate != null ? ', pagar a más tardar el ${purchaseDateLabel(p.dueDate!)}' : ''}'
                           : 'De contado',
                     ),
-                    if ((p.createdBy ?? '').isNotEmpty) _info(Icons.person_outline, 'Registró ${p.createdBy}'),
+                    if ((p.createdBy ?? '').isNotEmpty) _info(Icons.person_outline_outlined, 'Registró ${p.createdBy}'),
                   ],
                 ),
               ),
@@ -232,7 +233,7 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
                       ),
                       Text(
                         'Abonado ${CurrencyFormatter.format(p.paidAmount)} de ${CurrencyFormatter.format(p.total)}',
-                        style: TextStyle(color: c.ink, fontSize: 13),
+                        style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall),
                       ),
                       for (final pay in p.payments)
                         Padding(
@@ -240,7 +241,7 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
                           child: Text(
                             '${purchaseDateLabel(pay.date)} · ${CurrencyFormatter.format(pay.amount)}'
                             '${(pay.note ?? '').isEmpty ? '' : ' · ${pay.note}'}',
-                            style: TextStyle(color: c.inkMuted, fontSize: 12.5),
+                            style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall),
                           ),
                         ),
                       if (!p.isPaid) ...[
@@ -251,7 +252,7 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
                           children: [
                             FilledButton.icon(
                               onPressed: _busy ? null : _addPayment,
-                              icon: const Icon(Icons.add_rounded, size: 18),
+                              icon: const Icon(Icons.add_outlined, size: 18),
                               label: const Text('Registrar abono'),
                             ),
                             OutlinedButton(
@@ -277,8 +278,8 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 3),
                         child: Row(
                           children: [
-                            Expanded(child: Text('${i.quantity} × ${i.label}', style: TextStyle(color: c.ink, fontSize: 13))),
-                            Text(CurrencyFormatter.format(i.subtotal), style: TextStyle(color: c.ink, fontSize: 13)),
+                            Expanded(child: Text('${i.quantity} × ${i.label}', style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall))),
+                            Text(CurrencyFormatter.format(i.subtotal), style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall)),
                           ],
                         ),
                       ),
@@ -291,7 +292,7 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
                     ),
                     if ((p.notes ?? '').isNotEmpty) ...[
                       const SizedBox(height: AppSpace.md),
-                      Text(p.notes!, style: TextStyle(color: c.inkMuted, fontSize: 12.5)),
+                      Text(p.notes!, style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall)),
                     ],
                   ],
                 ),
@@ -312,7 +313,7 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
                     else if (_loadingPhoto)
                       const Center(child: Padding(padding: EdgeInsets.all(AppSpace.lg), child: CircularProgressIndicator()))
                     else if (_photoUrl == null)
-                      Text('No se pudo cargar la foto. Revisa tu conexión.', style: TextStyle(color: c.inkMuted, fontSize: 13))
+                      Text('No se pudo cargar la foto. Revisa tu conexión.', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall))
                     else
                       Row(
                         children: [
@@ -347,7 +348,7 @@ class _PurchaseDetailScreenState extends State<PurchaseDetailScreen> {
         children: [
           Icon(icon, size: 18, color: c.inkMuted),
           const SizedBox(width: AppSpace.md),
-          Expanded(child: Text(text, style: TextStyle(color: c.ink, fontSize: 13.5))),
+          Expanded(child: Text(text, style: TextStyle(color: c.ink, fontSize: AppText.sizeBody))),
         ],
       ),
     );
@@ -396,9 +397,9 @@ class _PayablesScreenState extends State<PayablesScreen> {
                 : ListView(
                     padding: const EdgeInsets.all(AppSpace.lg),
                     children: [
-                      Text('Total por pagar', style: TextStyle(color: c.inkMuted, fontSize: 12.5)),
+                      Text('Total por pagar', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall)),
                       Text(CurrencyFormatter.format(total),
-                          style: TextStyle(color: c.ink, fontSize: 24, fontWeight: FontWeight.bold)),
+                          style: TextStyle(color: c.ink, fontSize: AppText.sizePage, fontWeight: FontWeight.bold)),
                       const SizedBox(height: AppSpace.lg),
                       for (final p in list) ...[
                         AppCard(
@@ -421,7 +422,7 @@ class _PayablesScreenState extends State<PayablesScreen> {
                                           : (p.isOverdue()
                                               ? 'Venció el ${purchaseDateLabel(p.dueDate!)}'
                                               : 'Vence el ${purchaseDateLabel(p.dueDate!)}'),
-                                      style: TextStyle(color: p.isOverdue() ? c.danger : c.inkMuted, fontSize: 12),
+                                      style: TextStyle(color: p.isOverdue() ? c.danger : c.inkMuted, fontSize: AppText.sizeCaption),
                                     ),
                                   ],
                                 ),

@@ -140,10 +140,12 @@ void main() {
     final listed = await SalesRepository.instance.getSales(businessId: businessId);
     final casco = listed.firstWhere((s) => s.productName == 'Lavado de casco');
     expect(casco.productId, '');
-    await SalesRepository.instance.cancelSale(casco);
-    expect((await db.query('sales')).length, 1);
+    // Se anula la venta completa (los dos servicios del mismo cobro), sin borrarla
+    await SalesRepository.instance.voidSale(casco);
+    expect((await db.query('sales')).length, 2);
+    expect(await db.query('sales_ok'), isEmpty);
     expect(await db.query('stock_movements'), isEmpty);
-    expect((await db.query('customers')).single['debt_balance'], 13500);
+    expect((await db.query('customers')).single['debt_balance'], 0);
   });
 
   test('el aviso de listo usa las palabras de la plantilla', () {

@@ -1,12 +1,10 @@
 import '../widgets/sales_summary_card.dart';
 import '../widgets/quotations_list_modal.dart';
+import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/app_pagination.dart';
-import '../../../../core/design/primary_action_button.dart';
 import '../../../../core/design/quick_access_row.dart';
 import '../../../../core/design/skeleton.dart';
 import '../../../../core/theme/app_tokens.dart';
-import '../../../cash/data/cash_register_repository.dart';
-import '../../../cash/models/cash_session.dart';
 import '../widgets/sale_card.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import '../../../../core/services/data_events.dart';
@@ -19,14 +17,12 @@ import '../../data/sales_repository.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../models/sale.dart';
-import '../widgets/quick_sale_dialog.dart';
-import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
-import '../../../cash/presentation/screens/cash_register_screen.dart';
-import '../../../business/models/business.dart';
-import '../../../business/presentation/screens/modules_screen.dart';
+import '../../../sales/models/payment_method.dart';
+import '../widgets/digital_ticket_modal.dart';
+import '../../../../core/codes/code_reader.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -57,11 +53,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
   // Filtros y paginación
   String _selectedDateFilter = 'all'; // 'all', 'today', '7days', 'month', 'custom'
   DateTimeRange? _customDateRange;
-  String _selectedPaymentMethod = 'ALL'; // 'ALL', 'EFECTIVO', 'TRANSFERENCIA', 'FIADO'
+  /// 'ALL', un código de [PaymentMethod] o [_voided]
+  String _selectedPaymentMethod = 'ALL';
+  static const _voided = 'ANULADAS';
   int _currentPage = 1;
 
   /// Caja abierta del negocio (si usa el arqueo)
-  CashSession? _openCash;
   static const int _pageSize = 10;
   final ScrollController _scrollController = ScrollController();
 
@@ -146,11 +143,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     }
     final sales = await _salesRepo.getSales(businessId: bizId);
     final summary = await _salesRepo.getTodaySummary(bizId);
-    // Estado de la caja, solo si el negocio usa el arqueo
-    CashSession? openCash;
-    if (mounted && ActiveBusinessScope.read(context)?.cashRegisterEnabled == true) {
-      openCash = await CashRegisterRepository.instance.getOpenSession(bizId);
-    }
 
     if (widget.userRole == null) {
       final user = AuthRepository.instance.currentUser;
@@ -169,87 +161,57 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
       setState(() {
         _sales = sales;
         _summary = summary;
-        _openCash = openCash;
         _isLoading = false;
       });
     }
   }
 
+  /// Anular sin borrar: se pide el motivo y la venta queda en el historial como «Anulada»
   Future<void> _cancelSale(Sale sale) async {
-    final confirmed = await showDialog<bool>(
+    const reasons = ['Se equivocó de producto', 'El cliente devolvió', 'Cobro repetido', 'Prueba'];
+    final other = TextEditingController();
+    String? picked;
+    final reason = await AppSheet.show<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Anular esta venta?'),
-        content: Text(
-          'Se repondrán ${sale.quantity} unidades de "${sale.productName}" al inventario y se descontará del reporte.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('No, mantener'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Sí, anular venta'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await _salesRepo.cancelSale(sale);
-      _loadSales();
-      if (mounted) {
-        AppToast.showSuccess(
-          context,
-          'Venta anulada y ${sale.quantity} unid. devueltas al inventario.',
-          title: 'Venta Anulada',
-        );
-      }
-    }
-  }
-
-  Future<void> _navigateToCustomers() async {
-    var bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
-    if (bizId == null) {
-      final user = AuthRepository.instance.currentUser;
-      if (user != null) {
-        final biz = await _businessRepo.getActiveBusiness(user.id, user.email);
-        bizId = biz?.id;
-      }
-    }
-    if (bizId != null && mounted) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => CustomersScreen(businessId: bizId!),
-        ),
-      );
-      _loadSales();
-    }
-  }
-
-  Future<void> _openCashRegister() async {
-    final bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
-    if (bizId == null) return;
-    final user = AuthRepository.instance.currentUser;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CashRegisterScreen(
-          businessId: bizId,
-          userName: user?.displayName ?? 'Vendedor',
+      title: 'Anular esta venta',
+      subtitle: 'El stock vuelve al inventario y deja de contar en los totales, la caja y los reportes. '
+          'La venta queda en el historial como «Anulada».',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('¿Por qué la anulas?', style: AppText.body(ctx, weight: FontWeight.w600)),
+            const SizedBox(height: AppSpace.sm),
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: [
+                for (final r in reasons)
+                  ChoiceChip(label: Text(r), selected: picked == r, showCheckmark: false, onSelected: (_) => setLocal(() => picked = r)),
+              ],
+            ),
+            const SizedBox(height: AppSpace.md),
+            TextField(
+              controller: other,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setLocal(() => picked = null),
+              decoration: const InputDecoration(labelText: 'Otro motivo'),
+            ),
+            const SizedBox(height: AppSpace.lg),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: ctx.colors.danger, foregroundColor: ctx.colors.onAccent),
+              onPressed: (picked ?? other.text.trim()).isEmpty ? null : () => Navigator.pop(ctx, picked ?? other.text.trim()),
+              child: const Text('Anular venta'),
+            ),
+          ],
         ),
       ),
     );
-    if (mounted) _loadSales();
-  }
-
-  Future<void> _openQuickSale() async {
-    await QuickSaleDialog.show(context);
-    if (mounted) {
-      _loadSales();
-    }
+    other.dispose();
+    if (reason == null) return;
+    await _salesRepo.voidSale(sale, reason: reason);
+    await _loadSales();
+    if (mounted) AppToast.showSuccess(context, 'Venta anulada. El stock volvió al inventario.');
   }
 
   Future<void> _pickCustomDateRange() async {
@@ -263,25 +225,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
             start: now.subtract(const Duration(days: 7)),
             end: now,
           ),
-      builder: (context, child) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: isDark
-                ? const ColorScheme.dark(
-                    primary: Color(0xFF8B5CF6),
-                    onPrimary: Colors.white,
-                    surface: Color(0xFF131126),
-                    onSurface: Color(0xFFF8FAFC),
-                  )
-                : const ColorScheme.light(
-                    primary: Color(0xFF8B5CF6),
-                    onPrimary: Colors.white,
-                  ),
-          ),
-          child: child!,
-        );
-      },
     );
     if (picked != null) {
       setState(() {
@@ -294,8 +237,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
 
   List<Sale> get _filteredSales {
     return _sales.where((sale) {
-      // Filtro de método de pago
-      if (_selectedPaymentMethod != 'ALL') {
+      // Filtro de forma de pago (o solo las anuladas)
+      if (_selectedPaymentMethod == _voided) {
+        if (!sale.isVoided) return false;
+      } else if (_selectedPaymentMethod != 'ALL') {
         if (sale.paymentMethod != _selectedPaymentMethod) return false;
       }
 
@@ -345,15 +290,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final isDesktop = MediaQuery.of(context).size.width >= 850;
-    final business = ActiveBusinessScope.of(context);
     final filtered = _filteredSales;
     final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
     final currentPageClamped = _currentPage.clamp(1, totalPages);
     final pagedSales = filtered.skip((currentPageClamped - 1) * _pageSize).take(_pageSize).toList();
 
     return Scaffold(
-      appBar: isDesktop ? null : AppBar(title: const Text('Ventas')),
+      // Sin barra propia ni «Nueva venta»: los pone el encabezado único (re-diseño 0.13.0)
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
         child: LayoutBuilder(
@@ -364,20 +307,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
             return CustomScrollView(
               controller: _scrollController,
               slivers: [
-                if (isDesktop)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.lg, hPadding, 0),
-                      child: Row(
-                        children: [
-                          Text('Ventas', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: c.ink)),
-                          const Spacer(),
-                          PrimaryActionButton(label: 'Nueva venta', onPressed: _openQuickSale),
-                        ],
-                      ),
-                    ),
-                  ),
-
                 // Resumen de hoy
                 SliverToBoxAdapter(
                   child: Padding(
@@ -386,34 +315,17 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                   ),
                 ),
 
-                // Accesos rápidos
+                // Cotizaciones vive en Ventas; Clientes y Caja tienen su propio lugar en el menú
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
                     child: QuickAccessRow(
                       items: [
                         QuickAccessItem(
-                          icon: Icons.people_alt_outlined,
-                          label: 'Clientes y fiados',
-                          caption: 'Deudas y abonos',
-                          onTap: _navigateToCustomers,
-                        ),
-                        QuickAccessItem(
                           icon: Icons.request_quote_outlined,
                           label: 'Cotizaciones',
-                          caption: 'Proformas',
+                          caption: 'Proformas para tus clientes',
                           onTap: _openQuotations,
-                        ),
-                        // Caja siempre visible: si está apagada explica y lleva a Módulos
-                        QuickAccessItem(
-                          icon: Icons.point_of_sale_rounded,
-                          label: 'Caja',
-                          caption: business?.cashRegisterEnabled != true
-                              ? 'Apagada'
-                              : (_openCash == null
-                                  ? 'Cerrada'
-                                  : 'Abierta desde ${DateFormat('h:mm a', 'es_CO').format(_openCash!.openedAt)}'),
-                          onTap: business?.cashRegisterEnabled == true ? _openCashRegister : () => _explainCash(business),
                         ),
                       ],
                     ),
@@ -434,9 +346,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                     padding: EdgeInsets.fromLTRB(hPadding + AppSpace.xs, AppSpace.md, hPadding, AppSpace.xs),
                     child: Row(
                       children: [
-                        Text('Ventas registradas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                        Text('Ventas registradas', style: AppText.title(context)),
                         const SizedBox(width: AppSpace.sm),
-                        Text('${filtered.length}', style: AppText.amount(context, size: 14, weight: FontWeight.w500, color: c.inkMuted)),
+                        Text('${filtered.length}', style: AppText.amount(context, size: AppText.sizeBody, weight: FontWeight.w500, color: c.inkMuted)),
                         const Spacer(),
                         AppPagination(
                           currentPage: currentPageClamped,
@@ -507,14 +419,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
           },
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
-      floatingActionButton: isDesktop
-          ? null
-          : Padding(
-              // A la altura de la pastilla de Stocky en Inicio, justo encima de la barra
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-              child: PrimaryActionButton(label: 'Nueva venta', onPressed: _openQuickSale),
-            ),
     );
   }
 
@@ -523,6 +427,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
         showProfit: canViewCosts,
         onCancel: canCancelSale ? () => _cancelSale(sale) : null,
       );
+
+  /// Lee el código de barras de un tiquete (su número) y abre esa venta
+  Future<void> _scanTicket() async {
+    final code = await CodeReader.scan(context, title: 'Escanear un tiquete', caption: 'Ventas');
+    if (code == null || !mounted) return;
+    final clean = code.trim().replaceFirst('#', '').toUpperCase();
+    final match = _sales.where((s) => (s.invoiceNumber ?? '').replaceFirst('#', '').toUpperCase() == clean).toList();
+    if (match.isEmpty) {
+      AppToast.showWarning(context, 'No hay ninguna venta con el número $clean.');
+      return;
+    }
+    await DigitalTicketModal.show(context, salesList: match);
+  }
 
   void _clearFilters() {
     setState(() {
@@ -540,30 +457,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     if (mounted) _loadSales();
   }
 
-  /// La caja está apagada: qué hace y dónde se enciende (Ajustes › Módulos)
-  Future<void> _explainCash(Business? business) async {
-    if (business == null) return;
-    final canEdit = (_userRole ?? widget.userRole) != 'CASHIER';
-    final go = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Caja (arqueo)'),
-        content: Text(
-          'Abre el turno con una base, registra entradas y salidas y cierra contando el dinero para saber si cuadra.\n\n'
-          '${canEdit ? 'Se enciende en Ajustes › Módulos.' : 'El dueño o un administrador la enciende en Ajustes › Módulos.'}',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cerrar')),
-          if (canEdit) FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ir a Módulos')),
-        ],
-      ),
-    );
-    if (go == true && mounted) {
-      await ModulesScreen.open(context, business: business, canEdit: canEdit);
-      if (mounted) _loadSales();
-    }
-  }
-
 
 
   String get _dateLabel => switch (_selectedDateFilter) {
@@ -576,30 +469,29 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
         _ => 'Todas las fechas',
       };
 
-  String get _methodLabel => _selectedPaymentMethod == 'ALL' ? 'Todos los pagos' : paymentMethodLabel(_selectedPaymentMethod);
+  String get _methodLabel => switch (_selectedPaymentMethod) {
+        'ALL' => 'Todos los pagos',
+        _voided => 'Anuladas',
+        final m => PaymentMethod.label(m),
+      };
 
   /// Lista de opciones en una hoja inferior; devuelve la clave elegida
   Future<String?> _pickOption(String title, Map<String, String> options, String selected) {
-    return showModalBottomSheet<String>(
+    return AppSheet.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpace.xl, 0, AppSpace.xl, AppSpace.sm),
-              child: Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: ctx.colors.ink)),
+      title: title,
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final entry in options.entries)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(entry.value, style: AppText.body(ctx)),
+              trailing: entry.key == selected ? Icon(Icons.check_outlined, color: ctx.colors.accent) : null,
+              onTap: () => Navigator.pop(ctx, entry.key),
             ),
-            for (final entry in options.entries)
-              ListTile(
-                title: Text(entry.value),
-                trailing: entry.key == selected ? Icon(Icons.check_rounded, color: ctx.colors.accent) : null,
-                onTap: () => Navigator.pop(ctx, entry.key),
-              ),
-            const SizedBox(height: AppSpace.sm),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -619,10 +511,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                   child: Text(
                     label,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13.5, color: active ? c.accent : c.ink),
+                    style: AppText.body(context, color: active ? c.accent : c.ink),
                   ),
                 ),
-                Icon(Icons.expand_more_rounded, size: 20, color: active ? c.accent : c.inkMuted),
+                Icon(Icons.expand_more_outlined, size: 20, color: active ? c.accent : c.inkMuted),
               ],
             ),
           ),
@@ -653,14 +545,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
           }
         }),
         const SizedBox(width: AppSpace.sm),
+        // Escanear el código de un tiquete abre esa venta
+        IconButton.outlined(
+          tooltip: 'Escanear un tiquete',
+          onPressed: _scanTicket,
+          icon: const Icon(Icons.qr_code_scanner_outlined, size: 20),
+        ),
+        const SizedBox(width: AppSpace.sm),
         button(_methodLabel, _selectedPaymentMethod != 'ALL', () async {
           final picked = await _pickOption(
-            'Método de pago',
-            const {
+            'Forma de pago',
+            {
               'ALL': 'Todos los pagos',
-              'EFECTIVO': 'Efectivo',
-              'TRANSFERENCIA': 'Transferencia',
-              'FIADO': 'Fiado',
+              for (final m in PaymentMethod.forSale) m: PaymentMethod.label(m),
+              _voided: 'Anuladas',
             },
             _selectedPaymentMethod,
           );

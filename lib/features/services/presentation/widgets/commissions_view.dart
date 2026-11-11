@@ -10,6 +10,7 @@ import '../../data/commissions_repository.dart';
 import '../../data/services_repository.dart';
 import '../../models/commission_models.dart';
 import '../../models/service_models.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Periodo para ver lo pendiente
 enum CommissionPeriod {
@@ -80,18 +81,18 @@ class _CommissionsViewState extends State<CommissionsView> {
     final name = _name(e.staffId);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('¿Pagar ${CurrencyFormatter.format(e.total)} a $name?'),
-        content: Text(
+      builder: (ctx) => AppDialog(
+title: '¿Pagar ${CurrencyFormatter.format(e.total)} a $name?',
+content: Text(
           '${e.services} ${e.services == 1 ? 'servicio' : 'servicios'} · comisiones ${CurrencyFormatter.format(e.commissions)}'
           '${e.tips != 0 ? ' · propinas ${CurrencyFormatter.format(e.tips)}' : ''}.\n\n'
           'Queda como pagado y ya no aparece pendiente.',
         ),
-        actions: [
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Marcar como pagado')),
         ],
-      ),
+),
     );
     if (ok != true) return;
     try {
@@ -101,14 +102,14 @@ class _CommissionsViewState extends State<CommissionsView> {
       if (staff != null) {
         final send = await showDialog<bool>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Pago registrado'),
-            content: Text('¿Le envías el detalle a $name por WhatsApp?'),
-            actions: [
+          builder: (ctx) => AppDialog(
+title: 'Pago registrado',
+content: Text('¿Le envías el detalle a $name por WhatsApp?'),
+actions: [
               TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
               FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Enviar')),
             ],
-          ),
+),
         );
         if (send == true) {
           await CommissionsRepository.sendDetail(staff: staff, business: widget.business, earnings: e, paid: true);
@@ -133,7 +134,7 @@ class _CommissionsViewState extends State<CommissionsView> {
           shrinkWrap: true,
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
           children: [
-            Text(_name(e.staffId), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+            Text(_name(e.staffId), style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
             Text('Pendiente: ${CurrencyFormatter.format(e.total)}', style: TextStyle(color: c.inkMuted)),
             const SizedBox(height: AppSpace.md),
             for (final item in e.items)
@@ -145,7 +146,7 @@ class _CommissionsViewState extends State<CommissionsView> {
                       child: Text(
                         '${item.date.day}/${item.date.month} · ${item.label}'
                         '${item.kind == Commission.kindService ? ' (${item.pct.toStringAsFixed(item.pct % 1 == 0 ? 0 : 1)} % de ${CurrencyFormatter.format(item.base)})' : ''}',
-                        style: TextStyle(fontSize: 13, color: c.ink),
+                        style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink),
                       ),
                     ),
                     Text(CurrencyFormatter.format(item.amount),
@@ -179,7 +180,7 @@ class _CommissionsViewState extends State<CommissionsView> {
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.xs, AppSpace.lg, AppSpace.xxl),
           children: [
             Text('Cada servicio cobrado suma la comisión de quien lo hizo. Paga al final del día, la semana o el mes.',
-                style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
             const SizedBox(height: AppSpace.md),
             Wrap(
               spacing: AppSpace.sm,
@@ -201,7 +202,7 @@ class _CommissionsViewState extends State<CommissionsView> {
               AppCard(child: Text('No hay nada pendiente por pagar en este periodo.', style: TextStyle(color: c.inkMuted)))
             else ...[
               Text('Pendiente: ${CurrencyFormatter.format(total)}',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+                  style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
               const SizedBox(height: AppSpace.sm),
               for (final e in _pending) ...[
                 AppCard(
@@ -217,7 +218,7 @@ class _CommissionsViewState extends State<CommissionsView> {
                             Text(
                               '${e.services} ${e.services == 1 ? 'servicio' : 'servicios'} · comisiones ${CurrencyFormatter.format(e.commissions)}'
                               '${e.tips != 0 ? ' · propinas ${CurrencyFormatter.format(e.tips)}' : ''}',
-                              style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                              style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                             ),
                           ],
                         ),
@@ -233,7 +234,7 @@ class _CommissionsViewState extends State<CommissionsView> {
             ],
             if (_payouts.isNotEmpty) ...[
               const SizedBox(height: AppSpace.lg),
-              Text('Pagos hechos', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+              Text('Pagos hechos', style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
               const SizedBox(height: AppSpace.sm),
               for (final p in _payouts)
                 Padding(

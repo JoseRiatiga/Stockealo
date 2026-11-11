@@ -164,7 +164,7 @@ No quedan preguntas abiertas en este plan. Falta que el dueño lo apruebe.
 
 ## 8. Diseño de la pantalla de roles (referencia del dueño, 10 nov)
 
-El dueño mostró un video de referencia: una **matriz de roles y permisos con interruptores**. La pantalla **Ajustes › Equipo › Roles** seguirá esta idea, hecha por nosotros y sin copiar el código de la referencia. **Aprobado por el dueño el 10 nov.**
+El dueño mostró un video de referencia: una **matriz de roles y permisos con interruptores**. La pantalla **Ajustes › Equipo › Roles** seguirá esta idea, hecha por nosotros y sin copiar el código de la referencia. **El funcionamiento quedó aprobado el 10 nov. El aspecto es un diseño PROPUESTO:** se decide en el diseño final (ver `docs/referencias-diseno.md`).
 
 > **No se hace con el diseño V1:** el dueño planea cambiar el diseño de la app. Esta pantalla se dibuja con el diseño nuevo cuando esté definido. Lo que queda fijo es **cómo funciona**: matriz, interruptores, contador, «Seleccionar todo», Dueño bloqueado, cambios marcados y barra para guardar.
 

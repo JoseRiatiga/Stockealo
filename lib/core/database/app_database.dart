@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 12;
+  static const int _schemaVersion = 13;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -570,6 +570,19 @@ class AppDatabase {
       // Quien ya usaba la app ve una vez «Dónde quedó cada cosa» (las instalaciones nuevas no)
       await db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('where_moved_pending', '1')");
     }
+    if (oldVersion < 13 && newVersion >= 13) await salesV13(db);
+  }
+
+  /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
+  /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
+  /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  static Future<void> salesV13(Database db) async {
+    for (final column in ['voided_at', 'void_reason', 'voided_by', 'payment_split']) {
+      await _addColumnIfMissing(db, 'sales', column, 'TEXT');
+    }
+    // Tienda en línea (bloque 8): precio de antes, para mostrar la oferta
+    await _addColumnIfMissing(db, 'products', 'compare_price', 'REAL');
+    await db.execute('CREATE VIEW IF NOT EXISTS sales_ok AS SELECT * FROM sales WHERE voided_at IS NULL');
   }
 
   /// La descarga de la nube reescribía los productos sin `has_variants` y sus
@@ -853,6 +866,7 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_members_biz ON business_members(business_id)');
     await db.execute('CREATE INDEX idx_members_email ON business_members(email)');
     await db.execute('CREATE INDEX idx_quotations_biz ON quotations(business_id)');
+    await salesV13(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

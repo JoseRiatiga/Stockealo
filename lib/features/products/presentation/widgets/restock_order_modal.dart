@@ -18,6 +18,7 @@ import '../../data/product_repository.dart';
 import '../../models/product.dart';
 import '../../models/product_variant.dart';
 import 'product_image_view.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Un producto del pedido: cantidad total o, si tiene tallas y colores, una por cada una
 class RestockOrderItem {
@@ -226,11 +227,11 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Agregar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c.ink)),
+                    Text('Agregar producto', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.bold, color: c.ink)),
                     const SizedBox(height: AppSpace.md),
                     TextField(
                       autofocus: true,
-                      decoration: const InputDecoration(hintText: 'Buscar por nombre o código', prefixIcon: Icon(Icons.search)),
+                      decoration: const InputDecoration(hintText: 'Buscar por nombre o código', prefixIcon: Icon(Icons.search_outlined)),
                       onChanged: (val) => setModalState(() => query = val),
                     ),
                     const SizedBox(height: AppSpace.sm),
@@ -252,7 +253,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                                   ),
                                   title: Text(p.name, style: TextStyle(fontWeight: FontWeight.w600, color: c.ink)),
                                   subtitle: Text('Hay ${p.stock} · Cód: ${p.code}', style: TextStyle(color: c.inkMuted)),
-                                  trailing: Icon(Icons.add_circle_outline, color: c.accent),
+                                  trailing: Icon(Icons.add_circle_outline_outlined, color: c.accent),
                                   onTap: () {
                                     final item = RestockOrderItem.suggested(p);
                                     setState(() => _manual.insert(0, item));
@@ -281,9 +282,9 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
       context: context,
       builder: (ctx) {
         final c = ctx.colors;
-        return AlertDialog(
-          title: Text(p.name, style: const TextStyle(fontSize: 16)),
-          content: SizedBox(
+        return AppDialog(
+title: p.name,
+content: SizedBox(
             width: 360,
             child: SingleChildScrollView(
               child: Column(
@@ -292,7 +293,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                 children: [
                   Text(
                     item.withVariants ? '¿Cuántas pides de cada talla y color?' : '¿Cuántas unidades pides?',
-                    style: TextStyle(fontSize: 13, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                   ),
                   const SizedBox(height: AppSpace.md),
                   if (item.withVariants)
@@ -307,7 +308,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                             ],
                             Expanded(
                               child: Text('${v.label.isEmpty ? 'Sin nombre' : v.label}  ·  hay ${v.stock}',
-                                  style: TextStyle(color: c.ink, fontSize: 13)),
+                                  style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall)),
                             ),
                             SizedBox(width: 80, child: _qtyField(controllers[v.id]!)),
                           ],
@@ -319,11 +320,11 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
               ),
             ),
           ),
-          actions: [
+actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Aceptar')),
           ],
-        );
+);
       },
     );
     if (ok == true) {
@@ -438,13 +439,13 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Pedido a proveedor', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.ink)),
+                      Text('Pedido a proveedor', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.bold, color: c.ink)),
                       Text('Lo que se está acabando, por talla y color',
-                          style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                     ],
                   ),
                 ),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                IconButton(icon: const Icon(Icons.close_outlined), onPressed: () => Navigator.pop(context)),
               ],
             ),
           ),
@@ -469,13 +470,13 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                   _supplier == null
                       ? 'Elige uno para ver solo sus productos y enviarle el pedido'
                       : (hasWhatsApp ? 'Se envía directo a su WhatsApp' : 'Sin WhatsApp: se comparte el pedido'),
-                  style: TextStyle(color: c.inkMuted, fontSize: 12),
+                  style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption),
                 ),
                 trailing: _supplier == null
                     ? Text('Elegir', style: TextStyle(color: c.accent, fontWeight: FontWeight.w600))
                     : IconButton(
                         tooltip: 'Ver todos',
-                        icon: const Icon(Icons.close_rounded, size: 18),
+                        icon: const Icon(Icons.close_outlined, size: 18),
                         onPressed: () => setState(() => _supplier = null),
                       ),
                 onTap: _pickSupplier,
@@ -494,11 +495,11 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                       controller: _searchController,
                       decoration: InputDecoration(
                         hintText: 'Filtrar lista...',
-                        prefixIcon: const Icon(Icons.search, size: 18),
+                        prefixIcon: const Icon(Icons.search_outlined, size: 18),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear, size: 16),
+                                icon: const Icon(Icons.clear_outlined, size: 16),
                                 onPressed: () {
                                   _searchController.clear();
                                   setState(() => _searchFilter = '');
@@ -513,7 +514,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                 const SizedBox(width: AppSpace.sm),
                 OutlinedButton.icon(
                   onPressed: _showAddOtherProductSheet,
-                  icon: const Icon(Icons.add, size: 16),
+                  icon: const Icon(Icons.add_outlined, size: 16),
                   label: const Text('Agregar'),
                 ),
               ],
@@ -526,7 +527,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                 Expanded(
                   child: Text(
                     '${items.length} ${items.length == 1 ? 'producto' : 'productos'} para reponer',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: c.inkMuted),
                   ),
                 ),
                 TextButton(
@@ -556,22 +557,22 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.check_circle_outline, size: 56, color: c.success),
+                              Icon(Icons.check_circle_outline_outlined, size: 56, color: c.success),
                               const SizedBox(height: AppSpace.lg),
                               Text('Inventario en orden',
-                                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: c.ink)),
+                                  style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.bold, color: c.ink)),
                               const SizedBox(height: AppSpace.sm),
                               Text(
                                 _supplier == null
                                     ? 'No hay productos agotados ni bajos de stock.'
                                     : 'No hay productos de ${_supplier!.name} por reponer.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 13, color: c.inkMuted),
+                                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                               ),
                               const SizedBox(height: 20),
                               FilledButton.tonalIcon(
                                 onPressed: _showAddOtherProductSheet,
-                                icon: const Icon(Icons.add),
+                                icon: const Icon(Icons.add_outlined),
                                 label: const Text('Agregar productos'),
                               ),
                             ],
@@ -596,8 +597,8 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('${selected.length} ${selected.length == 1 ? 'producto' : 'productos'}',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: c.ink)),
-                          Text('$totalUnits unidades', style: TextStyle(fontSize: 11, color: c.inkMuted)),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeSmall, color: c.ink)),
+                          Text('$totalUnits unidades', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                         ],
                       ),
                     ),
@@ -605,9 +606,9 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('Costo estimado', style: TextStyle(fontSize: 11, color: c.inkMuted)),
+                          Text('Costo estimado', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                           Text(CurrencyFormatter.format(totalCost),
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: c.ink)),
+                              style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.bold, color: c.ink)),
                         ],
                       ),
                   ],
@@ -624,7 +625,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                     Expanded(
                       child: FilledButton.icon(
                         onPressed: selected.isEmpty ? null : _send,
-                        icon: Icon(hasWhatsApp ? Icons.send_rounded : Icons.share, size: 18),
+                        icon: Icon(hasWhatsApp ? Icons.send_outlined : Icons.share_outlined, size: 18),
                         label: Text(
                           hasWhatsApp ? 'Enviar a ${_supplier!.name}' : 'Compartir pedido',
                           overflow: TextOverflow.ellipsis,
@@ -669,7 +670,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(p.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink)),
+                      Text(p.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody, color: c.ink)),
                       const SizedBox(height: 4),
                       Wrap(
                         spacing: AppSpace.sm,
@@ -683,12 +684,12 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                             ),
                             child: Text(
                               out ? 'Agotado' : 'Hay ${p.stock} / mín. ${p.minStock}',
-                              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: out ? c.danger : c.warning),
+                              style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.bold, color: out ? c.danger : c.warning),
                             ),
                           ),
                           if (p.purchasePrice > 0)
                             Text('Costo ${CurrencyFormatter.format(p.purchasePrice)}',
-                                style: TextStyle(fontSize: 11, color: c.inkMuted)),
+                                style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                         ],
                       ),
                     ],
@@ -696,7 +697,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                 ),
                 if (!item.withVariants) ...[
                   IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, size: 22),
+                    icon: const Icon(Icons.remove_circle_outline_outlined, size: 22),
                     color: c.inkMuted,
                     onPressed: () {
                       if (item.orderQty > 1) setState(() => item.orderQty--);
@@ -704,7 +705,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                   ),
                   _qtyChip('${item.orderQty}', () => _editQuantity(item)),
                   IconButton(
-                    icon: const Icon(Icons.add_circle_outline, size: 22),
+                    icon: const Icon(Icons.add_circle_outline_outlined, size: 22),
                     color: c.accent,
                     onPressed: () => setState(() => item.orderQty++),
                   ),
@@ -738,7 +739,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(8)),
-        child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink)),
+        child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody, color: c.ink)),
       ),
     );
   }
@@ -764,7 +765,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
             ],
             Text(
               '${v.label.isEmpty ? 'Sin nombre' : v.label}: $qty',
-              style: TextStyle(fontSize: 12, color: c.ink, fontWeight: qty > 0 ? FontWeight.w600 : FontWeight.normal),
+              style: TextStyle(fontSize: AppText.sizeCaption, color: c.ink, fontWeight: qty > 0 ? FontWeight.w600 : FontWeight.normal),
             ),
           ],
         ),

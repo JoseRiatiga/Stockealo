@@ -12,4 +12,9 @@ class DataEvents {
   final ValueNotifier<int> salesVersion = ValueNotifier<int>(0);
 
   void salesChanged() => salesVersion.value++;
+
+  /// Sube cada vez que se abre o se cierra la caja (la pastilla del encabezado la escucha)
+  final ValueNotifier<int> cashVersion = ValueNotifier<int>(0);
+
+  void cashChanged() => cashVersion.value++;
 }

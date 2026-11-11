@@ -134,10 +134,10 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Historias', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+                      Text('Historias', style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
                       Text(
                         '${_currentPageIndex + 1} de ${pages.length}',
-                        style: TextStyle(fontSize: 12, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                       ),
                     ],
                   ),
@@ -156,7 +156,7 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                 IconButton(
                   tooltip: 'Cerrar',
                   onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close_rounded, color: c.inkMuted),
+                  icon: Icon(Icons.close_outlined, color: c.inkMuted),
                 ),
               ],
             ),
@@ -185,7 +185,7 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
               onPressed: _isExporting ? null : _shareCurrentStory,
               icon: _isExporting
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.share_rounded, size: 18),
+                  : const Icon(Icons.share_outlined, size: 18),
               label: Text(_isExporting ? 'Preparando imagen…' : 'Compartir esta historia'),
             ),
           ),
@@ -231,13 +231,13 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                           widget.business.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                          style: const TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: Colors.white),
                         ),
                         Text(
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11, color: Colors.white),
+                          style: const TextStyle(fontSize: AppText.sizeCaption, color: Colors.white),
                         ),
                       ],
                     ),
@@ -254,14 +254,14 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.chat_rounded, size: 15, color: k.price),
+                  Icon(Icons.chat_outlined, size: 15, color: k.price),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
                       contact,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: k.price),
+                      style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, color: k.price),
                     ),
                   ),
                 ],
@@ -274,7 +274,7 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 9.5, color: k.muted),
+                style: TextStyle(fontSize: AppText.sizeCaption, color: k.muted),
               ),
             ],
           ],
@@ -351,12 +351,12 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
             Expanded(child: _image(p, 56)),
             const SizedBox(height: AppSpace.md),
             if (meta != null)
-              Text(meta, maxLines: 1, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: k.muted)),
+              Text(meta, maxLines: 1, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: k.muted)),
             Text(
               p.name,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: k.ink, height: 1.2),
+              style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: k.ink, height: 1.2),
             ),
             if (hasDescription) ...[
               const SizedBox(height: 4),
@@ -364,7 +364,7 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                 p.description!.trim(),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11.5, color: k.muted),
+                style: TextStyle(fontSize: AppText.sizeCaption, color: k.muted),
               ),
             ],
             const SizedBox(height: AppSpace.sm),
@@ -392,12 +392,12 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             if (_meta(p) != null)
-                              Text(_meta(p)!, maxLines: 1, style: TextStyle(fontSize: 9.5, color: k.muted)),
+                              Text(_meta(p)!, maxLines: 1, style: TextStyle(fontSize: AppText.sizeCaption, color: k.muted)),
                             Text(
                               p.name,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: k.ink),
+                              style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w700, color: k.ink),
                             ),
                             const SizedBox(height: 6),
                             _priceRow(p, 16),
@@ -437,7 +437,7 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                 p.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: k.ink),
+                style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, color: k.ink),
               ),
               _priceRow(p, 13),
             ],

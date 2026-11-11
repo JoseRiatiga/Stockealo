@@ -14,9 +14,9 @@ Widget _app(Widget child, {bool disableAnimations = false}) => MaterialApp(
 
 void main() {
   group('GlassSurface', () {
-    testWidgets('dibuja el cristal con desenfoque', (tester) async {
+    testWidgets('es sólida: el diseño 0.13.0 no usa cristal ni desenfoque', (tester) async {
       await tester.pumpWidget(_app(const GlassSurface(child: Text('Inicio'))));
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNothing);
       expect(find.text('Inicio'), findsOneWidget);
     });
 

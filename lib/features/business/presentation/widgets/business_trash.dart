@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
+import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/status_pill.dart';
 
 /// Papelera de negocios: restaurar, eliminar definitivamente o vaciarla.
 class BusinessTrash {
@@ -14,7 +17,6 @@ class BusinessTrash {
     final deleted = await BusinessRepository.instance.getDeletedBusinesses(userId);
     if (!context.mounted) return;
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     await showModalBottomSheet(
       showDragHandle: false,
@@ -39,7 +41,7 @@ class BusinessTrash {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isDark ? context.colors.ink : Colors.grey.shade300,
+                        color: context.colors.lineStrong,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -50,12 +52,12 @@ class BusinessTrash {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.delete_outline, color: context.colors.danger),
+                          Icon(Icons.delete_outline_outlined, color: context.colors.danger),
                           const SizedBox(width: 8),
                           Text(
                             'Papelera de Empresas',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: AppText.sizeHeading,
                               fontWeight: FontWeight.bold,
                               color: context.colors.ink,
                             ),
@@ -65,13 +67,13 @@ class BusinessTrash {
                       if (deleted.isNotEmpty)
                         TextButton.icon(
                           onPressed: () => _emptyTrash(context, userId, onChanged, trashCtx, setTrashState, deleted),
-                          icon: const Icon(Icons.delete_sweep, size: 16, color: Colors.red),
-                          label: const Text(
+                          icon: Icon(Icons.delete_sweep_outlined, size: 16, color: context.colors.danger),
+                          label: Text(
                             'Vaciar',
                             style: TextStyle(
-                              color: Colors.red,
+                              color: context.colors.danger,
                               fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                              fontSize: AppText.sizeCaption,
                             ),
                           ),
                         ),
@@ -81,7 +83,7 @@ class BusinessTrash {
                   Text(
                     'Las empresas se conservan aquí durante 7 días antes de eliminarse de forma permanente.',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppText.sizeCaption,
                       color: context.colors.inkMuted,
                     ),
                   ),
@@ -92,7 +94,7 @@ class BusinessTrash {
                       child: Center(
                         child: Text(
                           'No hay empresas en la papelera',
-                          style: TextStyle(color: context.colors.inkMuted, fontSize: 14),
+                          style: TextStyle(color: context.colors.inkMuted, fontSize: AppText.sizeBody),
                         ),
                       ),
                     )
@@ -108,18 +110,18 @@ class BusinessTrash {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.4) : context.colors.dangerSoft,
+                              color: context.colors.dangerSoft,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
+                                color: context.colors.dangerSoft,
                               ),
                             ),
                             child: Row(
                               children: [
                                 CircleAvatar(
-                                  backgroundColor: isDark ? const Color(0xFF7F1D1D) : context.colors.dangerSoft,
-                                  foregroundColor: isDark ? const Color(0xFFFCA5A5) : context.colors.danger,
-                                  child: const Icon(Icons.storefront, size: 20),
+                                  backgroundColor: context.colors.dangerSoft,
+                                  foregroundColor: context.colors.danger,
+                                  child: const Icon(Icons.storefront_outlined, size: 20),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -129,7 +131,7 @@ class BusinessTrash {
                                       Text(
                                         biz.name,
                                         style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: AppText.sizeBody,
                                           fontWeight: FontWeight.bold,
                                           color: context.colors.ink,
                                         ),
@@ -137,9 +139,9 @@ class BusinessTrash {
                                       Text(
                                         'Expira en $daysLeft ${daysLeft == 1 ? "día" : "días"}',
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: AppText.sizeCaption,
                                           fontWeight: FontWeight.w600,
-                                          color: isDark ? const Color(0xFFFCA5A5) : context.colors.danger,
+                                          color: context.colors.danger,
                                         ),
                                       ),
                                     ],
@@ -151,30 +153,24 @@ class BusinessTrash {
                                     TextButton.icon(
                                       onPressed: () async {
                                         final messenger = ScaffoldMessenger.of(trashCtx);
-                                        final accent = context.colors.accent;
                                         await BusinessRepository.instance.restoreBusiness(biz.id);
                                         setTrashState(() {
                                           deleted.removeWhere((b) => b.id == biz.id);
                                         });
                                         await onChanged();
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text('Negocio "${biz.name}" restaurado'),
-                                            backgroundColor: accent,
-                                          ),
-                                        );
+                                        AppToast.showWith(messenger, message: 'Negocio "${biz.name}" restaurado', type: ToastType.info);
                                       },
-                                      icon: const Icon(Icons.restore, size: 15),
+                                      icon: const Icon(Icons.restore_outlined, size: 15),
                                       label: const Text('Restaurar'),
                                       style: TextButton.styleFrom(
                                         foregroundColor: context.colors.accent,
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeCaption),
                                       ),
                                     ),
                                     const SizedBox(width: 4),
                                     IconButton(
-                                      icon: const Icon(Icons.delete_forever, size: 20, color: Colors.red),
+                                      icon: Icon(Icons.delete_forever_outlined, size: 20, color: context.colors.danger),
                                       tooltip: 'Eliminar definitivamente',
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
@@ -224,25 +220,14 @@ class BusinessTrash {
       context: trashCtx,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
           final isWordMatch = wordController.text.trim().toUpperCase() == 'VACIAR';
           final canSubmit = isWordMatch && passwordController.text.length >= 6 && !isDeleting;
 
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Row(
-              children: [
-                Icon(Icons.delete_sweep, color: Colors.red, size: 28),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '¿Vaciar toda la papelera?',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
+          return AppDialog(
+icon: Icons.delete_sweep_outlined,
+tone: AppTone.danger,
+title: '¿Vaciar toda la papelera?',
+content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,15 +235,15 @@ class BusinessTrash {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.5) : context.colors.dangerSoft,
+                      color: context.colors.dangerSoft,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA)),
+                      border: Border.all(color: context.colors.dangerSoft),
                     ),
                     child: Text(
                       'Se destruirán definitivamente todas las empresas en la papelera (${deleted.length} ${deleted.length == 1 ? "empresa" : "empresas"}) y todos sus datos en el teléfono y en la nube. Esta acción NO se puede deshacer.',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? const Color(0xFFFCA5A5) : context.colors.danger,
+                        fontSize: AppText.sizeCaption,
+                        color: context.colors.danger,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -267,7 +252,7 @@ class BusinessTrash {
                   Text(
                     '1. Escribe la palabra VACIAR para confirmar:',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppText.sizeCaption,
                       fontWeight: FontWeight.bold,
                       color: context.colors.ink,
                     ),
@@ -287,7 +272,7 @@ class BusinessTrash {
                   Text(
                     '2. Ingresa tu contraseña de Dueño:',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppText.sizeCaption,
                       fontWeight: FontWeight.bold,
                       color: context.colors.ink,
                     ),
@@ -300,7 +285,7 @@ class BusinessTrash {
                       hintText: 'Contraseña de tu cuenta',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
+                        icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                         onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
                       ),
                     ),
@@ -311,17 +296,17 @@ class BusinessTrash {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
+                        color: context.colors.danger.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                          Icon(Icons.error_outline_outlined, color: context.colors.danger, size: 16),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               errorMessage!,
-                              style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: context.colors.danger, fontSize: AppText.sizeCaption, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
@@ -331,14 +316,14 @@ class BusinessTrash {
                 ],
               ),
             ),
-            actions: [
+actions: [
               TextButton(
                 onPressed: isDeleting ? null : () => Navigator.pop(dialogCtx),
                 child: const Text('Cancelar'),
               ),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: context.colors.danger,
                   foregroundColor: Colors.white,
                   elevation: 0,
                 ),
@@ -376,12 +361,7 @@ class BusinessTrash {
                           Navigator.pop(dialogCtx);
                         }
 
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Papelera vaciada por completo.'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                        AppToast.showWith(messenger, message: 'Papelera vaciada por completo.', type: ToastType.error);
                       }
                     : null,
                 icon: isDeleting
@@ -390,11 +370,11 @@ class BusinessTrash {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Icon(Icons.delete_sweep, size: 18),
+                    : const Icon(Icons.delete_sweep_outlined, size: 18),
                 label: const Text('Vaciar Todo'),
               ),
             ],
-          );
+);
         },
       ),
     );
@@ -418,25 +398,14 @@ class BusinessTrash {
       context: trashCtx,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
           final isNameMatch = nameController.text.trim() == biz.name.trim();
           final canSubmit = isNameMatch && passwordController.text.length >= 6 && !isDeleting;
 
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Row(
-              children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Eliminar definitivamente',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
+          return AppDialog(
+icon: Icons.warning_amber_outlined,
+tone: AppTone.danger,
+title: 'Eliminar definitivamente',
+content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,15 +413,15 @@ class BusinessTrash {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.5) : context.colors.dangerSoft,
+                      color: context.colors.dangerSoft,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA)),
+                      border: Border.all(color: context.colors.dangerSoft),
                     ),
                     child: Text(
                       'Esta acción es IRREVERSIBLE. Se destruirán para siempre los productos, ventas, inventario, clientes y miembros de "${biz.name}" en el teléfono y en la nube.',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? const Color(0xFFFCA5A5) : context.colors.danger,
+                        fontSize: AppText.sizeCaption,
+                        color: context.colors.danger,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -461,7 +430,7 @@ class BusinessTrash {
                   Text(
                     '1. Escribe el nombre exacto de la empresa:',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppText.sizeCaption,
                       fontWeight: FontWeight.bold,
                       color: context.colors.ink,
                     ),
@@ -471,16 +440,16 @@ class BusinessTrash {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: isDark ? context.colors.ink : Colors.grey.shade100,
+                      color: context.colors.surfaceMuted,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: isDark ? context.colors.ink : Colors.grey.shade300),
+                      border: Border.all(color: context.colors.lineStrong),
                     ),
                     child: SelectableText(
                       biz.name,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
-                        fontSize: 13,
+                        color: context.colors.info,
+                        fontSize: AppText.sizeSmall,
                       ),
                     ),
                   ),
@@ -498,7 +467,7 @@ class BusinessTrash {
                   Text(
                     '2. Ingresa tu contraseña de Dueño:',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppText.sizeCaption,
                       fontWeight: FontWeight.bold,
                       color: context.colors.ink,
                     ),
@@ -511,7 +480,7 @@ class BusinessTrash {
                       hintText: 'Contraseña de tu cuenta',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
+                        icon: Icon(obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                         onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
                       ),
                     ),
@@ -522,17 +491,17 @@ class BusinessTrash {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
+                        color: context.colors.danger.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                          Icon(Icons.error_outline_outlined, color: context.colors.danger, size: 16),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               errorMessage!,
-                              style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: context.colors.danger, fontSize: AppText.sizeCaption, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
@@ -542,14 +511,14 @@ class BusinessTrash {
                 ],
               ),
             ),
-            actions: [
+actions: [
               TextButton(
                 onPressed: isDeleting ? null : () => Navigator.pop(dialogCtx),
                 child: const Text('Cancelar'),
               ),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: context.colors.danger,
                   foregroundColor: Colors.white,
                   elevation: 0,
                 ),
@@ -587,12 +556,7 @@ class BusinessTrash {
                           Navigator.pop(dialogCtx);
                         }
 
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text('Empresa "${biz.name}" eliminada definitivamente.'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                        AppToast.showWith(messenger, message: 'Empresa "${biz.name}" eliminada definitivamente.', type: ToastType.error);
                       }
                     : null,
                 icon: isDeleting
@@ -601,11 +565,11 @@ class BusinessTrash {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Icon(Icons.delete_forever, size: 18),
+                    : const Icon(Icons.delete_forever_outlined, size: 18),
                 label: const Text('Destruir Definitivamente'),
               ),
             ],
-          );
+);
         },
       ),
     );

@@ -1,8 +1,11 @@
 import '../../../../core/theme/app_tokens.dart';
 import 'package:flutter/material.dart';
 import '../../../auth/data/auth_repository.dart';
-import '../../../products/presentation/screens/barcode_scanner_screen.dart';
 import '../../../team/data/team_repository.dart';
+import '../../../../core/codes/code_reader.dart';
+import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/status_pill.dart';
 
 /// Unirse a un negocio con el código de invitación o su QR.
 class JoinBusinessDialog {
@@ -15,23 +18,18 @@ class JoinBusinessDialog {
     await showDialog<void>(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Icon(Icons.group_add_outlined, color: context.colors.accent),
-              const SizedBox(width: 10),
-              const Text('Unirse a Empresa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: SingleChildScrollView(
+        builder: (context, setDialogState) => AppDialog(
+icon: Icons.group_add_outlined,
+tone: AppTone.accent,
+title: 'Unirse a un negocio',
+content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Ingresa como colaborador escaneando el código QR o escribiendo el código de invitación.',
-                  style: TextStyle(fontSize: 13, color: context.colors.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: context.colors.inkMuted),
                 ),
                 const SizedBox(height: 18),
 
@@ -45,15 +43,12 @@ class JoinBusinessDialog {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    icon: const Icon(Icons.qr_code_scanner, size: 20),
+                    icon: const Icon(Icons.qr_code_scanner_outlined, size: 20),
                     label: const Text('Escanear Código QR', style: TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: isSubmitting
                         ? null
                         : () async {
-                            final scanned = await Navigator.push<String>(
-                              context,
-                              MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
-                            );
+                            final scanned = await CodeReader.scan(context, title: 'Código del negocio');
                             if (scanned != null && scanned.trim().isNotEmpty) {
                               codeController.text = scanned.trim();
                               setDialogState(() {});
@@ -71,10 +66,8 @@ class JoinBusinessDialog {
                       child: Text(
                         'O escribe el código',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? context.colors.inkMuted
-                              : context.colors.inkMuted,
+                          fontSize: AppText.sizeCaption,
+                          color: context.colors.inkMuted,
                         ),
                       ),
                     ),
@@ -89,7 +82,7 @@ class JoinBusinessDialog {
                   textCapitalization: TextCapitalization.characters,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: AppText.sizeHeading,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2.0,
                     color: context.colors.accent,
@@ -99,10 +92,10 @@ class JoinBusinessDialog {
                     hintText: 'Ej. 6CC1-4831',
                     errorText: errorText,
                     errorMaxLines: 3,
-                    prefixIcon: Icon(Icons.pin, color: context.colors.inkMuted),
+                    prefixIcon: Icon(Icons.pin_outlined, color: context.colors.inkMuted),
                     suffixIcon: codeController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
+                            icon: const Icon(Icons.clear_outlined, size: 18),
                             onPressed: () {
                               codeController.clear();
                               setDialogState(() => errorText = null);
@@ -115,7 +108,7 @@ class JoinBusinessDialog {
               ],
             ),
           ),
-          actions: [
+actions: [
             TextButton(
               onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
               child: const Text('Cancelar'),
@@ -148,12 +141,7 @@ class JoinBusinessDialog {
                           Navigator.pop(dialogCtx);
                         }
                         if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('¡Te has unido exitosamente a "${joinedBiz.name}"!'),
-                            backgroundColor: context.colors.accent,
-                          ),
-                        );
+                        AppToast.show(context, message: '¡Te has unido exitosamente a "${joinedBiz.name}"!', type: ToastType.info);
                         Navigator.pop(context, true);
                       } catch (e) {
                         if (!dialogCtx.mounted) return;
@@ -172,7 +160,7 @@ class JoinBusinessDialog {
                   : const Text('Unirme'),
             ),
           ],
-        ),
+),
       ),
     );
   }

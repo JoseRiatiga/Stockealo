@@ -318,7 +318,7 @@ class PhoneAlertsService {
         await _plugin.zonedSchedule(
           id,
           'Hoy pasa ${s.name}',
-          'Revisa qué pedirle en Inventario › Pedido.',
+          'Revisa qué pedirle en Stock.',
           tz.TZDateTime.from(when.toUtc(), tz.UTC),
           const NotificationDetails(android: _visitChannel),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,

@@ -1,0 +1,4 @@
+# Archivos de la web que el navegador carga tal cual: sin convertir saltos de línea
+# (con CRLF el trabajador de la base local deja de responder: "getDatabasesPath is null")
+web/sqflite_sw.js text eol=lf
+*.wasm binary

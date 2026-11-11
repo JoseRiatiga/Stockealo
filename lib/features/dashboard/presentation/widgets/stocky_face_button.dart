@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../auth/presentation/widgets/stocky_mascot.dart';
 import 'stocky_assistant_modal.dart';
+import '../../../../core/theme/app_tokens.dart';
 
 class StockyFaceButton extends StatelessWidget {
   final String? businessId;
@@ -32,7 +33,6 @@ class StockyFaceButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (showLabel) {
       // Versión Desktop / Tablet extendida tipo pill
@@ -42,10 +42,10 @@ class StockyFaceButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1A3C) : const Color(0xFFF1F5F9),
+            color: context.colors.surfaceMuted,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+              color: context.colors.accent.withValues(alpha: 0.4),
               width: 1.2,
             ),
           ),
@@ -55,29 +55,29 @@ class StockyFaceButton extends StatelessWidget {
               Container(
                 width: 24,
                 height: 24,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Color(0xFF0F0E1E),
+                  color: context.colors.paper,
                 ),
                 child: const Center(
                   child: StockyMascot(size: 20, state: StockyState.idle),
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Stocky',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: AppText.sizeCaption,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF8B5CF6),
+                  color: context.colors.accent,
                 ),
               ),
               const SizedBox(width: 6),
               Container(
                 width: 6,
                 height: 6,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF10B981),
+                decoration: BoxDecoration(
+                  color: context.colors.accent,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -102,14 +102,14 @@ class StockyFaceButton extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isDark ? const Color(0xFF1C1838) : const Color(0xFFECFDF5),
+                color: context.colors.successSoft,
                 border: Border.all(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.6),
+                  color: context.colors.accent.withValues(alpha: 0.6),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+                    color: context.colors.accent.withValues(alpha: 0.25),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -138,15 +138,15 @@ class StockyFaceButton extends StatelessWidget {
                       width: 9,
                       height: 9,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
+                        color: context.colors.accent,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isDark ? const Color(0xFF1C1838) : Colors.white,
+                          color: context.colors.surface,
                           width: 1.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.8),
+                            color: context.colors.accent.withValues(alpha: 0.8),
                             blurRadius: 4,
                             spreadRadius: 1,
                           ),

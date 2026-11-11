@@ -38,7 +38,7 @@ class CategoryFilterBar extends StatelessWidget {
             labelStyle: TextStyle(
               color: isSelected ? c.onAccent : c.ink,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              fontSize: 13.5,
+              fontSize: AppText.sizeBody,
             ),
             side: BorderSide(color: isSelected ? c.accent : c.line),
           );

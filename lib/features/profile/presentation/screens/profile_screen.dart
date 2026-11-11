@@ -31,7 +31,8 @@ import '../../../team/data/team_repository.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/services/update_service.dart';
 import '../../../../core/widgets/update_dialog.dart';
-import '../../../../core/widgets/modern_dialog.dart';
+import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/status_pill.dart';
 import '../../../../core/widgets/image_source_picker_modal.dart';
 import '../../../backup/data/auto_backup_service.dart';
 import '../../../pro/data/pro_service.dart';
@@ -163,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           ),
           if (_summaryAlerts)
             SettingsRow(
-              icon: Icons.schedule_rounded,
+              icon: Icons.schedule_outlined,
               title: 'Hora del resumen',
               subtitle: _hourLabel(_summaryHour),
               onTap: _pickSummaryHour,
@@ -173,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
           child: Text(
             'Se calculan con lo registrado en este celular. Cada persona del equipo elige sus avisos en su propio celular.',
-            style: TextStyle(fontSize: 12.5, height: 1.4, color: c.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeSmall, height: 1.4, color: c.inkMuted),
           ),
         ),
       ];
@@ -254,21 +255,21 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(AppSpace.xl, 0, AppSpace.xl, AppSpace.sm),
-                child: Text('Volver a una copia', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.ink)),
+                child: Text('Volver a una copia', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w800, color: c.ink)),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(AppSpace.xl, 0, AppSpace.xl, AppSpace.md),
                 child: Text(
                   'Elige cómo estaban tus datos. Lo que hayas hecho después de esa copia se pierde.',
-                  style: TextStyle(fontSize: 13.5, color: c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeBody, color: c.inkMuted),
                 ),
               ),
               for (final copy in _autoBackups)
                 ListTile(
-                  leading: Icon(Icons.history_rounded, color: c.accent),
+                  leading: Icon(Icons.history_outlined, color: c.accent),
                   title: Text(_backupWhen(copy.date), style: TextStyle(fontWeight: FontWeight.w600, color: c.ink)),
                   subtitle: Text('${(copy.bytes / 1024).ceil()} KB', style: TextStyle(color: c.inkMuted)),
-                  trailing: Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                  trailing: Icon(Icons.chevron_right_outlined, color: c.inkFaint),
                   onTap: () => Navigator.pop(ctx, copy),
                 ),
               const SizedBox(height: AppSpace.md),
@@ -283,9 +284,9 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       context: context,
       builder: (ctx) {
         final c = ctx.colors;
-        return AlertDialog(
-          title: const Text('¿Volver a esta copia?'),
-          content: Column(
+        return AppDialog(
+title: '¿Volver a esta copia?',
+content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -300,17 +301,17 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                   ),
                   child: Text(
                     'Con la nube activa, lo que ya está en la nube volverá a aparecer al sincronizar.',
-                    style: TextStyle(fontSize: 13, height: 1.35, color: c.ink),
+                    style: TextStyle(fontSize: AppText.sizeSmall, height: 1.35, color: c.ink),
                   ),
                 ),
               ],
             ],
           ),
-          actions: [
+actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Volver a esta copia')),
           ],
-        );
+);
       },
     );
     if (confirmed != true || !mounted) return;
@@ -346,12 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     if (updateInfo.hasUpdate) {
       UpdateDialog.show(context, updateInfo);
     } else if (updateInfo.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(updateInfo.errorMessage!),
-          backgroundColor: Colors.orange.shade800,
-        ),
-      );
+      AppToast.show(context, message: updateInfo.errorMessage!, type: ToastType.warning);
     } else {
       UpToDateDialog.show(context, updateInfo.currentVersion);
     }
@@ -413,20 +409,10 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     setState(() => _isCloudSyncEnabled = value);
 
     if (value) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sincronización en la nube activada. Respaldando datos...'),
-          backgroundColor: Color(0xFF059669),
-        ),
-      );
+      AppToast.show(context, message: 'Sincronización en la nube activada. Respaldando datos...', type: ToastType.success);
       _runManualSync();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Modo Local Privado activo. Tus datos se guardan únicamente en este equipo.'),
-          backgroundColor: Color(0xFF475569),
-        ),
-      );
+      AppToast.show(context, message: 'Modo Local Privado activo. Tus datos se guardan únicamente en este equipo.', type: ToastType.info);
     }
   }
 
@@ -440,19 +426,9 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     setState(() => _isManualSyncing = false);
 
     if (res.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Respaldo al día: ${res.productsCount} productos y ${res.salesCount} ventas.'),
-          backgroundColor: const Color(0xFF059669),
-        ),
-      );
+      AppToast.show(context, message: 'Respaldo al día: ${res.productsCount} productos y ${res.salesCount} ventas.', type: ToastType.success);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Aviso: ${res.errorMessage ?? "No se pudo sincronizar"}'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppToast.show(context, message: 'Aviso: ${res.errorMessage ?? "No se pudo sincronizar"}', type: ToastType.warning);
     }
   }
 
@@ -521,18 +497,11 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Perfil comercial actualizado con éxito'),
-            backgroundColor: Color(0xFF059669),
-          ),
-        );
+        AppToast.show(context, message: 'Perfil comercial actualizado con éxito', type: ToastType.success);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        AppToast.show(context, message: 'Error: $e', type: ToastType.error);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -544,16 +513,16 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     try {
       await BackupService.instance.exportBackup();
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      AppToast.showWith(messenger, message: e.toString().replaceFirst('Exception: ', ''), type: ToastType.info);
     }
   }
 
   Future<void> _restoreBackup() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Restaurar un respaldo?'),
-        content: Column(
+      builder: (ctx) => AppDialog(
+title: '¿Restaurar un respaldo?',
+content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -567,24 +536,24 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD97706).withValues(alpha: 0.10),
+                  color: context.colors.warning.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Text(
+                child: Text(
                   'Tienes la sincronización en la nube activa: lo que ya está en la nube volverá '
                   'a aparecer al sincronizar. El respaldo sirve para recuperar datos perdidos, '
                   'no para borrar los que están en la nube.',
-                  style: TextStyle(fontSize: 13, color: Color(0xFFB45309), height: 1.35),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: context.colors.warning, height: 1.35),
                 ),
               ),
             ],
           ],
         ),
-        actions: [
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Elegir archivo')),
         ],
-      ),
+),
     );
     if (confirmed != true || !mounted) return;
 
@@ -592,10 +561,10 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     try {
       final restored = await BackupService.instance.importBackup();
       if (restored) {
-        messenger.showSnackBar(const SnackBar(content: Text('Respaldo restaurado.'), backgroundColor: Color(0xFF059669)));
+        AppToast.showWith(messenger, message: 'Respaldo restaurado.', type: ToastType.success);
       }
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red));
+      AppToast.showWith(messenger, message: e.toString().replaceFirst('Exception: ', ''), type: ToastType.error);
     }
   }
 
@@ -603,17 +572,15 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
 
   /// Opción A: Confirmación para purgar únicamente los datos en la nube
   Future<void> _showPurgeCloudDialog() async {
-    final confirmed = await ModernConfirmDialog.show(
+    final confirmed = await AppDialog.confirm(
       context: context,
-      title: 'Purgar datos de la Nube',
-      message: '¿Deseas eliminar únicamente tus copias en la nube?\n\n'
-          '• Se borrarán tus registros en la nube.\n'
-          '• Tus datos en este dispositivo seguirán 100% INTACTOS.\n'
-          '• La app volverá al Modo Local Privado.',
-      icon: Icons.cloud_off_rounded,
-      iconColor: Colors.orange,
-      confirmText: 'Purgar Nube',
-      confirmColor: Colors.orange,
+      title: 'Borrar tus datos de la nube',
+      message: 'Se borran solo las copias en la nube.\n\n'
+          '• Lo que tienes en este equipo no se toca.\n'
+          '• La app vuelve a guardar solo en este equipo.',
+      icon: Icons.cloud_off_outlined,
+      confirmText: 'Borrar de la nube',
+      destructive: true,
     );
 
     if (confirmed == true && _user != null) {
@@ -625,14 +592,9 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ok
+        AppToast.show(context, message: ok
                 ? 'Datos de la nube purgados. Tu aplicación ahora está 100% en modo local privado.'
-                : 'Ocurrió un inconveniente al purgar los datos de la nube.'),
-            backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
-          ),
-        );
+                : 'Ocurrió un inconveniente al purgar los datos de la nube.', type: ToastType.error);
       }
     }
   }
@@ -646,12 +608,11 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          return ModernDialog(
-            icon: Icons.warning_amber_rounded,
-            iconColor: const Color(0xFFDC2626),
-            title: 'Eliminar Cuenta Definitivamente',
-            subtitle: 'Esta acción es irreversible y permanente',
+          return AppDialog(
+            icon: Icons.warning_amber_outlined,
+            tone: AppTone.danger,
+            title: 'Eliminar la cuenta para siempre',
+            subtitle: 'No se puede deshacer',
             maxWidth: 440,
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -661,9 +622,9 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                   'Se borrarán por completo tus empresas, catálogo de productos, registro de ventas, clientes e historial contable tanto de este dispositivo como de la nube.\n\n'
                   'Para confirmar, escribe la palabra "ELIMINAR" a continuación:',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: AppText.sizeSmall,
                     height: 1.4,
-                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                    color: context.colors.inkMuted,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -688,7 +649,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                 style: OutlinedButton.styleFrom(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   side: BorderSide(
-                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
+                    color: context.colors.lineStrong,
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
@@ -696,7 +657,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                 child: Text(
                   'Cancelar',
                   style: TextStyle(
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    color: context.colors.inkMuted,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -704,7 +665,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
               const SizedBox(width: 10),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: canProceed ? const Color(0xFFDC2626) : Colors.grey.shade400,
+                  backgroundColor: canProceed ? context.colors.danger : context.colors.inkFaint,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -720,9 +681,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                           } catch (e) {
                             if (mounted) {
                               setState(() => _isLoading = false);
-                              messenger.showSnackBar(
-                                SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-                              );
+                              AppToast.showWith(messenger, message: e.toString().replaceFirst('Exception: ', ''), type: ToastType.info);
                             }
                             return;
                           }
@@ -785,8 +744,8 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Ajustes', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: c.ink)),
-                            Text('Haz que la app sea tuya.', style: TextStyle(fontSize: 15, color: c.inkMuted)),
+                            Text('Ajustes', style: TextStyle(fontSize: AppText.sizeDisplay, fontWeight: FontWeight.w800, color: c.ink)),
+                            Text('Haz que la app sea tuya.', style: TextStyle(fontSize: AppText.sizeBodyLarge, color: c.inkMuted)),
                           ],
                         ),
                       ),
@@ -811,7 +770,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                         ),
                         if (_currentBusinessRole.toUpperCase() != 'CASHIER')
                           SettingsRow(
-                            icon: Icons.history_rounded,
+                            icon: Icons.history_outlined,
                             title: 'Actividad del equipo',
                             subtitle: 'Quién vendió, cambió precios o ajustó el stock',
                             onTap: () => ActivityScreen.open(context, _activeBusiness!),
@@ -868,7 +827,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                       ),
                       if (PhoneAlertsService.instance.isSupported)
                         SettingsRow(
-                          icon: Icons.notifications_none_rounded,
+                          icon: Icons.notifications_none_outlined,
                           title: 'Avisos',
                           subtitle: [
                             if (_stockAlerts) 'Stock bajo',
@@ -887,7 +846,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                     ]),
                     SettingsGroup(label: 'Privacidad y seguridad', children: [
                       SettingsRow(
-                        icon: Icons.lock_outline_rounded,
+                        icon: Icons.lock_outline,
                         title: 'Cambiar contraseña',
                         subtitle: 'Tu clave de acceso',
                         onTap: _user == null ? null : () => ChangePasswordDialog.show(context, userId: _user!.id),
@@ -899,7 +858,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                         onTap: () => LegalDocumentScreen.show(context),
                       ),
                       SettingsRow(
-                        icon: Icons.delete_outline_rounded,
+                        icon: Icons.delete_outline_outlined,
                         title: 'Borrar datos',
                         subtitle: SupabaseService.cloudSyncForced
                             ? 'Eliminar la cuenta'
@@ -934,7 +893,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                         onTap: () => WhereThingsMovedSheet.show(context),
                       ),
                       SettingsRow(
-                        icon: Icons.logout_rounded,
+                        icon: Icons.logout_outlined,
                         title: 'Cerrar sesión',
                         danger: true,
                         onTap: widget.onLogout,
@@ -943,7 +902,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                     Center(
                       child: Text(
                         'Stockealo $_currentAppVersion · Control de inventario',
-                        style: TextStyle(fontSize: 12, color: c.inkFaint),
+                        style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
                       ),
                     ),
                   ],
@@ -988,7 +947,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                           backgroundImage: avatar,
                           child: avatar == null
                               ? Text(initial,
-                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: c.accent))
+                                  style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.accent))
                               : null,
                         ),
                         Positioned(
@@ -997,7 +956,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                           child: CircleAvatar(
                             radius: 10,
                             backgroundColor: c.accent,
-                            child: Icon(Icons.camera_alt_rounded, color: c.onAccent, size: 11),
+                            child: Icon(Icons.camera_alt_outlined, color: c.onAccent, size: 11),
                           ),
                         ),
                       ],
@@ -1010,7 +969,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(user?.displayName ?? 'Comerciante',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.ink)),
+                          style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
                       Text(
                         [
                           if (user?.email.isNotEmpty == true) user!.email,
@@ -1018,14 +977,14 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                         ].join(' · '),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
                   tooltip: _isEditingProfile ? 'Cancelar' : 'Editar tus datos',
-                  icon: Icon(_isEditingProfile ? Icons.close_rounded : Icons.edit_outlined, color: c.inkMuted),
+                  icon: Icon(_isEditingProfile ? Icons.close_outlined : Icons.edit_outlined, color: c.inkMuted),
                   onPressed: () => setState(() => _isEditingProfile = !_isEditingProfile),
                 ),
               ],
@@ -1035,7 +994,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
               TextField(
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Nombre', prefixIcon: Icon(Icons.person_outline)),
+                decoration: const InputDecoration(labelText: 'Nombre', prefixIcon: Icon(Icons.person_outline_outlined)),
               ),
               const SizedBox(height: AppSpace.md),
               PhoneField(
@@ -1095,7 +1054,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       SettingsGroup(children: [
         Builder(builder: (context) {
           final dark = theme.themeMode == ThemeMode.dark ||
-              (theme.themeMode == ThemeMode.system && MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+              (theme.themeMode == ThemeMode.system && context.isDarkTheme);
           return SettingsRow.toggle(
             icon: dark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
             title: 'Modo oscuro',
@@ -1121,7 +1080,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                       color: theme.accentFor('business'),
                       selected: theme.accentChoice == 'business',
                       label: ThemeController.accentLabel('business'),
-                      icon: Icons.storefront_rounded,
+                      icon: Icons.storefront_outlined,
                       onTap: () => theme.setAccentChoice('business'),
                     ),
                     const SizedBox(width: AppSpace.sm),
@@ -1133,7 +1092,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                               style: TextStyle(fontWeight: FontWeight.w600, color: context.colors.ink)),
                           Text(business?.name ?? '',
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 12.5, color: context.colors.inkMuted)),
+                              style: TextStyle(fontSize: AppText.sizeSmall, color: context.colors.inkMuted)),
                         ],
                       ),
                     ),
@@ -1179,7 +1138,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       ),
       SettingsGroup(label: 'Accesibilidad', children: [
         SettingsRow.toggle(
-          icon: Icons.blur_off_rounded,
+          icon: Icons.blur_off_outlined,
           title: 'Reducir transparencias',
           subtitle: 'Barras sólidas; útil en celulares lentos',
           value: theme.reduceTransparency,
@@ -1192,7 +1151,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
           child: Text(
             'Los cambios se ven al instante. Guárdalos con "Revisar" o vuelve atrás con "Descartar".',
-            style: TextStyle(fontSize: 12.5, color: context.colors.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeSmall, color: context.colors.inkMuted),
           ),
         ),
     ];
@@ -1224,7 +1183,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
             ),
           if (_isCloudSyncEnabled)
             SettingsRow(
-              icon: Icons.sync_rounded,
+              icon: Icons.sync_outlined,
               title: _isManualSyncing ? 'Sincronizando…' : 'Sincronizar ahora',
               subtitle: 'Sube y baja los últimos cambios',
               onTap: _isManualSyncing ? null : _runManualSync,
@@ -1236,7 +1195,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
         if (AutoBackupService.instance.isSupported)
           SettingsGroup(label: 'Copias automáticas', children: [
             SettingsRow.toggle(
-              icon: Icons.history_rounded,
+              icon: Icons.history_outlined,
               title: 'Copia diaria en este celular',
               subtitle: _autoBackupSummary,
               value: _autoBackupEnabled,
@@ -1252,7 +1211,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                   : null,
             ),
             SettingsRow(
-              icon: Icons.restore_rounded,
+              icon: Icons.restore_outlined,
               title: 'Volver a una copia',
               subtitle: 'Deshace un error, como borrar productos sin querer',
               onTap: _pickAutoBackup,
@@ -1267,7 +1226,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
               onTap: _exportBackup,
             ),
             SettingsRow(
-              icon: Icons.settings_backup_restore_rounded,
+              icon: Icons.settings_backup_restore_outlined,
               title: 'Restaurar respaldo',
               subtitle: 'Recupera los datos desde un archivo',
               onTap: _restoreBackup,
@@ -1279,7 +1238,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
             child: Text(
               'Las copias diarias viven en este celular: si lo pierdes, se pierden con él. '
               'Activa la nube o exporta un respaldo en archivo de vez en cuando.',
-              style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+              style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
             ),
           ),
       ];
@@ -1311,7 +1270,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
           child: Text(
             'Antes de borrar te pediremos confirmarlo. Eliminar la cuenta no se puede deshacer.',
-            style: TextStyle(fontSize: 12.5, color: context.colors.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeSmall, color: context.colors.inkMuted),
           ),
         ),
       ];
@@ -1353,7 +1312,7 @@ class _AccentDot extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               child: selected
-                  ? Icon(Icons.check_rounded, color: c.onAccent, size: 20)
+                  ? Icon(Icons.check_outlined, color: c.onAccent, size: 20)
                   : (icon != null ? Icon(icon, color: Colors.white, size: 18) : null),
             ),
           ),
@@ -1396,7 +1355,7 @@ class _TextSizeOption extends StatelessWidget {
             child: Text(
               'Aa',
               style: TextStyle(
-                fontSize: 16 * scale,
+                fontSize: AppText.sizeTitle * scale,
                 fontWeight: FontWeight.w700,
                 color: selected ? c.accent : c.ink,
               ),

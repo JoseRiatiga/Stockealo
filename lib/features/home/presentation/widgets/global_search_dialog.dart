@@ -9,7 +9,8 @@ import '../../../products/models/product.dart';
 import '../../../products/presentation/screens/product_detail_screen.dart';
 import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../../products/presentation/widgets/stock_status_badge.dart';
-import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
+import '../../../sales/presentation/screens/sell_screen.dart';
+import '../../navigation/app_places.dart';
 
 class GlobalSearchDialog extends StatefulWidget {
   final String? businessId;
@@ -111,16 +112,16 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
               padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.sm, AppSpace.sm),
               child: Row(
                 children: [
-                  Icon(Icons.search_rounded, color: c.inkMuted, size: 22),
+                  Icon(Icons.search_outlined, color: c.inkMuted, size: 22),
                   const SizedBox(width: AppSpace.md),
                   Expanded(
                     child: TextField(
                       controller: _searchController,
                       autofocus: true,
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.ink),
+                      style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w600, color: c.ink),
                       decoration: InputDecoration(
                         hintText: 'Busca un producto o una función',
-                        hintStyle: TextStyle(fontSize: 14, color: c.inkFaint),
+                        hintStyle: TextStyle(fontSize: AppText.sizeBody, color: c.inkFaint),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
@@ -133,7 +134,7 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
                   if (_searchController.text.isNotEmpty)
                     IconButton(
                       tooltip: 'Borrar',
-                      icon: Icon(Icons.close_rounded, size: 18, color: c.inkMuted),
+                      icon: Icon(Icons.close_outlined, size: 18, color: c.inkMuted),
                       onPressed: () => _searchController.clear(),
                     ),
                   TextButton(
@@ -189,7 +190,7 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
 
   Widget _sectionLabel(String text) => Padding(
         padding: const EdgeInsets.only(left: AppSpace.xs, bottom: AppSpace.sm),
-        child: Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.inkMuted)),
+        child: Text(text, style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: context.colors.inkMuted)),
       );
 
   /// Sin escribir: todas las funciones de la app y dónde viven
@@ -230,13 +231,13 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(f.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.ink)),
+                    Text(f.title, style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w600, color: c.ink)),
                     const SizedBox(height: 2),
-                    Text('Está en ${f.where}', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                    Text('Está en ${f.where}', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: c.inkFaint, size: 20),
+              Icon(Icons.chevron_right_outlined, color: c.inkFaint, size: 20),
             ],
           ),
         ),
@@ -252,12 +253,12 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off_rounded, size: 40, color: c.inkFaint),
+            Icon(Icons.search_off_outlined, size: 40, color: c.inkFaint),
             const SizedBox(height: AppSpace.md),
-            Text('No encontramos nada', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+            Text('No encontramos nada', style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.xs),
             Text('Prueba con otra palabra, el código de barras o la categoría.',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
           ],
         ),
       ),
@@ -287,7 +288,7 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
                 Text(product.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.ink)),
+                    style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w600, color: c.ink)),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: AppSpace.sm,
@@ -335,6 +336,7 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
   Future<void> _sellProduct(Product product) async {
     final nav = Navigator.of(context);
     nav.pop();
-    await QuickSaleDialog.show(nav.context, product);
+    await SellScreen.sell(nav.context, product);
+    AppPlace.go(AppPlace.vender);
   }
 }

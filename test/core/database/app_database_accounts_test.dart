@@ -83,7 +83,7 @@ void main() {
         containsAll(['is_deleted', 'deleted_at', 'description', 'country', 'icon', 'color', 'logo_url', 'cash_register_enabled']),
       );
       expect(await columnsOf('app_settings'), isNotEmpty);
-      expect(await db.getVersion(), 12);
+      expect(await db.getVersion(), 13);
       expect(await columnsOf('services'), containsAll(['price', 'commission_pct', 'duration_min', 'prices', 'staff_ids']));
       expect(await columnsOf('staff_attendance'), containsAll(['staff_id', 'day', 'status', 'pauses']));
       expect(await columnsOf('staff'), containsAll(['name', 'commission_pct', 'member_email']));

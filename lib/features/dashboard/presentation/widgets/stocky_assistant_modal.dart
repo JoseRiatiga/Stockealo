@@ -1,4 +1,5 @@
 import '../../../../core/theme/app_tokens.dart';
+import '../../../home/navigation/app_places.dart';
 import '../../../../core/theme/stocky_palette.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import '../../../customers/data/debt_reminder.dart';
@@ -334,28 +335,28 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
 
       case 'navigate_sales':
         Navigator.pop(context);
-        if (widget.onNavigateToTab != null) {
-          widget.onNavigateToTab!(2);
-        }
+        widget.onNavigateToTab?.call(AppPlace.ventas);
         break;
 
       case 'navigate_inventory':
         Navigator.pop(context);
-        if (widget.onNavigateToTab != null) {
-          widget.onNavigateToTab!(1);
-        }
+        widget.onNavigateToTab?.call(AppPlace.productos);
         break;
 
-      // Stocky solo lleva a donde vive cada cosa (0.12.0): no abre copias
+      // Stocky solo lleva a donde vive cada cosa: no abre copias
       case 'navigate_customers':
+        Navigator.pop(context);
+        widget.onNavigateToTab?.call(AppPlace.personas);
+        break;
+
       case 'quick_sale':
         Navigator.pop(context);
-        widget.onNavigateToTab?.call(2);
+        widget.onNavigateToTab?.call(AppPlace.vender);
         break;
 
       case 'restock_modal':
         Navigator.pop(context);
-        widget.onNavigateToTab?.call(1);
+        widget.onNavigateToTab?.call(AppPlace.stock);
         break;
 
       case 'whatsapp_debtor':
@@ -459,7 +460,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
               children: [
                 Row(
                   children: [
-                    Text('Stocky', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.ink)),
+                    Text('Stocky', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w800, color: c.ink)),
                     const SizedBox(width: AppSpace.sm),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -469,7 +470,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                       ),
                       child: Text(
                         'BETA',
-                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: c.inkMuted),
                       ),
                     ),
                   ],
@@ -479,7 +480,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                   children: [
                     Container(width: 7, height: 7, decoration: BoxDecoration(color: c.success, shape: BoxShape.circle)),
                     const SizedBox(width: 6),
-                    Text('En línea', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                    Text('En línea', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                   ],
                 ),
               ],
@@ -487,12 +488,12 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
           ),
           _aiModeButton(c),
           IconButton(
-            icon: Icon(Icons.refresh_rounded, size: 21, color: c.inkMuted),
+            icon: Icon(Icons.refresh_outlined, size: 21, color: c.inkMuted),
             tooltip: 'Reiniciar conversación',
             onPressed: _resetChat,
           ),
           IconButton(
-            icon: Icon(Icons.close_rounded, size: 22, color: c.inkMuted),
+            icon: Icon(Icons.close_outlined, size: 22, color: c.inkMuted),
             tooltip: 'Cerrar',
             onPressed: () => Navigator.pop(context),
           ),
@@ -522,7 +523,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                 valueListenable: ai.remaining,
                 builder: (_, left, __) => Text(
                   left == null ? 'IA de Stocky' : 'IA de Stocky · te quedan $left hoy',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: c.inkMuted),
                 ),
               ),
             ),
@@ -537,7 +538,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                       Padding(
                         padding: const EdgeInsets.only(top: 1),
                         child: Icon(
-                          option == mode ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                          option == mode ? Icons.radio_button_checked_outlined : Icons.radio_button_off_outlined,
                           size: 18,
                           color: option == mode ? c.accent : c.inkFaint,
                         ),
@@ -549,7 +550,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                           children: [
                             Text(option.label, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
                             const SizedBox(height: 2),
-                            Text(option.description, style: TextStyle(fontSize: 12.5, height: 1.3, color: c.inkMuted)),
+                            Text(option.description, style: TextStyle(fontSize: AppText.sizeSmall, height: 1.3, color: c.inkMuted)),
                           ],
                         ),
                       ),
@@ -568,11 +569,11 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.auto_awesome_rounded, size: 15, color: on ? c.accent : c.inkMuted),
+                Icon(Icons.auto_awesome_outlined, size: 15, color: on ? c.accent : c.inkMuted),
                 const SizedBox(width: 4),
                 Text(
                   on ? 'IA' : 'IA no',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: on ? c.accent : c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w800, color: on ? c.accent : c.inkMuted),
                 ),
               ],
             ),
@@ -597,7 +598,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
             onPressed: () => _handleSendMessage(chip['prompt']!),
             backgroundColor: c.surface,
             side: BorderSide(color: c.line),
-            labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.ink),
+            labelStyle: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.ink),
             shape: const StadiumBorder(),
           );
         },
@@ -613,7 +614,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
           Expanded(
             child: TextField(
               controller: _textController,
-              style: TextStyle(fontSize: 15, color: c.ink),
+              style: TextStyle(fontSize: AppText.sizeBodyLarge, color: c.ink),
               textInputAction: TextInputAction.send,
               textCapitalization: TextCapitalization.sentences,
               onSubmitted: (_) => _handleSendMessage(),
@@ -650,7 +651,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                 child: SizedBox(
                   width: 48,
                   height: 48,
-                  child: Icon(Icons.arrow_upward_rounded, color: c.onAccent, size: 22),
+                  child: Icon(Icons.arrow_upward_outlined, color: c.onAccent, size: 22),
                 ),
               ),
             ),
@@ -688,7 +689,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
               children: [
                 SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: c.accent)),
                 const SizedBox(width: AppSpace.sm + 2),
-                Text(_thinkingLabel, style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                Text(_thinkingLabel, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
               ],
             ),
           ),
@@ -712,7 +713,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
               bottomLeft: Radius.circular(18),
             ),
           ),
-          child: Text(msg.text, style: TextStyle(fontSize: 14.5, color: c.onAccent, height: 1.35)),
+          child: Text(msg.text, style: TextStyle(fontSize: AppText.sizeBodyLarge, color: c.onAccent, height: 1.35)),
         ),
       );
     }
@@ -744,12 +745,12 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.auto_awesome_rounded, size: 13, color: c.inkFaint),
+                      Icon(Icons.auto_awesome_outlined, size: 13, color: c.inkFaint),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
                           _aiFooter(msg),
-                          style: TextStyle(fontSize: 11.5, color: c.inkFaint),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
                         ),
                       ),
                     ],
@@ -779,16 +780,15 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
 
   Widget _buildActionPill(StockyAction action, StockealoColors c) {
     final (IconData icon, Color color) = switch (action.actionType) {
-      'navigate_sales' => (Icons.point_of_sale_rounded, c.info),
+      'navigate_sales' => (Icons.point_of_sale_outlined, c.info),
       'navigate_inventory' => (Icons.inventory_2_outlined, c.accent),
-      'navigate_customers' => (Icons.people_outline_rounded, c.warning),
-      'quick_sale' => (Icons.add_shopping_cart_rounded, c.accent),
+      'navigate_customers' => (Icons.people_outline_outlined, c.warning),
+      'quick_sale' => (Icons.add_shopping_cart_outlined, c.accent),
       'restock_modal' => (Icons.local_shipping_outlined, c.danger),
-      'whatsapp_debtor' => (Icons.chat_bubble_outline_rounded, c.success),
-      'ask_ai' => (Icons.auto_awesome_rounded, c.accent),
-      _ => (Icons.arrow_forward_rounded, c.accent),
+      'whatsapp_debtor' => (Icons.chat_bubble_outline_outlined, c.success),
+      'ask_ai' => (Icons.auto_awesome_outlined, c.accent),
+      _ => (Icons.arrow_forward_outlined, c.accent),
     };
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return InkWell(
       onTap: () => _handleActionTap(action),
@@ -796,7 +796,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 7),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: isDark ? 0.18 : 0.10),
+          color: color.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
@@ -805,7 +805,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
           children: [
             Icon(icon, size: 15, color: color),
             const SizedBox(width: 6),
-            Text(action.label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: color)),
+            Text(action.label, style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: color)),
           ],
         ),
       ),
@@ -824,7 +824,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
           padding: const EdgeInsets.only(bottom: 2),
           child: Text.rich(
             TextSpan(
-              style: TextStyle(fontSize: 14, height: 1.42, color: c.ink),
+              style: TextStyle(fontSize: AppText.sizeBody, height: 1.42, color: c.ink),
               children: _parseMarkdownSpans(line, c.ink),
             ),
           ),

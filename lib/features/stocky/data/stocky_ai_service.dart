@@ -175,13 +175,13 @@ class StockyAiService {
     final db = await AppDatabase.instance.database;
     final top = await db.rawQuery('''
       SELECT product_name, SUM(quantity) AS qty
-      FROM sales WHERE business_id = ? AND date >= ?
+      FROM sales_ok WHERE business_id = ? AND date >= ?
       GROUP BY product_name ORDER BY qty DESC LIMIT 5
     ''', [businessId, DateTime.now().subtract(const Duration(days: 30)).toIso8601String()]);
     final stagnant = await db.rawQuery('''
       SELECT name FROM products
       WHERE business_id = ? AND is_active = 1 AND stock > 0
-        AND id NOT IN (SELECT DISTINCT product_id FROM sales WHERE business_id = ? AND date >= ? AND product_id IS NOT NULL)
+        AND id NOT IN (SELECT DISTINCT product_id FROM sales_ok WHERE business_id = ? AND date >= ? AND product_id IS NOT NULL)
       LIMIT 5
     ''', [businessId, businessId, DateTime.now().subtract(const Duration(days: 14)).toIso8601String()]);
 

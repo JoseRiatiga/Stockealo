@@ -21,10 +21,13 @@ import '../widgets/debt_reminder_schedule_sheet.dart';
 
 class CustomersScreen extends StatefulWidget {
   final String businessId;
+  /// Dentro del marco de la app (lugar del menú): sin barra propia, el encabezado único pone el título
+  final bool embedded;
 
   const CustomersScreen({
     super.key,
     required this.businessId,
+    this.embedded = false,
   });
 
   @override
@@ -121,11 +124,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Historial de abonos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: context.colors.ink)),
-                      Text(customer.name, style: TextStyle(fontSize: 13, color: context.colors.inkMuted)),
+                      Text('Historial de abonos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeTitle, color: context.colors.ink)),
+                      Text(customer.name, style: TextStyle(fontSize: AppText.sizeSmall, color: context.colors.inkMuted)),
                     ],
                   ),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  IconButton(icon: const Icon(Icons.close_outlined), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
               const Divider(height: 20),
@@ -155,8 +158,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             size: 18,
                           ),
                         ),
-                        title: Text(CurrencyFormatter.formatCOP(p.amount), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        subtitle: Text('$dateStr • ${p.paymentMethod}${p.notes != null ? " • ${p.notes}" : ""}', style: TextStyle(fontSize: 11, color: context.colors.inkMuted)),
+                        title: Text(CurrencyFormatter.formatCOP(p.amount), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody)),
+                        subtitle: Text('$dateStr • ${p.paymentMethod}${p.notes != null ? " • ${p.notes}" : ""}', style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.inkMuted)),
                       );
                     },
                   ),
@@ -235,17 +238,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final filtered = _filteredCustomers;
 
     return Scaffold(
       backgroundColor: context.colors.surfaceMuted,
-      appBar: AppBar(
-        title: const Text('Clientes y fiados', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        elevation: 0,
-        backgroundColor: context.colors.surface,
-        foregroundColor: context.colors.ink,
-      ),
+      appBar: widget.embedded ? null : AppBar(title: const Text('Clientes y fiados')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
@@ -257,9 +254,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.4) : context.colors.warningSoft,
+                color: context.colors.warningSoft,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? context.colors.warning : const Color(0xFFFDE68A)),
+                border: Border.all(color: context.colors.warningSoft),
               ),
               child: Row(
                 children: [
@@ -269,7 +266,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       color: context.colors.warning.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.receipt_long, color: isDark ? const Color(0xFFFDE68A) : context.colors.warning, size: 24),
+                    child: Icon(Icons.receipt_long_outlined, color: context.colors.warning, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -279,17 +276,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         Text(
                           'Fiados por cobrar',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFFFDE68A) : context.colors.warning,
+                            fontSize: AppText.sizeCaption,
+                            color: context.colors.warning,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
                           CurrencyFormatter.formatCOP(_totalDebt),
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: AppText.sizeHeading,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFFFDE68A) : context.colors.warning,
+                            color: context.colors.warning,
                           ),
                         ),
                       ],
@@ -304,9 +301,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     child: Text(
                       _debtorsCount == 1 ? '1 cliente debe' : '$_debtorsCount clientes deben',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: AppText.sizeCaption,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFFDE68A) : context.colors.warning,
+                        color: context.colors.warning,
                       ),
                     ),
                   ),
@@ -325,9 +322,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     hintText: 'Buscar por nombre o teléfono',
-                    prefixIcon: Icon(Icons.search, color: context.colors.inkMuted),
+                    prefixIcon: Icon(Icons.search_outlined, color: context.colors.inkMuted),
                     suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => setState(() => _searchController.clear()))
+                        ? IconButton(icon: const Icon(Icons.clear_outlined, size: 18), onPressed: () => setState(() => _searchController.clear()))
                         : null,
                     filled: true,
                     fillColor: context.colors.surfaceMuted,
@@ -338,11 +335,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _buildFilterChip('TODOS', 'Todos (${_customers.length})', isDark),
+                    _buildFilterChip('TODOS', 'Todos (${_customers.length})'),
                     const SizedBox(width: 8),
-                    _buildFilterChip('DEUDA', 'Con deuda ($_debtorsCount)', isDark),
+                    _buildFilterChip('DEUDA', 'Con deuda ($_debtorsCount)'),
                     const SizedBox(width: 8),
-                    _buildFilterChip('AL_DIA', 'Al día (${_customers.length - _debtorsCount})', isDark),
+                    _buildFilterChip('AL_DIA', 'Al día (${_customers.length - _debtorsCount})'),
                   ],
                 ),
               ],
@@ -358,13 +355,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.people_outline, size: 54, color: context.colors.lineStrong),
+                            Icon(Icons.people_outline_outlined, size: 54, color: context.colors.lineStrong),
                             const SizedBox(height: 12),
                             Text(
                               _customers.isEmpty ? 'Aún no tienes clientes registrados' : 'No se encontraron clientes con este filtro',
                               style: TextStyle(
                                 color: context.colors.inkMuted,
-                                fontSize: 14,
+                                fontSize: AppText.sizeBody,
                               ),
                             ),
                           ],
@@ -380,7 +377,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
                           final c = filtered[index];
-                          return _buildCustomerCard(c, isDark);
+                          return _buildCustomerCard(c);
                         },
                       ),
           ),
@@ -394,32 +391,32 @@ class _CustomersScreenState extends State<CustomersScreen> {
           onPressed: _openCreateCustomerDialog,
           backgroundColor: context.colors.accent,
           foregroundColor: Colors.white,
-          icon: const Icon(Icons.person_add),
+          icon: const Icon(Icons.person_add_outlined),
           label: const Text('Nuevo cliente'),
         ),
       ),
     );
   }
 
-  Widget _buildFilterChip(String key, String label, bool isDark) {
+  Widget _buildFilterChip(String key, String label) {
     final selected = _filter == key;
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: isDark ? const Color(0xFF064E3B) : context.colors.successSoft,
+      selectedColor: context.colors.successSoft,
       backgroundColor: context.colors.surfaceMuted,
       labelStyle: TextStyle(
-        fontSize: 12,
+        fontSize: AppText.sizeCaption,
         fontWeight: FontWeight.bold,
         color: selected
-            ? (isDark ? const Color(0xFFA7F3D0) : context.colors.accent)
+            ? (context.colors.accent)
             : (context.colors.inkMuted),
       ),
       onSelected: (_) => setState(() => _filter = key),
     );
   }
 
-  Widget _buildCustomerCard(Customer customer, bool isDark) {
+  Widget _buildCustomerCard(Customer customer) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
@@ -427,7 +424,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           color: customer.hasDebt
-              ? (isDark ? context.colors.warning : const Color(0xFFFDE68A))
+              ? (context.colors.warningSoft)
               : (context.colors.line),
         ),
       ),
@@ -441,14 +438,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
               children: [
                 CircleAvatar(
                   backgroundColor: customer.hasDebt
-                      ? (isDark ? const Color(0xFF78350F) : context.colors.warningSoft)
-                      : (isDark ? const Color(0xFF064E3B) : context.colors.successSoft),
+                      ? (context.colors.warningSoft)
+                      : (context.colors.successSoft),
                   child: Text(
                     customer.name.isNotEmpty ? customer.name[0].toUpperCase() : 'C',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: customer.hasDebt
-                          ? (isDark ? const Color(0xFFFDE68A) : context.colors.warning)
+                          ? (context.colors.warning)
                           : context.colors.accent,
                     ),
                   ),
@@ -462,7 +459,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         customer.name,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                          fontSize: AppText.sizeBodyLarge,
                           color: context.colors.ink,
                         ),
                       ),
@@ -477,7 +474,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 child: Text(
                                   '${_reminders[customer.id]!.frequencyLabel} · '
                                   '${formatAppTime(TimeOfDay(hour: _reminders[customer.id]!.hour, minute: _reminders[customer.id]!.minute))}',
-                                  style: TextStyle(fontSize: 12, color: context.colors.accent),
+                                  style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.accent),
                                 ),
                               ),
                             ],
@@ -495,7 +492,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             Text(
                               customer.phone!,
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: AppText.sizeCaption,
                                 color: context.colors.inkMuted,
                               ),
                             ),
@@ -509,13 +506,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: customer.hasDebt
-                        ? (isDark ? const Color(0xFF78350F) : context.colors.warningSoft)
-                        : (isDark ? const Color(0xFF064E3B) : context.colors.successSoft),
+                        ? (context.colors.warningSoft)
+                        : (context.colors.successSoft),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: customer.hasDebt
-                          ? (isDark ? context.colors.warning : const Color(0xFFFDE68A))
-                          : (isDark ? context.colors.accent : const Color(0xFFA7F3D0)),
+                          ? (context.colors.warningSoft)
+                          : (context.colors.successSoft),
                     ),
                   ),
                   child: Column(
@@ -524,20 +521,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       Text(
                         customer.hasDebt ? 'Deuda' : 'Al día',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: AppText.sizeCaption,
                           fontWeight: FontWeight.bold,
                           color: customer.hasDebt
-                              ? (isDark ? const Color(0xFFFDE68A) : context.colors.warning)
+                              ? (context.colors.warning)
                               : context.colors.accent,
                         ),
                       ),
                       Text(
                         CurrencyFormatter.formatCOP(customer.debtBalance),
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: AppText.sizeSmall,
                           fontWeight: FontWeight.bold,
                           color: customer.hasDebt
-                              ? (isDark ? const Color(0xFFFDE68A) : context.colors.warning)
+                              ? (context.colors.warning)
                               : context.colors.accent,
                         ),
                       ),
@@ -552,7 +549,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               children: [
                 if (customer.hasDebt) ...[
                   IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline, size: 20, color: Color(0xFF25D366)),
+                    icon: const Icon(Icons.chat_bubble_outline_outlined, size: 20, color: AppPalette.whatsapp),
                     tooltip: 'Recordar pago por WhatsApp',
                     onPressed: () => _sendFriendlyReminderWhatsApp(customer),
                   ),
@@ -564,8 +561,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         onPaymentRecorded: _onPaymentRecorded,
                       );
                     },
-                    icon: const Icon(Icons.attach_money, size: 16),
-                    label: const Text('Abonar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    icon: const Icon(Icons.attach_money_outlined, size: 16),
+                    label: const Text('Abonar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeSmall)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: context.colors.accent,
                       foregroundColor: Colors.white,
@@ -582,7 +579,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       )
                     : PopupMenuButton<String>(
                         tooltip: 'Cobro y estado de cuenta',
-                        icon: Icon(Icons.more_vert_rounded, color: context.colors.inkMuted),
+                        icon: Icon(Icons.more_vert_outlined, color: context.colors.inkMuted),
                         onSelected: (v) => v == 'statement' ? _shareStatement(customer) : _scheduleReminder(customer),
                         itemBuilder: (_) => [
                           _proMenuItem('statement', Icons.picture_as_pdf_outlined, 'Estado de cuenta (PDF)'),
@@ -595,8 +592,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       ),
                 OutlinedButton.icon(
                   onPressed: () => _showCustomerPaymentsHistory(customer),
-                  icon: const Icon(Icons.history, size: 16),
-                  label: const Text('Historial', style: TextStyle(fontSize: 12)),
+                  icon: const Icon(Icons.history_outlined, size: 16),
+                  label: const Text('Historial', style: TextStyle(fontSize: AppText.sizeCaption)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: context.colors.ink,
                     side: BorderSide(color: context.colors.lineStrong),

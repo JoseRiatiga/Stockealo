@@ -13,6 +13,7 @@ import '../../business/models/business.dart';
 import '../../services/models/commission_models.dart';
 import '../../services/models/service_models.dart';
 import '../../team/data/team_repository.dart';
+import '../../sales/models/payment_method.dart';
 
 /// Partes que se pueden descargar desde Reportes
 enum ReportSection {
@@ -460,7 +461,7 @@ class ReportExportService {
   }
 
   Future<List<Map<String, Object?>>> _salesIn(DatabaseExecutor db, Business b, ReportPeriod p) async {
-    final rows = await db.query('sales', where: 'business_id = ?', whereArgs: [b.id], orderBy: 'date DESC');
+    final rows = await db.query('sales_ok', where: 'business_id = ?', whereArgs: [b.id], orderBy: 'date DESC');
     return [
       for (final s in rows)
         if (p.from == null || (DateTime.tryParse(s['date'] as String? ?? '') != null &&
@@ -498,7 +499,7 @@ class ReportExportService {
         DoubleCellValue(t),
         DoubleCellValue(c),
         DoubleCellValue(n),
-        TextCellValue(_paymentLabel(s['payment_method'] as String?)),
+        TextCellValue(PaymentMethod.label(s['payment_method'] as String?)),
         TextCellValue(s['customer_name'] as String? ?? 'Consumidor final'),
         TextCellValue(s['seller_name'] as String? ?? ''),
       ]);
@@ -509,14 +510,6 @@ class ReportExportService {
       IntCellValue(units), TextCellValue(''), DoubleCellValue(total), DoubleCellValue(cost), DoubleCellValue(profit),
     ]);
   }
-
-  static String _paymentLabel(String? m) => switch ((m ?? '').toUpperCase()) {
-        'EFECTIVO' => 'Efectivo',
-        'TRANSFERENCIA' => 'Transferencia',
-        'FIADO' => 'Fiado',
-        '' => 'Efectivo',
-        _ => m!,
-      };
 
   Future<void> _customers(Sheet sheet, DatabaseExecutor db, Business b) async {
     sheet.appendRow(_header(['Cliente', 'Teléfono', 'Dirección', 'Debe (${b.currency})', 'Cliente desde', 'Estado']));

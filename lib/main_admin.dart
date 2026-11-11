@@ -92,7 +92,7 @@ class _Message extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.lock_outline_rounded, size: 40, color: c.inkMuted),
+              Icon(Icons.lock_outline, size: 40, color: c.inkMuted),
               const SizedBox(height: AppSpace.md),
               Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: c.ink)),
               if (onSignOut != null) ...[

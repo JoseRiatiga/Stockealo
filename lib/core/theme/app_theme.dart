@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'app_tokens.dart';
 
-/// Tema de la app construido con el sistema de diseño V1 (ver app_tokens.dart).
+/// Tema de la app con el sistema de diseño del re-diseño 0.13.0 (ver app_tokens.dart).
 ///
-/// [accent] es el verde de Stockealo, o el color del negocio si el usuario activó
-/// "Usar el color del negocio en la app": cambia el botón principal, la pestaña
-/// activa y los detalles de color; fondos y textos no cambian.
+/// [accent] es el color del negocio (o el verde de Stockealo): cambia el botón
+/// principal, la opción activa y los detalles de color. Fondos y textos no cambian.
+/// Los widgets de Material sin estilo propio toman de aquí la escala de letra, las
+/// esquinas y los colores, así que se ven como el diseño aprobado sin código extra.
 class AppTheme {
   AppTheme._();
 
-  // Compatibilidad con pantallas que aún no usan context.colors
+  // Compatibilidad con pantallas que aún no usan context.colors (se quitan en el re-diseño)
   static const Color primaryGreen = AppPalette.brand;
   static const Color alertRed = AppPalette.danger;
   static const Color warningAmber = AppPalette.warning;
@@ -22,27 +23,58 @@ class AppTheme {
   static ThemeData build(Brightness brightness, {Color accent = AppPalette.brand}) {
     final isDark = brightness == Brightness.dark;
     final c = isDark ? StockealoColors.dark(accent: accent) : StockealoColors.light(accent: accent);
+    final a = c.accent; // ya ajustado para que el texto blanco se lea
 
     final scheme = ColorScheme.fromSeed(
-      seedColor: accent,
+      seedColor: a,
       brightness: brightness,
     ).copyWith(
-      primary: accent,
+      primary: a,
       onPrimary: c.onAccent,
-      secondary: accent,
+      secondary: a,
       onSecondary: c.onAccent,
       surface: c.surface,
       onSurface: c.ink,
       onSurfaceVariant: c.inkMuted,
       surfaceTint: Colors.transparent,
+      surfaceContainerLowest: c.surface,
+      surfaceContainerLow: c.surface,
+      surfaceContainer: c.surface,
+      surfaceContainerHigh: c.surfaceMuted,
+      surfaceContainerHighest: c.surfaceMuted,
       outline: c.lineStrong,
       outlineVariant: c.line,
       error: c.danger,
       onError: Colors.white,
     );
 
-    final baseText = (isDark ? Typography.material2021().white : Typography.material2021().black)
-        .apply(fontFamily: AppText.fontFamily, bodyColor: c.ink, displayColor: c.ink);
+    TextStyle t(double size, FontWeight weight, Color color, {double? height, double? spacing}) => TextStyle(
+          fontFamily: AppText.fontFamily,
+          fontSize: size,
+          fontWeight: weight,
+          height: height,
+          letterSpacing: spacing,
+          color: color,
+        );
+
+    // La escala de Material apuntando a la escala de Stockealo
+    final textTheme = TextTheme(
+      displayLarge: t(AppText.sizeFigure, FontWeight.w700, c.ink, spacing: -0.6),
+      displayMedium: t(AppText.sizeDisplay, FontWeight.w700, c.ink, spacing: -0.6),
+      displaySmall: t(AppText.sizeDisplay, FontWeight.w700, c.ink, spacing: -0.6),
+      headlineLarge: t(AppText.sizeDisplay, FontWeight.w700, c.ink, spacing: -0.5),
+      headlineMedium: t(AppText.sizePage, FontWeight.w700, c.ink, spacing: -0.5),
+      headlineSmall: t(AppText.sizePage, FontWeight.w700, c.ink, spacing: -0.5),
+      titleLarge: t(AppText.sizeHeading, FontWeight.w700, c.ink, spacing: -0.2),
+      titleMedium: t(AppText.sizeTitle, FontWeight.w600, c.ink),
+      titleSmall: t(AppText.sizeBody, FontWeight.w600, c.ink),
+      bodyLarge: t(AppText.sizeBodyLarge, FontWeight.w400, c.ink, height: 1.5),
+      bodyMedium: t(AppText.sizeBody, FontWeight.w400, c.ink, height: 1.45),
+      bodySmall: t(AppText.sizeCaption, FontWeight.w400, c.inkMuted, height: 1.4),
+      labelLarge: t(AppText.sizeBody, FontWeight.w600, c.ink),
+      labelMedium: t(AppText.sizeSmall, FontWeight.w500, c.inkMuted),
+      labelSmall: t(AppText.sizeCaption, FontWeight.w500, c.inkMuted),
+    );
 
     OutlineInputBorder border(Color color, [double width = 1]) => OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.control),
@@ -50,33 +82,32 @@ class AppTheme {
         );
 
     final roundedControl = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control));
-    const buttonText = TextStyle(fontFamily: AppText.fontFamily, fontSize: 15, fontWeight: FontWeight.w600);
+    final buttonText = t(AppText.sizeBody, FontWeight.w600, c.ink);
+    const buttonPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 12);
+    const buttonMin = Size(44, 44);
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
       fontFamily: AppText.fontFamily,
-      textTheme: baseText,
+      textTheme: textTheme,
       scaffoldBackgroundColor: c.paper,
       canvasColor: c.paper,
       dividerColor: c.line,
       splashFactory: InkSparkle.splashFactory,
       extensions: [c],
+      iconTheme: IconThemeData(color: c.ink, size: 20),
       appBarTheme: AppBarTheme(
-        backgroundColor: c.paper,
+        backgroundColor: c.surface,
         foregroundColor: c.ink,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        centerTitle: true,
-        titleTextStyle: TextStyle(
-          fontFamily: AppText.fontFamily,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          color: c.ink,
-        ),
-        iconTheme: IconThemeData(color: c.ink),
+        centerTitle: false,
+        shape: Border(bottom: BorderSide(color: c.line)),
+        titleTextStyle: t(AppText.sizeHeading, FontWeight.w700, c.ink, spacing: -0.2),
+        iconTheme: IconThemeData(color: c.ink, size: 20),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
@@ -94,31 +125,37 @@ class AppTheme {
         fillColor: c.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: 14),
         border: border(c.lineStrong),
-        enabledBorder: border(c.line),
-        focusedBorder: border(accent, 1.6),
+        enabledBorder: border(c.lineStrong),
+        focusedBorder: border(a, 2),
         errorBorder: border(c.danger),
-        focusedErrorBorder: border(c.danger, 1.6),
-        labelStyle: TextStyle(color: c.inkMuted),
-        floatingLabelStyle: TextStyle(color: accent),
-        hintStyle: TextStyle(color: c.inkFaint),
+        focusedErrorBorder: border(c.danger, 2),
+        labelStyle: t(AppText.sizeBody, FontWeight.w500, c.inkMuted),
+        floatingLabelStyle: t(AppText.sizeBody, FontWeight.w600, a),
+        hintStyle: t(AppText.sizeBody, FontWeight.w400, c.inkFaint),
+        helperStyle: t(AppText.sizeCaption, FontWeight.w400, c.inkMuted),
+        errorStyle: t(AppText.sizeCaption, FontWeight.w500, c.danger),
         prefixIconColor: c.inkMuted,
         suffixIconColor: c.inkMuted,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: accent,
+          backgroundColor: a,
           foregroundColor: c.onAccent,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          minimumSize: buttonMin,
+          padding: buttonPadding,
           shape: roundedControl,
           textStyle: buttonText,
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: accent,
+          backgroundColor: a,
           foregroundColor: c.onAccent,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          disabledBackgroundColor: c.surfaceMuted,
+          disabledForegroundColor: c.inkFaint,
+          minimumSize: buttonMin,
+          padding: buttonPadding,
           shape: roundedControl,
           textStyle: buttonText,
         ),
@@ -126,49 +163,95 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: c.ink,
+          backgroundColor: c.surface,
           side: BorderSide(color: c.lineStrong),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          minimumSize: buttonMin,
+          padding: buttonPadding,
           shape: roundedControl,
           textStyle: buttonText,
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: accent,
+          foregroundColor: a,
+          minimumSize: buttonMin,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
           shape: roundedControl,
-          textStyle: buttonText.copyWith(fontSize: 14),
+          textStyle: buttonText,
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          foregroundColor: c.ink,
+          minimumSize: buttonMin,
+          shape: roundedControl,
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: accent,
+        backgroundColor: a,
         foregroundColor: c.onAccent,
         elevation: 0,
         focusElevation: 0,
         hoverElevation: 0,
         highlightElevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sheet)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
       ),
+      // Chips: la opción elegida va en negro (en oscuro, en blanco), como las categorías del diseño
       chipTheme: ChipThemeData(
         backgroundColor: c.surface,
-        selectedColor: accent,
+        selectedColor: c.ink,
+        disabledColor: c.surfaceMuted,
         side: BorderSide(color: c.line),
         shape: const StadiumBorder(),
-        labelStyle: TextStyle(fontFamily: AppText.fontFamily, color: c.ink, fontSize: 13),
-        secondaryLabelStyle: TextStyle(fontFamily: AppText.fontFamily, color: c.onAccent, fontSize: 13),
-        checkmarkColor: c.onAccent,
+        showCheckmark: false,
+        labelStyle: t(AppText.sizeSmall, FontWeight.w600, c.ink),
+        secondaryLabelStyle: t(AppText.sizeSmall, FontWeight.w600, c.surface),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: AppSpace.xs),
       ),
-      // Menús ⋮: tarjeta blanca con borde fino, como el resto de V1 (no el gris de Material)
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          backgroundColor: c.surface,
+          foregroundColor: c.inkMuted,
+          selectedBackgroundColor: c.surfaceMuted,
+          selectedForegroundColor: c.ink,
+          side: BorderSide(color: c.line),
+          textStyle: t(AppText.sizeSmall, FontWeight.w600, c.ink),
+        ),
+      ),
+      // Menús ⋮: tarjeta blanca con borde fino y sin sombra
       popupMenuTheme: PopupMenuThemeData(
         color: c.surface,
         surfaceTintColor: Colors.transparent,
-        elevation: 6,
-        shadowColor: Colors.black.withValues(alpha: 0.12),
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.control),
-          side: BorderSide(color: c.line),
+          side: BorderSide(color: c.lineStrong),
         ),
-        textStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, color: c.ink),
-        labelTextStyle: WidgetStatePropertyAll(TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, color: c.ink)),
+        textStyle: t(AppText.sizeBody, FontWeight.w400, c.ink),
+        labelTextStyle: WidgetStatePropertyAll(t(AppText.sizeBody, FontWeight.w400, c.ink)),
+      ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(c.surface),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          elevation: const WidgetStatePropertyAll(0),
+          shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            side: BorderSide(color: c.lineStrong),
+          )),
+        ),
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: t(AppText.sizeBody, FontWeight.w400, c.ink),
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(c.surface),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          elevation: const WidgetStatePropertyAll(0),
+          shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            side: BorderSide(color: c.lineStrong),
+          )),
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: c.surface,
@@ -178,10 +261,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppRadius.sheet),
           side: BorderSide(color: c.line),
         ),
-        titleTextStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 18, fontWeight: FontWeight.w700, color: c.ink),
-        contentTextStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, height: 1.4, color: c.inkMuted),
+        titleTextStyle: t(AppText.sizeHeading, FontWeight.w700, c.ink, spacing: -0.2),
+        contentTextStyle: t(AppText.sizeBody, FontWeight.w400, c.inkMuted, height: 1.5),
       ),
-      // Reloj para elegir la hora: papel, tarjetas y el acento, sin el celeste de Material
+      // Reloj para elegir la hora: tarjeta, relleno y el color del negocio
       timePickerTheme: TimePickerThemeData(
         backgroundColor: c.surface,
         elevation: 0,
@@ -189,35 +272,35 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppRadius.sheet),
           side: BorderSide(color: c.line),
         ),
-        helpTextStyle: TextStyle(fontFamily: AppText.fontFamily, fontSize: 15, fontWeight: FontWeight.w700, color: c.ink),
+        helpTextStyle: t(AppText.sizeBodyLarge, FontWeight.w700, c.ink),
         hourMinuteShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
         hourMinuteColor: WidgetStateColor.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? Color.alphaBlend(accent.withValues(alpha: 0.14), c.surface) : c.surfaceMuted,
+          (states) => states.contains(WidgetState.selected) ? Color.alphaBlend(a.withValues(alpha: 0.14), c.surface) : c.surfaceMuted,
         ),
         hourMinuteTextColor: WidgetStateColor.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? accent : c.ink,
+          (states) => states.contains(WidgetState.selected) ? a : c.ink,
         ),
-        hourMinuteTextStyle: const TextStyle(fontFamily: AppText.fontFamily, fontSize: 52, fontWeight: FontWeight.w600),
+        hourMinuteTextStyle: t(AppText.sizeClock, FontWeight.w600, c.ink),
         dayPeriodShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
         dayPeriodBorderSide: BorderSide(color: c.lineStrong),
         dayPeriodColor: WidgetStateColor.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? accent : c.surface,
+          (states) => states.contains(WidgetState.selected) ? a : c.surface,
         ),
         dayPeriodTextColor: WidgetStateColor.resolveWith(
           (states) => states.contains(WidgetState.selected) ? c.onAccent : c.inkMuted,
         ),
-        dayPeriodTextStyle: const TextStyle(fontFamily: AppText.fontFamily, fontSize: 14, fontWeight: FontWeight.w600),
+        dayPeriodTextStyle: t(AppText.sizeBody, FontWeight.w600, c.ink),
         dialBackgroundColor: c.surfaceMuted,
-        dialHandColor: accent,
+        dialHandColor: a,
         dialTextColor: WidgetStateColor.resolveWith(
           (states) => states.contains(WidgetState.selected) ? c.onAccent : c.ink,
         ),
-        dialTextStyle: const TextStyle(fontFamily: AppText.fontFamily, fontSize: 15, fontWeight: FontWeight.w500),
+        dialTextStyle: t(AppText.sizeBodyLarge, FontWeight.w500, c.ink),
         entryModeIconColor: c.inkMuted,
         cancelButtonStyle: TextButton.styleFrom(foregroundColor: c.inkMuted),
         confirmButtonStyle: TextButton.styleFrom(
-          foregroundColor: accent,
-          textStyle: const TextStyle(fontFamily: AppText.fontFamily, fontWeight: FontWeight.w700),
+          foregroundColor: a,
+          textStyle: t(AppText.sizeBody, FontWeight.w700, a),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
@@ -226,16 +309,32 @@ class AppTheme {
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.card), borderSide: BorderSide.none),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.card),
-            borderSide: BorderSide(color: accent, width: 2),
+            borderSide: BorderSide(color: a, width: 2),
           ),
         ),
       ),
-      bottomSheetTheme: BottomSheetThemeData(
+      datePickerTheme: DatePickerThemeData(
         backgroundColor: c.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sheet),
+          side: BorderSide(color: c.line),
+        ),
+        headerBackgroundColor: c.surface,
+        headerForegroundColor: c.ink,
+        todayBorder: BorderSide(color: a),
+      ),
+      // Hojas que suben: una sola forma, con su asa (las pantallas no dibujan la suya)
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: c.surface,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: c.surface,
+        elevation: 0,
+        modalElevation: 0,
         showDragHandle: true,
         dragHandleColor: c.lineStrong,
+        dragHandleSize: const Size(40, 5),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
         ),
@@ -243,44 +342,65 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: c.toast,
-        contentTextStyle: TextStyle(fontFamily: AppText.fontFamily, color: c.onToast, fontSize: 14),
+        contentTextStyle: t(AppText.sizeBody, FontWeight.w500, c.onToast),
         actionTextColor: c.onToast,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.transparent,
+        backgroundColor: c.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        indicatorColor: accent,
+        indicatorColor: a,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(color: states.contains(WidgetState.selected) ? c.onAccent : c.inkMuted),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => TextStyle(
-            fontFamily: AppText.fontFamily,
-            fontSize: 12,
-            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
-            color: states.contains(WidgetState.selected) ? c.ink : c.inkMuted,
+          (states) => t(
+            AppText.sizeCaption,
+            states.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
+            states.contains(WidgetState.selected) ? c.ink : c.inkMuted,
           ),
         ),
       ),
+      // Interruptor como el del diseño: círculo blanco, riel del color del negocio
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? c.onAccent : c.inkFaint,
-        ),
+        thumbColor: const WidgetStatePropertyAll(Colors.white),
         trackColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? accent : c.surfaceMuted,
+          (states) => states.contains(WidgetState.selected) ? a : c.lineStrong,
         ),
-        trackOutlineColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? accent : c.lineStrong,
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+        thumbIcon: const WidgetStatePropertyAll(null),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? a : Colors.transparent,
+        ),
+        checkColor: WidgetStatePropertyAll(c.onAccent),
+        side: BorderSide(color: c.lineStrong, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? a : c.lineStrong,
         ),
       ),
-      progressIndicatorTheme: ProgressIndicatorThemeData(color: accent, linearTrackColor: c.surfaceMuted),
-      listTileTheme: ListTileThemeData(iconColor: c.inkMuted, textColor: c.ink),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: a, linearTrackColor: c.surfaceMuted),
+      listTileTheme: ListTileThemeData(
+        iconColor: c.inkMuted,
+        textColor: c.ink,
+        titleTextStyle: t(AppText.sizeBody, FontWeight.w600, c.ink),
+        subtitleTextStyle: t(AppText.sizeSmall, FontWeight.w400, c.inkMuted),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
+      ),
       tooltipTheme: TooltipThemeData(
-        decoration: BoxDecoration(color: c.toast, borderRadius: BorderRadius.circular(8)),
-        textStyle: TextStyle(fontFamily: AppText.fontFamily, color: c.onToast, fontSize: 12),
+        decoration: BoxDecoration(color: c.toast, borderRadius: BorderRadius.circular(AppRadius.small)),
+        textStyle: t(AppText.sizeCaption, FontWeight.w500, c.onToast),
+      ),
+      badgeTheme: BadgeThemeData(
+        backgroundColor: c.danger,
+        textColor: Colors.white,
+        textStyle: t(AppText.sizeCaption, FontWeight.w700, Colors.white),
       ),
     );
   }

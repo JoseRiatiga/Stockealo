@@ -31,7 +31,7 @@ class LegalDocumentScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text(
             'Información legal',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeHeading),
           ),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(kTextTabBarHeight + 24),
@@ -79,7 +79,7 @@ class _TermsOfServiceView extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(hPadding, 20, hPadding, 30),
           children: [
         _buildHeader(
-          icon: Icons.gavel_rounded,
+          icon: Icons.gavel_outlined,
           title: 'Términos y condiciones de uso',
           subtitle: 'Última actualización: Noviembre 2026',
         ),
@@ -188,7 +188,7 @@ class _PrivacyPolicyView extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(hPadding, 20, hPadding, 30),
           children: [
         _buildHeader(
-          icon: Icons.shield_rounded,
+          icon: Icons.shield_outlined,
           title: 'Política de privacidad y tratamiento de datos',
           subtitle: 'Compromiso de protección de tus datos comerciales y privacidad',
         ),
@@ -239,15 +239,15 @@ class _PrivacyPolicyView extends StatelessWidget {
           number: '6',
           title: 'Permisos del dispositivo y su uso estricto',
           content:
-              '📷 Cámara: para escanear códigos de barras/QR y tomar fotos de tus productos.\n'
+              '• Cámara: para escanear códigos de barras/QR y tomar fotos de tus productos.\n'
               '\n'
-              '🖼️ Galería y archivos: para elegir fotos de productos y para guardar o importar reportes, catálogos y respaldos.\n'
+              '• Galería y archivos: para elegir fotos de productos y para guardar o importar reportes, catálogos y respaldos.\n'
               '\n'
-              '🔔 Notificaciones: para avisarte del stock bajo, el resumen del día y los recordatorios de cobro que tú programes. Los avisos programados se mantienen aunque reinicies el celular.\n'
+              '• Notificaciones: para avisarte del stock bajo, el resumen del día y los recordatorios de cobro que tú programes. Los avisos programados se mantienen aunque reinicies el celular.\n'
               '\n'
               '⬇️ Instalar actualizaciones: para instalar las nuevas versiones de Stockealo cuando tú lo confirmes.\n'
               '\n'
-              '🌐 Conexión de red: para validar tu cuenta, sincronizar con la nube, consultar Stockealo Pro y Stocky con IA, buscar actualizaciones y abrir WhatsApp para compartir tickets, catálogos o recordatorios.',
+              '• Conexión de red: para validar tu cuenta, sincronizar con la nube, consultar Stockealo Pro y Stocky con IA, buscar actualizaciones y abrir WhatsApp para compartir tickets, catálogos o recordatorios.',
         ),
         _buildSection(
           number: '7',
@@ -283,7 +283,7 @@ class _PrivacyPolicyView extends StatelessWidget {
           content:
               'Para cualquier solicitud de privacidad, consulta sobre el tratamiento de tus datos o soporte técnico, escríbenos al correo oficial:\n'
               '\n'
-              '📧 byjosealbert@gmail.com',
+              '• byjosealbert@gmail.com',
         ),
         const SizedBox(height: 30),
       ],
@@ -335,9 +335,9 @@ class _LegalHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                Text(title, style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
                 const SizedBox(height: AppSpace.xs),
-                Text(subtitle, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                Text(subtitle, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
               ],
             ),
           ),
@@ -383,16 +383,16 @@ class _LegalSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: c.line),
             ),
-            child: Text(number, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: c.inkMuted)),
+            child: Text(number, style: TextStyle(fontWeight: FontWeight.w700, fontSize: AppText.sizeSmall, color: c.inkMuted)),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+                Text(title, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
                 const SizedBox(height: 6),
-                Text(content, style: TextStyle(fontSize: 13, height: 1.5, color: c.inkMuted)),
+                Text(content, style: TextStyle(fontSize: AppText.sizeSmall, height: 1.5, color: c.inkMuted)),
               ],
             ),
           ),

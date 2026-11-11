@@ -1,4 +1,5 @@
 import '../../../../core/theme/app_tokens.dart';
+import '../../navigation/app_places.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/notification_service.dart';
@@ -32,7 +33,6 @@ class NotificationsModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final service = NotificationService.instance;
 
     final bgColor = context.colors.surface;
@@ -87,7 +87,7 @@ class NotificationsModal extends StatelessWidget {
                             color: context.colors.accent.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(Icons.notifications_active_rounded, color: context.colors.accent, size: 20),
+                          child: Icon(Icons.notifications_active_outlined, color: context.colors.accent, size: 20),
                         ),
                         const SizedBox(width: 10),
                         Column(
@@ -95,11 +95,11 @@ class NotificationsModal extends StatelessWidget {
                           children: [
                             Text(
                               'Centro de Notificaciones',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain),
+                              style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.bold, color: textMain),
                             ),
                             Text(
                               '${service.unreadCount} sin leer',
-                              style: TextStyle(fontSize: 11, color: textMuted),
+                              style: TextStyle(fontSize: AppText.sizeCaption, color: textMuted),
                             ),
                           ],
                         ),
@@ -108,8 +108,8 @@ class NotificationsModal extends StatelessWidget {
                     if (notifications.isNotEmpty)
                       TextButton.icon(
                         onPressed: service.unreadCount > 0 ? service.markAllAsRead : null,
-                        icon: const Icon(Icons.done_all_rounded, size: 16),
-                        label: const Text('Leídas', style: TextStyle(fontSize: 12)),
+                        icon: const Icon(Icons.done_all_outlined, size: 16),
+                        label: const Text('Leídas', style: TextStyle(fontSize: AppText.sizeCaption)),
                         style: TextButton.styleFrom(
                           foregroundColor: context.colors.accent,
                         ),
@@ -139,7 +139,6 @@ class NotificationsModal extends StatelessWidget {
                         return _buildNotificationTile(
                           context,
                           notif: notif,
-                          isDark: isDark,
                           cardBg: cardBg,
                           borderColor: borderColor,
                           textMain: textMain,
@@ -159,7 +158,6 @@ class NotificationsModal extends StatelessWidget {
   Widget _buildNotificationTile(
     BuildContext context, {
     required AppNotification notif,
-    required bool isDark,
     required Color cardBg,
     required Color borderColor,
     required Color textMain,
@@ -171,19 +169,19 @@ class NotificationsModal extends StatelessWidget {
     switch (notif.type) {
       case NotificationType.sale:
         iconColor = context.colors.accent;
-        icon = Icons.shopping_bag_rounded;
+        icon = Icons.shopping_bag_outlined;
         break;
       case NotificationType.stockAlert:
         iconColor = context.colors.warning;
-        icon = Icons.warning_amber_rounded;
+        icon = Icons.warning_amber_outlined;
         break;
       case NotificationType.team:
-        iconColor = const Color(0xFF38BDF8);
-        icon = Icons.group_rounded;
+        iconColor = context.colors.info;
+        icon = Icons.group_outlined;
         break;
       case NotificationType.system:
         iconColor = context.colors.accent;
-        icon = Icons.auto_awesome_rounded;
+        icon = Icons.auto_awesome_outlined;
     }
 
     return InkWell(
@@ -191,18 +189,18 @@ class NotificationsModal extends StatelessWidget {
         NotificationService.instance.markAsRead(notif.id);
         Navigator.pop(context);
 
-        // Si es una venta, navegar al Historial de Ventas (pestaña 2)
+        // Una venta lleva a Ventas; un aviso de stock, a Stock (lo que falta)
         if (notif.type == NotificationType.sale) {
-          onNavigateToTab?.call(2);
+          onNavigateToTab?.call(AppPlace.ventas);
         } else if (notif.type == NotificationType.stockAlert) {
-          onNavigateToTab?.call(1);
+          onNavigateToTab?.call(AppPlace.stock);
         }
       },
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: notif.isRead ? cardBg : (isDark ? const Color(0xFF221B42) : const Color(0xFFF3E8FF)),
+          color: notif.isRead ? cardBg : (context.colors.surfaceMuted),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: notif.isRead ? borderColor : context.colors.accent.withValues(alpha: 0.4),
@@ -232,7 +230,7 @@ class NotificationsModal extends StatelessWidget {
                         child: Text(
                           notif.title,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: AppText.sizeSmall,
                             fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.bold,
                             color: textMain,
                           ),
@@ -242,7 +240,7 @@ class NotificationsModal extends StatelessWidget {
                       ),
                       Text(
                         _formatTimeAgo(notif.timestamp),
-                        style: TextStyle(fontSize: 10, color: textMuted),
+                        style: TextStyle(fontSize: AppText.sizeCaption, color: textMuted),
                       ),
                     ],
                   ),
@@ -250,7 +248,7 @@ class NotificationsModal extends StatelessWidget {
                   Text(
                     notif.message,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppText.sizeCaption,
                       color: notif.isRead ? textMuted : (context.colors.ink),
                       height: 1.25,
                     ),

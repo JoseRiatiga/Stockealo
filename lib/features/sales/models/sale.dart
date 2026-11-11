@@ -9,7 +9,8 @@ class Sale {
   final double unitCost;
   final double totalAmount;
   final double netProfit;
-  final String paymentMethod; // 'EFECTIVO' | 'TRANSFERENCIA' | 'FIADO'
+  /// Código de [PaymentMethod] (EFECTIVO, NEQUI, TRANSFERENCIA, TARJETA, FIADO o MIXTO)
+  final String paymentMethod;
   final String? customerName;
   final String? sellerName;
   final DateTime date;
@@ -24,7 +25,19 @@ class Sale {
   /// Empleados que hicieron el servicio (lista JSON de ids)
   final String? staffIds;
 
+  /// Número de la venta (todas las líneas de una misma venta lo comparten)
+  final String? invoiceNumber;
+
+  /// Anulada: sigue en el historial, pero no cuenta en totales, caja ni reportes
+  final DateTime? voidedAt;
+  final String? voidReason;
+  final String? voidedBy;
+
+  /// Pago mixto: cuánto entró por cada medio en esta línea (JSON)
+  final String? paymentSplit;
+
   bool get isService => serviceId != null || productId.isEmpty;
+  bool get isVoided => voidedAt != null;
 
   Sale({
     required this.id,
@@ -47,6 +60,11 @@ class Sale {
     this.serviceId,
     this.workOrderId,
     this.staffIds,
+    this.invoiceNumber,
+    this.voidedAt,
+    this.voidReason,
+    this.voidedBy,
+    this.paymentSplit,
   });
 
   Map<String, dynamic> toMap() {
@@ -71,6 +89,11 @@ class Sale {
       'service_id': serviceId,
       'work_order_id': workOrderId,
       'staff_ids': staffIds,
+      'invoice_number': invoiceNumber,
+      'voided_at': voidedAt?.toIso8601String(),
+      'void_reason': voidReason,
+      'voided_by': voidedBy,
+      'payment_split': paymentSplit,
     };
   }
 
@@ -96,6 +119,11 @@ class Sale {
       serviceId: map['service_id'] as String?,
       workOrderId: map['work_order_id'] as String?,
       staffIds: map['staff_ids'] as String?,
+      invoiceNumber: map['invoice_number'] as String?,
+      voidedAt: DateTime.tryParse('${map['voided_at'] ?? ''}'),
+      voidReason: map['void_reason'] as String?,
+      voidedBy: map['voided_by'] as String?,
+      paymentSplit: map['payment_split'] as String?,
     );
   }
 }

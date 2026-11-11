@@ -17,12 +17,20 @@ class OnlineStoreConfig {
   final String? welcome;
   final bool showStock;
 
+  /// Plantilla: [StoreTemplate.classic] o [StoreTemplate.fashion]
+  final String template;
+
+  /// Título grande de la portada (plantilla Moda): «Chaquetas y abrigos para el frío»
+  final String? heroTitle;
+
   const OnlineStoreConfig({
     required this.slug,
     required this.enabled,
     required this.whatsapp,
     this.welcome,
     this.showStock = false,
+    this.template = StoreTemplate.classic,
+    this.heroTitle,
   });
 
   factory OnlineStoreConfig.fromJson(Map<String, dynamic> j) => OnlineStoreConfig(
@@ -31,9 +39,53 @@ class OnlineStoreConfig {
         whatsapp: j['whatsapp'] as String? ?? '',
         welcome: j['welcome'] as String?,
         showStock: j['show_stock'] == true,
+        template: StoreTemplate.of(j['template'] as String?),
+        heroTitle: j['hero_title'] as String?,
       );
 
   String get url => '$storeBaseUrl/$slug';
+}
+
+/// Las plantillas de la tienda
+abstract final class StoreTemplate {
+  /// La de siempre, mejorada: clara, con el color del negocio arriba
+  static const classic = 'clasica';
+
+  /// Oscura, de portada grande, con filtros por talla, color y precio (ropa, calzado)
+  static const fashion = 'moda';
+
+  static String of(String? v) => v == fashion ? fashion : classic;
+  static String label(String v) => v == fashion ? 'Moda' : 'Clásica';
+}
+
+/// Una talla, un color o los dos de un producto de la tienda
+class StoreVariant {
+  final String id;
+  final String? size;
+  final String? color;
+
+  /// Muestra del color (#RRGGBB o 'multi')
+  final String? hex;
+  final double extra;
+  final int? stock;
+
+  const StoreVariant({required this.id, this.size, this.color, this.hex, this.extra = 0, this.stock});
+
+  String get label => [if (size != null) size!, if (color != null) color!].join(' · ');
+
+  static String? _clean(Object? v) {
+    final t = (v as String? ?? '').trim();
+    return t.isEmpty ? null : t;
+  }
+
+  factory StoreVariant.fromJson(Map<String, dynamic> j) => StoreVariant(
+        id: j['id'] as String,
+        size: _clean(j['size']),
+        color: _clean(j['color']),
+        hex: _clean(j['hex']),
+        extra: (j['extra'] as num?)?.toDouble() ?? 0,
+        stock: (j['stock'] as num?)?.toInt(),
+      );
 }
 
 /// Un producto de la tienda pública
@@ -47,6 +99,12 @@ class StoreProduct {
   /// Unidades disponibles; null si el negocio no las muestra
   final int? stock;
 
+  /// Precio de antes (se ve tachado con «Oferta»); null si no está en oferta
+  final double? oldPrice;
+
+  /// Tallas y colores con existencias (vacío si el producto no tiene)
+  final List<StoreVariant> variants;
+
   const StoreProduct({
     required this.id,
     required this.name,
@@ -54,7 +112,13 @@ class StoreProduct {
     required this.price,
     this.imageUrl,
     this.stock,
+    this.oldPrice,
+    this.variants = const [],
   });
+
+  bool get onOffer => (oldPrice ?? 0) > price;
+  List<String> get sizes => [for (final s in variants.map((v) => v.size).whereType<String>().toSet()) s];
+  List<String> get colorHexes => [for (final h in variants.map((v) => v.hex).whereType<String>().toSet()) h];
 
   factory StoreProduct.fromJson(Map<String, dynamic> j) => StoreProduct(
         id: j['id'] as String,
@@ -63,6 +127,10 @@ class StoreProduct {
         price: (j['price'] as num?)?.toDouble() ?? 0,
         imageUrl: j['image_url'] as String?,
         stock: (j['stock'] as num?)?.toInt(),
+        oldPrice: (j['old_price'] as num?)?.toDouble(),
+        variants: [
+          for (final v in (j['variants'] as List? ?? const [])) StoreVariant.fromJson(Map<String, dynamic>.from(v as Map)),
+        ],
       );
 }
 
@@ -76,6 +144,8 @@ class PublicStore {
   final String? color;
   final String currency;
   final List<StoreProduct> products;
+  final String template;
+  final String? heroTitle;
 
   const PublicStore({
     required this.slug,
@@ -86,6 +156,8 @@ class PublicStore {
     this.welcome,
     this.logoUrl,
     this.color,
+    this.template = StoreTemplate.classic,
+    this.heroTitle,
   });
 
   factory PublicStore.fromJson(Map<String, dynamic> j) {
@@ -98,6 +170,8 @@ class PublicStore {
       logoUrl: b['logo_url'] as String?,
       color: b['color'] as String?,
       currency: b['currency'] as String? ?? 'COP',
+      template: StoreTemplate.of(j['template'] as String?),
+      heroTitle: j['hero_title'] as String?,
       products: [
         for (final p in (j['products'] as List? ?? const [])) StoreProduct.fromJson(Map<String, dynamic>.from(p as Map)),
       ],
@@ -110,14 +184,21 @@ class PublicStore {
       ];
 }
 
-/// Un renglón del carrito
+/// Un renglón del carrito (con la talla o el color elegido, si tiene)
 class CartLine {
   final StoreProduct product;
   final int quantity;
+  final StoreVariant? variant;
 
-  const CartLine(this.product, this.quantity);
+  const CartLine(this.product, this.quantity, [this.variant]);
 
-  double get subtotal => product.price * quantity;
+  /// El producto y la variante, para no mezclar la talla S con la M
+  String get key => keyOf(product, variant);
+  static String keyOf(StoreProduct p, StoreVariant? v) => v == null ? p.id : '${p.id}:${v.id}';
+  String get name => variant == null ? product.name : '${product.name} (${variant!.label})';
+  double get unitPrice => product.price + (variant?.extra ?? 0);
+  double get subtotal => unitPrice * quantity;
+  int? get stock => variant?.stock ?? product.stock;
 }
 
 class OnlineStoreException implements Exception {
@@ -157,22 +238,34 @@ class OnlineStoreService {
     required String whatsapp,
     String? welcome,
     bool showStock = false,
+    String template = StoreTemplate.classic,
+    String? heroTitle,
   }) async {
     final client = _client;
     if (client == null || client.auth.currentSession == null) {
       throw const OnlineStoreException('Necesitas iniciar sesión y tener internet.');
     }
+    final params = {
+      'p_business_id': businessId,
+      'p_slug': slug,
+      'p_enabled': enabled,
+      'p_whatsapp': whatsapp,
+      'p_welcome': welcome,
+      'p_show_stock': showStock,
+    };
     try {
-      final data = await client.rpc('save_my_store', params: {
-        'p_business_id': businessId,
-        'p_slug': slug,
-        'p_enabled': enabled,
-        'p_whatsapp': whatsapp,
-        'p_welcome': welcome,
-        'p_show_stock': showStock,
-      });
+      final data = await client.rpc('save_my_store', params: {...params, 'p_template': template, 'p_hero_title': heroTitle});
       return OnlineStoreConfig.fromJson(Map<String, dynamic>.from(data as Map));
     } on PostgrestException catch (e) {
+      // La nube todavía no tiene las plantillas (función de 8 datos): se guarda lo demás
+      if (e.code == 'PGRST202') {
+        try {
+          final data = await client.rpc('save_my_store', params: params);
+          return OnlineStoreConfig.fromJson(Map<String, dynamic>.from(data as Map));
+        } on PostgrestException catch (e2) {
+          throw OnlineStoreException(errorMessage(e2.message));
+        }
+      }
       throw OnlineStoreException(errorMessage(e.message));
     }
   }
@@ -221,7 +314,7 @@ class OnlineStoreService {
     return [
       'Hola $businessName, quiero hacer este pedido:',
       '',
-      for (final l in lines) '• ${l.quantity} × ${l.product.name} — ${money(l.subtotal)}',
+      for (final l in lines) '• ${l.quantity} × ${l.name} — ${money(l.subtotal)}',
       '',
       'Total: ${money(total)}',
       if (name.isNotEmpty) 'A nombre de: $name',

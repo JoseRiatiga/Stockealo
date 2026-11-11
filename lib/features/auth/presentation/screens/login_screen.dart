@@ -10,6 +10,7 @@ import '../../data/auth_repository.dart';
 import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../widgets/forgot_password_dialog.dart';
 import '../widgets/stocky_mascot.dart';
+import '../../../../core/design/app_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -172,9 +173,8 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final rawMsg = e.toString().replaceAll('Exception: ', '');
         setState(() {
-          _errorMessage = rawMsg;
+          _errorMessage = AuthRepository.translateAuthError(e);
           _mascotState = StockyState.error;
         });
       }
@@ -192,11 +192,9 @@ class _LoginScreenState extends State<LoginScreen> {
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.colors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Confirma tu correo', style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Column(
+      builder: (ctx) => AppDialog(
+title: 'Confirma tu correo',
+content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -211,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
               keyboardType: TextInputType.number,
               maxLength: 6,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: AppText.sizeHeading, letterSpacing: 8, fontWeight: FontWeight.w700),
               decoration: InputDecoration(
                 counterText: '',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -222,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
-        actions: [
+actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
@@ -235,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: const Text('Confirmar'),
           ),
         ],
-      ),
+),
     );
   }
 
@@ -290,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Text(
             _isRegisterMode ? 'Crea tu cuenta' : 'Hola de nuevo',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: c.ink),
+            style: TextStyle(fontSize: AppText.sizePage, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: c.ink),
           ),
           const SizedBox(height: AppSpace.xs),
           Text(
@@ -298,7 +296,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ? 'Es gratis. Tu inventario queda guardado en la nube.'
                 : 'Entra para ver tu inventario y tus ventas.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, height: 1.4, color: c.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeBodyLarge, height: 1.4, color: c.inkMuted),
           ),
           const SizedBox(height: AppSpace.xl),
           _AuthModeSwitch(register: _isRegisterMode, onChanged: _setMode),
@@ -320,18 +318,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline_rounded, color: c.danger, size: 20),
+                        Icon(Icons.error_outline_outlined, color: c.danger, size: 20),
                         const SizedBox(width: AppSpace.sm + 2),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: TextStyle(color: c.ink, fontSize: 13.5, height: 1.35),
+                            style: TextStyle(color: c.ink, fontSize: AppText.sizeBody, height: 1.35),
                           ),
                         ),
                         IconButton(
                           tooltip: 'Cerrar aviso',
                           visualDensity: VisualDensity.compact,
-                          icon: Icon(Icons.close_rounded, size: 18, color: c.inkMuted),
+                          icon: Icon(Icons.close_outlined, size: 18, color: c.inkMuted),
                           onPressed: () => setState(() => _errorMessage = null),
                         ),
                       ],
@@ -349,7 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: InputDecoration(
                 labelText: 'Tu nombre',
                 hintText: 'José Martínez',
-                prefixIcon: Icon(Icons.person_outline_rounded, color: c.inkMuted),
+                prefixIcon: Icon(Icons.person_outline_outlined, color: c.inkMuted),
               ),
               validator: (v) {
                 if (!_isRegisterMode) return null;
@@ -382,7 +380,7 @@ class _LoginScreenState extends State<LoginScreen> {
             decoration: InputDecoration(
               labelText: 'Correo',
               hintText: 'tu@correo.com',
-              prefixIcon: Icon(Icons.mail_outline_rounded, color: c.inkMuted),
+              prefixIcon: Icon(Icons.mail_outline_outlined, color: c.inkMuted),
             ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
@@ -401,7 +399,7 @@ class _LoginScreenState extends State<LoginScreen> {
             onFieldSubmitted: _isRegisterMode ? null : (_) => _submit(),
             decoration: InputDecoration(
               labelText: 'Contraseña',
-              prefixIcon: Icon(Icons.lock_outline_rounded, color: c.inkMuted),
+              prefixIcon: Icon(Icons.lock_outline, color: c.inkMuted),
               suffixIcon: IconButton(
                 tooltip: _obscurePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
                 icon: Icon(
@@ -438,7 +436,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onChanged: (_) => _clearError(),
               decoration: InputDecoration(
                 labelText: 'Repite la contraseña',
-                prefixIcon: Icon(Icons.lock_reset_rounded, color: c.inkMuted),
+                prefixIcon: Icon(Icons.lock_reset_outlined, color: c.inkMuted),
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Confirma tu contraseña';
@@ -453,7 +451,7 @@ class _LoginScreenState extends State<LoginScreen> {
             label: _isLoading
                 ? (_isRegisterMode ? 'Creando cuenta…' : 'Ingresando…')
                 : (_isRegisterMode ? 'Crear cuenta' : 'Ingresar'),
-            icon: _isRegisterMode ? Icons.person_add_alt_1_rounded : Icons.arrow_forward_rounded,
+            icon: _isRegisterMode ? Icons.person_add_alt_1_outlined : Icons.arrow_forward_outlined,
             onPressed: _isLoading ? null : _submit,
           ),
           const SizedBox(height: AppSpace.lg),
@@ -463,13 +461,13 @@ class _LoginScreenState extends State<LoginScreen> {
               TextButton(
                 onPressed: () => LegalDocumentScreen.show(context, initialTabIndex: 0),
                 style: TextButton.styleFrom(foregroundColor: c.inkMuted, visualDensity: VisualDensity.compact),
-                child: const Text('Términos', style: TextStyle(fontSize: 12.5)),
+                child: const Text('Términos', style: TextStyle(fontSize: AppText.sizeSmall)),
               ),
               Text('·', style: TextStyle(color: c.inkFaint)),
               TextButton(
                 onPressed: () => LegalDocumentScreen.show(context, initialTabIndex: 1),
                 style: TextButton.styleFrom(foregroundColor: c.inkMuted, visualDensity: VisualDensity.compact),
-                child: const Text('Privacidad', style: TextStyle(fontSize: 12.5)),
+                child: const Text('Privacidad', style: TextStyle(fontSize: AppText.sizeSmall)),
               ),
             ],
           ),
@@ -506,7 +504,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// En oscuro el verde de marca se aclara para que los enlaces se lean sobre el fondo
   Color _linkColor(StockealoColors c) =>
-      Theme.of(context).brightness == Brightness.dark ? Color.lerp(c.accent, Colors.white, 0.4)! : c.accent;
+      c.accent;
 
   Widget _termsRow(StockealoColors c) {
     final linkStyle = TextStyle(fontWeight: FontWeight.w700, color: _linkColor(c), decoration: TextDecoration.underline);
@@ -522,7 +520,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Expanded(
           child: Text.rich(
             TextSpan(
-              style: TextStyle(fontSize: 13, height: 1.4, color: c.ink),
+              style: TextStyle(fontSize: AppText.sizeSmall, height: 1.4, color: c.ink),
               children: [
                 const TextSpan(text: 'Acepto los '),
                 TextSpan(
@@ -575,7 +573,7 @@ class _AuthModeSwitch extends StatelessWidget {
               ),
               child: Text(
                 label,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: selected ? c.ink : c.inkMuted),
+                style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w700, color: selected ? c.ink : c.inkMuted),
               ),
             ),
           ),

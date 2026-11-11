@@ -10,7 +10,6 @@ import 'package:stockealo/features/auth/models/app_user.dart';
 import 'package:stockealo/features/business/models/business.dart';
 import 'package:stockealo/features/cash/data/cash_register_repository.dart';
 import 'package:stockealo/features/cash/models/cash_session.dart';
-import 'package:stockealo/features/cash/presentation/widgets/cash_status_card.dart';
 
 /// Arqueo de caja mejorado (0.12.0): movimientos, propinas, mercancía de contado,
 /// cierre por forma de pago, nota obligatoria si no cuadra y comprobante
@@ -158,11 +157,12 @@ void main() {
     expect(s.isStale(DateTime(2026, 11, 11, 7)), isTrue);
   });
 
-  test('avisa al cobrar en efectivo con la caja cerrada, sin avisar por otros medios', () async {
-    expect(await isCashClosedFor(business, 'EFECTIVO'), isTrue);
-    expect(await isCashClosedFor(business, 'TRANSFERENCIA'), isFalse);
-    expect(await isCashClosedFor(business.copyWith(cashRegisterEnabled: false), 'EFECTIVO'), isFalse);
+  test('caja obligatoria: con la caja cerrada no se puede vender, por ningún medio', () async {
+    expect(await isCashClosedFor(business), isTrue);
+    expect(await isCashClosedFor(business.copyWith(cashRegisterEnabled: false)), isFalse);
+    await expectLater(repo.requireOpen(businessId), throwsA(isA<CashClosedException>()));
     await repo.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Ana');
-    expect(await isCashClosedFor(business, 'EFECTIVO'), isFalse);
+    expect(await isCashClosedFor(business), isFalse);
+    await repo.requireOpen(businessId);
   });
 }

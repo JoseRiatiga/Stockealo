@@ -73,9 +73,9 @@ class _AttendanceViewState extends State<AttendanceView> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.xs, AppSpace.lg, AppSpace.xxl),
           children: [
-            Text('Hoy', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+            Text('Hoy', style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
             Text('Marca quién vino al empezar el día. Solo quien llegó y está libre puede recibir servicios.',
-                style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
             const SizedBox(height: AppSpace.md),
             if (people.isEmpty)
               AppCard(
@@ -86,7 +86,7 @@ class _AttendanceViewState extends State<AttendanceView> {
                       child: Text('Aún no hay personas para hacer los servicios. Agrégalas en Ajustes › Equipo.',
                           style: TextStyle(color: c.ink)),
                     ),
-                    if (widget.onOpenTeam != null) Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                    if (widget.onOpenTeam != null) Icon(Icons.chevron_right_outlined, color: c.inkFaint),
                   ],
                 ),
               ),
@@ -106,7 +106,7 @@ class _AttendanceViewState extends State<AttendanceView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(s.name, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
-                      Text(detail, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                      Text(detail, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                       const SizedBox(height: AppSpace.xs),
                       Wrap(
                         spacing: AppSpace.xs,

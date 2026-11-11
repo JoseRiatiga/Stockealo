@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_tokens.dart';
 
 /// Aviso de que la app ya está en la última versión.
 class UpToDateDialog {
   static void show(BuildContext context, String currentVersion) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF131126) : Colors.white,
+        backgroundColor: context.colors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
           side: BorderSide(
-            color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
+            color: context.colors.line,
             width: 1.5,
           ),
         ),
@@ -26,15 +26,15 @@ class UpToDateDialog {
                 height: 68,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF059669).withValues(alpha: 0.15),
+                  color: context.colors.accent.withValues(alpha: 0.15),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                    color: context.colors.accent.withValues(alpha: 0.3),
                     width: 2,
                   ),
                 ),
-                child: const Icon(
-                  Icons.verified_rounded,
-                  color: Color(0xFF10B981),
+                child: Icon(
+                  Icons.verified_outlined,
+                  color: context.colors.accent,
                   size: 38,
                 ),
               ),
@@ -42,27 +42,27 @@ class UpToDateDialog {
               Text(
                 '¡Estás al día!',
                 style: TextStyle(
-                  fontSize: 19,
+                  fontSize: AppText.sizeHeading,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                  color: context.colors.ink,
                 ),
               ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF18152F) : const Color(0xFFF1F5F9),
+                  color: context.colors.surfaceMuted,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
+                    color: context.colors.lineStrong,
                   ),
                 ),
                 child: Text(
                   'Versión v$currentVersion',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: AppText.sizeCaption,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                    color: context.colors.accent,
                   ),
                 ),
               ),
@@ -71,9 +71,9 @@ class UpToDateDialog {
                 'Tu aplicación cuenta con las últimas optimizaciones, correcciones y funciones disponibles.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: AppText.sizeSmall,
                   height: 1.4,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  color: context.colors.inkMuted,
                 ),
               ),
               const SizedBox(height: 22),
@@ -81,7 +81,7 @@ class UpToDateDialog {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF059669),
+                    backgroundColor: context.colors.accent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
@@ -92,7 +92,7 @@ class UpToDateDialog {
                   onPressed: () => Navigator.of(ctx).pop(),
                   child: const Text(
                     'Entendido',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

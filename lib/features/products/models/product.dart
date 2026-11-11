@@ -22,6 +22,10 @@ class Product {
   /// Proveedor principal (opcional)
   final String? supplierId;
 
+  /// Precio de antes, para mostrar la oferta en la tienda en línea (se ve tachado).
+  /// Solo cuenta si es mayor al precio de venta.
+  final double? comparePrice;
+
   Product({
     required this.id,
     required this.businessId,
@@ -41,7 +45,11 @@ class Product {
     this.hasVariants = false,
     this.variants = const [],
     this.supplierId,
+    this.comparePrice,
   });
+
+  /// Está en oferta: tiene un precio de antes mayor al de ahora
+  bool get onOffer => (comparePrice ?? 0) > salePrice && salePrice > 0;
 
   /// Ganancia neta por unidad
   double get profit => salePrice - purchasePrice;
@@ -87,6 +95,8 @@ class Product {
     List<ProductVariant>? variants,
     String? supplierId,
     bool clearSupplier = false,
+    double? comparePrice,
+    bool clearComparePrice = false,
   }) {
     return Product(
       id: id ?? this.id,
@@ -107,6 +117,7 @@ class Product {
       hasVariants: hasVariants ?? this.hasVariants,
       variants: variants ?? this.variants,
       supplierId: clearSupplier ? null : (supplierId ?? this.supplierId),
+      comparePrice: clearComparePrice ? null : (comparePrice ?? this.comparePrice),
     );
   }
 
@@ -129,6 +140,7 @@ class Product {
       'is_synced': isSynced ? 1 : 0,
       'has_variants': hasVariants ? 1 : 0,
       'supplier_id': supplierId,
+      'compare_price': comparePrice,
     };
   }
 
@@ -152,6 +164,7 @@ class Product {
       hasVariants: (map['has_variants'] as int?) == 1,
       variants: variants,
       supplierId: map['supplier_id'] as String?,
+      comparePrice: (map['compare_price'] as num?)?.toDouble(),
     );
   }
 }

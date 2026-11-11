@@ -8,6 +8,7 @@ import '../../../../core/utils/countries.dart';
 import '../../../business/data/business_repository.dart';
 import '../../data/supplier_repository.dart';
 import '../../models/supplier.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Ficha del proveedor. Solo el nombre es obligatorio; lo demás va en "Más datos".
 class SupplierFormScreen extends StatefulWidget {
@@ -99,10 +100,10 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
     if (s == null) return;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Quitar proveedor?'),
-        content: Text('Se quita "${s.name}". Sus productos quedan sin proveedor y las entradas de mercancía se conservan.'),
-        actions: [
+      builder: (ctx) => AppDialog(
+title: '¿Quitar proveedor?',
+content: Text('Se quita "${s.name}". Sus productos quedan sin proveedor y las entradas de mercancía se conservan.'),
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -110,7 +111,7 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
             child: const Text('Quitar'),
           ),
         ],
-      ),
+),
     );
     if (ok != true) return;
     await _repo.deleteSupplier(s);
@@ -129,7 +130,7 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
         title: Text(_s == null ? 'Nuevo proveedor' : 'Editar proveedor'),
         actions: [
           if (_s != null)
-            IconButton(icon: const Icon(Icons.delete_outline), tooltip: 'Quitar proveedor', onPressed: _delete),
+            IconButton(icon: const Icon(Icons.delete_outline_outlined), tooltip: 'Quitar proveedor', onPressed: _delete),
         ],
       ),
       body: ContentWidth(
@@ -163,7 +164,7 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
               decoration: const InputDecoration(
                 labelText: 'Persona de contacto (opcional)',
                 hintText: 'Ej. Carlos, el vendedor',
-                prefixIcon: Icon(Icons.person_outline),
+                prefixIcon: Icon(Icons.person_outline_outlined),
               ),
             ),
             const SizedBox(height: AppSpace.md),
@@ -173,7 +174,7 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
                 initiallyExpanded: _hasExtraData,
                 tilePadding: EdgeInsets.zero,
                 title: Text('Más datos', style: TextStyle(fontWeight: FontWeight.w600, color: c.ink)),
-                subtitle: Text('NIT, día de visita, entrega, forma de pago', style: TextStyle(color: c.inkMuted, fontSize: 12)),
+                subtitle: Text('NIT, día de visita, entrega, forma de pago', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
                 childrenPadding: const EdgeInsets.only(bottom: AppSpace.lg),
                 children: [
                   TextField(
@@ -184,7 +185,7 @@ class _SupplierFormScreenState extends State<SupplierFormScreen> {
                   TextField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Correo', prefixIcon: Icon(Icons.mail_outline)),
+                    decoration: const InputDecoration(labelText: 'Correo', prefixIcon: Icon(Icons.mail_outline_outlined)),
                   ),
                   const SizedBox(height: AppSpace.md),
                   DropdownButtonFormField<String?>(
@@ -223,7 +224,7 @@ initialValue: _visitDay,
                   const SizedBox(height: AppSpace.lg),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('Forma de pago', style: TextStyle(color: c.inkMuted, fontSize: 12.5)),
+                    child: Text('Forma de pago', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall)),
                   ),
                   const SizedBox(height: AppSpace.sm),
                   SegmentedButton<bool>(

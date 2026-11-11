@@ -81,7 +81,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
           children: [
             Text('Lo lee el equipo de Stockealo. Así mejoramos la app para tu negocio.',
-                style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
             const SizedBox(height: AppSpace.md),
             AppCard(
               child: Column(
@@ -96,7 +96,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                     ],
                   ),
                   const SizedBox(height: AppSpace.md),
-                  Text('¿En qué parte de la app?', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                  Text('¿En qué parte de la app?', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                   const SizedBox(height: AppSpace.xs),
                   Wrap(
                     spacing: AppSpace.sm,
@@ -133,18 +133,18 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                     ),
                   const SizedBox(height: AppSpace.sm),
                   Text('Enviamos también la versión de la app, tu equipo y el negocio, para encontrar el problema más rápido.',
-                      style: TextStyle(fontSize: 11.5, color: c.inkFaint)),
+                      style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
                   const SizedBox(height: AppSpace.md),
                   FilledButton.icon(
                     onPressed: _sending ? null : _send,
-                    icon: const Icon(Icons.send_rounded, size: 18),
+                    icon: const Icon(Icons.send_outlined, size: 18),
                     label: Text(_sending ? 'Enviando…' : 'Enviar'),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpace.xl),
-            Text('Lo que he enviado', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+            Text('Lo que he enviado', style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.sm),
             FutureBuilder<List<AppFeedback>>(
               future: _mine,
@@ -168,12 +168,12 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                                 Expanded(
                                   child: Text(
                                     '${f.kindLabel}${f.area == null ? '' : ' · ${f.area}'} · ${f.createdAt.day}/${f.createdAt.month}',
-                                    style: TextStyle(fontSize: 12, color: c.inkMuted),
+                                    style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                                   ),
                                 ),
                                 Text(f.statusLabel,
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: AppText.sizeCaption,
                                       fontWeight: FontWeight.w700,
                                       color: f.status == 'RESUELTO' ? c.success : (f.status == 'DESCARTADO' ? c.inkFaint : c.info),
                                     )),
@@ -187,7 +187,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(AppSpace.sm),
                                 decoration: BoxDecoration(color: c.successSoft, borderRadius: BorderRadius.circular(AppRadius.control)),
-                                child: Text('Stockealo: ${f.adminReply}', style: TextStyle(color: c.ink, fontSize: 13)),
+                                child: Text('Stockealo: ${f.adminReply}', style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall)),
                               ),
                             ],
                           ],

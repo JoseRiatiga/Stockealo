@@ -18,7 +18,7 @@ import '../widgets/messages_view.dart';
 enum ServicesSection {
   board('Tablero', Icons.view_kanban_outlined),
   attendance('Asistencia', Icons.how_to_reg_outlined),
-  history('Historial', Icons.history_rounded),
+  history('Historial', Icons.history_outlined),
   commissions('Comisiones', Icons.payments_outlined),
   catalog('Catálogo y precios', Icons.sell_outlined),
   messages('Mensajes', Icons.chat_outlined);
@@ -195,14 +195,14 @@ class _TemplatePickerState extends State<TemplatePicker> {
           padding: const EdgeInsets.all(AppSpace.lg),
           children: [
             Text('¿Qué tipo de negocio es?',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink)),
+                style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.xs),
             Text(
               widget.canConfigure
                   ? 'Te armamos la base con los nombres y servicios de ejemplo de tu tipo de negocio. '
                       'Después cambias precios y servicios en Catálogo y precios.'
                   : 'El dueño o un administrador debe elegir el tipo de negocio para empezar.',
-              style: TextStyle(fontSize: 13.5, height: 1.4, color: c.inkMuted),
+              style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
             ),
             const SizedBox(height: AppSpace.lg),
             for (final t in ServiceTemplate.all) ...[
@@ -223,12 +223,12 @@ class _TemplatePickerState extends State<TemplatePicker> {
                               if (t.usesVehicleKinds) 'precio según ${t.vehicleKinds.map((k) => k.label.toLowerCase()).join(', ')}',
                               if (t.examples.isNotEmpty) '${t.examples.length} servicios de ejemplo',
                             ].join(' · '),
-                            style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                            style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                           ),
                         ],
                       ),
                     ),
-                    if (widget.canConfigure) Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                    if (widget.canConfigure) Icon(Icons.chevron_right_outlined, color: c.inkFaint),
                   ],
                 ),
               ),

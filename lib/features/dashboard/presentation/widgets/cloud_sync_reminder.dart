@@ -109,7 +109,7 @@ class _CloudSyncReminderState extends State<CloudSyncReminder> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.cloud_off_outlined, color: c.inkMuted),
+                Icon(Icons.cloud_off_outlined, color: c.warning),
                 const SizedBox(width: AppSpace.md),
                 Expanded(
                   child: Column(
@@ -117,13 +117,13 @@ class _CloudSyncReminderState extends State<CloudSyncReminder> {
                     children: [
                       Text(
                         'Tus datos están solo en este celular',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink),
+                        style: AppText.bodyLarge(context, weight: FontWeight.w700),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Si lo pierdes o se daña, se pierden. Con la copia en la nube también puedes '
                         'verlos desde el computador.',
-                        style: TextStyle(fontSize: 13.5, height: 1.35, color: c.inkMuted),
+                        style: AppText.small(context),
                       ),
                     ],
                   ),

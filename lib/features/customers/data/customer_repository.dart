@@ -7,6 +7,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../team/data/activity_repository.dart';
 import '../models/customer.dart';
 import '../models/customer_payment.dart';
+import '../../sales/models/payment_method.dart';
 
 class PaymentResult {
   final Customer customer;
@@ -182,7 +183,7 @@ class CustomerRepository {
       businessId: businessId,
       action: ActivityAction.debtPayment,
       summary: 'Recibió un abono de ${CurrencyFormatter.format(amount)} de ${customer.name} '
-          '(${activityPaymentLabel(paymentMethod)}; ${remainingDebt > 0 ? 'debe ${CurrencyFormatter.format(remainingDebt)}' : 'quedó al día'})',
+          '(${PaymentMethod.label(paymentMethod).toLowerCase()}; ${remainingDebt > 0 ? 'debe ${CurrencyFormatter.format(remainingDebt)}' : 'quedó al día'})',
       data: {'customer_id': customerId, 'amount': amount},
     );
 

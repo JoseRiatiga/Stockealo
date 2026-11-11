@@ -92,12 +92,12 @@ class _AdminStoresPageState extends State<AdminStoresPage> {
                   IconButton(
                     tooltip: 'Copiar enlace',
                     onPressed: () => adminCopy(context, s.url, 'Enlace'),
-                    icon: Icon(Icons.copy_rounded, size: 18, color: c.inkMuted),
+                    icon: Icon(Icons.copy_outlined, size: 18, color: c.inkMuted),
                   ),
                   IconButton(
                     tooltip: 'Abrir tienda',
                     onPressed: () => launchUrl(Uri.parse(s.url), webOnlyWindowName: '_blank'),
-                    icon: Icon(Icons.open_in_new_rounded, size: 18, color: c.inkMuted),
+                    icon: Icon(Icons.open_in_new_outlined, size: 18, color: c.inkMuted),
                   ),
                 ],
               ),

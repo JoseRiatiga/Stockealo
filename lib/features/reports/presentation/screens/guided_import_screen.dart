@@ -12,8 +12,9 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../data/guided_import.dart';
+import '../../../../core/design/app_dialog.dart';
 
-/// Inventario › Importar desde Excel (0.12.0): elegir el archivo, confirmar qué
+/// Productos › Importar desde Excel (0.12.0): elegir el archivo, confirmar qué
 /// es cada columna, ver cómo quedarán los productos y elegir qué hacer con los que
 /// ya existen. Antes de importar se guarda una copia para poder deshacer.
 class GuidedImportScreen extends StatefulWidget {
@@ -102,18 +103,18 @@ class _GuidedImportScreenState extends State<GuidedImportScreen> {
     final valid = rows.where((r) => r.name.isNotEmpty).length;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('¿Importar $valid productos?'),
-        content: Text(
+      builder: (ctx) => AppDialog(
+title: '¿Importar $valid productos?',
+content: Text(
           '${_updateExisting ? 'Los que ya existen se actualizan' : 'Los que ya existen se dejan como están'}'
           '${_stockMode == StockMode.add ? ' y su stock se suma' : ''}.\n\n'
           'Antes de importar guardamos una copia: si algo sale mal, la recuperas en Ajustes › Nube y respaldo › Volver a una copia.',
         ),
-        actions: [
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Importar')),
         ],
-      ),
+),
     );
     if (ok != true) return;
     setState(() => _working = true);
@@ -127,16 +128,16 @@ class _GuidedImportScreenState extends State<GuidedImportScreen> {
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Importación lista'),
-          content: Text([
+        builder: (ctx) => AppDialog(
+title: 'Importación lista',
+content: Text([
             '${out.created} productos nuevos',
             '${out.updated} actualizados',
             if (out.skipped > 0) '${out.skipped} omitidos (sin nombre, repetidos o ya existentes)',
             if (out.backedUp) '\nSe guardó una copia antes de importar.',
           ].join('\n')),
-          actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Listo'))],
-        ),
+actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Listo'))],
+),
       );
       if (mounted) Navigator.pop(context, out.created + out.updated > 0);
     } catch (e) {
@@ -156,7 +157,7 @@ class _GuidedImportScreenState extends State<GuidedImportScreen> {
 
     Widget step(String n, String title) => Padding(
           padding: const EdgeInsets.only(top: AppSpace.xl, bottom: AppSpace.sm),
-          child: Text('$n. $title', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+          child: Text('$n. $title', style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
         );
 
     return Scaffold(
@@ -167,7 +168,7 @@ class _GuidedImportScreenState extends State<GuidedImportScreen> {
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
           children: [
             Text('Trae los productos que ya tienes en un Excel. Te mostramos cómo quedarán antes de guardar nada.',
-                style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
             step('1', 'Elige el archivo'),
             AppCard(
               child: Column(
@@ -230,7 +231,7 @@ initialValue: _headerRow,
                                   style: TextStyle(fontWeight: FontWeight.w600, color: c.ink)),
                               if (_table!.rows.length > _headerRow + 1 && i < _table!.rows[_headerRow + 1].length)
                                 Text('Ej.: ${_table!.rows[_headerRow + 1][i]}',
-                                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                             ],
                           ),
                         ),
@@ -283,18 +284,18 @@ initialValue: _headerRow,
                             if (r.stock != null) 'Stock ${r.stock}',
                             if (r.category != null) r.category!,
                           ].join(' · '),
-                          style: TextStyle(fontSize: 12, color: c.inkMuted),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                         ),
-                        for (final issue in r.issues) Text(issue, style: TextStyle(fontSize: 12, color: c.warning)),
+                        for (final issue in r.issues) Text(issue, style: TextStyle(fontSize: AppText.sizeCaption, color: c.warning)),
                       ],
                     ),
                   ),
                   const SizedBox(height: AppSpace.xs),
                 ],
                 if (rows.length > 10)
-                  Text('… y ${rows.length - 10} filas más.', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                  Text('… y ${rows.length - 10} filas más.', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                 step('4', 'Elige qué hacer'),
-                Text('Si un producto ya existe (mismo código o nombre)', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                Text('Si un producto ya existe (mismo código o nombre)', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                 const SizedBox(height: AppSpace.xs),
                 SegmentedButton<bool>(
                   showSelectedIcon: false,
@@ -307,7 +308,7 @@ initialValue: _headerRow,
                 ),
                 if (_updateExisting) ...[
                   const SizedBox(height: AppSpace.md),
-                  Text('Su stock', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                  Text('Su stock', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                   const SizedBox(height: AppSpace.xs),
                   SegmentedButton<StockMode>(
                     showSelectedIcon: false,
@@ -322,7 +323,7 @@ initialValue: _headerRow,
                 const SizedBox(height: AppSpace.xl),
                 FilledButton.icon(
                   onPressed: _working || rows.length == noName ? null : _import,
-                  icon: const Icon(Icons.download_done_rounded),
+                  icon: const Icon(Icons.download_done_outlined),
                   label: Text(_working ? 'Importando…' : 'Importar ${rows.length - noName} productos'),
                 ),
               ],

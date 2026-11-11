@@ -402,7 +402,7 @@ class ServicesRepository {
     if (!order.isPaid) return order;
     for (final id in order.saleIds) {
       final sale = await SalesRepository.instance.getSaleById(id);
-      if (sale != null) await SalesRepository.instance.cancelSale(sale);
+      if (sale != null) await SalesRepository.instance.voidSale(sale);
     }
     await CommissionsRepository.instance.onOrderReopened(order.id, now: now);
     final at = now ?? DateTime.now();

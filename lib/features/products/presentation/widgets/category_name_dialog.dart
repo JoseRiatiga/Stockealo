@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Nombre de una categoría, para crearla o renombrarla. No deja repetir una que ya
 /// existe con otra escritura ("ropa" / "Ropa"): al crear, propone elegir esa.
@@ -70,9 +71,9 @@ class _CategoryNameDialogState extends State<CategoryNameDialog> {
     if (match != null) {
       helper = _renaming ? 'Ya tienes una categoría "$match".' : 'Ya tienes "$match": se elegirá esa.';
     }
-    return AlertDialog(
-      title: Text(_renaming ? 'Renombrar categoría' : 'Nueva categoría'),
-      content: SizedBox(
+    return AppDialog(
+title: _renaming ? 'Renombrar categoría' : 'Nueva categoría',
+content: SizedBox(
         width: 380,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -82,7 +83,7 @@ class _CategoryNameDialogState extends State<CategoryNameDialog> {
               _renaming
                   ? 'Los productos de "${widget.initial}" pasan con el nombre nuevo.'
                   : 'Agrupa tus productos para encontrarlos rápido y filtrar el inventario.',
-              style: TextStyle(fontSize: 13, height: 1.4, color: c.inkMuted),
+              style: TextStyle(fontSize: AppText.sizeSmall, height: 1.4, color: c.inkMuted),
             ),
             const SizedBox(height: AppSpace.md),
             TextField(
@@ -102,13 +103,13 @@ class _CategoryNameDialogState extends State<CategoryNameDialog> {
           ],
         ),
       ),
-      actions: [
+actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: _canSave ? _save : null,
           child: Text(_renaming ? 'Guardar' : (match == null ? 'Crear' : 'Elegir')),
         ),
       ],
-    );
+);
   }
 }

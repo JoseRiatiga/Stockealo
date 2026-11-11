@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_tokens.dart';
 
 class ProductImageView extends StatelessWidget {
   final String? imagePath;
@@ -24,12 +25,11 @@ class ProductImageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     Widget placeholder = Container(
       width: width,
       height: height,
-      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+      color: context.colors.surfaceMuted,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -37,15 +37,15 @@ class ProductImageView extends StatelessWidget {
             Icon(
               Icons.inventory_2_outlined,
               size: iconSize,
-              color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+              color: context.colors.inkFaint,
             ),
             if (placeholderText != null) ...[
               const SizedBox(height: 8),
               Text(
                 placeholderText!,
                 style: TextStyle(
-                  fontSize: 13,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  fontSize: AppText.sizeSmall,
+                  color: context.colors.inkMuted,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -75,14 +75,14 @@ class ProductImageView extends StatelessWidget {
             return Container(
               width: width,
               height: height,
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-              child: const Center(
+              color: context.colors.surfaceMuted,
+              child: Center(
                 child: SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF059669),
+                    color: context.colors.accent,
                   ),
                 ),
               ),

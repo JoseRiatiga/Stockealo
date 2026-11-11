@@ -221,7 +221,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
         const SizedBox(height: AppSpace.lg),
         PrimaryActionButton(
           label: _creating ? 'Creando…' : (_count == 1 ? 'Crear código' : 'Crear $_count códigos'),
-          icon: Icons.add_rounded,
+          icon: Icons.add_outlined,
           onPressed: _creating ? null : _create,
         ),
       ],
@@ -240,7 +240,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
               IconButton(
                 tooltip: 'Menos',
                 onPressed: value > min ? () => onChanged(value - 1) : null,
-                icon: const Icon(Icons.remove_rounded),
+                icon: const Icon(Icons.remove_outlined),
               ),
               Expanded(
                 child: Text('$value',
@@ -249,7 +249,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
               IconButton(
                 tooltip: 'Más',
                 onPressed: value < max ? () => onChanged(value + 1) : null,
-                icon: const Icon(Icons.add_rounded),
+                icon: const Icon(Icons.add_outlined),
               ),
             ],
           ),
@@ -268,7 +268,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: c.success),
+              Icon(Icons.check_circle_outlined, color: c.success),
               const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: Text(
@@ -299,7 +299,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
                 IconButton(
                   tooltip: 'Copiar código',
                   onPressed: () => adminCopy(context, code.code, 'Código'),
-                  icon: Icon(Icons.copy_rounded, size: 20, color: c.inkMuted),
+                  icon: Icon(Icons.copy_outlined, size: 20, color: c.inkMuted),
                 ),
               ],
             ),
@@ -349,7 +349,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
           IconButton(
             tooltip: 'Copiar código',
             onPressed: () => adminCopy(context, code.code, 'Código'),
-            icon: Icon(Icons.copy_rounded, size: 20, color: c.inkMuted),
+            icon: Icon(Icons.copy_outlined, size: 20, color: c.inkMuted),
           ),
           PopupMenuButton<String>(
             tooltip: 'Más',

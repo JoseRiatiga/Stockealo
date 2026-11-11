@@ -4,7 +4,6 @@ import '../../../../core/services/web_update_service.dart';
 import '../../../pro/data/pro_service.dart';
 import '../../../services/presentation/screens/services_tab.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
-import '../../../../core/design/glass_surface.dart';
 import '../../../../core/services/phone_alerts_service.dart';
 import '../../../backup/data/auto_backup_service.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -25,7 +24,11 @@ import '../../../team/data/team_repository.dart';
 import '../../../../core/services/update_service.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/widgets/update_dialog.dart';
-import '../widgets/app_sidebar_pro.dart';
+import '../widgets/app_menu.dart';
+import '../places/places.dart';
+import '../../navigation/app_places.dart';
+import '../../../sales/presentation/screens/sell_screen.dart';
+import '../../../store/presentation/screens/online_store_screen.dart';
 import '../widgets/app_header_bar.dart';
 import '../widgets/where_things_moved_sheet.dart';
 import '../widgets/global_search_dialog.dart';
@@ -68,6 +71,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   @override
   void initState() {
     super.initState();
+    AppPlace.request.addListener(_onPlaceRequest);
     _loadNavigationContext();
     _checkAppUpdateSilently();
     // Copia diaria de los datos en el celular; sin esperar y sin estorbar si falla.
@@ -105,6 +109,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   @override
   void dispose() {
+    AppPlace.request.removeListener(_onPlaceRequest);
     _lifecycle.dispose();
     _webUpdateTimer?.cancel();
     ProService.instance.status.removeListener(_onProChanged);
@@ -178,7 +183,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     messenger.showMaterialBanner(
       MaterialBanner(
         backgroundColor: c.infoSoft,
-        leading: Icon(Icons.system_update_alt_rounded, color: c.info),
+        leading: Icon(Icons.system_update_alt_outlined, color: c.info),
         content: Text(
           latest.isEmpty
               ? 'Hay una versión nueva de Stockealo. Toca Actualizar para usarla.'
@@ -203,62 +208,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     );
   }
 
+  /// Lugares que ya se abrieron: se construyen la primera vez y luego conservan su estado
+  final Set<int> _opened = {AppPlace.inicio};
+
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  /// Otra pantalla pidió ir a un lugar (por ejemplo, «Vender» desde un producto)
+  void _onPlaceRequest() {
+    final id = AppPlace.request.value;
+    if (id == null || !mounted) return;
+    AppPlace.request.value = null;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    _navigateToTab(id);
+  }
+
   void _navigateToTab(int index) {
     setState(() {
       _currentIndex = index;
+      _opened.add(index);
     });
   }
 
-  /// Números de pantalla: 0 Inicio, 1 Inventario, 2 Ventas, 3 Ajustes, 4 Reportes.
-  /// Reportes llegó después: se muestra antes de Ajustes sin cambiar los números
-  /// que ya usan Stocky, las notificaciones y el buscador.
-  static const _reportsIndex = 4;
-
-  /// Servicios (solo con Pro Servicios) y «Más», que en el celular abre Reportes y Ajustes
-  static const _servicesIndex = 5;
-  static const _moreIndex = 6;
-
-  bool get _showReports => ReportsTab.allowed(_userRole);
   bool get _showServices => ProService.instance.status.value.services;
-
-  /// Orden en la barra de abajo: máximo 5 pestañas. Con Servicios, Reportes y
-  /// Ajustes pasan a «Más».
-  List<int> get _tabOrder => _showServices
-      ? [0, 2, _servicesIndex, 1, _moreIndex]
-      : [0, 1, 2, if (_showReports) _reportsIndex, 3];
-
-  static const _tabInfo = <int, (IconData, IconData, String)>{
-    0: (Icons.dashboard_outlined, Icons.dashboard_rounded, 'Inicio'),
-    1: (Icons.inventory_2_outlined, Icons.inventory_2_rounded, 'Inventario'),
-    2: (Icons.point_of_sale_outlined, Icons.point_of_sale_rounded, 'Ventas'),
-    3: (Icons.settings_outlined, Icons.settings_rounded, 'Ajustes'),
-    _reportsIndex: (Icons.insert_chart_outlined_rounded, Icons.insert_chart_rounded, 'Reportes'),
-    _servicesIndex: (Icons.view_kanban_outlined, Icons.view_kanban_rounded, 'Servicios'),
-    _moreIndex: (Icons.more_horiz_rounded, Icons.more_horiz_rounded, 'Más'),
-  };
-
-  /// «Más»: Reportes y Ajustes, con texto
-  Future<void> _openMore() async {
-    final picked = await showModalBottomSheet<int>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final i in [if (_showReports) _reportsIndex, 3])
-              ListTile(
-                leading: Icon(_tabInfo[i]!.$1),
-                title: Text(_tabInfo[i]!.$3),
-                onTap: () => Navigator.pop(ctx, i),
-              ),
-            const SizedBox(height: AppSpace.sm),
-          ],
-        ),
-      ),
-    );
-    if (picked != null) _navigateToTab(picked);
-  }
 
   /// Ajustes › Equipo, donde se agregan las personas que hacen los servicios
   Future<void> _openTeam() async {
@@ -267,197 +238,148 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     await Navigator.push(context, MaterialPageRoute(builder: (_) => EmployeesScreen(business: biz)));
   }
 
+  void _openSearch() => GlobalSearchDialog.show(
+        context,
+        businessId: _activeBusiness?.id,
+        userRole: _userRole,
+        onNavigateToTab: _navigateToTab,
+      );
+
+  void _openNotifications() => NotificationsModal.show(context: context, onNavigateToTab: _navigateToTab);
+
+  /// «Nueva venta» del encabezado: lleva a Vender
+  void _newSale() => _navigateToTab(AppPlace.vender);
+
+  /// El lugar con ese número. Todos se identifican con el número de [AppPlace].
+  Widget _placeBody(int id) => switch (id) {
+        AppPlace.inicio => DashboardScreen(
+            userId: widget.userId,
+            onNavigateToTab: _navigateToTab,
+            onLogout: widget.onLogout,
+          ),
+        AppPlace.vender => _activeBusiness == null
+            ? const SizedBox.shrink()
+            : SellScreen(key: ValueKey('sell-${_activeBusiness!.id}'), business: _activeBusiness!, role: _userRole),
+        AppPlace.ventas => SalesHistoryScreen(businessId: null, userRole: _userRole),
+        AppPlace.caja => CashPlace(business: _activeBusiness, role: _userRole),
+        AppPlace.servicios => _showServices
+            ? ServicesTab(business: _activeBusiness, userRole: _userRole, onOpenTeam: _openTeam)
+            : const SizedBox.shrink(),
+        AppPlace.productos => ProductsListScreen(
+            userId: widget.userId,
+            onLogout: widget.onLogout,
+            userRole: _userRole,
+            onOpenStock: () => _navigateToTab(AppPlace.stock),
+          ),
+        AppPlace.stock => ProductsListScreen(
+            userId: widget.userId,
+            onLogout: widget.onLogout,
+            userRole: _userRole,
+            mode: ProductsListMode.stock,
+          ),
+        AppPlace.personas => PeoplePlace(business: _activeBusiness, role: _userRole),
+        AppPlace.tienda => _activeBusiness == null
+            ? const SizedBox.shrink()
+            : OnlineStoreScreen(key: ValueKey('store-${_activeBusiness!.id}'), business: _activeBusiness!, embedded: true),
+        AppPlace.reportes => ReportsTab(userRole: _userRole),
+        _ => ProfileScreen(onLogout: widget.onLogout),
+      };
+
+  static const _allPlaces = [
+    AppPlace.inicio, AppPlace.productos, AppPlace.ventas, AppPlace.ajustes, AppPlace.reportes, AppPlace.servicios,
+    AppPlace.vender, AppPlace.caja, AppPlace.stock, AppPlace.personas, AppPlace.tienda,
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final screens = [
-      DashboardScreen(
-        userId: widget.userId,
-        onNavigateToInventory: () => _navigateToTab(1),
-        onNavigateToSales: () => _navigateToTab(2),
-        onNavigateToTab: _navigateToTab,
-        onLogout: widget.onLogout,
-      ),
-      ProductsListScreen(
-        userId: widget.userId,
-        onLogout: widget.onLogout,
-        userRole: _userRole,
-      ),
-      SalesHistoryScreen(
-        businessId: null,
-        userRole: _userRole,
-      ),
-      ProfileScreen(
-        onLogout: widget.onLogout,
-      ),
-      ReportsTab(userRole: _userRole),
-      _showServices
-          ? ServicesTab(business: _activeBusiness, userRole: _userRole, onOpenTeam: _openTeam)
-          : const SizedBox.shrink(),
-    ];
-    // Si la cuenta deja de poder ver Reportes o Servicios, vuelve a Inicio
-    if (_currentIndex == _reportsIndex && !_showReports) _currentIndex = 0;
-    if (_currentIndex == _servicesIndex && !_showServices) _currentIndex = 0;
-    final order = _tabOrder;
+    // Si la persona deja de poder ver el lugar (rol o plan), vuelve a Inicio
+    final place = AppPlace.byId(_currentIndex);
+    if (_currentIndex != AppPlace.ajustes && !place.visibleFor(role: _userRole, services: _showServices)) {
+      _currentIndex = AppPlace.inicio;
+    }
+    final current = AppPlace.byId(_currentIndex);
+    final stack = IndexedStack(
+      index: _allPlaces.indexOf(_currentIndex),
+      children: [
+        for (final id in _allPlaces) _opened.contains(id) ? _placeBody(id) : const SizedBox.shrink(),
+      ],
+    );
+    final showStocky = _currentIndex != AppPlace.ajustes && _currentIndex != AppPlace.reportes;
+    final title = _currentIndex == AppPlace.inicio ? (_activeBusiness?.name ?? 'Inicio') : current.label;
+
+    Widget header(bool compact) => AnimatedBuilder(
+          animation: NotificationService.instance,
+          builder: (context, _) => AppHeaderBar(
+            title: title,
+            subtitle: current.subtitle,
+            compact: compact,
+            business: _activeBusiness,
+            alertCount: NotificationService.instance.unreadCount,
+            onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+            onSearchTap: _openSearch,
+            onNotificationsTap: _openNotifications,
+            onNewSale: _newSale,
+            onCashTap: () => _navigateToTab(AppPlace.caja),
+          ),
+        );
+
+    AppMenu menu({required bool inDrawer}) => AppMenu(
+          selectedId: _currentIndex,
+          onSelect: (id) {
+            if (inDrawer) Navigator.of(context).maybePop();
+            _navigateToTab(id);
+          },
+          business: _activeBusiness,
+          userName: _userName,
+          userRole: _userRole,
+          services: _showServices,
+          onSelectBusiness: () {
+            if (inDrawer) Navigator.of(context).maybePop();
+            _handleSelectBusiness();
+          },
+          onLogout: widget.onLogout,
+          inDrawer: inDrawer,
+        );
 
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
-        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () {
-          GlobalSearchDialog.show(
-            context,
-            businessId: _activeBusiness?.id,
-            userRole: _userRole,
-            onNavigateToTab: _navigateToTab,
-          );
-        },
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _openSearch,
       },
       child: Focus(
         autofocus: true,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 850;
+            final body = Stack(
+              children: [
+                stack,
+                // Stocky abajo a la derecha (no en Ajustes ni Reportes)
+                if (showStocky)
+                  Positioned(
+                    right: isWide ? AppSpace.xl : AppSpace.lg,
+                    bottom: (isWide ? AppSpace.xl : AppSpace.lg) + MediaQuery.of(context).padding.bottom,
+                    child: StockyFloatingButton(businessId: _activeBusiness?.id, onNavigateToTab: _navigateToTab),
+                  ),
+              ],
+            );
 
             if (isWide) {
               return Scaffold(
+                key: _scaffoldKey,
                 body: Row(
                   children: [
-                    // Sidebar Pro tipo Bento / Nuxt Suite
-                    AppSidebarPro(
-                      selectedIndex: _currentIndex,
-                      onItemSelected: _navigateToTab,
-                      activeBusiness: _activeBusiness,
-                      userName: _userName,
-                      userRole: _userRole,
-                      showServices: _showServices,
-                      onSelectBusiness: _handleSelectBusiness,
-                      onLogout: widget.onLogout,
-                    ),
-                    // Área Principal con Header Bar
-                    Expanded(
-                      child: Column(
-                        children: [
-                          AnimatedBuilder(
-                            animation: NotificationService.instance,
-                            builder: (context, _) {
-                              return AppHeaderBar(
-                                title: switch (_currentIndex) {
-                                  0 => _activeBusiness?.name ?? 'Inicio',
-                                  1 => 'Inventario',
-                                  2 => 'Ventas',
-                                  _reportsIndex => 'Reportes',
-                                  _servicesIndex => 'Servicios',
-                                  _ => 'Ajustes',
-                                },
-                                subtitle: switch (_currentIndex) {
-                                  0 => 'Resumen de hoy',
-                                  1 => 'Productos, stock y precios',
-                                  2 => 'Historial, clientes y cotizaciones',
-                                  _reportsIndex => 'Ganancias y descargas en Excel',
-                                  _servicesIndex => 'Tablero, asistencia, historial y precios',
-                                  _ => 'Haz que la app sea tuya',
-                                },
-                                alertCount: NotificationService.instance.unreadCount,
-                                onNotificationsTap: () => NotificationsModal.show(
-                                  context: context,
-                                  onNavigateToTab: _navigateToTab,
-                                ),
-                                onSearchTap: () => GlobalSearchDialog.show(
-                                  context,
-                                  businessId: _activeBusiness?.id,
-                                  userRole: _userRole,
-                                  onNavigateToTab: _navigateToTab,
-                                ),
-                              );
-                            },
-                          ),
-                          Expanded(
-                            child: Stack(
-                              children: [
-                                IndexedStack(
-                                  index: _currentIndex,
-                                  children: screens,
-                                ),
-                                // Stocky abajo a la derecha, igual que en el celular (arriba pasaba desapercibido)
-                                if (_currentIndex != 3 && _currentIndex != _reportsIndex)
-                                  Positioned(
-                                    right: AppSpace.xl,
-                                    bottom: AppSpace.xl,
-                                    child: StockyFloatingButton(
-                                      businessId: _activeBusiness?.id,
-                                      onNavigateToTab: _navigateToTab,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    menu(inDrawer: false),
+                    Expanded(child: Column(children: [header(false), Expanded(child: body)])),
                   ],
                 ),
               );
             }
 
-            // Modo Móvil
-            final showStockyFab = _currentIndex != 3 && _currentIndex != _reportsIndex;
-            // Inventario y Ventas tienen su botón principal a la izquierda en la misma fila.
-            // En celulares angostos no caben los dos: Stocky sube una fila para no taparlo
-            final hasPrimaryButton = _currentIndex == 1 || _currentIndex == 2 || _currentIndex == _servicesIndex;
-            final liftStocky = hasPrimaryButton && constraints.maxWidth < 400;
-
+            // Celular: el mismo menú, que se abre con ☰ (sin barra de pestañas abajo)
             return Scaffold(
-              // El contenido pasa por debajo de la barra de cristal
-              extendBody: true,
-              body: Builder(
-                // Este contexto ya incluye el alto de la barra en padding.bottom
-                builder: (bodyContext) => Stack(
-                  children: [
-                    IndexedStack(
-                      index: _currentIndex,
-                      children: screens,
-                    ),
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOutCubic,
-                      right: AppSpace.lg,
-                      bottom: showStockyFab
-                          ? MediaQuery.of(bodyContext).padding.bottom + AppSpace.lg + (liftStocky ? 64 : 0)
-                          : -80,
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 200),
-                        opacity: showStockyFab ? 1.0 : 0.0,
-                        child: StockyFloatingButton(
-                          businessId: _activeBusiness?.id,
-                          onNavigateToTab: _navigateToTab,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              bottomNavigationBar: SafeArea(
-                minimum: const EdgeInsets.fromLTRB(AppSpace.md, 0, AppSpace.md, AppSpace.sm),
-                child: GlassSurface(
-                  borderRadius: BorderRadius.circular(28),
-                  child: NavigationBar(
-                    height: 64,
-                    // Reportes y Ajustes se marcan en «Más» cuando están dentro de él
-                    selectedIndex: (order.contains(_currentIndex)
-                            ? order.indexOf(_currentIndex)
-                            : order.indexOf(_moreIndex))
-                        .clamp(0, order.length - 1),
-                    onDestinationSelected: (i) => order[i] == _moreIndex ? _openMore() : _navigateToTab(order[i]),
-                    labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                    destinations: [
-                      for (final i in order)
-                        NavigationDestination(
-                          icon: Icon(_tabInfo[i]!.$1),
-                          selectedIcon: Icon(_tabInfo[i]!.$2),
-                          label: _tabInfo[i]!.$3,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+              key: _scaffoldKey,
+              drawer: Drawer(width: 304, child: menu(inDrawer: true)),
+              body: Column(children: [header(true), Expanded(child: body)]),
             );
           },
         ),

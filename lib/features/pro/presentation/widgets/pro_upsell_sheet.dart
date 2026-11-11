@@ -134,7 +134,7 @@ class _ProUpsellSheetState extends State<ProUpsellSheet> {
                 child: IconButton(
                   tooltip: 'Cerrar',
                   onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close_rounded, color: c.inkMuted),
+                  icon: Icon(Icons.close_outlined, color: c.inkMuted),
                 ),
               ),
               const Center(child: ProCrown(size: 40)),
@@ -142,13 +142,13 @@ class _ProUpsellSheetState extends State<ProUpsellSheet> {
               Text(
                 widget.title,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink),
+                style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink),
               ),
               const SizedBox(height: AppSpace.sm),
               Text(
                 widget.message,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+                style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
               ),
               const SizedBox(height: AppSpace.lg),
               Container(
@@ -169,14 +169,14 @@ class _ProUpsellSheetState extends State<ProUpsellSheet> {
               Text(
                 'Todo lo demás sigue gratis.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: c.inkFaint),
+                style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
               ),
               const SizedBox(height: AppSpace.lg),
               if (_priceFrom != null) ...[
                 Text(
                   _priceFrom!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.ink),
+                  style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w600, color: c.ink),
                 ),
                 const SizedBox(height: AppSpace.sm),
               ],
@@ -227,7 +227,7 @@ class _ProUpsellSheetState extends State<ProUpsellSheet> {
               children: [
                 Text(b.$2, style: TextStyle(fontWeight: highlighted ? FontWeight.w700 : FontWeight.w500, color: c.ink)),
                 // Solo el beneficio de lo que tocaste lleva la explicación
-                if (highlighted) Text(b.$3, style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                if (highlighted) Text(b.$3, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
               ],
             ),
           ),

@@ -378,7 +378,7 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(currentTip.emoji, style: const TextStyle(fontSize: 18)),
+                            Text(currentTip.emoji, style: const TextStyle(fontSize: AppText.sizeHeading)),
                             const SizedBox(width: AppSpace.sm),
                             Flexible(
                               child: Column(
@@ -387,14 +387,14 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
                                 children: [
                                   Text(
                                     'Consejo de Stocky · toca para verlo',
-                                    style: TextStyle(fontSize: 11, color: c.inkMuted),
+                                    style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                                   ),
                                   const SizedBox(height: 1),
                                   Text(
                                     currentTip.title,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.ink),
+                                    style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.ink),
                                   ),
                                 ],
                               ),
@@ -403,7 +403,7 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
                               tooltip: 'Cerrar consejo',
                               visualDensity: VisualDensity.compact,
                               onPressed: _dismissTip,
-                              icon: Icon(Icons.close_rounded, size: 16, color: c.inkFaint),
+                              icon: Icon(Icons.close_outlined, size: 16, color: c.inkFaint),
                             ),
                           ],
                         ),
@@ -435,7 +435,7 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
                     children: [
                       Text(
                         'Pregúntale a Stocky',
-                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.ink),
+                        style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w600, color: c.ink),
                       ),
                       const SizedBox(width: AppSpace.sm),
                       Container(

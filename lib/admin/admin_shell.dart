@@ -18,16 +18,16 @@ import 'admin_businesses_page.dart';
 /// Secciones del panel
 enum AdminSection {
   summary('Resumen', Icons.dashboard_outlined),
-  users('Usuarios', Icons.people_outline_rounded),
+  users('Usuarios', Icons.people_outline_outlined),
   businesses('Negocios', Icons.store_mall_directory_outlined),
   stores('Tiendas', Icons.storefront_outlined),
   subscriptions('Suscripciones', Icons.workspace_premium_outlined),
   payments('Pagos', Icons.payments_outlined),
   codes('Códigos', Icons.confirmation_number_outlined),
   feedback('Sugerencias y fallos', Icons.feedback_outlined),
-  maintenance('Mantenimiento', Icons.construction_rounded),
+  maintenance('Mantenimiento', Icons.construction_outlined),
   team('Equipo y registro', Icons.badge_outlined),
-  config('Configuración', Icons.tune_rounded);
+  config('Configuración', Icons.tune_outlined);
 
   final String label;
   final IconData icon;
@@ -94,7 +94,7 @@ class _AdminShellState extends State<AdminShell> {
               title: Text('Stockealo · ${_section.label}'),
               backgroundColor: c.paper,
               actions: [
-                IconButton(tooltip: 'Buscar', onPressed: _search, icon: const Icon(Icons.search_rounded)),
+                IconButton(tooltip: 'Buscar', onPressed: _search, icon: const Icon(Icons.search_outlined)),
               ],
             ),
       drawer: wide ? null : Drawer(backgroundColor: c.surface, child: SafeArea(child: menu)),
@@ -150,7 +150,7 @@ class _Menu extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(AppSpace.sm, 0, AppSpace.sm, AppSpace.sm),
           child: OutlinedButton.icon(
             onPressed: onSearch,
-            icon: const Icon(Icons.search_rounded, size: 18),
+            icon: const Icon(Icons.search_outlined, size: 18),
             label: const Align(alignment: Alignment.centerLeft, child: Text('Buscar…')),
             style: OutlinedButton.styleFrom(foregroundColor: c.inkMuted, alignment: Alignment.centerLeft),
           ),
@@ -205,7 +205,7 @@ class _Menu extends StatelessWidget {
               const SizedBox(height: AppSpace.sm),
               OutlinedButton.icon(
                 onPressed: onSignOut,
-                icon: const Icon(Icons.logout_rounded, size: 18),
+                icon: const Icon(Icons.logout_outlined, size: 18),
                 label: const Text('Cerrar sesión'),
               ),
             ],

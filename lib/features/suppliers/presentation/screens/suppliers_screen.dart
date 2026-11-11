@@ -15,12 +15,16 @@ import 'purchase_entry_screen.dart';
 import 'supplier_orders_screen.dart';
 import 'supplier_form_screen.dart';
 
-/// Inventario › Proveedores: la lista, con acceso a las entradas de mercancía
+/// Clientes y proveedores › Proveedores: la lista, con acceso a las entradas de mercancía
 class SuppliersScreen extends StatefulWidget {
   final Business business;
   final String? userName;
 
-  const SuppliersScreen({super.key, required this.business, this.userName});
+  /// Dentro del marco de la app (lugar «Clientes y proveedores»): sin barra propia;
+  /// «Pedidos enviados» y «Entradas» pasan a una fila arriba de la lista
+  final bool embedded;
+
+  const SuppliersScreen({super.key, required this.business, this.userName, this.embedded = false});
 
   static Future<void> open(BuildContext context, {required Business business, String? userName}) =>
       Navigator.of(context).push(MaterialPageRoute(
@@ -80,31 +84,44 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
     return Scaffold(
       backgroundColor: c.paper,
-      appBar: AppBar(
-        title: const Text('Proveedores'),
-        actions: [
-          IconButton(
-            tooltip: 'Pedidos enviados',
-            icon: const Icon(Icons.local_shipping_outlined),
-            onPressed: () async {
-              await SupplierOrdersScreen.open(context, business: widget.business);
-              _load();
-            },
-          ),
-          TextButton.icon(
-            onPressed: () => PurchasesScreen.open(context, business: widget.business),
-            icon: const Icon(Icons.receipt_long_outlined, size: 18),
-            label: const Text('Entradas'),
-          ),
-        ],
-      ),
+      appBar: widget.embedded ? null : AppBar(title: const Text('Proveedores'), actions: _actions(context)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _new,
-        icon: const Icon(Icons.add_rounded),
+        icon: const Icon(Icons.add_outlined),
         label: const Text('Nuevo proveedor'),
       ),
       body: ContentWidth(
-        child: _loading
+        child: widget.embedded ? Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, 0),
+            child: Row(mainAxisAlignment: MainAxisAlignment.end, children: _actions(context)),
+          ),
+          Expanded(child: _content(list)),
+        ]) : _content(list),
+      ),
+    );
+  }
+
+  List<Widget> _actions(BuildContext context) => [
+        TextButton.icon(
+          onPressed: () async {
+            await SupplierOrdersScreen.open(context, business: widget.business);
+            _load();
+          },
+          icon: const Icon(Icons.local_shipping_outlined, size: 18),
+          label: const Text('Pedidos enviados'),
+        ),
+        TextButton.icon(
+          onPressed: () => PurchasesScreen.open(context, business: widget.business),
+          icon: const Icon(Icons.receipt_long_outlined, size: 18),
+          label: const Text('Entradas'),
+        ),
+      ];
+
+  Widget _content(List<Supplier> list) {
+    final c = context.colors;
+    return Builder(builder: (context) {
+      return _loading
             ? const Center(child: CircularProgressIndicator())
             : ListView(
                 padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, 96),
@@ -132,11 +149,11 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                               Text('Registrar entrada de mercancía',
                                   style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
                               Text('Lo que llegó suma al inventario, también por talla y color',
-                                  style: TextStyle(color: c.inkMuted, fontSize: 12)),
+                                  style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
                             ],
                           ),
                         ),
-                        Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                        Icon(Icons.chevron_right_outlined, color: c.inkFaint),
                       ],
                     ),
                   ),
@@ -164,12 +181,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                   Text(
                                     '${_payables.length} ${_payables.length == 1 ? 'entrada' : 'entradas'} a crédito'
                                     '${overdue > 0 ? ' · $overdue ${overdue == 1 ? 'vencida' : 'vencidas'}' : ''}',
-                                    style: TextStyle(color: overdue > 0 ? c.danger : c.inkMuted, fontSize: 12),
+                                    style: TextStyle(color: overdue > 0 ? c.danger : c.inkMuted, fontSize: AppText.sizeCaption),
                                   ),
                                 ],
                               ),
                             ),
-                            Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                            Icon(Icons.chevron_right_outlined, color: c.inkFaint),
                           ],
                         ),
                       );
@@ -179,7 +196,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                   if (_suppliers.isNotEmpty) ...[
                     TextField(
                       onChanged: (v) => setState(() => _q = v),
-                      decoration: const InputDecoration(hintText: 'Buscar proveedor', prefixIcon: Icon(Icons.search)),
+                      decoration: const InputDecoration(hintText: 'Buscar proveedor', prefixIcon: Icon(Icons.search_outlined)),
                     ),
                     const SizedBox(height: AppSpace.md),
                   ],
@@ -191,12 +208,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           Icon(Icons.storefront_outlined, size: 48, color: c.inkFaint),
                           const SizedBox(height: AppSpace.md),
                           Text('Aún no tienes proveedores',
-                              style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: 15)),
+                              style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: AppText.sizeBodyLarge)),
                           const SizedBox(height: AppSpace.xs),
                           Text(
                             'Es opcional. Te sirve para enviarles pedidos por WhatsApp y llevar lo que te llega.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: c.inkMuted, fontSize: 13),
+                            style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall),
                           ),
                         ],
                       ),
@@ -223,7 +240,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                     '${_counts[s.id] ?? 0} ${(_counts[s.id] ?? 0) == 1 ? 'producto' : 'productos'}',
                                     s.summary,
                                   ].join(' · '),
-                                  style: TextStyle(color: c.inkMuted, fontSize: 12),
+                                  style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption),
                                 ),
                               ],
                             ),
@@ -240,9 +257,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                     const SizedBox(height: AppSpace.sm),
                   ],
                 ],
-              ),
-      ),
-    );
+              );
+    });
   }
 }
 
@@ -293,10 +309,10 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
     final c = context.colors;
     final pending = _purchases.fold(0.0, (s, p) => s + p.balance);
     final info = <(IconData, String)>[
-      if ((_s.contactName ?? '').isNotEmpty) (Icons.person_outline, _s.contactName!),
+      if ((_s.contactName ?? '').isNotEmpty) (Icons.person_outline_outlined, _s.contactName!),
       if ((_s.phone ?? '').isNotEmpty) (Icons.phone_outlined, _s.phone!),
       if ((_s.taxId ?? '').isNotEmpty) (Icons.badge_outlined, 'NIT ${_s.taxId}'),
-      if ((_s.email ?? '').isNotEmpty) (Icons.mail_outline, _s.email!),
+      if ((_s.email ?? '').isNotEmpty) (Icons.mail_outline_outlined, _s.email!),
       if (_s.minOrder != null) (Icons.shopping_basket_outlined, 'Pedido mínimo ${CurrencyFormatter.format(_s.minOrder!)}'),
       (Icons.payments_outlined, _s.summary),
       if ((_s.notes ?? '').isNotEmpty) (Icons.notes_outlined, _s.notes!),
@@ -324,7 +340,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
                         children: [
                           Icon(icon, size: 18, color: c.inkMuted),
                           const SizedBox(width: AppSpace.md),
-                          Expanded(child: Text(text, style: TextStyle(color: c.ink, fontSize: 13.5))),
+                          Expanded(child: Text(text, style: TextStyle(color: c.ink, fontSize: AppText.sizeBody))),
                         ],
                       ),
                     ),
@@ -381,10 +397,10 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
               ),
             ],
             const SizedBox(height: AppSpace.xl),
-            Text('Entradas de mercancía', style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, fontSize: 15)),
+            Text('Entradas de mercancía', style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, fontSize: AppText.sizeBodyLarge)),
             const SizedBox(height: AppSpace.sm),
             if (_purchases.isEmpty)
-              Text('Aún no hay entradas de este proveedor.', style: TextStyle(color: c.inkMuted, fontSize: 13))
+              Text('Aún no hay entradas de este proveedor.', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall))
             else
               for (final p in _purchases) ...[
                 PurchaseTile(purchase: p, onChanged: _load),
@@ -437,7 +453,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
           final saved = await PurchaseEntryScreen.open(context, business: widget.business);
           if (saved == true) _load();
         },
-        icon: const Icon(Icons.add_rounded),
+        icon: const Icon(Icons.add_outlined),
         label: const Text('Nueva entrada'),
       ),
       body: ContentWidth(
@@ -503,7 +519,7 @@ class PurchaseTile extends StatelessWidget {
                     if (p.photoPath != null) 'con foto',
                     if (status != null) 'a crédito, $status',
                   ].join(' · '),
-                  style: TextStyle(color: p.isOverdue() ? c.danger : c.inkMuted, fontSize: 12),
+                  style: TextStyle(color: p.isOverdue() ? c.danger : c.inkMuted, fontSize: AppText.sizeCaption),
                 ),
               ],
             ),

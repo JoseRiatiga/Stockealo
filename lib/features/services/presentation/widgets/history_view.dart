@@ -10,6 +10,7 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
 import '../../data/services_repository.dart';
 import '../../models/service_models.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Servicios › Historial: búsqueda en vivo por placa o serial, nombre o teléfono.
 /// Muestra las visitas, lo gastado, los servicios y quién atendió. Un trabajo ya
@@ -69,9 +70,9 @@ class _HistoryViewState extends State<HistoryView> {
     final note = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('¿Anular el cobro de ${o.title}?'),
-        content: Column(
+      builder: (ctx) => AppDialog(
+title: '¿Anular el cobro de ${o.title}?',
+content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Se anulan sus ventas (y el fiado, si lo hubo) y vuelve al tablero como listo para cobrar.'),
@@ -82,11 +83,11 @@ class _HistoryViewState extends State<HistoryView> {
             ),
           ],
         ),
-        actions: [
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Volver')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Anular cobro')),
         ],
-      ),
+),
     );
     final text = note.text;
     note.dispose();
@@ -118,7 +119,7 @@ class _HistoryViewState extends State<HistoryView> {
           TextField(
             controller: _query,
             onChanged: _onChanged,
-            decoration: InputDecoration(hintText: 'Buscar por $hint', prefixIcon: const Icon(Icons.search)),
+            decoration: InputDecoration(hintText: 'Buscar por $hint', prefixIcon: const Icon(Icons.search_outlined)),
           ),
           const SizedBox(height: AppSpace.md),
           if (_query.text.trim().isNotEmpty && _orders.isNotEmpty)
@@ -160,13 +161,13 @@ class _HistoryViewState extends State<HistoryView> {
                         ),
                         Text(
                           '${o.createdAt.day}/${o.createdAt.month}/${o.createdAt.year} · ${o.statusLabelFor(_t)}',
-                          style: TextStyle(fontSize: 12, color: c.inkMuted),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                         ),
                         const SizedBox(height: 2),
                         for (final l in o.lines)
                           Text(
                             '${l.name}${l.staffIds.isEmpty ? '' : ' · ${l.staffIds.map((id) => _staffNames[id] ?? 'Empleado').join(', ')}'}',
-                            style: TextStyle(fontSize: 12.5, color: c.ink),
+                            style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink),
                           ),
                       ],
                     ),

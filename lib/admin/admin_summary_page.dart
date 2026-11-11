@@ -89,7 +89,7 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
                   final columns = box.maxWidth >= 720 ? 3 : 2;
                   final tiles = [
                     _Tile('Cuentas', '${s.usersTotal}', '+${s.users7d} esta semana · +${s.users30d} en 30 días',
-                        Icons.people_outline_rounded, () => widget.onOpen(AdminSection.users)),
+                        Icons.people_outline_outlined, () => widget.onOpen(AdminSection.users)),
                     _Tile('Negocios', '${s.businessesTotal}', '${s.businessesPro} con Pro', Icons.store_mall_directory_outlined,
                         () => widget.onOpen(AdminSection.businesses)),
                     _Tile('Suscripciones activas', '${s.subscriptionsActive}', '${s.redemptions30d} canjes en 30 días',
@@ -125,7 +125,7 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
         decoration: BoxDecoration(color: c.warningSoft, borderRadius: BorderRadius.circular(AppRadius.card)),
         child: Row(
           children: [
-            Icon(Icons.info_outline_rounded, color: c.warning),
+            Icon(Icons.info_outline, color: c.warning),
             const SizedBox(width: AppSpace.md),
             Expanded(child: Text(text, style: TextStyle(color: c.ink))),
             TextButton(onPressed: onTap, child: Text(action)),

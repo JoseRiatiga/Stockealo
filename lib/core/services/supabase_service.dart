@@ -456,6 +456,7 @@ class SupabaseService {
           if (e.toString().contains('product_name') ||
               e.toString().contains('customer_name') ||
               e.toString().contains('variant_') ||
+              _saleV13Columns.any(e.toString().contains) ||
               e.toString().contains('42703')) {
             final fallbackSales = formattedSales.map((m) {
               final copy = Map<String, dynamic>.from(m);
@@ -463,6 +464,10 @@ class SupabaseService {
               copy.remove('customer_name');
               copy.remove('variant_id');
               copy.remove('variant_name');
+              copy.remove('service_id');
+              copy.remove('work_order_id');
+              copy.remove('staff_ids');
+              _saleV13Columns.forEach(copy.remove);
               return copy;
             }).toList();
             await client!.from('sales').upsert(
@@ -701,7 +706,7 @@ class SupabaseService {
         final List<dynamic> cloudProducts = await client!.from('products').select();
         // Lo que la nube no guardaba antes (variantes, descripción) no se pierde al reescribir
         final localExtras = <String, Map<String, Object?>>{
-          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description', 'supplier_id']))
+          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description', 'supplier_id', 'compare_price']))
             r['id'] as String: r,
         };
         for (final p in cloudProducts) {
@@ -717,6 +722,7 @@ class SupabaseService {
               'description': p['description'] ?? local?['description'],
               'has_variants': (p['has_variants'] == true || localHasVariants) ? 1 : 0,
               'supplier_id': p.containsKey('supplier_id') ? p['supplier_id'] : local?['supplier_id'],
+              'compare_price': p.containsKey('compare_price') ? p['compare_price'] : local?['compare_price'],
               'category': p['category'] ?? 'General',
               'purchase_price': (p['cost_price'] as num?)?.toDouble() ?? 0.0,
               'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
@@ -812,7 +818,7 @@ class SupabaseService {
         final localSales = <String, Map<String, Object?>>{
           for (final r in await db.query('sales', columns: [
             'id', 'variant_id', 'variant_name', 'seller_name', 'invoice_number', 'product_photo_path', 'discount_amount',
-            'service_id', 'work_order_id', 'staff_ids',
+            'service_id', 'work_order_id', 'staff_ids', 'voided_at', 'void_reason', 'voided_by', 'payment_split',
           ]))
             r['id'] as String: r,
         };
@@ -903,6 +909,11 @@ class SupabaseService {
               'service_id': s['service_id'] ?? local?['service_id'],
               'work_order_id': s['work_order_id'] ?? local?['work_order_id'],
               'staff_ids': s['staff_ids'] ?? local?['staff_ids'],
+              // Anulada en este equipo o en otro: no se pierde al descargar
+              'voided_at': s['voided_at'] ?? local?['voided_at'],
+              'void_reason': s['void_reason'] ?? local?['void_reason'],
+              'voided_by': s['voided_by'] ?? local?['voided_by'],
+              'payment_split': s['payment_split'] ?? local?['payment_split'],
               'seller_name': local?['seller_name'],
               'invoice_number': local?['invoice_number'],
               'product_photo_path': local?['product_photo_path'],
@@ -1342,13 +1353,16 @@ class SupabaseService {
       'created_at': p['created_at'],
       if (editedAt != null) 'updated_at': editedAt,
       'supplier_id': p['supplier_id'],
+      // Precio de antes (oferta en la tienda en línea)
+      'compare_price': (p['compare_price'] as num?)?.toDouble(),
     };
     try {
       await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
     } catch (e) {
-      // Nube sin la columna del proveedor todavía: se guarda el resto
-      if (!e.toString().contains('supplier_id') && !e.toString().contains('42703')) rethrow;
+      // Nube sin la columna del proveedor o del precio de antes todavía: se guarda el resto
+      if (!e.toString().contains('supplier_id') && !e.toString().contains('compare_price') && !e.toString().contains('42703')) rethrow;
       row.remove('supplier_id');
+      row.remove('compare_price');
       await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
     }
   }
@@ -1361,6 +1375,15 @@ class SupabaseService {
         if ((s['service_id'] as String?)?.isNotEmpty == true) 'service_id': s['service_id'],
         if ((s['work_order_id'] as String?)?.isNotEmpty == true) 'work_order_id': s['work_order_id'],
         if ((s['staff_ids'] as String?)?.isNotEmpty == true) 'staff_ids': s['staff_ids'],
+        // Re-diseño 0.13.0: venta anulada (queda en el historial) y pago mixto
+        ..._saleV13Fields(s),
+      };
+
+  static const _saleV13Columns = ['voided_at', 'void_reason', 'voided_by', 'payment_split'];
+
+  static Map<String, dynamic> _saleV13Fields(Map<String, dynamic> s) => {
+        for (final c in _saleV13Columns)
+          if ((s[c] as String?)?.isNotEmpty == true) c: s[c],
       };
 
   Future<void> _sendSale(SupabaseClient db, Map<String, dynamic> s) async {
@@ -1395,7 +1418,10 @@ class SupabaseService {
           e.toString().contains('customer_name') ||
           e.toString().contains('variant_') ||
           e.toString().contains('service_id') ||
+          _saleV13Columns.any(e.toString().contains) ||
           e.toString().contains('42703')) {
+        // La nube todavía no tiene esas columnas: la venta sube sin ellas
+        _saleV13Columns.forEach(payload.remove);
         payload.remove('product_name');
         payload.remove('customer_name');
         payload.remove('variant_id');

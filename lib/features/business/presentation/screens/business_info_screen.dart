@@ -15,6 +15,7 @@ import '../../../team/data/team_repository.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
 import '../widgets/business_selector_modal.dart';
+import '../../../../core/design/app_dialog.dart';
 
 class BusinessInfoScreen extends StatefulWidget {
   final Business business;
@@ -119,12 +120,12 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Mover a la papelera?'),
-        content: Text(
+      builder: (ctx) => AppDialog(
+title: '¿Mover a la papelera?',
+content: Text(
           'El negocio "${_business.name}" se enviará a la papelera durante 7 días. Podrás restaurarlo o se eliminará de forma definitiva al finalizar el plazo.',
         ),
-        actions: [
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: ctx.colors.danger, foregroundColor: Colors.white),
@@ -132,7 +133,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
             child: const Text('Mover a la papelera'),
           ),
         ],
-      ),
+),
     );
 
     if (confirmed == true) {
@@ -160,9 +161,9 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
       };
 
   IconData get _roleIcon => switch (_userRole.toUpperCase()) {
-        'OWNER' => Icons.workspace_premium_rounded,
-        'ADMIN' => Icons.admin_panel_settings_rounded,
-        _ => Icons.point_of_sale_rounded,
+        'OWNER' => Icons.workspace_premium_outlined,
+        'ADMIN' => Icons.admin_panel_settings_outlined,
+        _ => Icons.point_of_sale_outlined,
       };
 
   void _copyBusinessId() {
@@ -182,15 +183,15 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
               padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.sm, AppSpace.md, AppSpace.md),
               child: Row(
                 children: [
-                  _RoundButton(icon: Icons.chevron_left_rounded, label: 'Atrás', onTap: () => Navigator.pop(context)),
+                  _RoundButton(icon: Icons.chevron_left_outlined, label: 'Atrás', onTap: () => Navigator.pop(context)),
                   Expanded(
                     child: Text(
                       'Tu negocio',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.ink),
+                      style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink),
                     ),
                   ),
-                  _RoundButton(icon: Icons.swap_horiz_rounded, label: 'Cambiar de negocio', onTap: _switchBusiness),
+                  _RoundButton(icon: Icons.swap_horiz_outlined, label: 'Cambiar de negocio', onTap: _switchBusiness),
                 ],
               ),
             ),
@@ -209,21 +210,21 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
                               const SizedBox(height: AppSpace.xl),
                               SettingsGroup(label: 'Detalles', children: [
                                 SettingsRow(
-                                  icon: Icons.event_rounded,
+                                  icon: Icons.event_outlined,
                                   title: 'Creado el',
                                   subtitle: _formatDate(_business.createdAt),
                                 ),
                                 SettingsRow(
-                                  icon: Icons.fingerprint_rounded,
+                                  icon: Icons.fingerprint_outlined,
                                   title: 'ID del negocio',
                                   subtitle: _business.id,
                                   onTap: _copyBusinessId,
-                                  trailing: Icon(Icons.copy_rounded, size: 20, color: c.inkFaint),
+                                  trailing: Icon(Icons.copy_outlined, size: 20, color: c.inkFaint),
                                 ),
                               ]),
                               SettingsGroup(children: [
                                 SettingsRow(
-                                  icon: Icons.delete_outline_rounded,
+                                  icon: Icons.delete_outline_outlined,
                                   title: 'Mover a la papelera',
                                   subtitle: _userRole == 'OWNER'
                                       ? 'Se guarda 7 días por si cambias de opinión'
@@ -255,7 +256,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
             children: [
               Icon(icon, size: 14, color: c.inkMuted),
               const SizedBox(width: AppSpace.xs),
-              Text(text, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.inkMuted)),
+              Text(text, style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
             ],
           ),
         );
@@ -274,7 +275,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
           Text(
             _business.name,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.ink),
+            style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w800, color: c.ink),
           ),
           const SizedBox(height: AppSpace.sm),
           Wrap(
@@ -289,14 +290,14 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
                 child: CountryLabel(
                   country: country,
                   text: '${country.name} · ${_business.currency}',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted),
                 ),
               ),
             ],
           ),
           if (description.isNotEmpty) ...[
             const SizedBox(height: AppSpace.md),
-            Text(description, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: c.inkMuted)),
+            Text(description, textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeBody, color: c.inkMuted)),
           ],
           const SizedBox(height: AppSpace.lg),
           SizedBox(
@@ -311,7 +312,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
                       foregroundColor: c.ink,
                       side: BorderSide(color: c.line),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
-                      textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+                      textStyle: const TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w600),
                     ),
                     icon: Icon(Icons.edit_outlined, size: 18, color: c.inkMuted),
                     label: const Text('Editar negocio'),
@@ -319,12 +320,12 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.lock_outline_rounded, size: 16, color: c.inkFaint),
+                      Icon(Icons.lock_outline, size: 16, color: c.inkFaint),
                       const SizedBox(width: AppSpace.xs),
                       Flexible(
                         child: Text(
                           'Solo el dueño o un administrador puede editarlo',
-                          style: TextStyle(fontSize: 13, color: c.inkMuted),
+                          style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                         ),
                       ),
                     ],

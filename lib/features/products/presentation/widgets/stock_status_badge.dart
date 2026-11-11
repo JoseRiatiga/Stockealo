@@ -29,12 +29,12 @@ class StockStatusBadge extends StatelessWidget {
       bgColor = c.warningSoft;
       textColor = c.warning;
       label = compact ? '${product.stock}' : 'Bajo stock (${product.stock})';
-      icon = Icons.warning_amber_rounded;
+      icon = Icons.warning_amber_outlined;
     } else {
       bgColor = c.successSoft;
       textColor = c.success;
       label = compact ? '${product.stock}' : 'Stock: ${product.stock}';
-      icon = Icons.check_circle_outline;
+      icon = Icons.check_circle_outline_outlined;
     }
 
     return Container(

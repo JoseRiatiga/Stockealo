@@ -9,10 +9,10 @@ class AppFunction {
   final String id;
   final String title;
 
-  /// Dónde vive, con las palabras de la app ("Ventas › Caja")
+  /// Dónde vive, con las palabras del menú ("Productos › Catálogo")
   final String where;
 
-  /// Número de pestaña: 0 Inicio, 1 Inventario, 2 Ventas, 3 Ajustes, 4 Reportes, 5 Servicios
+  /// Número del lugar donde vive (ver AppPlace en home/navigation/app_places.dart)
   final int tab;
   final IconData icon;
   final List<String> keywords;
@@ -36,26 +36,28 @@ class AppFunction {
 }
 
 const kAppFunctions = <AppFunction>[
-  AppFunction(id: 'new_sale', title: 'Nueva venta', where: 'Ventas', tab: 2, icon: Icons.point_of_sale_rounded,
+  AppFunction(id: 'new_sale', title: 'Nueva venta', where: 'Vender', tab: 6, icon: Icons.point_of_sale_outlined,
       keywords: ['venta', 'vender', 'cobrar', 'factura']),
-  AppFunction(id: 'customers', title: 'Clientes y fiados', where: 'Ventas › Clientes y fiados', tab: 2, icon: Icons.people_alt_outlined,
+  AppFunction(id: 'customers', title: 'Clientes y fiados', where: 'Clientes y proveedores', tab: 9, icon: Icons.people_alt_outlined,
       keywords: ['cliente', 'fiado', 'deuda', 'abono', 'debe']),
   AppFunction(id: 'quotes', title: 'Cotizaciones', where: 'Ventas › Cotizaciones', tab: 2, icon: Icons.request_quote_outlined,
       keywords: ['cotizacion', 'proforma', 'presupuesto']),
-  AppFunction(id: 'cash', title: 'Caja', where: 'Ventas › Caja', tab: 2, icon: Icons.point_of_sale_outlined,
+  AppFunction(id: 'cash', title: 'Caja', where: 'Caja', tab: 7, icon: Icons.point_of_sale_outlined,
       keywords: ['caja', 'arqueo', 'efectivo', 'cierre', 'base', 'turno']),
-  AppFunction(id: 'new_product', title: 'Nuevo producto', where: 'Inventario', tab: 1, icon: Icons.add_box_outlined,
-      keywords: ['producto', 'agregar', 'stock', 'inventario', 'existencia']),
-  AppFunction(id: 'import_excel', title: 'Importar desde Excel', where: 'Inventario › Importar desde Excel', tab: 1, icon: Icons.upload_file_outlined,
+  AppFunction(id: 'new_product', title: 'Nuevo producto', where: 'Productos', tab: 1, icon: Icons.add_box_outlined,
+      keywords: ['producto', 'agregar', 'nuevo', 'inventario', 'crear']),
+  AppFunction(id: 'import_excel', title: 'Importar desde Excel', where: 'Productos › Importar desde Excel', tab: 1, icon: Icons.upload_file_outlined,
       keywords: ['importar', 'excel', 'cargar', 'subir', 'plantilla'], managersOnly: true),
-  AppFunction(id: 'suppliers', title: 'Proveedores y entradas', where: 'Inventario › Proveedores y entradas', tab: 1,
+  AppFunction(id: 'suppliers', title: 'Proveedores y entradas', where: 'Clientes y proveedores › Proveedores', tab: 9,
       icon: Icons.move_to_inbox_outlined, keywords: ['proveedor', 'pedido', 'entrada', 'mercancia', 'compra', 'pagar'],
       managersOnly: true),
-  AppFunction(id: 'catalog', title: 'Catálogo', where: 'Inventario › Catálogo', tab: 1, icon: Icons.menu_book_rounded,
+  AppFunction(id: 'stock', title: 'Stock por reponer', where: 'Stock', tab: 8, icon: Icons.layers_outlined,
+      keywords: ['stock', 'reponer', 'agotado', 'falta', 'minimo', 'pedir', 'faltante']),
+  AppFunction(id: 'catalog', title: 'Catálogo', where: 'Productos › Catálogo', tab: 1, icon: Icons.menu_book_outlined,
       keywords: ['catalogo', 'pdf', 'historia', 'compartir']),
-  AppFunction(id: 'online_store', title: 'Tienda en línea', where: 'Inventario › Tienda en línea', tab: 1, icon: Icons.storefront_outlined,
+  AppFunction(id: 'online_store', title: 'Tienda en línea', where: 'Tienda en línea', tab: 10, icon: Icons.storefront_outlined,
       keywords: ['tienda', 'online', 'web', 'carrito', 'pedido en linea'], managersOnly: true),
-  AppFunction(id: 'profits', title: 'Ganancias', where: 'Reportes › Ganancias', tab: 4, icon: Icons.insights_rounded,
+  AppFunction(id: 'profits', title: 'Ganancias', where: 'Reportes › Ganancias', tab: 4, icon: Icons.insights_outlined,
       keywords: ['ganancia', 'perdida', 'utilidad', 'reporte', 'margen'], managersOnly: true),
   AppFunction(id: 'excel', title: 'Descargar Excel', where: 'Reportes › Descargar Excel', tab: 4, icon: Icons.table_chart_outlined,
       keywords: ['excel', 'descargar', 'exportar', 'reporte', 'xlsx'], managersOnly: true),

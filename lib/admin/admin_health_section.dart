@@ -36,7 +36,7 @@ class AdminHealthSection extends StatelessWidget {
         if (h.allGood)
           AdminCard(
             child: Row(children: [
-              Icon(Icons.check_circle_outline_rounded, color: c.success),
+              Icon(Icons.check_circle_outline_outlined, color: c.success),
               const SizedBox(width: AppSpace.md),
               Expanded(child: Text('Todo en orden: nadie necesita atención hoy.', style: TextStyle(color: c.ink))),
             ]),
@@ -61,7 +61,7 @@ class AdminHealthSection extends StatelessWidget {
         if (h.expiring.isNotEmpty)
           _group(
             context,
-            icon: Icons.hourglass_bottom_rounded,
+            icon: Icons.hourglass_bottom_outlined,
             title: '${h.expiring.length} Pro vence${h.expiring.length == 1 ? '' : 'n'} en los próximos 7 días',
             hint: 'Avísales antes de que venza para que renueven.',
             rows: [
@@ -202,7 +202,7 @@ class AdminHealthSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Icon(Icons.storage_rounded, color: c.inkMuted),
+            Icon(Icons.storage_outlined, color: c.inkMuted),
             const SizedBox(width: AppSpace.md),
             Expanded(child: Text('Uso de Supabase', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink))),
           ]),

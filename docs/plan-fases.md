@@ -36,7 +36,12 @@ Invita y gana, contador de cupos de fundador, prueba gratis de Pro.
    - carga más rápida: medir antes y después, pantalla con el logo, partes que bajan solo al usarlas (panel, Reportes, importador), fuentes, íconos y caché.
    - **No frena la 0.12.1:** si se complica, se publica sin esto y llega con la 0.13.0.
 
-## 0.13.0 · Pro Servicios para cualquier negocio (prioridad máxima)
+## 0.13.0 · RE-DISEÑO completo (decisión A del dueño, 11 nov)
+
+Va antes que Pro Servicios, para no hacer pantallas dos veces. Bloques y detalle: `docs/plan-rediseno.md`, sección 9. Diseño final aprobado: https://claude.ai/artifact/JQtmF7vnoWhwMBujRAMitb
+Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ventas se rehacen).
+
+## 0.14.0 · Pro Servicios para cualquier negocio (antes 0.13.0)
 
 **Objetivo:** que Pro Servicios sirva igual a un lavadero, una barbería, un spa, un taller, un servicio técnico o una lavandería. Detalle en `docs/plan-servicios-tipos.md`.
 **Si llega una barbería antes de terminar,** se publica el Bloque A como 0.13.0 apenas esté listo, y el Bloque B sale como 0.13.1.
@@ -75,7 +80,7 @@ Invita y gana, contador de cupos de fundador, prueba gratis de Pro.
 
 **Supabase:** sí (citas, reservas, pagos, ventas anuladas, órdenes). Cada migración, con permiso.
 
-## 0.14.0 · Equipo y planes
+## 0.15.0 · Equipo y planes (antes 0.14.0)
 
 ### Roles y permisos (`docs/plan-roles.md`)
 
@@ -106,7 +111,7 @@ Invita y gana, contador de cupos de fundador, prueba gratis de Pro.
 19. Cierre del día por WhatsApp: a mano en gratis, automático con Pro.
 20. Recordatorio en el celular para cerrar la caja.
 
-## 0.15.0 · Tienda y crecimiento
+## 0.16.0 · Tienda y crecimiento (antes 0.15.0)
 
 ### Calidad y confianza
 
@@ -135,7 +140,7 @@ Invita y gana, contador de cupos de fundador, prueba gratis de Pro.
 17. Entrar con Google (y Apple).
 18. Cupones desde el panel.
 
-## 0.16.0 · Sedes y negocio
+## 0.17.0 · Sedes y negocio (antes 0.16.0)
 
 ### Sedes (Pro Servicios, `docs/plan-sedes.md`)
 

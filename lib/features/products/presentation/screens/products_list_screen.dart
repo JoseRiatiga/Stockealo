@@ -1,7 +1,5 @@
 import '../../../reports/presentation/screens/guided_import_screen.dart';
 import '../../../suppliers/presentation/widgets/visit_today_banner.dart';
-import '../../../suppliers/presentation/screens/suppliers_screen.dart';
-import '../../../store/presentation/screens/online_store_screen.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/design/app_card.dart';
 import '../../../../core/design/app_pagination.dart';
@@ -9,7 +7,7 @@ import '../../../../core/design/primary_action_button.dart';
 import '../../../../core/design/quick_access_row.dart';
 import '../../../../core/design/skeleton.dart';
 import '../../../../core/theme/app_tokens.dart';
-import '../../../business/presentation/business_identity.dart';
+import '../widgets/restock_order_modal.dart';
 import '../widgets/quick_stock_dialog.dart';
 import '../widgets/product_sort_filter_sheet.dart';
 import '../../../business/presentation/active_business_scope.dart';
@@ -22,12 +20,10 @@ import '../../models/product.dart';
 import '../widgets/category_filter_bar.dart';
 import '../widgets/manage_categories_modal.dart';
 import '../widgets/product_card.dart';
-import 'barcode_scanner_screen.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../business/models/business.dart';
-import '../../../business/presentation/widgets/business_selector_modal.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../widgets/catalog_generator_modal.dart';
 import '../../../team/data/team_repository.dart';
@@ -35,17 +31,29 @@ import '../../../../core/services/data_events.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
+import '../../../../core/codes/code_reader.dart';
+
+/// Productos (el catálogo) y, en [ProductsListMode.stock], el lugar Stock: la
+/// misma lista arrancando en «por reponer», con el aviso del proveedor que pasa
+/// hoy y «Pedir al proveedor». Cada cosa tiene un solo lugar (re-diseño 0.13.0).
+enum ProductsListMode { catalog, stock }
 
 class ProductsListScreen extends StatefulWidget {
   final String userId;
   final String? userRole;
   final VoidCallback? onLogout;
+  final ProductsListMode mode;
+
+  /// Productos: «N por reponer · Ver en Stock» lleva al lugar Stock
+  final VoidCallback? onOpenStock;
 
   const ProductsListScreen({
     super.key,
     required this.userId,
     this.userRole,
     this.onLogout,
+    this.mode = ProductsListMode.catalog,
+    this.onOpenStock,
   });
 
   @override
@@ -66,7 +74,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   List<Category> _categories = [];
   String _selectedCategory = 'Todos';
   String _sortOption = 'name_asc';
-  String _stockFilterOption = 'all';
+  late String _stockFilterOption = widget.mode == ProductsListMode.stock ? 'to_restock' : 'all';
+
+  /// Lugar Stock: lo que falta y lo que llega
+  bool get _stockMode => widget.mode == ProductsListMode.stock;
 
   /// Marca dónde empieza la lista, para bajar hasta ella al filtrar desde el resumen
   final _listStartKey = GlobalKey();
@@ -245,10 +256,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
 
   Future<void> _scanToSearch() async {
     if (_activeBusiness == null) return;
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
-    );
+    final code = await CodeReader.scan(context, title: 'Buscar por código');
     if (code != null && code.isNotEmpty) {
       _searchController.text = code;
       _loadData();
@@ -275,7 +283,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     }
   }
 
-  /// Inventario › Importar desde Excel
+  /// Productos › Importar desde Excel
   Future<void> _openExcelImport() async {
     if (_activeBusiness == null) return;
     final imported = await GuidedImportScreen.open(context, businessId: _activeBusiness!.id);
@@ -283,16 +291,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   }
 
 
-
-  Future<void> _openSuppliers() async {
-    if (_activeBusiness == null) return;
-    await SuppliersScreen.open(
-      context,
-      business: _activeBusiness!,
-      userName: AuthRepository.instance.currentUser?.displayName,
-    );
-    _loadData();
-  }
 
   void _openCatalogModal() {
     if (_activeBusiness == null) return;
@@ -382,41 +380,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     final c = context.colors;
     final isDesktop = MediaQuery.of(context).size.width >= 850;
     return Scaffold(
-      appBar: isDesktop
-          ? null
-          : AppBar(
-              title: InkWell(
-                onTap: () async {
-                  final changed = await BusinessSelectorModal.show(
-                    context,
-                    userId: widget.userId,
-                    onLogout: widget.onLogout,
-                  );
-                  if (changed == true) _loadData();
-                },
-                borderRadius: BorderRadius.circular(AppRadius.control),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: AppSpace.xs),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_activeBusiness != null) ...[
-                        BusinessAvatar(business: _activeBusiness!, size: 26),
-                        const SizedBox(width: AppSpace.sm),
-                      ],
-                      Flexible(
-                        child: Text(
-                          _activeBusiness?.name ?? 'Stockealo',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-                        ),
-                      ),
-                      const Icon(Icons.expand_more_rounded),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+      // Sin barra propia: el encabezado único lo pone el marco de la app
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
         child: LayoutBuilder(
@@ -431,7 +395,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
             return CustomScrollView(
               controller: _scrollController,
               slivers: [
-                if (isDesktop && canEditProducts)
+                if (isDesktop && canEditProducts && !_stockMode)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(hPadding, AppSpace.lg, hPadding, 0),
@@ -450,33 +414,19 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                   ),
                 ),
 
-                // Accesos rápidos (antes en el menú ⋮)
+                // Accesos del catálogo (Tienda y Proveedores tienen su propio lugar en el menú)
+                if (!_stockMode)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
                     child: QuickAccessRow(
                       items: [
                         QuickAccessItem(
-                          icon: Icons.menu_book_rounded,
+                          icon: Icons.menu_book_outlined,
                           label: 'Catálogo',
                           caption: 'PDF e historias',
                           onTap: _openCatalogModal,
                         ),
-                        if (canEditProducts)
-                          QuickAccessItem(
-                            icon: Icons.storefront_outlined,
-                            label: 'Tienda en línea',
-                            caption: 'Tu catálogo con carrito',
-                            pro: true,
-                            onTap: () => OnlineStoreScreen.open(context, _activeBusiness!),
-                          ),
-                        if (canEditProducts)
-                          QuickAccessItem(
-                            icon: Icons.move_to_inbox_outlined,
-                            label: 'Proveedores y entradas',
-                            caption: 'Pedidos y lo que llega',
-                            onTap: _openSuppliers,
-                          ),
                         if (canEditProducts)
                           QuickAccessItem(
                             icon: Icons.upload_file_outlined,
@@ -490,7 +440,25 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                 ),
 
                 // Hoy pasa un proveedor: recordatorio con el pedido a un toque
-                if (canEditProducts && _activeBusiness != null)
+                if (_stockMode && canEditProducts && _activeBusiness != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton.icon(
+                          onPressed: () => RestockOrderModal.show(
+                            context,
+                            business: _activeBusiness!,
+                            userName: AuthRepository.instance.currentUser?.displayName,
+                          ),
+                          icon: const Icon(Icons.local_shipping_outlined, size: 18),
+                          label: const Text('Pedir al proveedor'),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_stockMode && canEditProducts && _activeBusiness != null)
                   SliverToBoxAdapter(
                     child: VisitTodayBanner(
                       key: ValueKey('visit-${_activeBusiness!.id}'),
@@ -512,13 +480,13 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                       },
                       decoration: InputDecoration(
                         hintText: 'Buscar por nombre o código',
-                        prefixIcon: const Icon(Icons.search_rounded),
+                        prefixIcon: const Icon(Icons.search_outlined),
                         suffixIcon: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (_searchController.text.isNotEmpty)
                               IconButton(
-                                icon: const Icon(Icons.close_rounded, size: 20),
+                                icon: const Icon(Icons.close_outlined, size: 20),
                                 tooltip: 'Borrar búsqueda',
                                 onPressed: () {
                                   _searchController.clear();
@@ -527,7 +495,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                                 },
                               ),
                             IconButton(
-                              icon: const Icon(Icons.qr_code_scanner_rounded),
+                              icon: const Icon(Icons.qr_code_scanner_outlined),
                               tooltip: 'Escanear código',
                               onPressed: _scanToSearch,
                             ),
@@ -547,10 +515,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                       children: [
                         OutlinedButton.icon(
                           onPressed: _openSortFilterModal,
-                          icon: Icon(Icons.tune_rounded, size: 18, color: _hasActiveFilters ? c.accent : c.inkMuted),
+                          icon: Icon(Icons.tune_outlined, size: 18, color: _hasActiveFilters ? c.accent : c.inkMuted),
                           label: Text(
                             _hasActiveFilters ? 'Orden: ${_getSortLabel(_sortOption)} · Filtros' : 'Orden: ${_getSortLabel(_sortOption)}',
-                            style: TextStyle(fontSize: 13, color: _hasActiveFilters ? c.accent : c.ink),
+                            style: TextStyle(fontSize: AppText.sizeSmall, color: _hasActiveFilters ? c.accent : c.ink),
                           ),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
@@ -566,8 +534,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                             side: BorderSide(color: c.line),
                           ),
                           segments: const [
-                            ButtonSegment(value: ProductLayout.list, icon: Icon(Icons.view_list_rounded), tooltip: 'Ver en lista'),
-                            ButtonSegment(value: ProductLayout.grid, icon: Icon(Icons.grid_view_rounded), tooltip: 'Ver en cuadrícula'),
+                            ButtonSegment(value: ProductLayout.list, icon: Icon(Icons.view_list_outlined), tooltip: 'Ver en lista'),
+                            ButtonSegment(value: ProductLayout.grid, icon: Icon(Icons.grid_view_outlined), tooltip: 'Ver en cuadrícula'),
                           ],
                           selected: {_layout},
                           onSelectionChanged: (s) => _setLayout(s.first),
@@ -637,7 +605,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                       padding: EdgeInsets.fromLTRB(hPadding + AppSpace.xs, AppSpace.md, hPadding, AppSpace.xs),
                       child: Row(
                         children: [
-                          Text('Productos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                          Text('Productos', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
                           const SizedBox(width: AppSpace.sm),
                           Text('${_products.length}', style: AppText.amount(context, size: 14, weight: FontWeight.w500, color: c.inkMuted)),
                           const Spacer(),
@@ -704,7 +672,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
       ),
       // El botón principal va a la izquierda: a la derecha está Stocky
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
-      floatingActionButton: canEditProducts && !isDesktop
+      floatingActionButton: canEditProducts && !isDesktop && !_stockMode
           ? Padding(
               // A la altura de la pastilla de Stocky en Inicio, justo encima de la barra
               padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
@@ -726,7 +694,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(value, style: AppText.amount(context, size: 22, color: color)),
-              Text(label, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+              Text(label, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
             ],
           ),
         );
@@ -746,20 +714,20 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
             Divider(height: AppSpace.xl, color: c.line),
             Row(
               children: [
-                Expanded(child: Text('Valor del inventario', style: TextStyle(fontSize: 13, color: c.inkMuted))),
+                Expanded(child: Text('Valor del inventario', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted))),
                 Text(CurrencyFormatter.format(totalValue), style: AppText.amount(context, size: 15)),
               ],
             ),
           ],
-          if (lowStock > 0 || outOfStock > 0) ...[
+          if ((lowStock > 0 || outOfStock > 0) && !_stockMode) ...[
             const SizedBox(height: AppSpace.md),
             Material(
               color: c.warningSoft,
               borderRadius: BorderRadius.circular(AppRadius.control),
               child: InkWell(
                 borderRadius: BorderRadius.circular(AppRadius.control),
-                // El pedido vive en Proveedores y entradas: aquí solo se filtran los que faltan
-                onTap: _showToRestock,
+                // Lo que falta vive en Stock (si no hay marco, se filtra aquí mismo)
+                onTap: widget.onOpenStock ?? _showToRestock,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
                   child: Row(
@@ -768,11 +736,11 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                       const SizedBox(width: AppSpace.sm),
                       Expanded(
                         child: Text(
-                          '${lowStock + outOfStock} por reponer · Ver cuáles',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.warning),
+                          '${lowStock + outOfStock} por reponer · ${widget.onOpenStock != null ? 'Ver en Stock' : 'Ver cuáles'}',
+                          style: AppText.small(context, weight: FontWeight.w600, color: c.warning),
                         ),
                       ),
-                      Icon(Icons.chevron_right_rounded, size: 20, color: c.warning),
+                      Icon(Icons.chevron_right_outlined, size: 20, color: c.warning),
                     ],
                   ),
                 ),

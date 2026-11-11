@@ -103,7 +103,7 @@ class _MessagesViewState extends State<MessagesView> {
         padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.xs, AppSpace.lg, AppSpace.xxl),
         children: [
           Text('Se envían a mano por WhatsApp desde el tablero. Apaga los que no quieras usar.',
-              style: TextStyle(fontSize: 13, color: c.inkMuted)),
+              style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
           const SizedBox(height: AppSpace.md),
           for (final phase in MessagePhase.values) ...[
             AppCard(
@@ -115,7 +115,7 @@ class _MessagesViewState extends State<MessagesView> {
                     value: _messages.phases[phase]!.enabled,
                     onChanged: (v) => _update(phase, enabled: v),
                     title: Text(phase.label, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
-                    subtitle: Text(phase.when, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                    subtitle: Text(phase.when, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                   ),
                   if (_messages.phases[phase]!.enabled) ...[
                     TextField(
@@ -133,7 +133,7 @@ class _MessagesViewState extends State<MessagesView> {
                         for (final v in PhaseMessages.variables.entries)
                           if (v.key != '{placa}' || widget.template.usesIdentifier)
                             ActionChip(
-                              label: Text(v.key, style: const TextStyle(fontSize: 12)),
+                              label: Text(v.key, style: const TextStyle(fontSize: AppText.sizeCaption)),
                               tooltip: v.value,
                               visualDensity: VisualDensity.compact,
                               onPressed: () => _insert(phase, v.key),
@@ -154,7 +154,7 @@ class _MessagesViewState extends State<MessagesView> {
                           turn: 3,
                           waitMinutes: 25,
                         ),
-                        style: TextStyle(fontSize: 13, color: c.ink),
+                        style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink),
                       ),
                     ),
                     Align(

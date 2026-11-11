@@ -127,7 +127,7 @@ class _PhoneFieldState extends State<PhoneField> {
                   CountryFlag(code: _country.code, width: 24),
                   const SizedBox(width: 6),
                   Text('+${_country.dialCode}', style: AppText.amount(context, size: 15, weight: FontWeight.w500)),
-                  Icon(Icons.arrow_drop_down_rounded, color: c.inkMuted),
+                  Icon(Icons.arrow_drop_down_outlined, color: c.inkMuted),
                   Container(width: 1, height: 22, color: c.line, margin: const EdgeInsets.only(left: 4)),
                 ],
               ),

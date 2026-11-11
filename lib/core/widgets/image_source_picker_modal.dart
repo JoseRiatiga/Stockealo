@@ -212,7 +212,7 @@ class ImageSourcePickerModal extends StatelessWidget {
       color: danger ? c.dangerSoft : c.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card),
-        side: BorderSide(color: danger ? c.danger.withOpacity(0.25) : c.line),
+        side: BorderSide(color: danger ? c.danger.withValues(alpha: 0.25) : c.line),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

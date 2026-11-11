@@ -324,7 +324,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: primaryColor.withOpacity(0.12),
+                          color: primaryColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
@@ -378,7 +378,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                   decoration: BoxDecoration(
                     color: context.colors.dangerSoft,
                     borderRadius: BorderRadius.circular(AppRadius.control),
-                    border: Border.all(color: context.colors.danger.withOpacity(0.35)),
+                    border: Border.all(color: context.colors.danger.withValues(alpha: 0.35)),
                   ),
                   child: Row(
                     children: [
@@ -785,9 +785,9 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: context.colors.info.withOpacity(0.08),
+                color: context.colors.info.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: context.colors.info.withOpacity(0.25)),
+                border: Border.all(color: context.colors.info.withValues(alpha: 0.25)),
               ),
               child: Text(
                 'Esa ya es tu contraseña actual. Puedes ingresar con ella o escribir una diferente arriba.',
@@ -825,7 +825,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
           width: 72,
           height: 72,
           decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.12),
+            color: primaryColor.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
           child: Icon(

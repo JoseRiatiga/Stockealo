@@ -248,10 +248,8 @@ class QuickActionsCustomizer {
                         physics: const NeverScrollableScrollPhysics(),
                         buildDefaultDragHandles: false,
                         itemCount: selected.length,
-                        onReorder: (from, to) => setSheet(() {
-                          if (from < to) to -= 1;
-                          selected.insert(to, selected.removeAt(from));
-                        }),
+                        // onReorderItem ya entrega la posición final, sin restar 1
+                        onReorderItem: (from, to) => setSheet(() => selected.insert(to, selected.removeAt(from))),
                         itemBuilder: (_, i) {
                           final f = byId[selected[i]]!;
                           return Padding(

@@ -73,7 +73,7 @@ class AppPalette {
 
   /// "#RRGGBB" de un color, para guardarlo en el negocio
   static String toHex(Color color) =>
-      '#${(color.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+      '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 }
 
 /// Colores de las series de las gráficas (categorías): el acento primero y luego

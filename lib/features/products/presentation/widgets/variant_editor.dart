@@ -432,7 +432,7 @@ class VariantEditorController extends ChangeNotifier {
       hsl = hsl.withLightness((hsl.lightness - 0.18).clamp(0.12, 1.0));
     }
     final c = hsl.toColor();
-    final hex = '#${(c.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+    final hex = '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
     return (hex: hex, exact: exactKnown);
   }
 
@@ -946,7 +946,7 @@ class _ColorDialogState extends State<_ColorDialog> {
   /// Color elegido con las barras, la foto o el gotero (no de la paleta): el nombre
   /// propuesto es el del color de la paleta más parecido
   void _setColor(TextEditingController target, Color color) {
-    final hex = '#${(color.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+    final hex = '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
     _pick(target, VariantEditorController.colorNameFor(color), hex);
   }
 

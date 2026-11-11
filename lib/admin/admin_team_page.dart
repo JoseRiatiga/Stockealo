@@ -202,15 +202,21 @@ class _AdminDialogState extends State<_AdminDialog> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: AppSpace.md),
-            for (final e in _AdminTeamPageState.roles.entries)
-              RadioListTile<String>(
-                contentPadding: EdgeInsets.zero,
-                value: e.key,
-                groupValue: _role,
-                onChanged: (v) => setState(() => _role = v ?? _role),
-                title: Text(e.value.$1),
-                subtitle: Text(e.value.$2),
+            RadioGroup<String>(
+              groupValue: _role,
+              onChanged: (v) => setState(() => _role = v ?? _role),
+              child: Column(
+                children: [
+                  for (final e in _AdminTeamPageState.roles.entries)
+                    RadioListTile<String>(
+                      contentPadding: EdgeInsets.zero,
+                      value: e.key,
+                      title: Text(e.value.$1),
+                      subtitle: Text(e.value.$2),
+                    ),
+                ],
               ),
+            ),
           ],
         ),
       ),

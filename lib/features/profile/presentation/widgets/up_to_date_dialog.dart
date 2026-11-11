@@ -26,9 +26,9 @@ class UpToDateDialog {
                 height: 68,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF059669).withOpacity(0.15),
+                  color: const Color(0xFF059669).withValues(alpha: 0.15),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
                     width: 2,
                   ),
                 ),

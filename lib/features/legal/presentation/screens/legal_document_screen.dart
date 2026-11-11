@@ -39,7 +39,7 @@ class LegalDocumentScreen extends StatelessWidget {
               child: TabBar(
             overlayColor: WidgetStateProperty.resolveWith(
               (states) => states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed)
-                  ? c.surfaceMuted.withOpacity(0.6)
+                  ? c.surfaceMuted.withValues(alpha: 0.6)
                   : null,
             ),
             indicatorColor: c.accent,

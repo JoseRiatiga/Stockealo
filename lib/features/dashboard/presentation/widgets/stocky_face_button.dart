@@ -45,7 +45,7 @@ class StockyFaceButton extends StatelessWidget {
             color: isDark ? const Color(0xFF1E1A3C) : const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: const Color(0xFF8B5CF6).withOpacity(0.4),
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
               width: 1.2,
             ),
           ),
@@ -104,12 +104,12 @@ class StockyFaceButton extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: isDark ? const Color(0xFF1C1838) : const Color(0xFFECFDF5),
                 border: Border.all(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.6),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.6),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF8B5CF6).withOpacity(0.25),
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -146,7 +146,7 @@ class StockyFaceButton extends StatelessWidget {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF10B981).withOpacity(0.8),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.8),
                             blurRadius: 4,
                             spreadRadius: 1,
                           ),

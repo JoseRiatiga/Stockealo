@@ -280,7 +280,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Container(
               width: 112,
               height: 112,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: c.accent.withOpacity(0.10)),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: c.accent.withValues(alpha: 0.10)),
               child: Center(
                 child: StockyMascot(size: 92, state: _mascotState, lookProgress: _mascotLookProgress),
               ),
@@ -316,7 +316,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(
                       color: c.dangerSoft,
                       borderRadius: BorderRadius.circular(AppRadius.control),
-                      border: Border.all(color: c.danger.withOpacity(0.35)),
+                      border: Border.all(color: c.danger.withValues(alpha: 0.35)),
                     ),
                     child: Row(
                       children: [

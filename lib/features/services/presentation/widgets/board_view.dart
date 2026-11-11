@@ -207,15 +207,22 @@ class _ServiceBoardViewState extends State<ServiceBoardView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final i in candidates)
-                RadioListTile<int>(
-                  contentPadding: EdgeInsets.zero,
-                  value: i,
-                  groupValue: index,
-                  onChanged: (v) => setLocal(() => index = v ?? index),
-                  title: Text(order.lines[i].name),
-                  subtitle: Text(order.lines[i].isDone ? 'Vuelve a En proceso' : 'Vuelve a Pendiente'),
+              RadioGroup<int>(
+                groupValue: index,
+                onChanged: (v) => setLocal(() => index = v ?? index),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final i in candidates)
+                      RadioListTile<int>(
+                        contentPadding: EdgeInsets.zero,
+                        value: i,
+                        title: Text(order.lines[i].name),
+                        subtitle: Text(order.lines[i].isDone ? 'Vuelve a En proceso' : 'Vuelve a Pendiente'),
+                      ),
+                  ],
                 ),
+              ),
               TextField(
                 controller: note,
                 textCapitalization: TextCapitalization.sentences,

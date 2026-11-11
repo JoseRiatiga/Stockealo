@@ -65,7 +65,7 @@ class AppToast {
                         fontFamily: AppText.fontFamily,
                         fontSize: 13.5,
                         height: 1.3,
-                        color: title == null ? c.onToast : c.onToast.withOpacity(0.78),
+                        color: title == null ? c.onToast : c.onToast.withValues(alpha: 0.78),
                       ),
                     ),
                   ],

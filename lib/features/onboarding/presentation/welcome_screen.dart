@@ -193,7 +193,7 @@ class _StepView extends StatelessWidget {
             width: 168,
             height: 168,
             decoration: BoxDecoration(
-              color: c.accent.withOpacity(0.10),
+              color: c.accent.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(48),
             ),
             child: Center(

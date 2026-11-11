@@ -108,7 +108,7 @@ class SettingsIcon extends StatelessWidget {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: tint.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.12),
+        color: tint.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.12),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, size: 19, color: tint),

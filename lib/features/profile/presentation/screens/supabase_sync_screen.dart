@@ -102,7 +102,7 @@ class _SupabaseSyncScreenState extends State<SupabaseSyncScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -116,7 +116,7 @@ class _SupabaseSyncScreenState extends State<SupabaseSyncScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.12),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.cloud_done, color: Color(0xFF10B981), size: 24),
@@ -230,7 +230,7 @@ class _SupabaseSyncScreenState extends State<SupabaseSyncScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: _isSuccess
-                      ? (isDark ? const Color(0xFF064E3B).withOpacity(0.4) : const Color(0xFFF0FDF4))
+                      ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.4) : const Color(0xFFF0FDF4))
                       : (isDark ? const Color(0xFF450A0A) : const Color(0xFFFEF2F2)),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
@@ -292,7 +292,7 @@ class _SupabaseSyncScreenState extends State<SupabaseSyncScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withOpacity(0.12),
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(Icons.terminal, color: Color(0xFFD97706), size: 20),

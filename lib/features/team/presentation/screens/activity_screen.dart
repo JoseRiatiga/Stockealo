@@ -192,7 +192,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
           if (people.length > 1) ...[
             const SizedBox(height: AppSpace.sm),
             DropdownButtonFormField<String?>(
-              value: _person,
+              key: ValueKey(_person),
+initialValue: _person,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Persona', isDense: true),
               items: [
@@ -225,7 +226,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           Container(
             width: 36,
             height: 36,
-            decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
             child: Icon(icon, size: 19, color: color),
           ),
           const SizedBox(width: AppSpace.md),

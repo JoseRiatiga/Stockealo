@@ -246,7 +246,8 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
               ),
               const SizedBox(height: AppSpace.lg),
               DropdownButtonFormField<String>(
-                value: _country.code,
+                key: ValueKey(_country.code),
+initialValue: _country.code,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'País'),
                 items: [
@@ -266,7 +267,8 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
                   SizedBox(
                     width: 130,
                     child: DropdownButtonFormField<String>(
-                      value: _currency,
+                      key: ValueKey(_currency),
+initialValue: _currency,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Moneda'),
                       items: [

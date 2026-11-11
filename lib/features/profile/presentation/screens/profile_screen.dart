@@ -295,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                 Container(
                   padding: const EdgeInsets.all(AppSpace.md),
                   decoration: BoxDecoration(
-                    color: c.warning.withOpacity(0.12),
+                    color: c.warning.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(AppRadius.control),
                   ),
                   child: Text(
@@ -567,7 +567,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD97706).withOpacity(0.10),
+                  color: const Color(0xFFD97706).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Text(
@@ -835,7 +835,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
                               height: 36,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: AppPalette.proGold.withOpacity(0.16),
+                                color: AppPalette.proGold.withValues(alpha: 0.16),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: const ProCrown(size: 22),
@@ -1387,7 +1387,7 @@ class _TextSizeOption extends StatelessWidget {
           height: 56,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? c.accent.withOpacity(0.12) : c.surfaceMuted,
+            color: selected ? c.accent.withValues(alpha: 0.12) : c.surfaceMuted,
             borderRadius: BorderRadius.circular(AppRadius.control),
             border: Border.all(color: selected ? c.accent : Colors.transparent, width: 1.5),
           ),

@@ -108,7 +108,7 @@ class BusinessTrash {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF450A0A).withOpacity(0.4) : context.colors.dangerSoft,
+                              color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.4) : context.colors.dangerSoft,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
@@ -250,7 +250,7 @@ class BusinessTrash {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF450A0A).withOpacity(0.5) : context.colors.dangerSoft,
+                      color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.5) : context.colors.dangerSoft,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA)),
                     ),
@@ -311,7 +311,7 @@ class BusinessTrash {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
+                        color: Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -444,7 +444,7 @@ class BusinessTrash {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF450A0A).withOpacity(0.5) : context.colors.dangerSoft,
+                      color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.5) : context.colors.dangerSoft,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA)),
                     ),
@@ -522,7 +522,7 @@ class BusinessTrash {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
+                        color: Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(

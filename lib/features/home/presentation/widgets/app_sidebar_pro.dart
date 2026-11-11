@@ -147,7 +147,7 @@ class _AppSidebarProState extends State<AppSidebarPro> {
                       children: [
                         CircleAvatar(
                           radius: 18,
-                          backgroundColor: c.accent.withOpacity(0.14),
+                          backgroundColor: c.accent.withValues(alpha: 0.14),
                           child: Text(
                             widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
                             // En oscuro el acento se aclara para que la inicial se lea

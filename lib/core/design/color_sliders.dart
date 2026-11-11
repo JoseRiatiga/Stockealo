@@ -113,7 +113,7 @@ class _GradientSlider extends StatelessWidget {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: Colors.white,
-                              border: Border.all(color: c.ink.withOpacity(0.6), width: 2),
+                              border: Border.all(color: c.ink.withValues(alpha: 0.6), width: 2),
                               boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 3)],
                             ),
                           ),

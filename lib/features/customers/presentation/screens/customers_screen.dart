@@ -257,7 +257,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF78350F).withOpacity(0.4) : context.colors.warningSoft,
+                color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.4) : context.colors.warningSoft,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: isDark ? context.colors.warning : const Color(0xFFFDE68A)),
               ),
@@ -266,7 +266,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: context.colors.warning.withOpacity(0.2),
+                      color: context.colors.warning.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(Icons.receipt_long, color: isDark ? const Color(0xFFFDE68A) : context.colors.warning, size: 24),

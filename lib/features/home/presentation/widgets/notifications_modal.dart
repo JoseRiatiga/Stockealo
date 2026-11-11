@@ -84,7 +84,7 @@ class NotificationsModal extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(9),
                           decoration: BoxDecoration(
-                            color: context.colors.accent.withOpacity(0.12),
+                            color: context.colors.accent.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(Icons.notifications_active_rounded, color: context.colors.accent, size: 20),
@@ -182,7 +182,6 @@ class NotificationsModal extends StatelessWidget {
         icon = Icons.group_rounded;
         break;
       case NotificationType.system:
-      default:
         iconColor = context.colors.accent;
         icon = Icons.auto_awesome_rounded;
     }
@@ -206,7 +205,7 @@ class NotificationsModal extends StatelessWidget {
           color: notif.isRead ? cardBg : (isDark ? const Color(0xFF221B42) : const Color(0xFFF3E8FF)),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: notif.isRead ? borderColor : context.colors.accent.withOpacity(0.4),
+            color: notif.isRead ? borderColor : context.colors.accent.withValues(alpha: 0.4),
             width: notif.isRead ? 1 : 1.5,
           ),
         ),
@@ -216,7 +215,7 @@ class NotificationsModal extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.12),
+                color: iconColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: iconColor, size: 18),

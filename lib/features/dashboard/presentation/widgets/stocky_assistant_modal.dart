@@ -34,7 +34,7 @@ class StockyAssistantModal extends StatefulWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Cerrar asistente',
-      barrierColor: Colors.black.withOpacity(0.40),
+      barrierColor: Colors.black.withValues(alpha: 0.40),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim, secondaryAnim) {
         return StockyAssistantModal(
@@ -404,7 +404,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
                 borderRadius: radius,
                 border: Border.all(color: c.line),
                 // Flota sobre la app: única sombra, suave
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 28, offset: const Offset(0, 8))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 28, offset: const Offset(0, 8))],
               ),
               child: ClipRRect(
                 borderRadius: radius,
@@ -562,7 +562,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
             margin: const EdgeInsets.only(right: AppSpace.xs),
             padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm + 2, vertical: 6),
             decoration: BoxDecoration(
-              color: on ? c.accent.withOpacity(0.12) : c.surfaceMuted,
+              color: on ? c.accent.withValues(alpha: 0.12) : c.surfaceMuted,
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
             child: Row(
@@ -796,9 +796,9 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 7),
         decoration: BoxDecoration(
-          color: color.withOpacity(isDark ? 0.18 : 0.10),
+          color: color.withValues(alpha: isDark ? 0.18 : 0.10),
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: color.withOpacity(0.35)),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -860,7 +860,7 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
           text: matchedText.substring(1, matchedText.length - 1),
           style: TextStyle(
             fontStyle: FontStyle.italic,
-            color: baseColor.withOpacity(0.85),
+            color: baseColor.withValues(alpha: 0.85),
           ),
         ));
       }

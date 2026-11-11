@@ -160,9 +160,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
   String? _costHint(Product p) {
     final list = _costs[p.id];
     if (list == null || list.isEmpty) return null;
-    final mine = _supplier == null
-        ? null
-        : list.where((s) => s.supplierId == _supplier!.id).firstOrNull;
+    final mine = _supplier == null ? null : list.where((s) => s.supplierId == _supplier!.id).firstOrNull;
     final cheapest = list.first;
     final parts = <String>[
       if (mine != null) 'Última vez con ${mine.supplierName}: ${CurrencyFormatter.format(mine.unitCost)}',
@@ -826,14 +824,18 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
 
   Widget _section({required List<Widget> children}) {
     final c = context.colors;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.lg),
-      decoration: BoxDecoration(
-        color: c.surface,
+    // Material y no Container: las filas que se tocan dibujan su toque sobre él
+    return Material(
+      color: c.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: c.line),
+        side: BorderSide(color: c.line),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.lg),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+      ),
     );
   }
 
@@ -852,112 +854,116 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
   Widget _lineCard(_Line l) {
     final c = context.colors;
     final p = l.product;
-    return Container(
-      padding: const EdgeInsets.all(AppSpace.md),
-      decoration: BoxDecoration(
-        color: c.surface,
+    // Material y no Container: la casilla de «actualizar costo» dibuja su toque sobre él
+    return Material(
+      color: c.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: c.line),
+        side: BorderSide(color: c.line),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              ProductImageView(
-                imagePath: p.photoPath,
-                width: 40,
-                height: 40,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              const SizedBox(width: AppSpace.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(p.name, style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
-                    Text('Hay ${p.stock} · Cód: ${p.code}', style: TextStyle(color: c.inkMuted, fontSize: 12)),
-                  ],
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                ProductImageView(
+                  imagePath: p.photoPath,
+                  width: 40,
+                  height: 40,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ),
-              if (!l.withVariants) _qtyField(l.qty),
-              IconButton(
-                tooltip: 'Quitar',
-                icon: Icon(Icons.close_rounded, size: 18, color: c.inkFaint),
-                onPressed: () => setState(() {
-                  _lines.remove(l);
-                  l.dispose();
-                }),
-              ),
-            ],
-          ),
-          if (l.withVariants) ...[
-            const SizedBox(height: AppSpace.sm),
-            for (final v in p.variants)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6, left: 52),
-                child: Row(
-                  children: [
-                    if (ColorSwatchDot.hasSwatch(v.colorHex)) ...[
-                      ColorSwatchDot(hex: v.colorHex, hex2: v.colorHex2, size: 16),
-                      const SizedBox(width: AppSpace.sm),
+                const SizedBox(width: AppSpace.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(p.name, style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
+                      Text('Hay ${p.stock} · Cód: ${p.code}', style: TextStyle(color: c.inkMuted, fontSize: 12)),
                     ],
-                    Expanded(
-                      child: Text(
-                        '${v.label.isEmpty ? 'Sin nombre' : v.label}  ·  hay ${v.stock}',
-                        style: TextStyle(color: c.ink, fontSize: 13),
+                  ),
+                ),
+                if (!l.withVariants) _qtyField(l.qty),
+                IconButton(
+                  tooltip: 'Quitar',
+                  icon: Icon(Icons.close_rounded, size: 18, color: c.inkFaint),
+                  onPressed: () => setState(() {
+                    _lines.remove(l);
+                    l.dispose();
+                  }),
+                ),
+              ],
+            ),
+            if (l.withVariants) ...[
+              const SizedBox(height: AppSpace.sm),
+              for (final v in p.variants)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6, left: 52),
+                  child: Row(
+                    children: [
+                      if (ColorSwatchDot.hasSwatch(v.colorHex)) ...[
+                        ColorSwatchDot(hex: v.colorHex, hex2: v.colorHex2, size: 16),
+                        const SizedBox(width: AppSpace.sm),
+                      ],
+                      Expanded(
+                        child: Text(
+                          '${v.label.isEmpty ? 'Sin nombre' : v.label}  ·  hay ${v.stock}',
+                          style: TextStyle(color: c.ink, fontSize: 13),
+                        ),
                       ),
-                    ),
-                    _qtyField(l.variantQty[v.id]!),
-                    const SizedBox(width: 40),
-                  ],
+                      _qtyField(l.variantQty[v.id]!),
+                      const SizedBox(width: 40),
+                    ],
+                  ),
+                ),
+            ],
+            const SizedBox(height: AppSpace.sm),
+            Row(
+              children: [
+                const SizedBox(width: 52),
+                SizedBox(
+                  width: 150,
+                  child: TextField(
+                    controller: l.cost,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(isDense: true, labelText: 'Costo por unidad', prefixText: '\$ '),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  CurrencyFormatter.format(l.unitCost * l.units),
+                  style: TextStyle(color: c.ink, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            if (_costHint(l.product) case final hint?)
+              Padding(
+                padding: const EdgeInsets.only(left: 52, top: AppSpace.xs),
+                child: Text(hint, style: TextStyle(color: c.inkMuted, fontSize: 11.5)),
+              ),
+            if (l.costChanged)
+              Padding(
+                padding: const EdgeInsets.only(left: 40, top: AppSpace.xs),
+                child: CheckboxListTile(
+                  value: l.updateCost,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  onChanged: (v) => setState(() => l.updateCost = v ?? true),
+                  title: Text(
+                    p.purchasePrice > 0
+                        ? 'El costo cambió (antes ${CurrencyFormatter.format(p.purchasePrice)}). Actualizarlo en el producto'
+                        : 'Guardar este costo en el producto',
+                    style: TextStyle(color: c.warning, fontSize: 12.5),
+                  ),
                 ),
               ),
           ],
-          const SizedBox(height: AppSpace.sm),
-          Row(
-            children: [
-              const SizedBox(width: 52),
-              SizedBox(
-                width: 150,
-                child: TextField(
-                  controller: l.cost,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(isDense: true, labelText: 'Costo por unidad', prefixText: '\$ '),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                CurrencyFormatter.format(l.unitCost * l.units),
-                style: TextStyle(color: c.ink, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          if (_costHint(l.product) case final hint?)
-            Padding(
-              padding: const EdgeInsets.only(left: 52, top: AppSpace.xs),
-              child: Text(hint, style: TextStyle(color: c.inkMuted, fontSize: 11.5)),
-            ),
-          if (l.costChanged)
-            Padding(
-              padding: const EdgeInsets.only(left: 40, top: AppSpace.xs),
-              child: CheckboxListTile(
-                value: l.updateCost,
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                onChanged: (v) => setState(() => l.updateCost = v ?? true),
-                title: Text(
-                  p.purchasePrice > 0
-                      ? 'El costo cambió (antes ${CurrencyFormatter.format(p.purchasePrice)}). Actualizarlo en el producto'
-                      : 'Guardar este costo en el producto',
-                  style: TextStyle(color: c.warning, fontSize: 12.5),
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }

@@ -477,7 +477,7 @@ class _ExplosionPainter extends CustomPainter {
 
     // 1. Onda expansiva exterior
     final ringPaint = Paint()
-      ..color = glow.withOpacity(opacity * 0.75)
+      ..color = glow.withValues(alpha: opacity * 0.75)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.2 * (1.0 - progress);
     canvas.drawCircle(
@@ -488,7 +488,7 @@ class _ExplosionPainter extends CustomPainter {
 
     // 2. Onda expansiva interior dorada/verde
     final innerRingPaint = Paint()
-      ..color = StockyPalette.sparkleGold.withOpacity(opacity * 0.55)
+      ..color = StockyPalette.sparkleGold.withValues(alpha: opacity * 0.55)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0 * (1.0 - progress);
     canvas.drawCircle(
@@ -504,7 +504,7 @@ class _ExplosionPainter extends CustomPainter {
       final x = center.dx + math.cos(p.angle) * dist;
       final y = center.dy + math.sin(p.angle) * dist;
       final currentSize = p.size * (1.0 - progress * 0.55);
-      final pColor = p.color.withOpacity((opacity * p.initialOpacity).clamp(0.0, 1.0));
+      final pColor = p.color.withValues(alpha: (opacity * p.initialOpacity).clamp(0.0, 1.0));
 
       final paint = Paint()
         ..color = pColor

@@ -242,7 +242,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: context.colors.accent.withOpacity(0.12),
+                      color: context.colors.accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(Icons.description_outlined, color: context.colors.accent, size: 20),
@@ -294,7 +294,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: isBilled
-                                    ? context.colors.accent.withOpacity(0.3)
+                                    ? context.colors.accent.withValues(alpha: 0.3)
                                     : borderColor,
                               ),
                             ),
@@ -315,8 +315,8 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                           decoration: BoxDecoration(
                                             color: isBilled
-                                                ? context.colors.accent.withOpacity(0.15)
-                                                : context.colors.warning.withOpacity(0.15),
+                                                ? context.colors.accent.withValues(alpha: 0.15)
+                                                : context.colors.warning.withValues(alpha: 0.15),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
@@ -352,7 +352,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                 // Resumen de ítems
                                 Text(
                                   q.items.map((i) => '${i.quantity}x ${i.productName}').join(' • '),
-                                  style: TextStyle(fontSize: 11.5, color: textMain.withOpacity(0.85)),
+                                  style: TextStyle(fontSize: 11.5, color: textMain.withValues(alpha: 0.85)),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),

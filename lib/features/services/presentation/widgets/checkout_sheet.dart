@@ -6,7 +6,8 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
-import '../../../cash/presentation/widgets/cash_status_card.dart';
+import '../../../auth/data/auth_repository.dart';
+import '../../../cash/presentation/widgets/open_cash.dart';
 import '../../../sales/data/sales_repository.dart';
 import '../../data/services_repository.dart';
 import '../../models/service_models.dart';
@@ -63,6 +64,10 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
       AppToast.showWarning(context, 'Para fiar escribe el nombre del cliente.');
       return;
     }
+    // Caja obligatoria: si el negocio la usa y está cerrada, se abre aquí mismo
+    final user = AuthRepository.instance.currentUser;
+    if (!await CashGate.ensureOpen(context, business: widget.business, userName: user?.displayName ?? '')) return;
+    if (!mounted) return;
     setState(() => _saving = true);
     try {
       final sales = await SalesRepository.instance.recordServiceSale(
@@ -81,9 +86,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
         discount: _disc,
         tip: _tipValue,
       );
-      final cashClosed = await isCashClosedFor(widget.business, _method);
       if (!mounted) return;
-      if (cashClosed) AppToast.showWarning(context, kCashClosedWarning);
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
@@ -104,7 +107,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
           shrinkWrap: true,
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
           children: [
-            Text('Cobrar ${o.title}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+            Text('Cobrar ${o.title}', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.md),
             for (final l in o.lines)
               Padding(
@@ -114,7 +117,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                     Expanded(
                       child: Text(
                         '${l.name}${l.staffIds.isEmpty ? '' : ' · ${l.staffIds.map((id) => widget.staffNames[id] ?? 'Empleado').join(', ')}'}',
-                        style: TextStyle(color: c.ink, fontSize: 13.5),
+                        style: TextStyle(color: c.ink, fontSize: AppText.sizeBody),
                       ),
                     ),
                     Text(CurrencyFormatter.format(l.price), style: TextStyle(color: c.ink)),

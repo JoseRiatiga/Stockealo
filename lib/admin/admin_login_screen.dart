@@ -90,7 +90,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       autofillHints: const [AutofillHints.email],
                       textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(labelText: 'Correo', prefixIcon: Icon(Icons.mail_outline_rounded)),
+                      decoration: const InputDecoration(labelText: 'Correo', prefixIcon: Icon(Icons.mail_outline_outlined)),
                     ),
                     const SizedBox(height: AppSpace.md),
                     TextField(
@@ -100,7 +100,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       onSubmitted: (_) => _signIn(),
                       decoration: InputDecoration(
                         labelText: 'Contraseña',
-                        prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           tooltip: _hidePassword ? 'Mostrar' : 'Ocultar',
                           onPressed: () => setState(() => _hidePassword = !_hidePassword),
@@ -115,7 +115,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     const SizedBox(height: AppSpace.lg),
                     PrimaryActionButton(
                       label: _loading ? 'Entrando…' : 'Entrar',
-                      icon: Icons.login_rounded,
+                      icon: Icons.login_outlined,
                       onPressed: _loading ? null : _signIn,
                     ),
                   ],

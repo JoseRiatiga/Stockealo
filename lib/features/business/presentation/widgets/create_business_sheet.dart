@@ -223,7 +223,7 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
                                 .titleLarge
                                 ?.copyWith(fontWeight: FontWeight.w700)),
                         Text(_isEditing ? 'Los cambios se ven en todo el equipo' : 'Podrás cambiar todo esto después',
-                            style: TextStyle(color: c.inkMuted, fontSize: 13)),
+                            style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall)),
                       ],
                     ),
                   ),
@@ -286,7 +286,7 @@ initialValue: _currency,
                     child: Text.rich(
                       TextSpan(
                         text: 'Así se verán tus precios: ',
-                        style: TextStyle(color: c.inkMuted, fontSize: 13),
+                        style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall),
                         children: [
                           TextSpan(
                             text: CurrencyFormatter.formatIn(12500, _currency),
@@ -332,7 +332,7 @@ initialValue: _currency,
                                 width: 2.5),
                           ),
                           child: _colorKey == entry.key
-                              ? const Icon(Icons.check_rounded,
+                              ? const Icon(Icons.check_outlined,
                                   color: Colors.white, size: 18)
                               : null,
                         ),
@@ -351,7 +351,7 @@ initialValue: _currency,
                     Expanded(
                       child: Text(
                         'Sale en el catálogo, los comprobantes y el selector de negocios',
-                        style: TextStyle(fontSize: 13, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                       ),
                     ),
                     TextButton(onPressed: _pickLogo, child: const Text('Cambiar')),

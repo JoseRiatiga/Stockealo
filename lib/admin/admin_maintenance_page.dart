@@ -234,7 +234,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
     return AdminCard(
       child: Row(
         children: [
-          Icon(_state == 'none' ? Icons.check_circle_outline_rounded : Icons.construction_rounded, color: tone),
+          Icon(_state == 'none' ? Icons.check_circle_outline_outlined : Icons.construction_outlined, color: tone),
           const SizedBox(width: AppSpace.md),
           Expanded(
             child: Column(
@@ -286,7 +286,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
             decoration: BoxDecoration(color: c.warningSoft, borderRadius: BorderRadius.circular(AppRadius.control)),
             child: Row(
               children: [
-                Icon(Icons.construction_rounded, size: 18, color: c.warning),
+                Icon(Icons.construction_outlined, size: 18, color: c.warning),
                 const SizedBox(width: AppSpace.sm),
                 Expanded(child: Text(banner, style: TextStyle(fontSize: 12.5, color: c.ink))),
               ],
@@ -401,12 +401,12 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
               children: [
                 OutlinedButton.icon(
                   onPressed: _pickStart,
-                  icon: const Icon(Icons.event_rounded, size: 18),
+                  icon: const Icon(Icons.event_outlined, size: 18),
                   label: Text('Empieza ${_coLabel(_startsAt)}'),
                 ),
                 OutlinedButton.icon(
                   onPressed: _pickEnd,
-                  icon: const Icon(Icons.schedule_rounded, size: 18),
+                  icon: const Icon(Icons.schedule_outlined, size: 18),
                   label: Text('Termina ${_coLabel(_endsAt)}'),
                 ),
               ],
@@ -471,7 +471,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
                       (_level == 3 && _confirm.text.trim().toUpperCase() != 'MANTENIMIENTO')
                   ? null
                   : _save,
-              icon: const Icon(Icons.construction_rounded),
+              icon: const Icon(Icons.construction_outlined),
               label: Text(_saving ? 'Guardando…' : (_startNow ? 'Activar ahora' : 'Programar')),
             ),
           ),

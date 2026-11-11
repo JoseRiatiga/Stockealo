@@ -49,7 +49,7 @@ class ImageSourcePickerModal extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(AppRadius.sheet),
               child: ImageSourcePickerModal(
                 title: title,
                 subtitle: subtitle,
@@ -66,12 +66,11 @@ class ImageSourcePickerModal extends StatelessWidget {
       );
     }
 
+    // Hoja del sistema: el asa y el fondo los pone el tema
     return showModalBottomSheet(
-      showDragHandle: false,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => ImageSourcePickerModal(
         title: title,
         subtitle: subtitle,
@@ -92,31 +91,21 @@ class ImageSourcePickerModal extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(
         AppSpace.xl,
-        AppSpace.lg,
+        isDialog ? AppSpace.lg : 0,
         AppSpace.xl,
         isDialog ? AppSpace.xl : MediaQuery.of(context).padding.bottom + AppSpace.lg,
       ),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: isDialog
-            ? BorderRadius.circular(AppRadius.sheet)
-            : const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
-        border: Border.all(color: c.line),
-      ),
+      decoration: isDialog
+          ? BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.circular(AppRadius.sheet),
+              border: Border.all(color: c.line),
+            )
+          : null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isDialog)
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: AppSpace.lg),
-                decoration: BoxDecoration(color: c.lineStrong, borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-
           // Cabecera
           Row(
             children: [
@@ -124,10 +113,10 @@ class ImageSourcePickerModal extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+                    Text(title, style: AppText.heading(context)),
                     if (subtitle != null) ...[
                       const SizedBox(height: 3),
-                      Text(subtitle!, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                      Text(subtitle!, style: AppText.small(context)),
                     ],
                   ],
                 ),
@@ -135,7 +124,7 @@ class ImageSourcePickerModal extends StatelessWidget {
               IconButton(
                 tooltip: 'Cerrar',
                 onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.close_rounded, color: c.inkMuted, size: 20),
+                icon: Icon(Icons.close_outlined, color: c.inkMuted, size: 20),
               ),
             ],
           ),
@@ -166,7 +155,7 @@ class ImageSourcePickerModal extends StatelessWidget {
             const SizedBox(height: AppSpace.sm),
             _option(
               context,
-              icon: Icons.link_rounded,
+              icon: Icons.link_outlined,
               title: 'Traer la foto desde un enlace',
               subtitle: 'Pega el enlace del producto (Shein, Temu, Mercado Libre…) o de la imagen',
               onTap: () {
@@ -177,13 +166,13 @@ class ImageSourcePickerModal extends StatelessWidget {
           ],
           if (footerHint != null) ...[
             const SizedBox(height: AppSpace.md),
-            Text(footerHint!, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+            Text(footerHint!, style: AppText.caption(context)),
           ],
           if (hasExistingImage && onRemove != null) ...[
             const SizedBox(height: AppSpace.sm),
             _option(
               context,
-              icon: Icons.delete_outline_rounded,
+              icon: Icons.delete_outline_outlined,
               title: 'Quitar la imagen actual',
               subtitle: 'Vuelve a la imagen predeterminada',
               danger: true,
@@ -234,14 +223,13 @@ class ImageSourcePickerModal extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: danger ? c.danger : c.ink)),
+                    Text(title, style: AppText.body(context, weight: FontWeight.w600, color: danger ? c.danger : c.ink)),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                    Text(subtitle, style: AppText.caption(context)),
                   ],
                 ),
               ),
-              if (!danger) Icon(Icons.chevron_right_rounded, color: c.inkFaint, size: 20),
+              if (!danger) Icon(Icons.chevron_right_outlined, color: c.inkFaint, size: 20),
             ],
           ),
         ),

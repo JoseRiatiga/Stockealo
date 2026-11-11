@@ -66,14 +66,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   static (IconData, Color Function(StockealoColors)) _style(String action) => switch (action) {
-        ActivityAction.sale => (Icons.point_of_sale_rounded, (c) => c.success),
-        ActivityAction.saleCancel => (Icons.undo_rounded, (c) => c.danger),
+        ActivityAction.sale => (Icons.point_of_sale_outlined, (c) => c.success),
+        ActivityAction.saleCancel => (Icons.undo_outlined, (c) => c.danger),
         ActivityAction.priceChange => (Icons.sell_outlined, (c) => c.warning),
         ActivityAction.productCreate => (Icons.add_box_outlined, (c) => c.accent),
         ActivityAction.productUpdate => (Icons.edit_outlined, (c) => c.inkMuted),
-        ActivityAction.productDelete => (Icons.delete_outline_rounded, (c) => c.danger),
+        ActivityAction.productDelete => (Icons.delete_outline_outlined, (c) => c.danger),
         ActivityAction.stockAdjust => (Icons.inventory_2_outlined, (c) => c.accent),
-        ActivityAction.shrinkage => (Icons.remove_circle_outline_rounded, (c) => c.danger),
+        ActivityAction.shrinkage => (Icons.remove_circle_outline_outlined, (c) => c.danger),
         ActivityAction.purchase => (Icons.local_shipping_outlined, (c) => c.success),
         ActivityAction.supplierChange => (Icons.storefront_outlined, (c) => c.inkMuted),
         ActivityAction.supplierPayment => (Icons.payments_outlined, (c) => c.warning),
@@ -81,12 +81,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
         ActivityAction.staffChange => (Icons.badge_outlined, (c) => c.inkMuted),
         ActivityAction.debtPayment => (Icons.payments_outlined, (c) => c.success),
         ActivityAction.customerDelete => (Icons.person_remove_outlined, (c) => c.danger),
-        ActivityAction.cashOpen => (Icons.lock_open_rounded, (c) => c.accent),
-        ActivityAction.cashClose => (Icons.lock_outline_rounded, (c) => c.accent),
+        ActivityAction.cashOpen => (Icons.lock_open_outlined, (c) => c.accent),
+        ActivityAction.cashClose => (Icons.lock_outline, (c) => c.accent),
         ActivityAction.memberJoin || ActivityAction.memberAdd => (Icons.person_add_alt_1_outlined, (c) => c.accent),
         ActivityAction.memberRemove => (Icons.person_remove_outlined, (c) => c.danger),
         ActivityAction.roleChange => (Icons.manage_accounts_outlined, (c) => c.warning),
-        _ => (Icons.history_rounded, (c) => c.inkMuted),
+        _ => (Icons.history_outlined, (c) => c.inkMuted),
       };
 
   static String _dayLabel(DateTime d) {
@@ -150,7 +150,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                 padding: EdgeInsets.fromLTRB(AppSpace.xs, i == 0 ? AppSpace.sm : AppSpace.xl, 0, AppSpace.sm),
                                 child: Text(
                                   _dayLabel(e.createdAt).toUpperCase(),
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: c.inkFaint),
+                                  style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: c.inkFaint),
                                 ),
                               ),
                             _row(c, e),
@@ -236,7 +236,7 @@ initialValue: _person,
               children: [
                 Text.rich(
                   TextSpan(
-                    style: TextStyle(fontSize: 14, height: 1.35, color: c.ink),
+                    style: TextStyle(fontSize: AppText.sizeBody, height: 1.35, color: c.ink),
                     children: [
                       TextSpan(text: e.actor, style: const TextStyle(fontWeight: FontWeight.w700)),
                       const TextSpan(text: ' '),
@@ -247,7 +247,7 @@ initialValue: _person,
                 const SizedBox(height: 3),
                 Text(
                   e.pending ? '${_time(e.createdAt)} · sin subir a la nube' : _time(e.createdAt),
-                  style: TextStyle(fontSize: 12, color: e.pending ? c.warning : c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeCaption, color: e.pending ? c.warning : c.inkMuted),
                 ),
               ],
             ),
@@ -266,11 +266,11 @@ initialValue: _person,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_rounded, size: 44, color: c.inkFaint),
+          Icon(Icons.history_outlined, size: 44, color: c.inkFaint),
           const SizedBox(height: AppSpace.md),
           Text(
             nothingYet ? 'Todavía no hay actividad' : 'Nada con ese filtro',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.ink),
+            style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink),
           ),
           const SizedBox(height: AppSpace.xs),
           Text(
@@ -278,7 +278,7 @@ initialValue: _person,
                 ? 'Aquí verás quién vendió, cambió precios, ajustó el stock o cerró la caja.'
                 : 'Prueba con otro tipo o con todo el equipo.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
           ),
         ],
       ),

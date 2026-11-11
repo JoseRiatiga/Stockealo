@@ -39,13 +39,13 @@ class _WelcomeStep {
 
 const _steps = [
   _WelcomeStep(
-    icon: Icons.inventory_2_rounded,
+    icon: Icons.inventory_2_outlined,
     title: 'Tu inventario, siempre al día',
     body: 'Registra tus productos con foto, precio y stock.',
     points: ['Te avisamos antes de que algo se agote', 'Ves cuánto ganas en cada producto'],
   ),
   _WelcomeStep(
-    icon: Icons.point_of_sale_rounded,
+    icon: Icons.point_of_sale_outlined,
     title: 'Vende y cobra en segundos',
     body: 'Cada venta descuenta el stock sola.',
     points: ['Lleva los fiados de tus clientes', 'Envía comprobantes por WhatsApp'],
@@ -110,7 +110,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       ),
                       const SizedBox(width: AppSpace.sm + 2),
                       Expanded(
-                        child: Text('Stockealo', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.ink)),
+                        child: Text('Stockealo', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w800, color: c.ink)),
                       ),
                       AnimatedOpacity(
                         opacity: _isLast ? 0 : 1,
@@ -160,7 +160,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         width: double.infinity,
                         child: PrimaryActionButton(
                           label: _isLast ? 'Empezar' : 'Siguiente',
-                          icon: _isLast ? Icons.check_rounded : Icons.arrow_forward_rounded,
+                          icon: _isLast ? Icons.check_outlined : Icons.arrow_forward_outlined,
                           onPressed: _next,
                         ),
                       ),
@@ -211,10 +211,10 @@ class _StepView extends StatelessWidget {
           Text(
             step.title,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 27, fontWeight: FontWeight.w800, letterSpacing: -0.4, height: 1.15, color: c.ink),
+            style: TextStyle(fontSize: AppText.sizePage, fontWeight: FontWeight.w800, letterSpacing: -0.4, height: 1.15, color: c.ink),
           ),
           const SizedBox(height: AppSpace.md),
-          Text(step.body, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, height: 1.4, color: c.inkMuted)),
+          Text(step.body, textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeTitle, height: 1.4, color: c.inkMuted)),
           const SizedBox(height: AppSpace.xl),
           Container(
             padding: const EdgeInsets.all(AppSpace.lg),
@@ -230,9 +230,9 @@ class _StepView extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: AppSpace.xs + 2),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle_rounded, size: 20, color: c.accent),
+                        Icon(Icons.check_circle_outlined, size: 20, color: c.accent),
                         const SizedBox(width: AppSpace.md),
-                        Expanded(child: Text(point, style: TextStyle(fontSize: 15, color: c.ink))),
+                        Expanded(child: Text(point, style: TextStyle(fontSize: AppText.sizeBodyLarge, color: c.ink))),
                       ],
                     ),
                   ),

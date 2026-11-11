@@ -193,7 +193,7 @@ class _AdminFeedbackPageState extends State<AdminFeedbackPage> {
                       switch (f.kind) {
                         'FALLO' => Icons.bug_report_outlined,
                         'IDEA' => Icons.lightbulb_outline,
-                        _ => Icons.help_outline,
+                        _ => Icons.help_outline_outlined,
                       },
                       color: f.kind == 'FALLO' ? c.danger : c.accent,
                     ),

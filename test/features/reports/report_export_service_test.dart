@@ -23,7 +23,9 @@ Future<Database> _db() async {
     attribute_value TEXT, attribute2_value TEXT, sku_or_barcode TEXT, stock INTEGER, additional_price REAL)''');
   await db.execute('''CREATE TABLE sales (id TEXT PRIMARY KEY, business_id TEXT, product_name TEXT, variant_name TEXT,
     quantity INTEGER, total REAL, total_cost REAL, net_profit REAL, payment_method TEXT, customer_name TEXT,
-    seller_name TEXT, invoice_number TEXT, date TEXT)''');
+    seller_name TEXT, invoice_number TEXT, date TEXT, voided_at TEXT)''');
+  // Las ventas que cuentan (sin anuladas), igual que en la base de la app
+  await db.execute('CREATE VIEW sales_ok AS SELECT * FROM sales WHERE voided_at IS NULL');
   await db.execute('''CREATE TABLE customers (id TEXT PRIMARY KEY, business_id TEXT, name TEXT, phone TEXT,
     address TEXT, debt_balance REAL, created_at TEXT)''');
   await db.execute('''CREATE TABLE stock_movements (id TEXT PRIMARY KEY, business_id TEXT, product_id TEXT, type TEXT,

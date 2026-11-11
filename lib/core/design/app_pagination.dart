@@ -34,9 +34,9 @@ class AppPagination extends StatelessWidget {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _arrow(context, Icons.chevron_left_rounded, 'Página anterior', _hasPrevious ? currentPage - 1 : null),
+          _arrow(context, Icons.chevron_left_outlined, 'Página anterior', _hasPrevious ? currentPage - 1 : null),
           Text('$currentPage / $totalPages', style: AppText.amount(context, size: 13, weight: FontWeight.w600, color: c.inkMuted)),
-          _arrow(context, Icons.chevron_right_rounded, 'Página siguiente', _hasNext ? currentPage + 1 : null),
+          _arrow(context, Icons.chevron_right_outlined, 'Página siguiente', _hasNext ? currentPage + 1 : null),
         ],
       );
     }
@@ -48,12 +48,12 @@ class AppPagination extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: _hasPrevious ? () => onPageChanged(currentPage - 1) : null,
-              icon: const Icon(Icons.chevron_left_rounded),
+              icon: const Icon(Icons.chevron_left_outlined),
               label: const Text('Anterior'),
             ),
           ),
         ),
-        Text('Página $currentPage de $totalPages', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+        Text('Página $currentPage de $totalPages', style: AppText.small(context)),
         Expanded(
           child: Align(
             alignment: Alignment.centerRight,
@@ -61,7 +61,7 @@ class AppPagination extends StatelessWidget {
               onPressed: _hasNext ? () => onPageChanged(currentPage + 1) : null,
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [Text('Siguiente'), SizedBox(width: 4), Icon(Icons.chevron_right_rounded)],
+                children: [Text('Siguiente'), SizedBox(width: 4), Icon(Icons.chevron_right_outlined)],
               ),
             ),
           ),

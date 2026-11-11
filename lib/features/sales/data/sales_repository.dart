@@ -10,9 +10,11 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../team/data/activity_repository.dart';
 import '../../products/models/product.dart';
+import '../../cash/data/cash_register_repository.dart';
 import '../models/sale.dart';
 import '../models/cart_item.dart';
 import '../models/quotation.dart';
+import '../../sales/models/payment_method.dart';
 
 class SalesRepository {
   static final SalesRepository instance = SalesRepository();
@@ -165,7 +167,7 @@ class SalesRepository {
       businessId: businessId,
       action: ActivityAction.sale,
       summary: 'Vendió $quantity × ${product.name} por ${CurrencyFormatter.format(total)} '
-          '(${activityPaymentLabel(paymentMethod)}$who)',
+          '(${PaymentMethod.label(paymentMethod).toLowerCase()}$who)',
       data: {'sale_id': saleId, 'total': total},
     );
 
@@ -177,17 +179,21 @@ class SalesRepository {
   Future<List<Sale>> recordMultiProductSale({
     required String businessId,
     required List<CartItem> items,
-    required String paymentMethod, // 'EFECTIVO' | 'TRANSFERENCIA' | 'FIADO'
+    required String paymentMethod,
     String? customerName,
     double discountAmount = 0.0,
     double discountPercent = 0.0,
     String? notes,
+
+    /// Solo con pago mixto: cuánto entró por cada medio (debe sumar el total)
+    Map<String, double>? paymentSplit,
   }) async {
     if (items.isEmpty) {
       throw Exception('El carrito está vacío. Agrega al menos un producto.');
     }
 
     final db = await _dbProvider.database;
+    await CashRegisterRepository.instance.requireOpen(businessId);
 
     // 1. Validar stock de todos los productos y variantes antes de iniciar
     for (final item in items) {
@@ -208,6 +214,19 @@ class SalesRepository {
         ? discountAmount
         : (discountPercent > 0 ? (totalSubtotal * (discountPercent / 100.0)) : 0.0);
     final double finalTotal = (totalSubtotal - finalDiscount).clamp(0.0, double.infinity);
+
+    // Pago mixto: los medios tienen que sumar el total (sin fiado)
+    final mixed = paymentMethod == PaymentMethod.mixed;
+    if (mixed) {
+      final split = paymentSplit ?? const {};
+      final paid = split.values.fold<double>(0, (a, b) => a + b);
+      if (split.keys.any((k) => !PaymentMethod.forMixed.contains(k))) {
+        throw Exception('El pago mixto solo combina efectivo, Nequi, transferencia y tarjeta.');
+      }
+      if ((paid - finalTotal).abs() > 0.5) {
+        throw Exception('Las partes del pago mixto suman ${CurrencyFormatter.format(paid)} y el total es ${CurrencyFormatter.format(finalTotal)}.');
+      }
+    }
 
     final now = DateTime.now();
     final invoiceNumber = '#INV-${now.millisecondsSinceEpoch.toString().substring(5)}';
@@ -267,6 +286,10 @@ class SalesRepository {
         final double itemDiscount = finalDiscount * itemProportion;
         final double itemTotal = (item.subtotal - itemDiscount).clamp(0.0, double.infinity);
         final double itemProfit = itemTotal - item.totalCost;
+        // Cada línea guarda su parte de cada medio, para que la caja sepa cuánto fue en efectivo
+        final String? itemSplit = mixed && finalTotal > 0
+            ? PaymentMethod.encodeSplit({for (final e in paymentSplit!.entries) e.key: e.value * itemTotal / finalTotal})
+            : null;
 
         // Descontar stock específico de la variante si aplica. Por diferencia: la
         // variante del carrito puede traer existencias de hace rato
@@ -325,6 +348,7 @@ class SalesRepository {
           'discount_amount': itemDiscount,
           'variant_id': item.variant?.id,
           'variant_name': item.variant?.label,
+          'payment_split': itemSplit,
           'created_at': now.toIso8601String(),
           'is_synced': 0,
         });
@@ -357,6 +381,8 @@ class SalesRepository {
           date: now,
           variantId: item.variant?.id,
           variantName: item.variant?.label,
+          invoiceNumber: invoiceNumber,
+          paymentSplit: itemSplit,
         );
 
         createdSales.add(sale);
@@ -379,7 +405,7 @@ class SalesRepository {
       businessId: businessId,
       action: ActivityAction.sale,
       summary: 'Vendió $what por ${CurrencyFormatter.format(finalTotal)} '
-          '(${activityPaymentLabel(paymentMethod)}$who)'
+          '(${PaymentMethod.label(paymentMethod).toLowerCase()}$who)'
           '${finalDiscount > 0 ? ' con ${CurrencyFormatter.format(finalDiscount)} de descuento' : ''}',
       data: {'invoice': invoiceNumber, 'total': finalTotal, 'discount': finalDiscount},
     );
@@ -409,6 +435,7 @@ class SalesRepository {
       throw Exception('Para fiar escribe el nombre del cliente.');
     }
     final db = await _dbProvider.database;
+    await CashRegisterRepository.instance.requireOpen(order.businessId);
     final businessId = order.businessId;
     final subtotal = lines.fold(0.0, (s, l) => s + l.price);
     final discount = discountAmount.clamp(0.0, subtotal).toDouble();
@@ -524,7 +551,7 @@ class SalesRepository {
       businessId: businessId,
       action: ActivityAction.serviceSale,
       summary: 'Cobró $what${(order.plate ?? '').isNotEmpty ? ' (${order.plate})' : ''} por '
-          '${CurrencyFormatter.format(finalTotal)} (${activityPaymentLabel(paymentMethod)})'
+          '${CurrencyFormatter.format(finalTotal)} (${PaymentMethod.label(paymentMethod).toLowerCase()})'
           '${discount > 0 ? ' con ${CurrencyFormatter.format(discount)} de descuento' : ''}',
       data: {'work_order_id': order.id, 'total': finalTotal},
     );
@@ -695,6 +722,15 @@ class SalesRepository {
   }
 
   /// Una venta por su id (para anular el cobro de un servicio); null si no existe
+  /// Todas las líneas de la misma venta (mismo número), en el orden en que se vendieron
+  Future<List<Sale>> linesOf(Sale sale) async {
+    if ((sale.invoiceNumber ?? '').isEmpty) return [sale];
+    final db = await _dbProvider.database;
+    final rows = await db.query('sales',
+        where: 'business_id = ? AND invoice_number = ?', whereArgs: [sale.businessId, sale.invoiceNumber], orderBy: 'rowid');
+    return rows.isEmpty ? [sale] : [for (final r in rows) saleFromRow(r)];
+  }
+
   Future<Sale?> getSaleById(String id) async {
     final db = await _dbProvider.database;
     final rows = await db.query('sales', where: 'id = ?', whereArgs: [id], limit: 1);
@@ -730,6 +766,11 @@ class SalesRepository {
       serviceId: map['service_id'] as String?,
       workOrderId: map['work_order_id'] as String?,
       staffIds: map['staff_ids'] as String?,
+      invoiceNumber: map['invoice_number'] as String?,
+      voidedAt: DateTime.tryParse('${map['voided_at'] ?? ''}'),
+      voidReason: map['void_reason'] as String?,
+      voidedBy: map['voided_by'] as String?,
+      paymentSplit: map['payment_split'] as String?,
     );
   }
 
@@ -746,127 +787,147 @@ class SalesRepository {
     required DateTime from,
     required DateTime to,
   }) async {
+    // Las anuladas se ven en el historial, pero no suman
     final sales = (await getSales(businessId: businessId))
-        .where((s) => !s.date.isBefore(from) && s.date.isBefore(to))
+        .where((s) => !s.isVoided && !s.date.isBefore(from) && s.date.isBefore(to))
         .toList();
 
     double totalAmount = 0.0;
     double netProfit = 0.0;
     int totalUnits = 0;
-    double byEfectivo = 0.0;
-    double byTransferencia = 0.0;
-    double byFiado = 0.0;
+    final byMethod = <String, double>{};
+    final invoices = <String>{};
 
     for (final s in sales) {
       totalAmount += s.totalAmount;
       netProfit += s.netProfit;
       totalUnits += s.quantity;
-
-      switch (s.paymentMethod) {
-        case 'EFECTIVO':
-          byEfectivo += s.totalAmount;
-          break;
-        case 'TRANSFERENCIA':
-          byTransferencia += s.totalAmount;
-          break;
-        case 'FIADO':
-          byFiado += s.totalAmount;
-          break;
+      invoices.add(s.invoiceNumber ?? s.id);
+      for (final e in PaymentMethod.amounts(s.paymentMethod, s.totalAmount, s.paymentSplit).entries) {
+        byMethod[e.key] = (byMethod[e.key] ?? 0) + e.value;
       }
     }
 
     return {
-      'count': sales.length,
+      'count': invoices.length,
       'totalAmount': totalAmount,
       'netProfit': netProfit,
       'totalUnits': totalUnits,
-      'byEfectivo': byEfectivo,
-      'byTransferencia': byTransferencia,
-      'byFiado': byFiado,
+      'byMethod': byMethod,
+      'byEfectivo': byMethod[PaymentMethod.cash] ?? 0.0,
+      'byTransferencia': byMethod[PaymentMethod.transfer] ?? 0.0,
+      'byFiado': byMethod[PaymentMethod.credit] ?? 0.0,
     };
   }
 
-  /// Cancelar / Revertir una venta por error en la empresa correspondiente
-  Future<void> cancelSale(Sale sale) async {
+  /// Anula una venta SIN borrarla: queda en Ventas como «Anulada» (con el motivo y
+  /// quién la anuló) y deja de contar en totales, caja, reportes y fiados.
+  /// Anula todas las líneas de la misma venta (mismo número) y devuelve su stock.
+  /// Si ya estaba anulada no hace nada.
+  Future<void> voidSale(Sale sale, {String? reason}) async {
     final db = await _dbProvider.database;
-    int? restoredStock;
-    String? debtorId;
-    // Un servicio (lavado, corte...) no tiene inventario que reponer
-    final hasProduct = sale.productId.isNotEmpty;
-    await db.transaction((txn) async {
-      if (hasProduct) {
-        // Reponer stock
-        await txn.rawUpdate(
-          'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
-          [sale.quantity, sale.productId, sale.businessId],
-        );
-        final productRows = await txn.query(
-          'products',
-          columns: ['stock'],
-          where: 'id = ? AND business_id = ?',
-          whereArgs: [sale.productId, sale.businessId],
-        );
-        restoredStock = productRows.isNotEmpty ? productRows.first['stock'] as int : null;
+    final user = AuthRepository.instance.currentUser;
+    final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
+    final cleanReason = (reason ?? '').trim().isEmpty ? null : reason!.trim();
+    final now = DateTime.now().toIso8601String();
 
-        // La talla o el color vendido también recupera su unidad
-        if (sale.variantId != null) {
+    final invoice = (sale.invoiceNumber ?? '').isEmpty ? null : sale.invoiceNumber;
+    final rows = await db.query(
+      'sales',
+      where: invoice == null
+          ? 'id = ? AND business_id = ? AND voided_at IS NULL'
+          : 'invoice_number = ? AND business_id = ? AND voided_at IS NULL',
+      whereArgs: [invoice ?? sale.id, sale.businessId],
+    );
+    if (rows.isEmpty) return;
+    final lines = [for (final r in rows) saleFromRow(r)];
+
+    final stock = <String, int>{};
+    final variants = <String, int>{};
+    final debts = <String, double>{};
+
+    await db.transaction((txn) async {
+      for (final line in lines) {
+        if (line.productId.isNotEmpty) {
           await txn.rawUpdate(
-            'UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?',
-            [sale.quantity, DateTime.now().toIso8601String(), sale.variantId],
+            'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
+            [line.quantity, line.productId, line.businessId],
           );
+          final p = await txn.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [line.productId], limit: 1);
+          if (line.variantId != null) {
+            await txn.rawUpdate(
+              'UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?',
+              [line.quantity, now, line.variantId],
+            );
+            variants[line.variantId!] = (variants[line.variantId!] ?? 0) + line.quantity;
+          }
+          if (p.isNotEmpty) {
+            stock[line.productId] = (stock[line.productId] ?? 0) + line.quantity;
+            await txn.insert('stock_movements', {
+              'id': const Uuid().v4(),
+              'business_id': line.businessId,
+              'product_id': line.productId,
+              'type': 'AJUSTE',
+              'quantity': line.quantity,
+              'resulting_stock': p.first['stock'] as int,
+              'reason': 'Venta anulada${invoice == null ? '' : ' $invoice'}${cleanReason == null ? '' : ': $cleanReason'}',
+              'date': now,
+            });
+          }
         }
 
-        // Registrar reverso en kardex
-        await txn.insert('stock_movements', {
-          'id': const Uuid().v4(),
-          'business_id': sale.businessId,
-          'product_id': sale.productId,
-          'type': 'AJUSTE',
-          'quantity': sale.quantity,
-          'resulting_stock': restoredStock ?? 0,
-          'reason': 'Venta cancelada / reversada',
-          'date': DateTime.now().toIso8601String(),
-        });
-      }
+        // Fiado: la deuda baja lo que se había fiado
+        if (line.paymentMethod == PaymentMethod.credit && line.customerName != null) {
+          final c = await txn.query(
+            'customers',
+            where: 'business_id = ? AND LOWER(name) = ?',
+            whereArgs: [line.businessId, line.customerName!.toLowerCase()],
+            limit: 1,
+          );
+          if (c.isNotEmpty) {
+            final id = c.first['id'] as String;
+            await txn.rawUpdate('UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE id = ?', [line.totalAmount, id]);
+            debts[id] = (debts[id] ?? 0) + line.totalAmount;
+          }
+        }
 
-      // Si fue fiado, reducir deuda
-      if (sale.paymentMethod == 'FIADO' && sale.customerName != null) {
-        await txn.rawUpdate(
-          'UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE business_id = ? AND LOWER(name) = ?',
-          [sale.totalAmount, sale.businessId, sale.customerName!.toLowerCase()],
+        await txn.update(
+          'sales',
+          {'voided_at': now, 'void_reason': cleanReason, 'voided_by': by, 'is_synced': 0},
+          where: 'id = ?',
+          whereArgs: [line.id],
         );
-        final customerRows = await txn.query(
-          'customers',
-          where: 'business_id = ? AND LOWER(name) = ?',
-          whereArgs: [sale.businessId, sale.customerName!.toLowerCase()],
-          limit: 1,
-        );
-        debtorId = customerRows.isNotEmpty ? customerRows.first['id'] as String : null;
       }
-
-      // Eliminar registro de venta
-      await txn.delete(
-        'sales',
-        where: 'id = ? AND business_id = ?',
-        whereArgs: [sale.id, sale.businessId],
-      );
     });
 
     DataEvents.instance.salesChanged();
-    // Un servicio anulado no deja comisión (si ya se pagó, queda un ajuste)
-    if (sale.serviceId != null) await CommissionsRepository.instance.onSaleCancelled(sale.id);
+    for (final line in lines) {
+      // Un servicio anulado no deja comisión (si ya se pagó, queda un ajuste)
+      if (line.serviceId != null) await CommissionsRepository.instance.onSaleCancelled(line.id);
+    }
+    final total = lines.fold<double>(0, (s, l) => s + l.totalAmount);
+    final what = lines.length == 1 ? '${lines.first.quantity} × ${lines.first.productName}' : '${lines.length} productos';
     ActivityRepository.instance.log(
       businessId: sale.businessId,
       action: ActivityAction.saleCancel,
-      summary: 'Anuló la venta de ${sale.quantity} × ${sale.productName} por ${CurrencyFormatter.format(sale.totalAmount)}',
-      data: {'sale_id': sale.id, 'total': sale.totalAmount},
+      summary: 'Anuló la venta de $what por ${CurrencyFormatter.format(total)}${cleanReason == null ? '' : ' ($cleanReason)'}',
+      data: {'sale_id': sale.id, 'invoice': invoice, 'total': total},
     );
 
-    // Reflejar la anulación en la nube; si no, la venta reaparecería al descargar
+    // En la nube la venta queda marcada como anulada (no se borra)
     final cloud = SupabaseService.instance;
-    await cloud.deleteSaleFromCloud(sale.id);
-    if (restoredStock != null) await cloud.adjustProductStockInCloud(sale.productId, sale.quantity);
-    if (hasProduct && sale.variantId != null) await cloud.adjustVariantStockInCloud(sale.variantId!, sale.quantity);
-    if (debtorId != null) await cloud.adjustCustomerDebtInCloud(debtorId!, -sale.totalAmount);
+    final updated = await db.query('sales', where: 'id IN (${List.filled(lines.length, '?').join(',')})', whereArgs: [for (final l in lines) l.id]);
+    for (final r in updated) {
+      await cloud.insertSaleToCloud({...saleFromRow(r).toMap(), 'notes': r['notes'], 'customer_id': r['customer_id']});
+    }
+    for (final e in stock.entries) {
+      await cloud.adjustProductStockInCloud(e.key, e.value);
+    }
+    for (final e in variants.entries) {
+      await cloud.adjustVariantStockInCloud(e.key, e.value);
+    }
+    for (final e in debts.entries) {
+      await cloud.adjustCustomerDebtInCloud(e.key, -e.value);
+    }
   }
 }

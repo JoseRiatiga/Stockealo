@@ -77,7 +77,7 @@ class _GradientSlider extends StatelessWidget {
         children: [
           SizedBox(
             width: 74,
-            child: Text(label, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+            child: Text(label, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
           ),
           Expanded(
             child: LayoutBuilder(builder: (context, box) {

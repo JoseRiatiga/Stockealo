@@ -266,7 +266,9 @@ void main() {
       expect(o.isPaid, isFalse);
       expect(o.notes, contains('Se anuló el cobro'));
       final db = await appDb.database;
-      expect(await db.query('sales', where: 'id = ?', whereArgs: [sales.single.id]), isEmpty);
+      // El cobro queda en Ventas como anulado y deja de contar
+      expect((await db.query('sales', where: 'id = ?', whereArgs: [sales.single.id])).single['voided_at'], isNotNull);
+      expect(await db.query('sales_ok'), isEmpty);
     });
   });
 

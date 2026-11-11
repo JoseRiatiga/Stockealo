@@ -88,7 +88,7 @@ class _CatalogViewState extends State<CatalogView> {
             padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.xs, AppSpace.lg, 120),
             children: [
               Text('Toca un servicio para cambiar su precio, su comisión o quién lo hace.',
-                  style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
               const SizedBox(height: AppSpace.md),
               if (_services.isEmpty)
                 Padding(
@@ -111,7 +111,7 @@ class _CatalogViewState extends State<CatalogView> {
                                   color: s.isActive ? c.ink : c.inkFaint,
                                   decoration: s.isActive ? null : TextDecoration.lineThrough,
                                 )),
-                            Text(_priceText(s), style: TextStyle(fontSize: 12.5, color: c.ink)),
+                            Text(_priceText(s), style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink)),
                             Text(
                               [
                                 if (s.durationMin != null) '${s.durationMin} min',
@@ -121,12 +121,12 @@ class _CatalogViewState extends State<CatalogView> {
                                     : 'lo hacen ${s.staffIds.map((id) => names[id] ?? '?').join(', ')}',
                                 if (!s.isActive) 'oculto',
                               ].join(' · '),
-                              style: TextStyle(fontSize: 12, color: c.inkMuted),
+                              style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                             ),
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                      Icon(Icons.chevron_right_outlined, color: c.inkFaint),
                     ],
                   ),
                 ),
@@ -238,7 +238,7 @@ class _ServiceEditorSheetState extends State<ServiceEditorSheet> {
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
           children: [
             Text(widget.service == null ? 'Nuevo servicio' : 'Editar servicio',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+                style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.md),
             TextField(
               controller: _name,
@@ -247,8 +247,8 @@ class _ServiceEditorSheetState extends State<ServiceEditorSheet> {
             ),
             const SizedBox(height: AppSpace.md),
             if (_t.usesVehicleKinds) ...[
-              Text('Precio por tipo de vehículo', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.inkMuted)),
-              Text('Deja vacío el tipo al que no se le ofrece.', style: TextStyle(fontSize: 12, color: c.inkFaint)),
+              Text('Precio por tipo de vehículo', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
+              Text('Deja vacío el tipo al que no se le ofrece.', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
               const SizedBox(height: AppSpace.xs),
               Row(
                 children: [
@@ -295,7 +295,7 @@ class _ServiceEditorSheetState extends State<ServiceEditorSheet> {
               ],
             ),
             const SizedBox(height: AppSpace.md),
-            Text('Quién lo hace', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.inkMuted)),
+            Text('Quién lo hace', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
             const SizedBox(height: AppSpace.xs),
             if (widget.staff.isEmpty)
               Text('Primero agrega a las personas en Ajustes › Equipo.', style: TextStyle(color: c.inkMuted))

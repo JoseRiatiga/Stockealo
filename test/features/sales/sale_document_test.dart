@@ -21,6 +21,8 @@ Sale _sale(String id, String name, int qty, double price, {String method = 'EFEC
       date: DateTime(2026, 10, 30, 15, 20),
     );
 
+Sale sales0() => _sale('abcdef123456', 'Arroz', 2, 3000);
+
 void main() {
   setUpAll(() => initializeDateFormatting('es_CO', null));
 
@@ -66,20 +68,30 @@ void main() {
     expect(doc.toText('Papelería'), contains('Válida hasta el 06/11/2026'));
   });
 
-  testWidgets('la tarjeta se dibuja con el nombre, el título y el total', (tester) async {
+  test('el sello cambia según la venta: PAGADO, FIADO con el saldo y ANULADA', () {
+    expect(DigitalTicketModal.buildReceipt([sales0()]).stamp!.label, 'PAGADO');
+    final fiado = DigitalTicketModal.buildReceipt([_sale('x2', 'Panela', 1, 2500, method: 'FIADO')], debtAfter: 12500);
+    expect(fiado.stamp!.label, 'FIADO');
+    expect(fiado.stamp!.detail, contains('12.500'));
+    expect(fiado.after.map((r) => r.label), contains('Saldo pendiente'));
+    final paid = DigitalTicketModal.buildReceipt([sales0()], received: 10000, change: 4000);
+    expect(paid.after.map((r) => r.label), containsAll(['Recibido', 'Vuelto']));
+  });
+
+  testWidgets('el tiquete se dibuja con el negocio, el sello, el total y el pie', (tester) async {
     final business = Business(id: 'b1', userId: 'u1', name: 'Tienda Olinda', color: '#BE185D', createdAt: DateTime(2026));
     final doc = DigitalTicketModal.buildReceipt([_sale('abcdef123456', 'Arroz', 2, 3000)]);
     await tester.pumpWidget(MaterialApp(
       theme: AppTheme.build(Brightness.light),
       home: Scaffold(
         body: SingleChildScrollView(
-          child: SaleDocumentCard(business: business, businessName: business.name, doc: doc),
+          child: TicketPaper(business: business, businessName: business.name, doc: doc),
         ),
       ),
     ));
-    expect(find.text('Tienda Olinda'), findsOneWidget);
-    expect(find.text('Comprobante de venta'), findsOneWidget);
-    expect(find.text('T'), findsOneWidget); // inicial en lugar del logo
+    expect(find.text('TIENDA OLINDA'), findsOneWidget);
+    expect(find.text('PAGADO'), findsOneWidget);
+    expect(find.text('¡Gracias por tu compra!'), findsOneWidget);
     expect(find.text('Hecho con Stockealo'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

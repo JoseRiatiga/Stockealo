@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_tokens.dart';
-import 'glass_surface.dart';
 
 /// La acción principal de una pantalla ("+ Nueva venta", "+ Agregar producto"):
-/// cristal teñido con el acento. Debe haber una sola por pantalla.
+/// botón sólido con el color del negocio. Debe haber una sola por pantalla.
 class PrimaryActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -13,57 +12,28 @@ class PrimaryActionButton extends StatelessWidget {
   const PrimaryActionButton({
     super.key,
     required this.label,
-    this.icon = Icons.add_rounded,
+    this.icon = Icons.add_outlined,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    const radius = BorderRadius.all(Radius.circular(AppRadius.sheet));
     final enabled = onPressed != null;
     return Semantics(
       button: true,
       enabled: enabled,
       label: label,
-      // Apagado se ve apagado: antes se veía igual y parecía que no respondía
-      child: Opacity(
-        opacity: enabled ? 1 : 0.45,
-        child: GlassSurface(
-        tint: c.accent,
-        borderRadius: radius,
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            borderRadius: radius,
-            onTap: onPressed == null
-                ? null
-                : () {
-                    HapticFeedback.selectionClick();
-                    onPressed!();
-                  },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 20, color: c.onAccent),
-                  const SizedBox(width: AppSpace.sm),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontFamily: AppText.fontFamily,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: c.onAccent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+      excludeSemantics: true,
+      child: FilledButton.icon(
+        onPressed: enabled
+            ? () {
+                HapticFeedback.selectionClick();
+                onPressed!();
+              }
+            : null,
+        icon: Icon(icon, size: 18),
+        label: Text(label, style: AppText.body(context, weight: FontWeight.w600, color: enabled ? c.onAccent : c.inkFaint)),
       ),
     );
   }

@@ -70,7 +70,7 @@ class DashboardRepository {
         COALESCE(SUM(s.total), 0.0) as total_amount,
         COALESCE(SUM(s.net_profit), 0.0) as net_profit,
         COALESCE(SUM(s.quantity), 0) as units_sold
-      FROM sales s
+      FROM sales_ok s
       WHERE s.business_id = ? $periodWhereSql
     ''', periodArgs);
 
@@ -88,7 +88,7 @@ class DashboardRepository {
     if (compareWhereSql.isNotEmpty) {
       final compRes = await db.rawQuery('''
         SELECT COALESCE(SUM(total), 0.0) as total_amount 
-        FROM sales 
+        FROM sales_ok 
         WHERE business_id = ? $compareWhereSql
       ''', compareArgs);
       if (compRes.isNotEmpty) {
@@ -103,7 +103,7 @@ class DashboardRepository {
     if (period == 'today') {
       final today0 = DateTime(now.year, now.month, now.day);
       final weekRes = await db.rawQuery('''
-        SELECT COALESCE(SUM(total), 0.0) AS total_amount FROM sales
+        SELECT COALESCE(SUM(total), 0.0) AS total_amount FROM sales_ok
         WHERE business_id = ? AND date >= ? AND date < ?
       ''', [businessId, today0.subtract(const Duration(days: 7)).toIso8601String(), today0.toIso8601String()]);
       final weekTotal = (weekRes.first['total_amount'] as num?)?.toDouble() ?? 0.0;
@@ -138,7 +138,7 @@ class DashboardRepository {
     // Consulta específica de ventas de ayer para retrocompatibilidad
     final yesterdayRes = await db.rawQuery('''
       SELECT COALESCE(SUM(total), 0.0) as total_amount 
-      FROM sales 
+      FROM sales_ok 
       WHERE business_id = ? AND date LIKE ?
     ''', [businessId, yesterdayPrefix]);
     final double yesterdayTotal = (yesterdayRes.first['total_amount'] as num?)?.toDouble() ?? 0.0;
@@ -188,7 +188,7 @@ class DashboardRepository {
         final endIso = "${todayDateStr}T${slot['end']}";
         final slotRes = await db.rawQuery('''
           SELECT COALESCE(SUM(total), 0.0) as slot_total 
-          FROM sales 
+          FROM sales_ok 
           WHERE business_id = ? AND date >= ? AND date <= ?
         ''', [businessId, startIso, endIso]);
         final slotTotal = (slotRes.first['slot_total'] as num?)?.toDouble() ?? 0.0;
@@ -211,7 +211,7 @@ class DashboardRepository {
 
         final weekRes = await db.rawQuery('''
           SELECT COALESCE(SUM(total), 0.0) as week_total 
-          FROM sales 
+          FROM sales_ok 
           WHERE business_id = ? AND date >= ? AND date <= ?
         ''', [businessId, startIso, endIso]);
         final weekTotal = (weekRes.first['week_total'] as num?)?.toDouble() ?? 0.0;
@@ -228,7 +228,7 @@ class DashboardRepository {
         final prefix = "${targetMonthDate.year.toString().padLeft(4, '0')}-${targetMonthDate.month.toString().padLeft(2, '0')}%";
         final mRes = await db.rawQuery('''
           SELECT COALESCE(SUM(total), 0.0) as m_total 
-          FROM sales 
+          FROM sales_ok 
           WHERE business_id = ? AND date LIKE ?
         ''', [businessId, prefix]);
         final mTotal = (mRes.first['m_total'] as num?)?.toDouble() ?? 0.0;
@@ -245,7 +245,7 @@ class DashboardRepository {
 
         final dayRes = await db.rawQuery('''
           SELECT COALESCE(SUM(total), 0.0) as day_total 
-          FROM sales 
+          FROM sales_ok 
           WHERE business_id = ? AND date LIKE ?
         ''', [businessId, datePattern]);
 
@@ -266,7 +266,7 @@ class DashboardRepository {
         final datePattern = "${dayDate.year.toString().padLeft(4, '0')}-${dayDate.month.toString().padLeft(2, '0')}-${dayDate.day.toString().padLeft(2, '0')}%";
         final dayRes = await db.rawQuery('''
           SELECT COALESCE(SUM(total), 0.0) as day_total 
-          FROM sales 
+          FROM sales_ok 
           WHERE business_id = ? AND date LIKE ?
         ''', [businessId, datePattern]);
         final dayTotal = (dayRes.first['day_total'] as num?)?.toDouble() ?? 0.0;
@@ -284,7 +284,7 @@ class DashboardRepository {
         COALESCE(p.category, 'General') as category_name,
         COALESCE(SUM(s.total), 0.0) as total_amount,
         COALESCE(SUM(s.quantity), 0) as units_sold
-      FROM sales s
+      FROM sales_ok s
       LEFT JOIN products p ON s.product_id = p.id
       WHERE s.business_id = ? $periodWhereSql
       GROUP BY category_name
@@ -313,7 +313,7 @@ class DashboardRepository {
         s.product_name, 
         SUM(s.quantity) as qty, 
         SUM(s.total) as revenue 
-      FROM sales s
+      FROM sales_ok s
       WHERE s.business_id = ? $periodWhereSql
       GROUP BY s.product_name 
       ORDER BY qty DESC 
@@ -346,7 +346,7 @@ class DashboardRepository {
         s.total,
         s.payment_method,
         s.date
-      FROM sales s
+      FROM sales_ok s
       WHERE s.business_id = ?
       ORDER BY s.date DESC
       LIMIT 5

@@ -20,13 +20,14 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
 import '../../../products/data/product_repository.dart';
 import '../../../products/models/product.dart';
-import '../../../products/presentation/screens/barcode_scanner_screen.dart';
 import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../data/supplier_repository.dart';
 import '../../models/purchase.dart';
 import '../../models/supplier.dart';
 import '../../models/supplier_order.dart';
 import '../widgets/supplier_picker.dart';
+import '../../../../core/codes/code_reader.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Un producto en la entrada, con su cantidad (o una por talla y color) y su costo
 class _Line {
@@ -206,7 +207,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
           shrinkWrap: true,
           padding: const EdgeInsets.all(AppSpace.lg),
           children: [
-            Text('¿Qué pedido llegó?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c.ink)),
+            Text('¿Qué pedido llegó?', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.bold, color: c.ink)),
             const SizedBox(height: AppSpace.sm),
             for (final o in list.isEmpty ? _pendingOrders : list)
               ListTile(
@@ -218,7 +219,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                 ),
                 subtitle: Text(
                   '${o.statusLabel} · faltan ${o.missingUnits} de ${o.units} unidades',
-                  style: TextStyle(color: c.inkMuted, fontSize: 12),
+                  style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption),
                 ),
                 onTap: () => Navigator.pop(ctx, o),
               ),
@@ -347,15 +348,15 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
   Future<void> _confirmLeave() async {
     final choice = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Salir sin guardar la entrada?'),
-        content: const Text('Puedes dejarla como borrador y terminarla después en este equipo.'),
-        actions: [
+      builder: (ctx) => AppDialog(
+title: '¿Salir sin guardar la entrada?',
+content: const Text('Puedes dejarla como borrador y terminarla después en este equipo.'),
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, 'discard'), child: const Text('Descartar')),
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Seguir aquí')),
           FilledButton(onPressed: () => Navigator.pop(ctx, 'draft'), child: const Text('Guardar borrador')),
         ],
-      ),
+),
     );
     if (choice == null || !mounted) return;
     if (choice == 'draft') {
@@ -475,9 +476,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
   }
 
   Future<void> _scan() async {
-    final code = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
-    );
+    final code = await CodeReader.scan(context, title: 'Escanear lo que llegó', caption: 'Entrada de mercancía');
     if (code == null || code.isEmpty || !mounted) return;
     final product = await _products.getProductByCode(code, widget.business.id);
     if (!mounted) return;
@@ -604,17 +603,17 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('$_units ${_units == 1 ? 'unidad' : 'unidades'}',
-                          style: TextStyle(color: c.inkMuted, fontSize: 12)),
+                          style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
                       Text(
                         CurrencyFormatter.format(_total),
-                        style: TextStyle(color: c.ink, fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: c.ink, fontSize: AppText.sizeHeading, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                 ),
                 FilledButton.icon(
                   onPressed: _saving || _units == 0 ? null : _save,
-                  icon: const Icon(Icons.check_rounded, size: 18),
+                  icon: const Icon(Icons.check_outlined, size: 18),
                   label: Text(_saving ? 'Guardando...' : 'Guardar entrada'),
                 ),
               ],
@@ -637,7 +636,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                       Expanded(
                         child: Text(
                           'Retomaste el borrador del ${_dateLabel(_draftFrom!)}.',
-                          style: TextStyle(color: c.info, fontSize: 13),
+                          style: TextStyle(color: c.info, fontSize: AppText.sizeSmall),
                         ),
                       ),
                       TextButton(onPressed: _discardDraft, child: const Text('Descartar')),
@@ -657,13 +656,13 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                     ),
                     subtitle: Text(
                       _supplier == null ? 'Opcional: toca para elegirlo' : _supplier!.summary,
-                      style: TextStyle(color: c.inkMuted, fontSize: 12),
+                      style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption),
                     ),
                     trailing: _supplier == null
                         ? Text('Elegir', style: TextStyle(color: c.accent, fontWeight: FontWeight.w600))
                         : IconButton(
                             tooltip: 'Quitar proveedor',
-                            icon: const Icon(Icons.close_rounded, size: 18),
+                            icon: const Icon(Icons.close_outlined, size: 18),
                             onPressed: () => setState(() => _supplier = null),
                           ),
                     onTap: _pickSupplier,
@@ -704,7 +703,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
-                      leading: Icon(Icons.schedule_rounded, size: 18, color: context.colors.inkMuted),
+                      leading: Icon(Icons.schedule_outlined, size: 18, color: context.colors.inkMuted),
                       title: Text(
                         'Pagar a más tardar el ${_dateLabel(_dueDate ?? DateTime.now())}',
                         style: TextStyle(color: context.colors.ink),
@@ -729,7 +728,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                             ),
                             const SizedBox(width: AppSpace.md),
                             Expanded(
-                              child: Text('Foto de la factura lista', style: TextStyle(color: c.ink, fontSize: 13)),
+                              child: Text('Foto de la factura lista', style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall)),
                             ),
                             TextButton(onPressed: _pickPhoto, child: const Text('Cambiar')),
                           ],
@@ -750,7 +749,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                         child: Text(
                           'Recibiendo el pedido del ${_dateLabel(_order!.createdAt)}. '
                           'Corrige las cantidades si algo no llegó.',
-                          style: TextStyle(color: c.ink, fontSize: 12.5),
+                          style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall),
                         ),
                       ),
                       TextButton(onPressed: () => setState(() => _order = null), child: const Text('Quitar')),
@@ -774,14 +773,14 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                 children: [
                   Expanded(
                     child:
-                        Text('Lo que llegó', style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text('Lo que llegó', style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, fontSize: AppText.sizeBodyLarge)),
                   ),
                   IconButton(
-                      tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_rounded)),
+                      tooltip: 'Escanear código', onPressed: _scan, icon: const Icon(Icons.qr_code_scanner_outlined)),
                   const SizedBox(width: AppSpace.xs),
                   FilledButton.tonalIcon(
                     onPressed: _search,
-                    icon: const Icon(Icons.add_rounded, size: 18),
+                    icon: const Icon(Icons.add_outlined, size: 18),
                     label: const Text('Agregar'),
                   ),
                 ],
@@ -795,7 +794,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                       child: Text(
                         'Agrega los productos que llegaron. Si tienen tallas y colores, escribe cuántos llegaron de cada uno.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: c.inkMuted, fontSize: 13),
+                        style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall),
                       ),
                     ),
                   ],
@@ -881,14 +880,14 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(p.name, style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
-                      Text('Hay ${p.stock} · Cód: ${p.code}', style: TextStyle(color: c.inkMuted, fontSize: 12)),
+                      Text('Hay ${p.stock} · Cód: ${p.code}', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
                     ],
                   ),
                 ),
                 if (!l.withVariants) _qtyField(l.qty),
                 IconButton(
                   tooltip: 'Quitar',
-                  icon: Icon(Icons.close_rounded, size: 18, color: c.inkFaint),
+                  icon: Icon(Icons.close_outlined, size: 18, color: c.inkFaint),
                   onPressed: () => setState(() {
                     _lines.remove(l);
                     l.dispose();
@@ -910,7 +909,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                       Expanded(
                         child: Text(
                           '${v.label.isEmpty ? 'Sin nombre' : v.label}  ·  hay ${v.stock}',
-                          style: TextStyle(color: c.ink, fontSize: 13),
+                          style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall),
                         ),
                       ),
                       _qtyField(l.variantQty[v.id]!),
@@ -943,7 +942,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
             if (_costHint(l.product) case final hint?)
               Padding(
                 padding: const EdgeInsets.only(left: 52, top: AppSpace.xs),
-                child: Text(hint, style: TextStyle(color: c.inkMuted, fontSize: 11.5)),
+                child: Text(hint, style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
               ),
             if (l.costChanged)
               Padding(
@@ -958,7 +957,7 @@ class _PurchaseEntryScreenState extends State<PurchaseEntryScreen> {
                     p.purchasePrice > 0
                         ? 'El costo cambió (antes ${CurrencyFormatter.format(p.purchasePrice)}). Actualizarlo en el producto'
                         : 'Guardar este costo en el producto',
-                    style: TextStyle(color: c.warning, fontSize: 12.5),
+                    style: TextStyle(color: c.warning, fontSize: AppText.sizeSmall),
                   ),
                 ),
               ),
@@ -1004,20 +1003,20 @@ class _ProductSearchSheetState extends State<_ProductSearchSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Agregar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c.ink)),
+            Text('Agregar producto', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.bold, color: c.ink)),
             const SizedBox(height: AppSpace.md),
             TextField(
               autofocus: true,
               onChanged: (v) => setState(() => _q = v),
-              decoration: const InputDecoration(hintText: 'Buscar por nombre o código', prefixIcon: Icon(Icons.search)),
+              decoration: const InputDecoration(hintText: 'Buscar por nombre o código', prefixIcon: Icon(Icons.search_outlined)),
             ),
             const SizedBox(height: AppSpace.sm),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(backgroundColor: c.successSoft, child: Icon(Icons.add_rounded, color: c.success)),
+              leading: CircleAvatar(backgroundColor: c.successSoft, child: Icon(Icons.add_outlined, color: c.success)),
               title: Text('Crear producto nuevo', style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
               subtitle: Text('Si llegó algo que aún no tienes en el inventario',
-                  style: TextStyle(color: c.inkMuted, fontSize: 12)),
+                  style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
               onTap: () => Navigator.pop(context, _ProductSearchSheet.createNew),
             ),
             Divider(color: c.line, height: 1),
@@ -1041,9 +1040,9 @@ class _ProductSearchSheetState extends State<_ProductSearchSheet> {
                           title: Text(p.name, style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
                           subtitle: Text(
                             'Hay ${p.stock}${p.hasVariants ? ' · con tallas y colores' : ''}${fromSupplier ? ' · de este proveedor' : ''}',
-                            style: TextStyle(color: c.inkMuted, fontSize: 12),
+                            style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption),
                           ),
-                          trailing: Icon(Icons.add_circle_outline, color: c.accent),
+                          trailing: Icon(Icons.add_circle_outline_outlined, color: c.accent),
                           onTap: () => Navigator.pop(context, p),
                         );
                       },

@@ -86,22 +86,22 @@ class _DebtReminderScheduleSheetState extends State<DebtReminderScheduleSheet> {
                 children: [
                   Expanded(
                     child: Text('Recordatorio de cobro',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+                        style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
                   ),
                   IconButton(
                     tooltip: 'Cerrar',
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close_rounded, color: c.inkMuted),
+                    icon: Icon(Icons.close_outlined, color: c.inkMuted),
                   ),
                 ],
               ),
               Text(
                 'Te avisamos en el celular "Hoy toca cobrarle a ${widget.customer.name}". '
                 'Al tocar el aviso se abre WhatsApp con el mensaje listo: tú decides si lo envías.',
-                style: TextStyle(fontSize: 13, color: c.inkMuted),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
               ),
               const SizedBox(height: AppSpace.lg),
-              Text('Cada cuánto', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+              Text('Cada cuánto', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
               const SizedBox(height: AppSpace.sm),
               Wrap(
                 spacing: AppSpace.sm,
@@ -118,11 +118,11 @@ class _DebtReminderScheduleSheetState extends State<DebtReminderScheduleSheet> {
               const SizedBox(height: AppSpace.lg),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.schedule_rounded, color: c.inkMuted),
+                leading: Icon(Icons.schedule_outlined, color: c.inkMuted),
                 title: Text('Hora del aviso', style: TextStyle(color: c.ink)),
                 trailing: Text(
                   formatAppTime(_time),
-                  style: TextStyle(color: c.accent, fontWeight: FontWeight.w700, fontSize: 15),
+                  style: TextStyle(color: c.accent, fontWeight: FontWeight.w700, fontSize: AppText.sizeBodyLarge),
                 ),
                 onTap: _pickTime,
               ),

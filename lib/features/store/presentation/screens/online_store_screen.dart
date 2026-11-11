@@ -16,13 +16,17 @@ import '../../../business/models/business.dart';
 import '../../../pro/data/pro_service.dart';
 import '../../../pro/presentation/widgets/pro_upsell_sheet.dart';
 import '../../data/online_store_service.dart';
+import '../../../../core/design/status_pill.dart';
 
-/// Inventario › Tienda: publica el catálogo en stockealo.online/tienda/<slug> con
+/// Tienda en línea (lugar del menú): publica el catálogo en stockealo.online/tienda/<slug> con
 /// carrito; los pedidos llegan por WhatsApp (Stockealo Pro).
 class OnlineStoreScreen extends StatefulWidget {
   final Business business;
 
-  const OnlineStoreScreen({super.key, required this.business});
+  /// Dentro del marco de la app (lugar del menú): sin barra propia, el encabezado único pone el título
+  final bool embedded;
+
+  const OnlineStoreScreen({super.key, required this.business, this.embedded = false});
 
   static Future<void> open(BuildContext context, Business business) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => OnlineStoreScreen(business: business)));
@@ -38,6 +42,8 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
   String? _whatsapp;
   String? _initialWhatsapp;
   final _welcomeController = TextEditingController();
+  final _heroController = TextEditingController();
+  String _template = StoreTemplate.classic;
 
   OnlineStoreConfig? _saved;
   bool _enabled = true;
@@ -66,6 +72,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
     ProService.instance.status.removeListener(_onProChanged);
     _slugController.dispose();
     _welcomeController.dispose();
+    _heroController.dispose();
     super.dispose();
   }
 
@@ -87,6 +94,8 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         _welcomeController.text = saved?.welcome ?? '';
         _enabled = saved?.enabled ?? true;
         _showStock = saved?.showStock ?? false;
+        _template = saved?.template ?? StoreTemplate.classic;
+        _heroController.text = saved?.heroTitle ?? '';
       });
     } catch (e) {
       if (mounted) setState(() => _loadError = '$e');
@@ -140,6 +149,8 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         whatsapp: phone,
         welcome: _welcomeController.text,
         showStock: _showStock,
+        template: _template,
+        heroTitle: _heroController.text.trim().isEmpty ? null : _heroController.text.trim(),
       );
       if (!mounted) return;
       setState(() => _saved = saved);
@@ -162,7 +173,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
     final c = context.colors;
     return Scaffold(
       backgroundColor: c.paper,
-      appBar: AppBar(title: const Text('Tienda en línea')),
+      appBar: widget.embedded ? null : AppBar(title: const Text('Tienda en línea')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _loadError != null
@@ -228,7 +239,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                     children: [
                       Flexible(
                         child: Text('Tu catálogo con carrito',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                            style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
                       ),
                       if (!_pro) ...[const SizedBox(width: AppSpace.sm), const ProCrown()],
                     ],
@@ -237,7 +248,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                   Text(
                     'Tus clientes ven los productos con stock, eligen y te mandan el pedido por WhatsApp. '
                     'No muestra costos ni datos de tus clientes.',
-                    style: TextStyle(fontSize: 13, height: 1.4, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeSmall, height: 1.4, color: c.inkMuted),
                   ),
                 ],
               ),
@@ -254,13 +265,13 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: c.success),
+                Icon(Icons.check_circle_outlined, color: c.success),
                 const SizedBox(width: AppSpace.sm),
                 Text('Tu tienda está publicada', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
               ],
             ),
             const SizedBox(height: AppSpace.sm),
-            SelectableText(store.url, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.accent)),
+            SelectableText(store.url, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w600, color: c.accent)),
             const SizedBox(height: AppSpace.md),
             Wrap(
               spacing: AppSpace.sm,
@@ -269,17 +280,17 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                 OutlinedButton.icon(
                   onPressed: () => Share.share('Mira mi tienda y haz tu pedido aquí: ${store.url}',
                       subject: widget.business.name),
-                  icon: const Icon(Icons.share_rounded, size: 18),
+                  icon: const Icon(Icons.share_outlined, size: 18),
                   label: const Text('Compartir'),
                 ),
                 OutlinedButton.icon(
                   onPressed: () => _copyLink(store.url),
-                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  icon: const Icon(Icons.copy_outlined, size: 18),
                   label: const Text('Copiar'),
                 ),
                 OutlinedButton.icon(
                   onPressed: () => launchUrl(Uri.parse(store.url), mode: LaunchMode.externalApplication),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                  icon: const Icon(Icons.open_in_new_outlined, size: 18),
                   label: const Text('Ver'),
                 ),
               ],
@@ -298,7 +309,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
             const SizedBox(height: AppSpace.xs),
             Text(
               'La tienda muestra los productos guardados en la nube. Hoy tu inventario está solo en este celular.',
-              style: TextStyle(fontSize: 13, color: c.ink),
+              style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink),
             ),
             const SizedBox(height: AppSpace.sm),
             TextButton(onPressed: _turnOnCloud, child: const Text('Activar la nube y subir mis productos')),
@@ -338,6 +349,66 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
               required: true,
               onChanged: (v) => _whatsapp = v.isValid ? v.e164 : null,
             ),
+            const SizedBox(height: AppSpace.lg),
+            // Cómo se ve la tienda: Clásica o Moda
+            const SectionLabel('PLANTILLA', padding: EdgeInsets.only(bottom: AppSpace.sm)),
+            Row(
+              children: [
+                for (final (t, desc) in [
+                  (StoreTemplate.classic, 'Clara, con el color de tu negocio arriba. Para cualquier negocio.'),
+                  (StoreTemplate.fashion, 'Oscura, con portada grande, filtros por talla, color y precio, y ofertas. Para ropa y calzado.'),
+                ]) ...[
+                  if (t == StoreTemplate.fashion) const SizedBox(width: AppSpace.sm),
+                  Expanded(
+                    child: Semantics(
+                      button: true,
+                      selected: _template == t,
+                      child: Material(
+                        color: c.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.control + 2),
+                          side: BorderSide(color: _template == t ? c.accent : c.line, width: _template == t ? 2 : 1),
+                        ),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(AppRadius.control + 2),
+                          onTap: () => setState(() => _template = t),
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpace.md),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(t == StoreTemplate.fashion ? Icons.checkroom_outlined : Icons.storefront_outlined,
+                                        size: 18, color: _template == t ? c.accent : c.inkMuted),
+                                    const SizedBox(width: AppSpace.sm),
+                                    Text(StoreTemplate.label(t), style: AppText.body(context, weight: FontWeight.w700)),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpace.xs),
+                                Text(desc, style: AppText.caption(context)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (_template == StoreTemplate.fashion) ...[
+              const SizedBox(height: AppSpace.md),
+              TextField(
+                controller: _heroController,
+                maxLength: 80,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Título de la portada (opcional)',
+                  hintText: 'Ej.: Chaquetas y abrigos para el frío',
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpace.md),
             TextField(
               controller: _welcomeController,
@@ -352,7 +423,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('Mostrar unidades disponibles', style: TextStyle(color: c.ink)),
+              title: Text('Mostrar unidades disponibles', style: AppText.body(context)),
               value: _showStock,
               onChanged: (v) => setState(() => _showStock = v),
             ),

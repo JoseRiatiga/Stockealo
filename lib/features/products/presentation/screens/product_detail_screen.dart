@@ -11,10 +11,13 @@ import '../widgets/product_image_view.dart';
 import '../widgets/stock_status_badge.dart';
 import 'product_form_screen.dart';
 import '../../../auth/data/auth_repository.dart';
-import '../../../sales/presentation/widgets/quick_sale_dialog.dart';
 import '../../../team/data/team_repository.dart';
 import '../../../suppliers/data/supplier_repository.dart';
 import '../../../suppliers/models/purchase.dart';
+import '../../../sales/presentation/screens/sell_screen.dart';
+import '../../../home/navigation/app_places.dart';
+import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/design/app_dialog.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -73,9 +76,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  /// Lo agrega a la cuenta de Vender y lleva allá
   Future<void> _sell() async {
-    final sold = await QuickSaleDialog.show(context, _product);
-    if (sold == true) _refreshProduct();
+    await SellScreen.sell(context, _product);
+    AppPlace.go(AppPlace.vender);
   }
 
   Future<void> _showAdjustStockDialog() async {
@@ -102,35 +106,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           final newTotal = _withVariants
               ? variantControllers.values.fold<int>(0, (s, t) => s + (parse(t) ?? 0))
               : (parse(totalController) ?? 0);
-          return AlertDialog(
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppSpace.sm),
-                  decoration: BoxDecoration(
-                    color: c.successSoft,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.inventory_2_rounded, color: c.success, size: 20),
-                ),
-                const SizedBox(width: AppSpace.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Ajustar stock', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold)),
-                      Text(
-                        _product.name,
-                        style: TextStyle(fontSize: 12, color: c.inkMuted, fontWeight: FontWeight.normal),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            content: SizedBox(
+          return AppDialog(
+icon: Icons.inventory_2_outlined,
+title: 'Ajustar stock',
+subtitle: _product.name,
+content: SizedBox(
               width: 380,
               child: SingleChildScrollView(
                 child: Column(
@@ -141,7 +121,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       _withVariants
                           ? 'Escribe cuántas unidades hay de cada talla y color. El total se calcula solo.'
                           : 'Indica la nueva cantidad física disponible y el motivo:',
-                      style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                     ),
                     const SizedBox(height: 14),
                     if (_withVariants) ...[
@@ -157,7 +137,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               Expanded(
                                 child: Text(
                                   v.label.isEmpty ? 'Sin nombre' : v.label,
-                                  style: TextStyle(fontSize: 13.5, color: c.ink, fontWeight: FontWeight.w600),
+                                  style: TextStyle(fontSize: AppText.sizeBody, color: c.ink, fontWeight: FontWeight.w600),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -187,11 +167,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         child: Row(
                           children: [
-                            Text('Nuevo total', style: TextStyle(color: c.inkMuted, fontSize: 13)),
+                            Text('Nuevo total', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall)),
                             const Spacer(),
                             Text(
                               '$newTotal unidades',
-                              style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, fontSize: 14),
+                              style: TextStyle(color: c.ink, fontWeight: FontWeight.bold, fontSize: AppText.sizeBody),
                             ),
                           ],
                         ),
@@ -222,7 +202,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
             ),
-            actions: [
+actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancelar'),
@@ -232,7 +212,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: const Text('Guardar'),
               ),
             ],
-          );
+);
         },
       ),
     );
@@ -250,9 +230,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       }
       await _refreshProduct();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Stock actualizado correctamente')),
-        );
+        AppToast.show(context, message: 'Stock actualizado correctamente', type: ToastType.info);
       }
     }
   }
@@ -260,10 +238,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _confirmDelete() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar producto?'),
-        content: Text('¿Seguro que deseas eliminar "${_product.name}" del catálogo?'),
-        actions: [
+      builder: (ctx) => AppDialog(
+title: '¿Eliminar producto?',
+content: Text('¿Seguro que deseas eliminar "${_product.name}" del catálogo?'),
+actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancelar'),
@@ -274,15 +252,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: const Text('Eliminar'),
           ),
         ],
-      ),
+),
     );
 
     if (confirmed == true) {
       await _repository.deleteProduct(_product.id, _product.businessId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Producto eliminado')),
-        );
+        AppToast.show(context, message: 'Producto eliminado', type: ToastType.info);
         Navigator.pop(context, true);
       }
     }
@@ -321,7 +297,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         title: const Text('Detalle de producto'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.qr_code_2),
+            icon: const Icon(Icons.qr_code_2_outlined),
             tooltip: 'Código de barras / QR',
             onPressed: () => BarcodeModal.show(context, _product),
           ),
@@ -344,7 +320,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           if (canEdit)
             IconButton(
-              icon: const Icon(Icons.delete_outline),
+              icon: const Icon(Icons.delete_outline_outlined),
               tooltip: 'Eliminar',
               onPressed: _confirmDelete,
             ),
@@ -430,12 +406,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final c = context.colors;
     return Row(
       children: [
-        Expanded(child: Text(label, style: TextStyle(fontSize: 12.5, color: c.inkMuted))),
+        Expanded(child: Text(label, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted))),
         const SizedBox(width: AppSpace.sm),
         Text(
           value,
           style: TextStyle(
-            fontSize: 13.5,
+            fontSize: AppText.sizeBody,
             fontWeight: bold ? FontWeight.bold : FontWeight.w600,
             color: valueColor ?? c.ink,
           ),
@@ -478,23 +454,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   color: c.surfaceMuted,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.qr_code_rounded, size: 22, color: c.accent),
+                child: Icon(Icons.qr_code_outlined, size: 22, color: c.accent),
               ),
               const SizedBox(width: AppSpace.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Código / SKU', style: TextStyle(fontSize: 11, color: c.inkMuted)),
+                    Text('Código / SKU', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                     const SizedBox(height: 2),
                     Text(
                       _product.code,
-                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: c.ink),
+                      style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.bold, color: c.ink),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, size: 20, color: c.inkFaint),
+              Icon(Icons.chevron_right_outlined, size: 20, color: c.inkFaint),
             ],
           ),
         ),
@@ -511,7 +487,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: _sell,
-              icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+              icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
               label: const Text('Registrar venta'),
             ),
           ),
@@ -521,7 +497,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: _showAdjustStockDialog,
-                icon: const Icon(Icons.tune_rounded, size: 17),
+                icon: const Icon(Icons.tune_outlined, size: 17),
                 label: const Text('Ajustar stock físico'),
               ),
             ),
@@ -550,7 +526,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               child: Text(
                 _product.category,
-                style: TextStyle(color: c.inkMuted, fontWeight: FontWeight.w600, fontSize: 11.5),
+                style: TextStyle(color: c.inkMuted, fontWeight: FontWeight.w600, fontSize: AppText.sizeCaption),
               ),
             ),
             StockStatusBadge(product: _product),
@@ -559,7 +535,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         const SizedBox(height: 10),
         Text(
           _product.name,
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: c.ink, height: 1.25),
+          style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.bold, color: c.ink, height: 1.25),
         ),
       ],
     );
@@ -576,11 +552,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Inventario disponible', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                Text('Inventario disponible', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                 const SizedBox(height: 6),
                 Text(
                   '${_product.stock} ${_product.stock == 1 ? 'unidad' : 'unidades'}',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: c.ink),
+                  style: TextStyle(fontSize: AppText.sizePage, fontWeight: FontWeight.bold, color: c.ink),
                 ),
                 const SizedBox(height: AppSpace.xs),
                 Text(
@@ -588,7 +564,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ? 'Suma de ${variants.length} ${variants.length == 1 ? 'variante' : 'variantes'}'
                           '${outOfStock > 0 ? ' · $outOfStock agotada${outOfStock == 1 ? '' : 's'}' : ''}'
                       : 'Alerta mínima: ${_product.minStock} unid.',
-                  style: TextStyle(fontSize: 11.5, color: c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                 ),
               ],
             ),
@@ -626,12 +602,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Row(
             children: [
               Expanded(
-                child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink)),
+                child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody, color: c.ink)),
               ),
               if (canEdit)
                 TextButton.icon(
                   onPressed: _showAdjustStockDialog,
-                  icon: const Icon(Icons.tune_rounded, size: 16),
+                  icon: const Icon(Icons.tune_outlined, size: 16),
                   label: const Text('Ajustar'),
                 ),
             ],
@@ -644,7 +620,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: Text(
                   '${firstName.isEmpty ? 'Talla' : firstName} ${entry.key} · '
                   '${entry.value.fold<int>(0, (s, v) => s + v.stock)} u.',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: c.inkMuted),
                 ),
               ),
             Wrap(
@@ -681,7 +657,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ],
           Text(
             name.isEmpty ? 'Sin nombre' : name,
-            style: TextStyle(fontSize: 12.5, color: c.ink, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink, fontWeight: FontWeight.w500),
           ),
           const SizedBox(width: AppSpace.sm),
           Container(
@@ -693,7 +669,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Text(
               out ? 'Agotado' : '${v.stock}',
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: AppText.sizeCaption,
                 fontWeight: FontWeight.bold,
                 color: out ? Colors.white : c.ink,
               ),
@@ -712,11 +688,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Row(
             children: [
               Expanded(
-                child: Text('Precio de venta', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                child: Text('Precio de venta', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
               ),
               Text(
                 CurrencyFormatter.format(_product.salePrice),
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: c.ink),
+                style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.bold, color: c.ink),
               ),
             ],
           ),
@@ -736,7 +712,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 alignment: Alignment.centerRight,
                 child: Text(
                   'Por debajo del costo: cada venta deja pérdida',
-                  style: TextStyle(fontSize: 11.5, color: c.danger),
+                  style: TextStyle(fontSize: AppText.sizeCaption, color: c.danger),
                 ),
               ),
             ],
@@ -754,8 +730,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Costo por proveedor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink)),
-          Text('Según tus últimas entradas de mercancía', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+          Text('Costo por proveedor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody, color: c.ink)),
+          Text('Según tus últimas entradas de mercancía', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
           const SizedBox(height: AppSpace.md),
           for (final (i, s) in _supplierCosts.indexed)
             Padding(
@@ -766,11 +742,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(s.supplierName, style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: 13)),
+                        Text(s.supplierName, style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: AppText.sizeSmall)),
                         Text(
                           '${s.date.day} ${months[s.date.month - 1]} ${s.date.year}'
                           '${s.change == null || s.change == 0 ? '' : (s.change! > 0 ? ' · subió ${CurrencyFormatter.format(s.change!)}' : ' · bajó ${CurrencyFormatter.format(-s.change!)}')}',
-                          style: TextStyle(color: (s.change ?? 0) > 0 ? c.warning : c.inkMuted, fontSize: 11.5),
+                          style: TextStyle(color: (s.change ?? 0) > 0 ? c.warning : c.inkMuted, fontSize: AppText.sizeCaption),
                         ),
                       ],
                     ),
@@ -780,7 +756,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       margin: const EdgeInsets.only(right: AppSpace.sm),
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(color: c.successSoft, borderRadius: BorderRadius.circular(AppRadius.pill)),
-                      child: Text('Más barato', style: TextStyle(color: c.success, fontSize: 11, fontWeight: FontWeight.w600)),
+                      child: Text('Más barato', style: TextStyle(color: c.success, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600)),
                     ),
                   Text(CurrencyFormatter.format(s.unitCost), style: TextStyle(color: c.ink, fontWeight: FontWeight.bold)),
                 ],
@@ -801,7 +777,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         children: [
           Text(
             'Valor del inventario',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: c.ink),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody, color: c.ink),
           ),
           const SizedBox(height: AppSpace.md),
           _row('Invertido en stock', CurrencyFormatter.format(totalCost)),
@@ -824,10 +800,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         children: [
           Text(
             'Descripción / notas',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: c.inkMuted),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeSmall, color: c.inkMuted),
           ),
           const SizedBox(height: 6),
-          Text(_product.description!, style: TextStyle(color: c.ink, fontSize: 13, height: 1.4)),
+          Text(_product.description!, style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall, height: 1.4)),
         ],
       ),
     );

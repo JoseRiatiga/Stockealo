@@ -107,7 +107,7 @@ class _AdminSearchDialogState extends State<AdminSearchDialog> {
               onChanged: _onChanged,
               decoration: const InputDecoration(
                 hintText: 'Correo, nombre, negocio, código Pro o referencia de pago',
-                prefixIcon: Icon(Icons.search_rounded),
+                prefixIcon: Icon(Icons.search_outlined),
               ),
             ),
             SizedBox(height: 3, child: _loading ? const LinearProgressIndicator() : null),
@@ -133,7 +133,7 @@ class _AdminSearchDialogState extends State<AdminSearchDialog> {
                       ),
                     if (users.isNotEmpty) header('Cuentas'),
                     for (final u in users)
-                      item(Icons.person_outline_rounded, '${u['name'] ?? u['email']}', '${u['email']}',
+                      item(Icons.person_outline_outlined, '${u['name'] ?? u['email']}', '${u['email']}',
                           () => _openUser('${u['email']}')),
                     if (businesses.isNotEmpty) header('Negocios'),
                     for (final b in businesses)

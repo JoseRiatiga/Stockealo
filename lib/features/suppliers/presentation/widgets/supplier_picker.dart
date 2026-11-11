@@ -58,20 +58,20 @@ class _PickerSheetState extends State<_PickerSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Elige el proveedor', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c.ink)),
+            Text('Elige el proveedor', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.bold, color: c.ink)),
             const SizedBox(height: AppSpace.md),
             TextField(
               autofocus: widget.suppliers.isNotEmpty,
               textCapitalization: TextCapitalization.words,
               onChanged: (v) => setState(() => _query = v),
-              decoration: const InputDecoration(hintText: 'Buscar o escribir uno nuevo', prefixIcon: Icon(Icons.search)),
+              decoration: const InputDecoration(hintText: 'Buscar o escribir uno nuevo', prefixIcon: Icon(Icons.search_outlined)),
             ),
             const SizedBox(height: AppSpace.sm),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
                 backgroundColor: c.successSoft,
-                child: Icon(Icons.add_rounded, color: c.success),
+                child: Icon(Icons.add_outlined, color: c.success),
               ),
               title: Text(
                 q.isEmpty ? 'Nuevo proveedor' : 'Nuevo proveedor "${_query.trim()}"',
@@ -100,7 +100,7 @@ class _PickerSheetState extends State<_PickerSheet> {
                             child: Text(s.name.characters.first.toUpperCase(), style: TextStyle(color: c.ink)),
                           ),
                           title: Text(s.name, style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
-                          subtitle: Text(s.summary, style: TextStyle(color: c.inkMuted, fontSize: 12)),
+                          subtitle: Text(s.summary, style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
                           onTap: () => Navigator.pop(context, s),
                         );
                       },
@@ -162,10 +162,10 @@ class _SupplierToggleFieldState extends State<SupplierToggleField> {
         children: [
           SwitchListTile(
             value: _on,
-            title: Text('¿Tienes proveedor?', style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: 14)),
+            title: Text('¿Tienes proveedor?', style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: AppText.sizeBody)),
             subtitle: Text(
               _on ? 'Sirve para pedirle y registrar lo que llega' : 'Opcional',
-              style: TextStyle(color: c.inkMuted, fontSize: 12),
+              style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption),
             ),
             onChanged: (v) {
               setState(() => _on = v);
@@ -185,7 +185,7 @@ class _SupplierToggleFieldState extends State<SupplierToggleField> {
                 _supplier?.name ?? 'Elegir proveedor',
                 style: TextStyle(color: _supplier == null ? c.accent : c.ink, fontWeight: FontWeight.w600),
               ),
-              subtitle: _supplier == null ? null : Text(_supplier!.summary, style: TextStyle(color: c.inkMuted, fontSize: 12)),
+              subtitle: _supplier == null ? null : Text(_supplier!.summary, style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
               trailing: Text('Cambiar', style: TextStyle(color: c.accent, fontWeight: FontWeight.w600)),
               onTap: _choose,
             ),

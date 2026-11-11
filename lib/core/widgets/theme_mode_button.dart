@@ -16,7 +16,7 @@ class ThemeModeButton extends StatelessWidget {
     return ListenableBuilder(
       listenable: ThemeController.instance,
       builder: (context, _) {
-        final dark = Theme.of(context).brightness == Brightness.dark;
+        final dark = context.isDarkTheme;
         return IconButton(
           tooltip: dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro',
           onPressed: () => ThemeController.instance.toggleTheme(current: Theme.of(context).brightness),

@@ -149,17 +149,17 @@ class ProfitReportRepository {
              COALESCE(SUM(discount_amount), 0) AS discounts,
              COALESCE(SUM(CASE WHEN net_profit < 0 THEN -net_profit ELSE 0 END), 0) AS below_cost,
              COALESCE(SUM(CASE WHEN payment_method = 'FIADO' AND payment_status != 'PAGADO' THEN total ELSE 0 END), 0) AS credit_pending
-      FROM sales WHERE $inRange
+      FROM sales_ok WHERE $inRange
     ''', args)).first;
 
     final previous = (await db.rawQuery('''
       SELECT COALESCE(SUM(total), 0) - COALESCE(SUM(total_cost), 0) AS gross
-      FROM sales WHERE $inRange
+      FROM sales_ok WHERE $inRange
     ''', [businessId, _iso(prevFrom), _iso(prevTo)])).first;
 
     final methods = await db.rawQuery('''
       SELECT payment_method AS method, SUM(total) AS amount
-      FROM sales WHERE $inRange
+      FROM sales_ok WHERE $inRange
       GROUP BY payment_method ORDER BY amount DESC
     ''', args);
 
@@ -181,7 +181,7 @@ class ProfitReportRepository {
              SUM(quantity) AS qty,
              SUM(total) AS revenue,
              SUM(net_profit) AS profit
-      FROM sales WHERE $inRange
+      FROM sales_ok WHERE $inRange
       GROUP BY product_name
     ''', args);
 

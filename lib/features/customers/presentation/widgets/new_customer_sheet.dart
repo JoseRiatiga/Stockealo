@@ -75,7 +75,7 @@ class _NewCustomerSheetState extends State<NewCustomerSheet> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('Nuevo cliente', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-              Text('Solo el nombre es obligatorio', style: TextStyle(color: c.inkMuted, fontSize: 13)),
+              Text('Solo el nombre es obligatorio', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall)),
               const SizedBox(height: AppSpace.xl),
               TextField(
                 controller: _nameController,

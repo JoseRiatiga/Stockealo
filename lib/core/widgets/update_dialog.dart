@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+
+import '../design/app_dialog.dart';
+import '../theme/app_tokens.dart';
 import '../services/update_service.dart';
 import 'formatted_changelog_view.dart';
 
+/// Aviso de versión nueva del APK: qué trae, cuánto pesa, y la descarga con su avance.
 class UpdateDialog extends StatefulWidget {
   final AppUpdateInfo updateInfo;
 
@@ -34,7 +38,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
     setState(() {
       _isDownloading = true;
       _progress = 0.0;
-      _statusText = 'Iniciando descarga...';
+      _statusText = 'Empezando la descarga…';
       _errorMessage = null;
     });
 
@@ -45,12 +49,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
         setState(() {
           _progress = progress;
           if (progress >= 1.0) {
-            _statusText = 'Abriendo instalador del sistema...';
+            _statusText = 'Abriendo el instalador…';
           } else {
             final recMb = (received / (1024 * 1024)).toStringAsFixed(1);
             final totMb = (total / (1024 * 1024)).toStringAsFixed(1);
             final pct = (progress * 100).toInt();
-            _statusText = 'Descargando: $pct% ($recMb MB / $totMb MB)';
+            _statusText = 'Descargando: $pct % ($recMb de $totMb MB)';
           }
         });
       },
@@ -66,251 +70,66 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Dialog(
-      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-          width: 1.5,
-        ),
-      ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 1. Cabecera con Icono y Badge de Versión
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF059669).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.system_update_rounded,
-                    color: Color(0xFF10B981),
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '¡Nueva versión!',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF059669),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'v${widget.updateInfo.latestVersion}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Actual: v${widget.updateInfo.currentVersion}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    final c = context.colors;
+    final notes = widget.updateInfo.releaseNotes?.trim().isNotEmpty == true
+        ? widget.updateInfo.releaseNotes!.trim()
+        : '- Mejoras de rendimiento y estabilidad.';
+    return AppDialog(
+      icon: Icons.system_update_outlined,
+      title: 'Hay una versión nueva',
+      subtitle: 'Versión ${widget.updateInfo.latestVersion} · tienes la ${widget.updateInfo.currentVersion}',
+      showCloseButton: !_isDownloading,
+      maxWidth: 480,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Qué trae', style: AppText.body(context, weight: FontWeight.w600)),
+          const SizedBox(height: AppSpace.sm),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 200),
+            padding: const EdgeInsets.all(AppSpace.md + 2),
+            decoration: BoxDecoration(
+              color: c.paper,
+              borderRadius: BorderRadius.circular(AppRadius.control),
+              border: Border.all(color: c.line),
             ),
-            const SizedBox(height: 18),
-
-            // 2. Caja de Notas de la Versión (Changelog)
-            Text(
-              'Novedades de esta actualización:',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 180),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                ),
-              ),
-              child: SingleChildScrollView(
-                child: FormattedChangelogView(
-                  rawChangelog: widget.updateInfo.releaseNotes?.trim().isNotEmpty == true
-                      ? widget.updateInfo.releaseNotes!.trim()
-                      : '• Mejoras continuas en rendimiento y estabilidad general.',
-                  isDark: isDark,
-                ),
-              ),
-            ),
-
-            if (widget.updateInfo.formattedSize.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    Icons.data_usage_rounded,
-                    size: 14,
-                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Tamaño aproximado: ${widget.updateInfo.formattedSize}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            // 3. Estado de Descarga / Error
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(fontSize: 11.5, color: Colors.redAccent),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-
-            if (_isDownloading) ...[
-              const SizedBox(height: 18),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: LinearProgressIndicator(
-                  value: _progress > 0 ? _progress : null,
-                  backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
-                  minHeight: 10,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                _statusText,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Tus datos y ventas en este dispositivo seguirán 100% intactos.',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-
-            const SizedBox(height: 22),
-
-            // 4. Botones de Acción
-            if (!_isDownloading)
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
-                        'Más tarde',
-                        style: TextStyle(
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF059669),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      onPressed: _startDownload,
-                      icon: const Icon(Icons.download_rounded, size: 18),
-                      label: const Text(
-                        'Actualizar Ahora',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            else
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  'Cancelar',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                ),
-              ),
+            child: SingleChildScrollView(child: FormattedChangelogView(rawChangelog: notes)),
+          ),
+          if (widget.updateInfo.formattedSize.isNotEmpty) ...[
+            const SizedBox(height: AppSpace.sm),
+            Text('Pesa unos ${widget.updateInfo.formattedSize}', style: AppText.caption(context)),
           ],
-        ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: AppSpace.md),
+            Container(
+              padding: const EdgeInsets.all(AppSpace.md),
+              decoration: BoxDecoration(color: c.dangerSoft, borderRadius: BorderRadius.circular(AppRadius.control)),
+              child: Text(_errorMessage!, style: AppText.small(context, color: c.danger)),
+            ),
+          ],
+          if (_isDownloading) ...[
+            const SizedBox(height: AppSpace.lg),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              child: LinearProgressIndicator(value: _progress > 0 ? _progress : null, minHeight: 8),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            Text(_statusText, textAlign: TextAlign.center, style: AppText.small(context, weight: FontWeight.w600, color: c.ink)),
+            const SizedBox(height: AppSpace.xs),
+            Text('Tus datos y ventas de este equipo no se tocan.', textAlign: TextAlign.center, style: AppText.caption(context)),
+          ],
+        ],
       ),
-      ),
+      actions: _isDownloading
+          ? [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar'))]
+          : [
+              OutlinedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Más tarde')),
+              FilledButton.icon(
+                onPressed: _startDownload,
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Actualizar ahora'),
+              ),
+            ],
     );
   }
 }

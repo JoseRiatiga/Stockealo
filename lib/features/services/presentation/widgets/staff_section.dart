@@ -64,7 +64,7 @@ class _StaffSectionState extends State<StaffSection> {
           children: [
             Expanded(
               child: Text('Personas que hacen los servicios (${_staff.where((s) => s.isActive).length})',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+                  style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
             ),
             if (widget.canEdit)
               TextButton.icon(
@@ -75,7 +75,7 @@ class _StaffSectionState extends State<StaffSection> {
           ],
         ),
         Text('No necesitan cuenta en la app. Qué servicios hace cada una se elige en Servicios › Catálogo y precios.',
-            style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+            style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
         const SizedBox(height: AppSpace.sm),
         if (_staff.isEmpty)
           AppCard(
@@ -112,12 +112,12 @@ class _StaffSectionState extends State<StaffSection> {
                             (_servicesOf[s.id]!).join(', '),
                           if ((s.phone ?? '').isNotEmpty) s.phone!,
                         ].join(' · '),
-                        style: TextStyle(fontSize: 12, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                       ),
                     ],
                   ),
                 ),
-                if (widget.canEdit) Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                if (widget.canEdit) Icon(Icons.chevron_right_outlined, color: c.inkFaint),
               ],
             ),
           ),
@@ -190,7 +190,7 @@ class _StaffEditorState extends State<_StaffEditor> {
         padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
         children: [
           Text(widget.person == null ? 'Agregar persona' : 'Editar persona',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+              style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
           const SizedBox(height: AppSpace.md),
           TextField(
             controller: _name,

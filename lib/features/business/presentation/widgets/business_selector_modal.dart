@@ -12,6 +12,8 @@ import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../../../team/data/team_repository.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
+import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/status_pill.dart';
 
 class BusinessSelectorModal extends StatefulWidget {
   final String userId;
@@ -130,21 +132,21 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
   Future<void> _confirmLeaveBusiness(Business biz) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Salir de este equipo?'),
-        content: Text('Ya no tendrás acceso a los productos ni ventas de "${biz.name}". Puedes volver a unirte con el código de invitación.'),
-        actions: [
+      builder: (ctx) => AppDialog(
+title: '¿Salir de este equipo?',
+content: Text('Ya no tendrás acceso a los productos ni ventas de "${biz.name}". Puedes volver a unirte con el código de invitación.'),
+actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: context.colors.warning, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Salir del equipo'),
           ),
         ],
-      ),
+),
     );
 
     if (confirmed == true) {
@@ -183,9 +185,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
 
       await _loadBusinesses();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Has salido del equipo de "${biz.name}"')),
-        );
+        AppToast.show(context, message: 'Has salido del equipo de "${biz.name}"', type: ToastType.info);
       }
     }
   }
@@ -214,37 +214,28 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
             final isMatch = typedController.text.trim() == biz.name.trim();
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-                  SizedBox(width: 8),
-                  Expanded(child: Text('¿Mover a papelera?')),
-                ],
-              ),
-              content: Column(
+            return AppDialog(
+icon: Icons.warning_amber_outlined,
+tone: AppTone.danger,
+title: '¿Mover a la papelera?',
+content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'La empresa "${biz.name}" se moverá a la papelera. Tendrás 7 días para restaurarla antes de su eliminación definitiva.',
                     style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(ctx).brightness == Brightness.dark
-                          ? const Color(0xFFCBD5E1)
-                          : const Color(0xFF475569),
+                      fontSize: AppText.sizeSmall,
+                      color: context.colors.inkMuted,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'Para confirmar, escribe exactamente el nombre de la empresa:',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppText.sizeCaption,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(ctx).brightness == Brightness.dark
-                          ? const Color(0xFFF8FAFC)
-                          : const Color(0xFF1E293B),
+                      color: context.colors.ink,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -252,24 +243,18 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Theme.of(ctx).brightness == Brightness.dark
-                          ? const Color(0xFF0F172A)
-                          : Colors.grey.shade100,
+                      color: context.colors.surfaceMuted,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: Theme.of(ctx).brightness == Brightness.dark
-                            ? const Color(0xFF334155)
-                            : Colors.grey.shade300,
+                        color: context.colors.lineStrong,
                       ),
                     ),
                     child: SelectableText(
                       biz.name,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(ctx).brightness == Brightness.dark
-                            ? const Color(0xFFF8FAFC)
-                            : const Color(0xFF0F172A),
-                        fontSize: 13,
+                        color: context.colors.ink,
+                        fontSize: AppText.sizeSmall,
                       ),
                     ),
                   ),
@@ -283,7 +268,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
-                          color: isMatch ? const Color(0xFF059669) : Colors.red,
+                          color: isMatch ? context.colors.accent : context.colors.danger,
                           width: 1.5,
                         ),
                       ),
@@ -293,7 +278,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                   ),
                 ],
               ),
-              actions: [
+actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
                   child: const Text('Cancelar'),
@@ -301,15 +286,15 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                 ElevatedButton(
                   onPressed: isMatch ? () => Navigator.pop(ctx, true) : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: context.colors.danger,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    disabledForegroundColor: Colors.grey.shade500,
+                    disabledBackgroundColor: context.colors.lineStrong,
+                    disabledForegroundColor: context.colors.inkFaint,
                   ),
                   child: const Text('Eliminar y mover a papelera'),
                 ),
               ],
-            );
+);
           },
         );
       },
@@ -318,12 +303,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
     if (confirmed == true) {
       await _businessRepo.softDeleteBusiness(biz.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Empresa "${biz.name}" movida a la papelera (conservada por 7 días)'),
-          backgroundColor: const Color(0xFF334155),
-        ),
-      );
+      AppToast.show(context, message: 'Empresa "${biz.name}" movida a la papelera (conservada por 7 días)', type: ToastType.info);
       await _loadBusinesses();
       if (_currentBusiness == null || _currentBusiness?.id == biz.id) {
         if (_businesses.isNotEmpty) {
@@ -363,11 +343,11 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                 decoration: BoxDecoration(color: c.lineStrong, borderRadius: BorderRadius.circular(2)),
               ),
             ),
-          Text('Tus negocios', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+          Text('Tus negocios', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
           const SizedBox(height: 2),
           Text(
             'Cada negocio tiene sus propios productos, ventas y clientes',
-            style: TextStyle(fontSize: 13, color: c.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
           ),
           const SizedBox(height: AppSpace.lg),
 
@@ -410,7 +390,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: _showCreateBusinessDialog,
-                  icon: const Icon(Icons.add_rounded, size: 20),
+                  icon: const Icon(Icons.add_outlined, size: 20),
                   label: const Text('Nuevo negocio'),
                 ),
               ),
@@ -421,17 +401,17 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
           if (_deletedBusinesses.isNotEmpty)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.delete_outline_rounded, color: c.inkMuted),
+              leading: Icon(Icons.delete_outline_outlined, color: c.inkMuted),
               title: Text('Papelera · ${_deletedBusinesses.length}'),
               subtitle: const Text('Se pueden recuperar durante 7 días'),
-              trailing: Icon(Icons.chevron_right_rounded, color: c.inkMuted),
+              trailing: Icon(Icons.chevron_right_outlined, color: c.inkMuted),
               onTap: () => BusinessTrash.show(context, userId: widget.userId, onChanged: _loadBusinesses),
             ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.shield_outlined, color: c.inkMuted),
             title: const Text('Términos y privacidad'),
-            trailing: Icon(Icons.chevron_right_rounded, color: c.inkMuted),
+            trailing: Icon(Icons.chevron_right_outlined, color: c.inkMuted),
             onTap: () {
               Navigator.pop(context);
               LegalDocumentScreen.show(context);
@@ -439,7 +419,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.logout_rounded, color: c.danger),
+            leading: Icon(Icons.logout_outlined, color: c.danger),
             title: Text('Cerrar sesión', style: TextStyle(color: c.danger, fontWeight: FontWeight.w600)),
             onTap: () {
               Navigator.pop(context);
@@ -487,19 +467,19 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                       biz.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.ink),
+                      style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w600, color: c.ink),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '$roleLabel · ${biz.currency}',
-                      style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                     ),
                   ],
                 ),
               ),
-              if (isSelected) Icon(Icons.check_circle_rounded, color: c.accent),
+              if (isSelected) Icon(Icons.check_circle_outlined, color: c.accent),
               PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert_rounded, color: c.inkMuted),
+                icon: Icon(Icons.more_vert_outlined, color: c.inkMuted),
                 tooltip: 'Opciones de ${biz.name}',
                 onSelected: (action) {
                   if (action == 'edit') {
@@ -512,8 +492,8 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
                 },
                 itemBuilder: (_) => [
                   if (canManage) _menuItem('edit', Icons.edit_outlined, 'Editar negocio', c.ink),
-                  if (isOwner) _menuItem('delete', Icons.delete_outline_rounded, 'Mover a la papelera', c.danger),
-                  if (!isOwner) _menuItem('leave', Icons.logout_rounded, 'Salir del equipo', c.danger),
+                  if (isOwner) _menuItem('delete', Icons.delete_outline_outlined, 'Mover a la papelera', c.danger),
+                  if (!isOwner) _menuItem('leave', Icons.logout_outlined, 'Salir del equipo', c.danger),
                 ],
               ),
             ],

@@ -91,7 +91,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
         if (ProAdminService.instance.isOwner)
         FilledButton.icon(
           onPressed: _grant,
-          icon: const Icon(Icons.card_giftcard_rounded, size: 18),
+          icon: const Icon(Icons.card_giftcard_outlined, size: 18),
           label: const Text('Dar Pro'),
         ),
         const SizedBox(width: AppSpace.sm),
@@ -276,7 +276,7 @@ class _GrantDialogState extends State<_GrantDialog> {
               onSubmitted: _search,
               decoration: const InputDecoration(
                 hintText: 'Nombre del negocio o correo del dueño',
-                prefixIcon: Icon(Icons.search_rounded),
+                prefixIcon: Icon(Icons.search_outlined),
               ),
             ),
             SizedBox(height: 3, child: _searching ? const LinearProgressIndicator() : null),
@@ -299,7 +299,7 @@ class _GrantDialogState extends State<_GrantDialog> {
                       dense: true,
                       selected: _selected?.id == b.id,
                       selectedTileColor: c.successSoft,
-                      trailing: _selected?.id == b.id ? Icon(Icons.check_circle_rounded, color: c.accent) : null,
+                      trailing: _selected?.id == b.id ? Icon(Icons.check_circle_outlined, color: c.accent) : null,
                       title: Text(b.name),
                       subtitle: Text([b.ownerEmail ?? 'sin dueño', if (b.pro) 'ya tiene Pro'].join(' · ')),
                       onTap: () => setState(() => _selected = b),
@@ -340,7 +340,7 @@ class _GrantDialogState extends State<_GrantDialog> {
           width: 180,
           child: PrimaryActionButton(
             label: _saving ? 'Guardando…' : 'Dar Pro',
-            icon: Icons.card_giftcard_rounded,
+            icon: Icons.card_giftcard_outlined,
             onPressed: _selected == null || _saving ? null : _save,
           ),
         ),

@@ -1,66 +1,86 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../../core/design/app_dialog.dart';
 import '../../../../core/theme/app_tokens.dart';
 
-/// «Dónde quedó cada cosa» (0.12.0): cada función vive en un solo lugar y varias
-/// cambiaron de sitio. Sale una vez al abrir la versión; se vuelve a ver en
-/// Ajustes › Acerca de.
+/// «Dónde quedó cada cosa»: sale UNA vez por versión del menú a quien ya usaba la
+/// app (no a quien se acaba de registrar). Se vuelve a ver en Ajustes › Acerca de.
+///
+/// Versión 2 del mapa = re-diseño 0.13.0: el menú sigue el día del negocio.
 class WhereThingsMovedSheet {
   WhereThingsMovedSheet._();
 
-  /// Lo marca la actualización de la base a la versión 12 (solo quien ya usaba la app)
+  /// Lo marcó la actualización de la base a la versión 12 (quien ya usaba la 0.11)
   static const pendingKey = 'where_moved_pending';
 
+  /// Última versión del mapa que esta persona ya vio
+  static const seenKey = 'where_moved_version';
+  static const mapVersion = '2';
+
   static const changes = <(IconData, String, String)>[
-    (Icons.point_of_sale_rounded, 'Nueva venta', 'Ventas. Ya no está en el encabezado ni en Inicio.'),
-    (Icons.point_of_sale_outlined, 'Caja', 'Ventas › Caja. Se enciende en Ajustes › Módulos.'),
-    (Icons.insights_rounded, 'Ganancias', 'Pestaña Reportes, junto a Descargar Excel.'),
-    (Icons.upload_file_outlined, 'Importar desde Excel', 'Inventario. Ahora te guía paso a paso.'),
-    (Icons.move_to_inbox_outlined, 'Pedido a proveedor', 'Inventario › Proveedores y entradas.'),
-    (Icons.groups_2_outlined, 'Equipo y actividad', 'Ajustes › Tu negocio.'),
-    (Icons.widgets_outlined, 'Módulos', 'Ajustes › Tu negocio › Módulos: todo lo que ofrece Stockealo.'),
-    (Icons.dark_mode_outlined, 'Modo oscuro', 'Ajustes › Apariencia.'),
-    (Icons.dashboard_outlined, 'Inicio', 'Ahora es el resumen del día. Toca cada cifra para ir a su lugar.'),
-    (Icons.search_rounded, 'Buscador', 'También encuentra funciones: escribe «caja» o «proveedores».'),
+    (Icons.menu_outlined, 'Menú nuevo', 'Sigue el día: Inicio, Vender, Ventas, Caja, Productos, Stock, Clientes y proveedores, Reportes y Ajustes. En el celular se abre con ☰.'),
+    (Icons.add_outlined, 'Nueva venta', 'Siempre arriba, en el encabezado, en todas las pantallas.'),
+    (Icons.point_of_sale_outlined, 'Caja', 'Tiene su propio lugar en el menú, y su estado se ve arriba («Caja abierta desde 8:05»).'),
+    (Icons.receipt_long_outlined, 'Ventas', 'Es lo vendido y las cotizaciones.'),
+    (Icons.layers_outlined, 'Stock', 'Lugar nuevo: lo que falta, el proveedor que pasa hoy y «Pedir al proveedor».'),
+    (Icons.people_alt_outlined, 'Clientes y proveedores', 'Fiados, abonos y proveedores, juntos.'),
+    (Icons.storefront_outlined, 'Tienda en línea', 'Tiene su propio lugar en el menú.'),
+    (Icons.search_outlined, 'Buscador', 'Arriba (o Ctrl K): encuentra productos, clientes y funciones.'),
   ];
 
-  /// La primera vez después de actualizar
+  /// La primera vez con esta versión del menú, solo si ya usaba la app antes
   static Future<void> showOnce(BuildContext context) async {
     final db = AppDatabase.instance;
-    if (await db.getSetting(pendingKey) != '1') return;
-    await db.setSetting(pendingKey, '0');
+    if (await db.getSetting(seenKey) == mapVersion) return;
+    await db.setSetting(seenKey, mapVersion);
+    if (!await _usedBefore(db)) return;
     if (context.mounted) await show(context);
   }
 
-  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
+  /// Ya usaba la app: vio el aviso de la 0.12 o tiene un negocio de hace más de un día
+  static Future<bool> _usedBefore(AppDatabase db) async {
+    if (await db.getSetting(pendingKey) != null) return true;
+    try {
+      final d = await db.database;
+      final cutoff = DateTime.now().subtract(const Duration(days: 1)).toIso8601String();
+      final rows = await d.rawQuery('SELECT COUNT(*) AS n FROM businesses WHERE created_at < ?', [cutoff]);
+      return ((rows.first['n'] as int?) ?? 0) > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> show(BuildContext context) => AppSheet.show<void>(
         context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        showDragHandle: true,
+        title: 'Dónde quedó cada cosa',
+        subtitle: 'Ordenamos Stockealo para que siga el día de tu negocio.',
         builder: (ctx) {
           final c = ctx.colors;
-          return ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Dónde quedó cada cosa', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: c.ink)),
-              const SizedBox(height: AppSpace.xs),
-              Text('Ordenamos la app: cada cosa tiene un solo lugar.', style: TextStyle(color: c.inkMuted)),
-              const SizedBox(height: AppSpace.md),
               for (final (icon, title, where) in changes)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.sm - 2),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(icon, size: 20, color: c.accent),
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.tile)),
+                        child: Icon(icon, size: 18, color: c.accent),
+                      ),
                       const SizedBox(width: AppSpace.md),
                       Expanded(
-                        child: Text.rich(TextSpan(children: [
-                          TextSpan(text: '$title: ', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
-                          TextSpan(text: where, style: TextStyle(color: c.inkMuted)),
-                        ])),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, style: AppText.body(ctx, weight: FontWeight.w600)),
+                            Text(where, style: AppText.small(ctx)),
+                          ],
+                        ),
                       ),
                     ],
                   ),

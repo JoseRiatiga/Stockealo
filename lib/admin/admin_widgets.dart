@@ -57,7 +57,7 @@ class AdminPage extends StatelessWidget {
               IconButton(
                 tooltip: 'Actualizar',
                 onPressed: onRefresh,
-                icon: Icon(Icons.refresh_rounded, color: c.inkMuted),
+                icon: Icon(Icons.refresh_outlined, color: c.inkMuted),
               ),
           ],
         ),
@@ -182,7 +182,7 @@ class AdminSearchField extends StatelessWidget {
       child: TextField(
         textInputAction: TextInputAction.search,
         onSubmitted: (v) => onSubmitted(v.trim()),
-        decoration: InputDecoration(hintText: hint, prefixIcon: const Icon(Icons.search_rounded)),
+        decoration: InputDecoration(hintText: hint, prefixIcon: const Icon(Icons.search_outlined)),
       ),
     );
   }

@@ -9,7 +9,8 @@ import '../../../../core/design/skeleton.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_toast.dart';
-import '../../../../core/widgets/modern_dialog.dart';
+import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/status_pill.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
 import '../../../pro/data/pro_service.dart';
@@ -134,9 +135,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           final c = context.colors;
-          return ModernDialog(
+          return AppDialog(
             icon: Icons.manage_accounts_outlined,
-            iconColor: c.accent,
+            tone: AppTone.accent,
             title: 'Ajustar rol',
             subtitle: member.displayName,
             maxWidth: 440,
@@ -158,7 +159,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                       Expanded(
                         child: Text(
                           member.email,
-                          style: TextStyle(fontSize: 12, color: c.inkMuted),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -168,7 +169,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 const SizedBox(height: AppSpace.lg),
                 Text(
                   'Nivel de permisos',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.ink),
+                  style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.ink),
                 ),
                 const SizedBox(height: AppSpace.sm),
                 RadioGroup<String>(
@@ -181,10 +182,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                       contentPadding: EdgeInsets.zero,
                       activeColor: c.accent,
                       title: Text('Cajero o vendedor',
-                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: c.ink)),
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppText.sizeBody, color: c.ink)),
                       subtitle: Text(
                         'Solo registra ventas. Los precios de compra y los costos quedan protegidos.',
-                        style: TextStyle(fontSize: 11.5, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                       ),
                     ),
                     RadioListTile<String>(
@@ -192,10 +193,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                       contentPadding: EdgeInsets.zero,
                       activeColor: c.accent,
                       title: Text('Administrador',
-                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: c.ink)),
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppText.sizeBody, color: c.ink)),
                       subtitle: Text(
                         'Puede ingresar inventario, cambiar precios y ver márgenes.',
-                        style: TextStyle(fontSize: 11.5, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                       ),
                     ),
                     ],
@@ -241,12 +242,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   }
 
   Future<void> _removeMember(BusinessMember member) async {
-    final confirm = await ModernConfirmDialog.show(
+    final confirm = await AppDialog.confirm(
       context: context,
-      title: 'Desvincular del equipo',
+      title: 'Quitar del equipo',
       message: '¿Seguro que quieres quitar a ${member.displayName} (${member.email}) del equipo de ${widget.business.name}?',
-      confirmText: 'Desvincular',
-      isDestructive: true,
+      confirmText: 'Quitar',
+      destructive: true,
     );
 
     if (confirm == true) {
@@ -288,9 +289,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       barrierDismissible: false,
       builder: (ctx) {
         final c = ctx.colors;
-        return ModernDialog(
+        return AppDialog(
           icon: Icons.cloud_sync_outlined,
-          iconColor: c.accent,
+          tone: AppTone.accent,
           title: 'Trabajar en equipo',
           subtitle: 'Se activa la sincronización en la nube',
           maxWidth: 460,
@@ -301,7 +302,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               Text(
                 'Para que tu equipo venda y vea existencias de "${widget.business.name}" desde sus dispositivos, '
                 'los datos de este negocio se respaldan y sincronizan en la nube de Stockealo.',
-                style: TextStyle(fontSize: 13, color: c.inkMuted, height: 1.4),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted, height: 1.4),
               ),
               const SizedBox(height: AppSpace.md),
               Container(
@@ -326,7 +327,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                     ),
                     Divider(height: AppSpace.lg, color: c.line),
                     _buildConsentFeature(
-                      icon: Icons.sync_alt,
+                      icon: Icons.sync_alt_outlined,
                       title: 'Inventario al día',
                       subtitle: 'Las existencias se descuentan para todos.',
                     ),
@@ -336,7 +337,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               const SizedBox(height: AppSpace.md),
               Text(
                 'Al continuar aceptas la sincronización en la nube según los Términos de servicio y la Política de privacidad.',
-                style: TextStyle(fontSize: 11, color: c.inkFaint),
+                style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
               ),
             ],
           ),
@@ -347,7 +348,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
             ),
             const SizedBox(width: AppSpace.sm),
             FilledButton.icon(
-              icon: const Icon(Icons.check, size: 18),
+              icon: const Icon(Icons.check_outlined, size: 18),
               label: const Text('Aceptar y activar'),
               onPressed: () async {
                 Navigator.pop(ctx, true);
@@ -383,9 +384,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.ink)),
+              Text(title, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: c.ink)),
               const SizedBox(height: 2),
-              Text(subtitle, style: TextStyle(fontSize: 11, color: c.inkMuted)),
+              Text(subtitle, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
             ],
           ),
         ),
@@ -429,7 +430,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                       color: c.successSoft,
                       borderRadius: BorderRadius.circular(AppRadius.control),
                     ),
-                    child: Icon(Icons.qr_code_2, color: c.success, size: 26),
+                    child: Icon(Icons.qr_code_2_outlined, color: c.success, size: 26),
                   ),
                   const SizedBox(width: AppSpace.md),
                   Expanded(
@@ -437,8 +438,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Invitar al equipo',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
-                        Text(widget.business.name, style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                            style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
+                        Text(widget.business.name, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                       ],
                     ),
                   ),
@@ -465,7 +466,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               const SizedBox(height: AppSpace.lg),
 
               Text('O comparte este código de invitación',
-                  style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                  style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
               const SizedBox(height: AppSpace.sm),
               Container(
                 padding: const EdgeInsets.only(left: AppSpace.lg, right: AppSpace.xs),
@@ -480,7 +481,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                     Text(
                       inviteCode,
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: AppText.sizeHeading,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 2.5,
                         color: c.success,
@@ -488,7 +489,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                     ),
                     const SizedBox(width: AppSpace.sm),
                     IconButton(
-                      icon: Icon(Icons.copy, size: 20, color: c.success),
+                      icon: Icon(Icons.copy_outlined, size: 20, color: c.success),
                       tooltip: 'Copiar código',
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: inviteCode));
@@ -507,7 +508,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 width: double.infinity,
                 height: 48,
                 child: FilledButton.icon(
-                  icon: const Icon(Icons.share, size: 18),
+                  icon: const Icon(Icons.share_outlined, size: 18),
                   label: const Text('Compartir invitación'),
                   onPressed: () {
                     final text = 'Únete a mi equipo en Stockealo.\n\nNegocio: ${widget.business.name}\nCódigo de invitación: $inviteCode\n\nAbre la app Stockealo, elige "Soy colaborador" y escribe este código o escanea mi QR.';
@@ -539,7 +540,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 Icon(icon, size: 13, color: fg),
                 const SizedBox(width: AppSpace.xs),
               ],
-              Text(label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: fg)),
+              Text(label, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: fg)),
               if (onTap != null) ...[
                 const SizedBox(width: AppSpace.xs),
                 Icon(Icons.edit_outlined, size: 12, color: fg),
@@ -560,7 +561,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         color: c.surfaceMuted,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text('Tú', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: c.inkMuted)),
+      child: Text('Tú', style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, color: c.inkMuted)),
     );
   }
 
@@ -570,7 +571,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       backgroundColor: bg,
       child: Text(
         (name.trim().isNotEmpty ? name.trim().characters.first : '?').toUpperCase(),
-        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: fg),
+        style: TextStyle(fontWeight: FontWeight.w700, fontSize: AppText.sizeTitle, color: fg),
       ),
     );
   }
@@ -594,7 +595,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
           if (canInvite)
             TextButton.icon(
               onPressed: _checkAndShowInviteModal,
-              icon: const Icon(Icons.qr_code_2, size: 18),
+              icon: const Icon(Icons.qr_code_2_outlined, size: 18),
               label: const Text('Invitar'),
             ),
         ],
@@ -621,12 +622,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   children: [
                     Text(
                       widget.business.name,
-                      style: TextStyle(fontSize: 13, color: c.inkMuted),
+                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                     ),
                     const SizedBox(height: AppSpace.xs),
                     Text(
                       'Los cajeros solo registran ventas. Tus costos de compra y tus ganancias quedan protegidos.',
-                      style: TextStyle(fontSize: 13, color: c.inkMuted, height: 1.35),
+                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted, height: 1.35),
                     ),
                     const SizedBox(height: AppSpace.lg),
 
@@ -642,7 +643,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                 color: c.successSoft,
                                 borderRadius: BorderRadius.circular(AppRadius.control),
                               ),
-                              child: Icon(Icons.qr_code_scanner, color: c.success),
+                              child: Icon(Icons.qr_code_scanner_outlined, color: c.success),
                             ),
                             const SizedBox(width: AppSpace.md),
                             Expanded(
@@ -652,12 +653,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                   Text('Código ${widget.business.inviteCode}',
                                       style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
                                   Text('Compártelo con tu equipo para que se unan',
-                                      style: TextStyle(color: c.inkMuted, fontSize: 12)),
+                                      style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
                                 ],
                               ),
                             ),
                             Text('Ver QR', style: TextStyle(color: c.accent, fontWeight: FontWeight.w600)),
-                            Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                            Icon(Icons.chevron_right_outlined, color: c.inkFaint),
                           ],
                         ),
                       ),
@@ -666,7 +667,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
                     Text(
                       'Miembros (${employeesList.length + 1})',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink),
+                      style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink),
                     ),
                     const SizedBox(height: AppSpace.sm),
 
@@ -686,7 +687,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                     Flexible(
                                       child: Text(
                                         ownerName,
-                                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: c.ink),
+                                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppText.sizeBodyLarge, color: c.ink),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -696,10 +697,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                 if (_ownerEmail != null && _ownerEmail!.isNotEmpty)
                                   Text(
                                     _ownerEmail!,
-                                    style: TextStyle(fontSize: 12, color: c.inkMuted),
+                                    style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                Text('Acceso total', style: TextStyle(fontSize: 11, color: c.inkFaint)),
+                                Text('Acceso total', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
                               ],
                             ),
                           ),
@@ -708,7 +709,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                             label: 'Dueño',
                             fg: c.success,
                             bg: c.successSoft,
-                            icon: Icons.workspace_premium_rounded,
+                            icon: Icons.workspace_premium_outlined,
                           ),
                         ],
                       ),
@@ -721,21 +722,21 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                         padding: const EdgeInsets.symmetric(vertical: AppSpace.xxl),
                         child: Column(
                           children: [
-                            Icon(Icons.person_outline, size: 48, color: c.inkFaint),
+                            Icon(Icons.person_outline_outlined, size: 48, color: c.inkFaint),
                             const SizedBox(height: AppSpace.md),
                             Text(
                               canInvite
                                   ? 'Aún no hay colaboradores en este negocio'
                                   : 'No hay más miembros en este equipo',
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: 15),
+                              style: TextStyle(color: c.ink, fontWeight: FontWeight.w600, fontSize: AppText.sizeBodyLarge),
                             ),
                             if (canInvite) ...[
                               const SizedBox(height: AppSpace.xs),
                               Text(
                                 'Comparte el código de invitación para que se unan.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: c.inkMuted, fontSize: 13),
+                                style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall),
                               ),
                             ],
                           ],
@@ -791,7 +792,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                         Flexible(
                           child: Text(
                             member.displayName,
-                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: c.ink),
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppText.sizeBodyLarge, color: c.ink),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -800,7 +801,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                     ),
                     Text(
                       member.email,
-                      style: TextStyle(fontSize: 12, color: c.inkMuted),
+                      style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -822,7 +823,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 Expanded(
                   child: Text(
                     member.roleDescription,
-                    style: TextStyle(fontSize: 11.5, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                   ),
                 ),
                 const SizedBox(width: AppSpace.sm),

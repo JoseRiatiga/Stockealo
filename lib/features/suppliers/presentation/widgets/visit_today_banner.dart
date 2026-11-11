@@ -64,7 +64,7 @@ class _VisitTodayBannerState extends State<VisitTodayBanner> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Hoy pasa $who', style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
-                  Text('Revisa qué pedirle antes de que llegue.', style: TextStyle(color: c.inkMuted, fontSize: 12)),
+                  Text('Revisa qué pedirle antes de que llegue.', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
                 ],
               ),
             ),

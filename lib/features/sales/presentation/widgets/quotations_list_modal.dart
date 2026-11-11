@@ -12,6 +12,11 @@ import '../../models/quotation.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'digital_ticket_modal.dart';
 import 'sale_document.dart';
+import '../../../cash/presentation/widgets/open_cash.dart';
+import '../../../auth/data/auth_repository.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/design/status_pill.dart';
+import '../../../../core/design/app_dialog.dart';
 
 class QuotationsListModal extends StatefulWidget {
   final String businessId;
@@ -63,10 +68,15 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
   /// Abre la cotización con el logo del negocio para compartirla
   void _shareQuotation(Quotation q) {
     final business = ActiveBusinessScope.read(context);
-    SaleDocumentSheet.show(
+    TicketViewer.show(
       context,
       business: business,
       businessName: business?.name ?? 'Mi negocio',
+      headline: 'Cotización',
+      headlineTone: AppTone.info,
+      subline: q.validUntil == null
+          ? CurrencyFormatter.format(q.totalAmount)
+          : '${CurrencyFormatter.format(q.totalAmount)} · válida hasta el ${DateFormat("d 'de' MMMM", 'es_CO').format(q.validUntil!)}',
       doc: SaleDocument(
         title: 'Cotización',
         number: q.quotationNumber,
@@ -87,6 +97,9 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
         sellerName: q.sellerName,
         notes: q.notes,
         closing: 'Para confirmar tu pedido, responde a este mensaje.',
+        stamp: TicketStamp('COTIZACIÓN',
+            detail: q.validUntil == null ? null : 'Hasta ${DateFormat('dd MMM', 'es_CO').format(q.validUntil!).toUpperCase()}',
+            tone: AppTone.info),
       ),
     );
   }
@@ -99,12 +112,12 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Facturar Cotización?'),
-        content: Text(
+      builder: (ctx) => AppDialog(
+title: '¿Facturar Cotización?',
+content: Text(
           'Se descontarán las unidades del inventario y se registrará la venta formal por ${CurrencyFormatter.formatCOP(q.totalAmount)}.',
         ),
-        actions: [
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: context.colors.accent),
@@ -112,7 +125,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
             child: const Text('Confirmar y Facturar', style: TextStyle(color: Colors.white)),
           ),
         ],
-      ),
+),
     );
 
     if (confirm != true || !mounted) return;
@@ -149,6 +162,11 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
         ));
       }
 
+      // Caja obligatoria si el negocio la usa
+      if (!mounted) return;
+      final biz = ActiveBusinessScope.read(context);
+      final user = AuthRepository.instance.currentUser;
+      if (biz != null && mounted && !await CashGate.ensureOpen(context, business: biz, userName: user?.displayName ?? '')) return;
       final sales = await _salesRepo.recordMultiProductSale(
         businessId: widget.businessId,
         items: cartItems,
@@ -167,11 +185,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
           type: ToastType.success,
         );
         _loadQuotations();
-        DigitalTicketModal.show(
-          context,
-          salesList: sales,
-          discountAmount: q.discountAmount,
-        );
+        DigitalTicketModal.show(context, salesList: sales, discountAmount: q.discountAmount, justSold: true);
       }
     } catch (e) {
       if (mounted) {
@@ -183,17 +197,17 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
   Future<void> _deleteQuotation(Quotation q) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar Cotización?'),
-        content: Text('Se eliminará ${q.quotationNumber}. Esta acción no se puede deshacer.'),
-        actions: [
+      builder: (ctx) => AppDialog(
+title: '¿Eliminar Cotización?',
+content: Text('Se eliminará ${q.quotationNumber}. Esta acción no se puede deshacer.'),
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            child: Text('Eliminar', style: TextStyle(color: context.colors.danger)),
           ),
         ],
-      ),
+),
     );
 
     if (confirm == true) {
@@ -253,18 +267,18 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                     children: [
                       Text(
                         'Cotizaciones y Presupuestos',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain),
+                        style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.bold, color: textMain),
                       ),
                       Text(
                         '${_quotations.length} registradas (no descuentan stock)',
-                        style: TextStyle(fontSize: 11, color: textMuted),
+                        style: TextStyle(fontSize: AppText.sizeCaption, color: textMuted),
                       ),
                     ],
                   ),
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.close_rounded),
+                icon: const Icon(Icons.close_outlined),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -308,7 +322,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                       children: [
                                         Text(
                                           q.quotationNumber,
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: textMain),
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody, color: textMain),
                                         ),
                                         const SizedBox(width: 8),
                                         Container(
@@ -322,7 +336,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                           child: Text(
                                             q.status,
                                             style: TextStyle(
-                                              fontSize: 9.5,
+                                              fontSize: AppText.sizeCaption,
                                               fontWeight: FontWeight.bold,
                                               color: isBilled ? context.colors.accent : context.colors.warning,
                                             ),
@@ -333,7 +347,7 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                     Text(
                                       CurrencyFormatter.formatCOP(q.totalAmount),
                                       style: TextStyle(
-                                        fontSize: 15,
+                                        fontSize: AppText.sizeBodyLarge,
                                         fontWeight: FontWeight.bold,
                                         color: context.colors.accent,
                                       ),
@@ -345,14 +359,14 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                 if (q.customerName?.isNotEmpty == true)
                                   Text(
                                     'Cliente: ${q.customerName}',
-                                    style: TextStyle(fontSize: 12, color: textMuted),
+                                    style: TextStyle(fontSize: AppText.sizeCaption, color: textMuted),
                                   ),
 
                                 const SizedBox(height: 6),
                                 // Resumen de ítems
                                 Text(
                                   q.items.map((i) => '${i.quantity}x ${i.productName}').join(' • '),
-                                  style: TextStyle(fontSize: 11.5, color: textMain.withValues(alpha: 0.85)),
+                                  style: TextStyle(fontSize: AppText.sizeCaption, color: textMain.withValues(alpha: 0.85)),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -363,14 +377,14 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     IconButton(
-                                      icon: Icon(Icons.delete_outline, size: 18, color: context.colors.danger),
+                                      icon: Icon(Icons.delete_outline_outlined, size: 18, color: context.colors.danger),
                                       tooltip: 'Eliminar',
                                       onPressed: () => _deleteQuotation(q),
                                     ),
                                     const SizedBox(width: 4),
                                     OutlinedButton.icon(
-                                      icon: const Icon(Icons.share, size: 14),
-                                      label: const Text('WhatsApp', style: TextStyle(fontSize: 11.5)),
+                                      icon: const Icon(Icons.share_outlined, size: 14),
+                                      label: const Text('WhatsApp', style: TextStyle(fontSize: AppText.sizeCaption)),
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: context.colors.accent,
                                         side: BorderSide(color: context.colors.accent),
@@ -382,8 +396,8 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
                                     if (!isBilled) ...[
                                       const SizedBox(width: 8),
                                       ElevatedButton.icon(
-                                        icon: const Icon(Icons.point_of_sale_rounded, size: 14),
-                                        label: const Text('Facturar', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                        icon: const Icon(Icons.point_of_sale_outlined, size: 14),
+                                        label: const Text('Facturar', style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.bold)),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: context.colors.accent,
                                           foregroundColor: Colors.white,

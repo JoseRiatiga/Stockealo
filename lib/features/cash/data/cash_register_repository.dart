@@ -2,11 +2,14 @@ import 'package:sqflite/sqflite.dart' show DatabaseException;
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/services/data_events.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../team/data/activity_repository.dart';
+import '../../business/models/business.dart';
 import '../models/cash_session.dart';
+import '../../sales/models/payment_method.dart';
 
 /// Arqueo de caja por negocio (0.12.0: con movimientos, propinas, cierre por forma
 /// de pago y en la nube).
@@ -20,6 +23,15 @@ class CashRegisterRepository {
   final _cloud = SupabaseService.instance;
 
   static const String _cash = 'EFECTIVO';
+
+  /// Lanza [CashClosedException] si el negocio usa caja y no hay una abierta.
+  /// Lo llaman todas las formas de registrar una venta.
+  Future<void> requireOpen(String businessId) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query('businesses', columns: ['cash_register_enabled'], where: 'id = ?', whereArgs: [businessId], limit: 1);
+    if (rows.isEmpty || (rows.first['cash_register_enabled'] as int? ?? 0) != 1) return;
+    if (await getOpenSession(businessId) == null) throw const CashClosedException();
+  }
 
   Future<CashSession?> getOpenSession(String businessId) async {
     final db = await _dbProvider.database;
@@ -72,6 +84,7 @@ class CashRegisterRepository {
       summary: 'Abrió la caja con ${CurrencyFormatter.format(openingAmount)} de base',
       data: {'session_id': session.id},
     );
+    DataEvents.instance.cashChanged();
     return session;
   }
 
@@ -137,19 +150,23 @@ class CashRegisterRepository {
     final byMethod = <String, double>{};
     var cashSales = 0.0;
     var cashSalesCount = 0;
+    // Un pago mixto suma a cada medio lo que entró por él; una venta es un número
+    final cashInvoices = <String>{};
     final sales = await db.rawQuery('''
-      SELECT payment_method AS method, COALESCE(SUM(total), 0) AS amount, COUNT(*) AS count FROM sales
-      WHERE business_id = ? AND date >= ? AND date <= ? GROUP BY payment_method
+      SELECT payment_method AS method, total, payment_split, COALESCE(invoice_number, id) AS invoice FROM sales_ok
+      WHERE business_id = ? AND date >= ? AND date <= ?
     ''', [biz, from, to]);
     for (final r in sales) {
-      final method = '${r['method'] ?? 'OTRO'}'.toUpperCase();
-      final amount = (r['amount'] as num).toDouble();
-      byMethod[method] = (byMethod[method] ?? 0) + amount;
-      if (method == _cash) {
-        cashSales += amount;
-        cashSalesCount += (r['count'] as num).toInt();
+      final parts = PaymentMethod.amounts('${r['method'] ?? 'OTRO'}', (r['total'] as num).toDouble(), r['payment_split'] as String?);
+      for (final e in parts.entries) {
+        byMethod[e.key] = (byMethod[e.key] ?? 0) + e.value;
+        if (e.key == _cash && e.value > 0) {
+          cashSales += e.value;
+          cashInvoices.add('${r['invoice']}');
+        }
       }
     }
+    cashSalesCount = cashInvoices.length;
     var cashPayments = 0.0;
     final payments = await db.rawQuery('''
       SELECT payment_method AS method, COALESCE(SUM(amount), 0) AS amount FROM customer_payments
@@ -254,6 +271,7 @@ class CashRegisterRepository {
           '${difference.abs() < 1 ? ' (cuadró)' : difference > 0 ? ' (sobran ${CurrencyFormatter.format(difference)})' : ' (faltan ${CurrencyFormatter.format(-difference)})'}',
       data: {'session_id': session.id, 'difference': difference},
     );
+    DataEvents.instance.cashChanged();
     return closed;
   }
 
@@ -271,14 +289,10 @@ class CashRegisterRepository {
 
   /// Nombre de cada forma de pago en el resumen
   static String methodLabel(String code) => switch (code) {
-        'EFECTIVO' => 'Efectivo',
-        'TRANSFERENCIA' => 'Transferencia',
-        'TARJETA' => 'Tarjeta',
-        'FIADO' => 'Fiado',
         'ABONO_EFECTIVO' => 'Abonos en efectivo',
         'ABONO_TRANSFERENCIA' => 'Abonos por transferencia',
         _ when code.startsWith('ABONO_') => 'Abonos (${code.substring(6).toLowerCase()})',
-        _ => code[0] + code.substring(1).toLowerCase(),
+        _ => PaymentMethod.label(code),
       };
 
   /// Comprobante del cierre para enviar por WhatsApp
@@ -318,4 +332,19 @@ class CashRegisterRepository {
       if (servicesLines.isNotEmpty) ...['', ...servicesLines],
     ].join('\n');
   }
+}
+
+/// El negocio usa caja y no hay una abierta: no se puede vender (decisión del
+/// dueño, 10 nov). La pantalla ofrece «Abrir caja» ahí mismo.
+class CashClosedException implements Exception {
+  const CashClosedException();
+
+  @override
+  String toString() => 'Exception: Abre la caja para vender. Tu negocio usa caja y está cerrada.';
+}
+
+/// ¿El negocio usa caja y está cerrada? (antes de mostrar Vender o cobrar)
+Future<bool> isCashClosedFor(Business? business) async {
+  if (business == null || !business.cashRegisterEnabled) return false;
+  return await CashRegisterRepository.instance.getOpenSession(business.id) == null;
 }

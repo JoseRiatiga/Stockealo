@@ -91,7 +91,7 @@ class _AdminBusinessesPageState extends State<AdminBusinessesPage> {
                 onChanged: _onQuery,
                 decoration: const InputDecoration(
                   hintText: 'Buscar por nombre o correo del dueño',
-                  prefixIcon: Icon(Icons.search_rounded),
+                  prefixIcon: Icon(Icons.search_outlined),
                   isDense: true,
                 ),
               ),
@@ -150,7 +150,7 @@ class _AdminBusinessesPageState extends State<AdminBusinessesPage> {
                     IconButton(
                       tooltip: 'Copiar correo del dueño',
                       onPressed: () => adminCopy(context, b.ownerEmail!, 'Correo'),
-                      icon: Icon(Icons.copy_rounded, size: 18, color: c.inkMuted),
+                      icon: Icon(Icons.copy_outlined, size: 18, color: c.inkMuted),
                     ),
                 ],
               ),

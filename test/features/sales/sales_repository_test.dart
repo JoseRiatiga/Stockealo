@@ -146,17 +146,23 @@ void main() {
     });
   });
 
-  group('cancelSale', () {
-    test('repone el stock, descuenta la deuda y borra la venta', () async {
+  group('voidSale', () {
+    test('anular repone el stock y descuenta la deuda, y la venta queda en el historial como anulada', () async {
       final product = await addProduct('p1');
       final sale = await repo.recordSale(product: product, quantity: 3, paymentMethod: 'FIADO', customerName: 'Ana');
 
-      await repo.cancelSale(sale);
+      await repo.voidSale(sale, reason: 'Se equivocó de producto');
 
       expect(await stockOf('p1'), 10);
       expect(await debtOf('Ana'), 0);
       final db = await appDb.database;
-      expect(await db.query('sales'), isEmpty);
+      final row = (await db.query('sales')).single;
+      expect(row['voided_at'], isNotNull);
+      expect(row['void_reason'], 'Se equivocó de producto');
+      expect(await db.query('sales_ok'), isEmpty, reason: 'una venta anulada no cuenta en los totales');
+      // Anular dos veces no repone dos veces
+      await repo.voidSale(sale);
+      expect(await stockOf('p1'), 10);
       final reversal = (await db.query('stock_movements', where: "type = 'AJUSTE'")).single;
       expect(reversal['resulting_stock'], 10);
     });

@@ -20,7 +20,7 @@ const proBenefits = [
   (Icons.storefront_outlined, 'Tienda en línea', 'Tu catálogo con carrito; los pedidos te llegan por WhatsApp.'),
   (Icons.notifications_active_outlined, 'Cobro automático de fiados', 'Recordatorios programados y estado de cuenta en PDF.'),
   (Icons.auto_awesome_mosaic_outlined, 'Catálogos personalizados', 'Más plantillas y colores, sin el pie "Hecho con Stockealo".'),
-  (Icons.auto_awesome_rounded, 'Más preguntas a Stocky', '50 preguntas a la IA al día en vez de 10.'),
+  (Icons.auto_awesome_outlined, 'Más preguntas a Stocky', '50 preguntas a la IA al día en vez de 10.'),
 ];
 
 /// Lo que suma Pro Servicios además de todo Pro
@@ -174,7 +174,7 @@ class _ProScreenState extends State<ProScreen> {
                 padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.sm, AppSpace.xs, 0),
                 child: Text(
                   'Todo lo demás sigue gratis: inventario, ventas, fiados, reportes, equipo y respaldo.',
-                  style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                 ),
               ),
               const SizedBox(height: AppSpace.xl),
@@ -186,7 +186,7 @@ class _ProScreenState extends State<ProScreen> {
                   children: [
                     Text(
                       'Para lavaderos, barberías, talleres y otros negocios de servicios: todo lo de Pro y además:',
-                      style: TextStyle(fontSize: 13, height: 1.35, color: c.inkMuted),
+                      style: TextStyle(fontSize: AppText.sizeSmall, height: 1.35, color: c.inkMuted),
                     ),
                     const SizedBox(height: AppSpace.xs),
                     for (final b in proServicesBenefits) _benefit(c, b.$1, b.$2, b.$3),
@@ -204,7 +204,7 @@ class _ProScreenState extends State<ProScreen> {
                     children: [
                       Text(
                         'Por ahora los planes se activan con un código. Escríbenos y te contamos cómo tener Pro o Pro Servicios en tu negocio.',
-                        style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
                       ),
                       const SizedBox(height: AppSpace.md),
                       OutlinedButton.icon(
@@ -220,7 +220,7 @@ class _ProScreenState extends State<ProScreen> {
                   c,
                   Text(
                     'Pro aún no está disponible en tu país. Si te dieron un código, puedes canjearlo abajo.',
-                    style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
                   ),
                 )
               else ...[
@@ -235,7 +235,7 @@ class _ProScreenState extends State<ProScreen> {
               if (settings['legal_notice'] != null && plans.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.lg, AppSpace.xs, 0),
-                  child: Text(settings['legal_notice']!, style: TextStyle(fontSize: 11.5, height: 1.4, color: c.inkFaint)),
+                  child: Text(settings['legal_notice']!, style: TextStyle(fontSize: AppText.sizeCaption, height: 1.4, color: c.inkFaint)),
                 ),
             ],
           ),
@@ -248,7 +248,7 @@ class _ProScreenState extends State<ProScreen> {
   Widget _section(StockealoColors c, String label) => Padding(
         padding: const EdgeInsets.fromLTRB(AppSpace.xs, 0, 0, AppSpace.sm),
         child: Text(label.toUpperCase(),
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: c.inkFaint)),
+            style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: c.inkFaint)),
       );
 
   Widget _card(StockealoColors c, Widget child) => Container(
@@ -287,9 +287,9 @@ class _ProScreenState extends State<ProScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(status.active ? 'Tienes Pro' : 'Stockealo Pro',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: status.active ? c.onAccent : c.ink)),
+                        style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w800, color: status.active ? c.onAccent : c.ink)),
                     const SizedBox(height: 2),
-                    Text(text, style: TextStyle(fontSize: 13.5, color: status.active ? c.onAccent.withValues(alpha: 0.9) : c.inkMuted)),
+                    Text(text, style: TextStyle(fontSize: AppText.sizeBody, color: status.active ? c.onAccent.withValues(alpha: 0.9) : c.inkMuted)),
                   ],
                 ),
               ),
@@ -311,8 +311,8 @@ class _ProScreenState extends State<ProScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: c.ink)),
-                  Text(body, style: TextStyle(fontSize: 13, height: 1.35, color: c.inkMuted)),
+                  Text(title, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
+                  Text(body, style: TextStyle(fontSize: AppText.sizeSmall, height: 1.35, color: c.inkMuted)),
                 ],
               ),
             ),
@@ -347,7 +347,7 @@ class _ProScreenState extends State<ProScreen> {
               'services' => 'Para "${widget.business.name}": todo Pro más el módulo Servicios, con soporte.',
               _ => 'Para "${widget.business.name}" y todo su equipo.',
             },
-            style: TextStyle(fontSize: 13, color: c.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
           ),
         ),
         for (final p in plans) _planTile(c, p),
@@ -372,19 +372,19 @@ class _ProScreenState extends State<ProScreen> {
             padding: const EdgeInsets.all(AppSpace.lg),
             child: Row(
               children: [
-                Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                Icon(selected ? Icons.radio_button_checked_outlined : Icons.radio_button_off_outlined,
                     color: selected ? c.accent : c.inkFaint),
                 const SizedBox(width: AppSpace.md),
                 Expanded(
                   child: Row(
                     children: [
-                      Text(p.periodLabel, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+                      Text(p.periodLabel, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
                       if (p.label != null) ...[
                         const SizedBox(width: AppSpace.sm),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(color: c.warning.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(AppRadius.pill)),
-                          child: Text(p.label!, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c.warning)),
+                          child: Text(p.label!, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, color: c.warning)),
                         ),
                       ],
                     ],
@@ -395,9 +395,9 @@ class _ProScreenState extends State<ProScreen> {
                   children: [
                     if (p.regularPrice != null)
                       Text(_money(p.regularPrice!),
-                          style: TextStyle(fontSize: 12, color: c.inkFaint, decoration: TextDecoration.lineThrough)),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint, decoration: TextDecoration.lineThrough)),
                     Text(_money(p.price), style: AppText.amount(context, size: 17, weight: FontWeight.w800)),
-                    Text(p.perLabel, style: TextStyle(fontSize: 11.5, color: c.inkMuted)),
+                    Text(p.perLabel, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                   ],
                 ),
               ],
@@ -450,13 +450,13 @@ class _ProScreenState extends State<ProScreen> {
                       whatsapp != null
                           ? 'Escríbenos al WhatsApp y te decimos cómo pagar. Te enviamos un código para activar Pro aquí abajo.'
                           : 'Escríbenos a $proSupportEmail y te decimos cómo pagar. Te enviamos un código para activar Pro aquí abajo.',
-                      style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+                      style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
                     ),
                     if (whatsapp != null) _copyRow(c, whatsapp, 'WhatsApp de Stockealo', 'Número de WhatsApp copiado'),
                     const SizedBox(height: AppSpace.md),
                     FilledButton.icon(
                       onPressed: () => _askForPro(plan, whatsapp),
-                      icon: Icon(whatsapp != null ? Icons.chat_outlined : Icons.mail_outline_rounded, size: 20),
+                      icon: Icon(whatsapp != null ? Icons.chat_outlined : Icons.mail_outline_outlined, size: 20),
                       label: Text(whatsapp != null ? 'Escríbenos al WhatsApp' : 'Escribir un correo'),
                     ),
                   ],
@@ -480,7 +480,7 @@ class _ProScreenState extends State<ProScreen> {
                                       sameNumber ? 'Nequi y WhatsApp de Stockealo' : 'Nequi',
                                       if (settings['nequi_name'] != null) settings['nequi_name']!,
                                     ].join(' · '),
-                                    style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                                    style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                               ],
                             ),
                           ),
@@ -489,7 +489,7 @@ class _ProScreenState extends State<ProScreen> {
                               Clipboard.setData(ClipboardData(text: nequi));
                               AppToast.showSuccess(context, 'Número de Nequi copiado');
                             },
-                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            icon: const Icon(Icons.copy_outlined, size: 18),
                             label: const Text('Copiar'),
                           ),
                         ],
@@ -526,21 +526,21 @@ class _ProScreenState extends State<ProScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 2),
                   decoration: BoxDecoration(color: c.warningSoft, borderRadius: BorderRadius.circular(AppRadius.pill)),
                   child: Text('Modo de pruebas',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.warning)),
+                      style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: c.warning)),
                 ),
             ],
           ),
           const SizedBox(height: AppSpace.xs),
           Text(
             'Paga con Nequi, PSE, tarjeta o Bancolombia a través de Wompi. Pro se activa solo cuando se aprueba el pago.',
-            style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
           ),
           const SizedBox(height: AppSpace.md),
           FilledButton.icon(
             onPressed: plan == null || _paying ? null : () => _payOnline(plan),
             icon: _paying
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.lock_outline_rounded, size: 20),
+                : const Icon(Icons.lock_outline, size: 20),
             label: Text(plan == null ? 'Elige un plan' : 'Pagar ${_money(plan.price)} con Wompi'),
           ),
         ],
@@ -580,7 +580,7 @@ class _ProScreenState extends State<ProScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(number, style: AppText.amount(context, size: 18, weight: FontWeight.w800)),
-                  Text(caption, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                  Text(caption, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                 ],
               ),
             ),
@@ -589,7 +589,7 @@ class _ProScreenState extends State<ProScreen> {
                 Clipboard.setData(ClipboardData(text: number));
                 AppToast.showSuccess(context, copied);
               },
-              icon: const Icon(Icons.copy_rounded, size: 18),
+              icon: const Icon(Icons.copy_outlined, size: 18),
               label: const Text('Copiar'),
             ),
           ],
@@ -605,10 +605,10 @@ class _ProScreenState extends State<ProScreen> {
               height: 22,
               alignment: Alignment.center,
               decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Text(n, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: c.accent)),
+              child: Text(n, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w800, color: c.accent)),
             ),
             const SizedBox(width: AppSpace.sm + 2),
-            Expanded(child: Text(text, style: TextStyle(fontSize: 14, color: c.ink))),
+            Expanded(child: Text(text, style: TextStyle(fontSize: AppText.sizeBody, color: c.ink))),
           ],
         ),
       );
@@ -622,7 +622,7 @@ class _ProScreenState extends State<ProScreen> {
             textCapitalization: TextCapitalization.characters,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _redeem(),
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 1.5),
+            style: const TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, letterSpacing: 1.5),
             decoration: InputDecoration(
               labelText: 'Código',
               hintText: 'STK-XXXX-XXXX',
@@ -712,13 +712,13 @@ class _PaymentWaitSheetState extends State<PaymentWaitSheet> with WidgetsBinding
   Widget build(BuildContext context) {
     final c = context.colors;
     final (icon, color, title, body) = switch (_state) {
-      ProPaymentState.approved => (Icons.check_circle_rounded, c.success, 'Listo: ya tienes Pro',
+      ProPaymentState.approved => (Icons.check_circle_outlined, c.success, 'Listo: ya tienes Pro',
           'El pago fue aprobado y Pro ya está activo.'),
       ProPaymentState.declined => (Icons.cancel_outlined, c.danger, 'El pago no se aprobó',
           'Wompi rechazó o anuló el pago, así que no se te cobró. Puedes intentarlo de nuevo.'),
-      ProPaymentState.error => (Icons.error_outline_rounded, c.warning, 'Revisamos tu pago',
+      ProPaymentState.error => (Icons.error_outline_outlined, c.warning, 'Revisamos tu pago',
           'Hubo una diferencia con el pago. Escríbenos por WhatsApp con la referencia y lo resolvemos.'),
-      ProPaymentState.pending => (Icons.hourglass_top_rounded, c.accent, 'Esperando la confirmación',
+      ProPaymentState.pending => (Icons.hourglass_top_outlined, c.accent, 'Esperando la confirmación',
           'Termina el pago en Wompi. Cuando se apruebe, Pro se activa solo; puede tardar unos segundos.'),
     };
     return Container(
@@ -735,11 +735,11 @@ class _PaymentWaitSheetState extends State<PaymentWaitSheet> with WidgetsBinding
           children: [
             Icon(icon, size: 48, color: color),
             const SizedBox(height: AppSpace.md),
-            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink)),
+            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.sm),
-            Text(body, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted)),
+            Text(body, textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted)),
             const SizedBox(height: AppSpace.sm),
-            Text('Referencia ${widget.reference}', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: c.inkFaint)),
+            Text('Referencia ${widget.reference}', textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
             const SizedBox(height: AppSpace.lg),
             if (_state == ProPaymentState.pending) ...[
               if (_checking) const LinearProgressIndicator(),

@@ -9,10 +9,10 @@ import '../../../../core/utils/currency_options.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
-import '../../../products/presentation/screens/barcode_scanner_screen.dart';
 import '../../../team/data/team_repository.dart';
 import '../../data/business_repository.dart';
 import '../business_identity.dart';
+import '../../../../core/codes/code_reader.dart';
 
 /// Primera pantalla de una cuenta sin negocios: crear el propio o unirse al
 /// equipo de alguien más con su código o QR.
@@ -121,10 +121,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
   }
 
   Future<void> _scanQrCode() async {
-    final scanned = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
-    );
+    final scanned = await CodeReader.scan(context, title: 'Código del negocio');
     if (scanned != null && scanned.trim().isNotEmpty) {
       _joinWithCode(scanned.trim());
     }
@@ -184,7 +181,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                       ),
                       const SizedBox(width: AppSpace.sm + 2),
                       Expanded(
-                        child: Text('Stockealo', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.ink)),
+                        child: Text('Stockealo', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w800, color: c.ink)),
                       ),
                       if (widget.onLogout != null)
                         TextButton(
@@ -200,19 +197,19 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                   else ...[
                   Text(
                     greeting,
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w600, color: c.inkMuted),
                   ),
                   const SizedBox(height: AppSpace.xs),
                   Text(
                     _isJoiningTeam ? 'Únete a un equipo' : 'Crea tu negocio',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: c.ink),
+                    style: TextStyle(fontSize: AppText.sizePage, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: c.ink),
                   ),
                   const SizedBox(height: AppSpace.sm),
                   Text(
                     _isJoiningTeam
                         ? 'Pídele al dueño su código de invitación o escanea su QR.'
                         : 'Con esto empiezas a llevar tu inventario y tus ventas. Podrás cambiarlo después.',
-                    style: TextStyle(fontSize: 15, height: 1.4, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeBodyLarge, height: 1.4, color: c.inkMuted),
                   ),
                   const SizedBox(height: AppSpace.xl),
                   _ModeSwitch(
@@ -248,23 +245,23 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                 child: Text('$n', style: TextStyle(fontWeight: FontWeight.w700, color: c.accent)),
               ),
               const SizedBox(width: AppSpace.md),
-              Expanded(child: Text(text, style: TextStyle(fontSize: 15, height: 1.4, color: c.ink))),
+              Expanded(child: Text(text, style: TextStyle(fontSize: AppText.sizeBodyLarge, height: 1.4, color: c.ink))),
             ],
           ),
         );
 
     return [
-      Text(greeting, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.inkMuted)),
+      Text(greeting, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w600, color: c.inkMuted)),
       const SizedBox(height: AppSpace.xs),
       Text(
         '¿Ya usas Stockealo en tu celular?',
-        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: c.ink),
+        style: TextStyle(fontSize: AppText.sizePage, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: c.ink),
       ),
       const SizedBox(height: AppSpace.sm),
       Text(
         'Si tu negocio está en el celular con la sincronización apagada, sus datos están solo en '
         'ese celular y aquí no aparecen. Para verlos en la web:',
-        style: TextStyle(fontSize: 15, height: 1.4, color: c.inkMuted),
+        style: TextStyle(fontSize: AppText.sizeBodyLarge, height: 1.4, color: c.inkMuted),
       ),
       const SizedBox(height: AppSpace.xl),
       _card(
@@ -331,7 +328,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: AppText.sizeTitle,
                         fontWeight: FontWeight.w700,
                         color: name.isEmpty ? c.inkFaint : c.ink,
                       ),
@@ -340,7 +337,7 @@ class _CreateInitialBusinessScreenState extends State<CreateInitialBusinessScree
                     CountryLabel(
                       country: _country,
                       text: '${_country.name} · $_currency',
-                      style: TextStyle(fontSize: 13, color: c.inkMuted),
+                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                     ),
                   ],
                 ),
@@ -402,7 +399,7 @@ initialValue: _currency,
               child: Text.rich(
                 TextSpan(
                   text: 'Así se verán tus precios: ',
-                  style: TextStyle(color: c.inkMuted, fontSize: 13),
+                  style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall),
                   children: [
                     TextSpan(
                       text: CurrencyFormatter.formatIn(12500, _currency),
@@ -445,7 +442,7 @@ initialValue: _currency,
                         width: 2.5,
                       ),
                     ),
-                    child: _colorKey == entry.key ? const Icon(Icons.check_rounded, color: Colors.white, size: 18) : null,
+                    child: _colorKey == entry.key ? const Icon(Icons.check_outlined, color: Colors.white, size: 18) : null,
                   ),
                 ),
               ),
@@ -454,7 +451,7 @@ initialValue: _currency,
         const SizedBox(height: AppSpace.xxl),
         PrimaryActionButton(
           label: _isLoading ? 'Creando…' : 'Crear y empezar',
-          icon: Icons.arrow_forward_rounded,
+          icon: Icons.arrow_forward_outlined,
           onPressed: _isLoading ? null : _submitCreateBusiness,
         ),
       ],
@@ -476,7 +473,7 @@ initialValue: _currency,
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(13)),
-                    child: Icon(Icons.qr_code_scanner_rounded, color: c.accent),
+                    child: Icon(Icons.qr_code_scanner_outlined, color: c.accent),
                   ),
                   const SizedBox(width: AppSpace.md),
                   Expanded(
@@ -484,10 +481,10 @@ initialValue: _currency,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Escanea su código QR',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+                            style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
                         const SizedBox(height: 2),
                         Text('Lo encuentra en Ajustes › Tu negocio',
-                            style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                            style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                       ],
                     ),
                   ),
@@ -508,7 +505,7 @@ initialValue: _currency,
             Expanded(child: Divider(color: c.line)),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
-              child: Text('o escribe el código', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+              child: Text('o escribe el código', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
             ),
             Expanded(child: Divider(color: c.line)),
           ],
@@ -520,7 +517,7 @@ initialValue: _currency,
           textAlign: TextAlign.center,
           textInputAction: TextInputAction.done,
           onSubmitted: _isLoading ? null : _joinWithCode,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: 2.5, color: c.ink),
+          style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, letterSpacing: 2.5, color: c.ink),
           decoration: const InputDecoration(
             labelText: 'Código de invitación',
             hintText: '6CC1-4831',
@@ -529,7 +526,7 @@ initialValue: _currency,
         const SizedBox(height: AppSpace.xxl),
         PrimaryActionButton(
           label: _isLoading ? 'Verificando…' : 'Unirme al equipo',
-          icon: Icons.group_add_rounded,
+          icon: Icons.group_add_outlined,
           onPressed: _isLoading ? null : () => _joinWithCode(_codeController.text),
         ),
       ],
@@ -574,7 +571,7 @@ class _ModeSwitch extends StatelessWidget {
                       label,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: AppText.sizeBody,
                         fontWeight: FontWeight.w700,
                         color: selected ? c.ink : c.inkMuted,
                       ),
@@ -596,8 +593,8 @@ class _ModeSwitch extends StatelessWidget {
       ),
       child: Row(
         children: [
-          option(false, Icons.storefront_rounded, 'Soy el dueño'),
-          option(true, Icons.group_add_rounded, 'Me invitaron'),
+          option(false, Icons.storefront_outlined, 'Soy el dueño'),
+          option(true, Icons.group_add_outlined, 'Me invitaron'),
         ],
       ),
     );

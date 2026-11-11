@@ -12,16 +12,16 @@ void main() {
 
   test('los negocios creados antes conservan su ícono', () {
     const before = {
-      'tienda': Icons.storefront_rounded,
-      'ropa': Icons.checkroom_rounded,
-      'ferreteria': Icons.handyman_rounded,
-      'comida': Icons.restaurant_rounded,
-      'drogueria': Icons.local_pharmacy_rounded,
-      'belleza': Icons.content_cut_rounded,
-      'papeleria': Icons.edit_note_rounded,
-      'tecnologia': Icons.devices_rounded,
-      'regalos': Icons.redeem_rounded,
-      'otro': Icons.category_rounded,
+      'tienda': Icons.storefront_outlined,
+      'ropa': Icons.checkroom_outlined,
+      'ferreteria': Icons.handyman_outlined,
+      'comida': Icons.restaurant_outlined,
+      'drogueria': Icons.local_pharmacy_outlined,
+      'belleza': Icons.content_cut_outlined,
+      'papeleria': Icons.edit_note_outlined,
+      'tecnologia': Icons.devices_outlined,
+      'regalos': Icons.redeem_outlined,
+      'otro': Icons.category_outlined,
     };
     before.forEach((key, icon) => expect(businessKindFor(key).icon, icon, reason: key));
   });
@@ -60,8 +60,8 @@ void main() {
     await tester.enterText(find.byType(TextField), 'pan');
     await tester.pumpAndSettle();
     expect(find.text('Otros íconos relacionados con «pan»'), findsOneWidget);
-    expect(find.byIcon(Icons.bakery_dining_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.tv_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.bakery_dining_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.tv_outlined), findsOneWidget);
   });
 
   testWidgets('la fila abre el panel, se filtra y al elegir se cierra', (tester) async {
@@ -79,7 +79,7 @@ void main() {
       ),
     ));
     expect(find.text('Tienda'), findsOneWidget);
-    expect(find.byIcon(Icons.pets_rounded), findsNothing); // el panel no está abierto
+    expect(find.byIcon(Icons.pets_outlined), findsNothing); // el panel no está abierto
 
     await tester.tap(find.byType(BusinessIconField));
     await tester.pumpAndSettle();
@@ -90,7 +90,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'perros');
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.pets_rounded));
+    await tester.tap(find.byIcon(Icons.pets_outlined));
     await tester.pumpAndSettle();
 
     expect(selected, 'mascotas');

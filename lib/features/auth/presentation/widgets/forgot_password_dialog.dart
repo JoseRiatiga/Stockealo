@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../data/auth_repository.dart';
+import '../../../../core/widgets/app_toast.dart';
 
 class ForgotPasswordDialog extends StatefulWidget {
   final String? initialEmail;
@@ -121,7 +122,10 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
       final sec = match != null ? match.group(1) : '15';
       return 'Por seguridad, debes esperar $sec segundos antes de solicitar un nuevo código.';
     }
-    if (msg.contains('invalid token') || msg.contains('token has expired') || msg.contains('otp expired') || msg.contains('código inválido')) {
+    if (msg.contains('invalid token') ||
+        msg.contains('token has expired') ||
+        msg.contains('otp expired') ||
+        msg.contains('código inválido')) {
       return 'El código ingresado es incorrecto o ya expiró.';
     }
     if (msg.contains('user not found')) {
@@ -172,13 +176,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
       await _authRepo.requestPasswordResetOtp(email);
       if (mounted) {
         _startResendTimer();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Nuevo código de verificación enviado a tu correo.'),
-            backgroundColor: context.colors.accent,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        AppToast.show(context, message: 'Nuevo código de verificación enviado a tu correo.', type: ToastType.info);
       }
     } catch (e) {
       if (mounted) {
@@ -300,7 +298,6 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = context.colors.accent;
 
     return Dialog(
@@ -319,36 +316,34 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: primaryColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            _currentStep == 4 ? Icons.check_circle_outline_outlined : Icons.lock_reset_outlined,
+                            color: primaryColor,
+                            size: 22,
+                          ),
                         ),
-                        child: Icon(
-                          _currentStep == 4
-                              ? Icons.check_circle_outline
-                              : Icons.lock_reset_rounded,
-                          color: primaryColor,
-                          size: 22,
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            _currentStep == 4 ? '¡Listo!' : 'Recuperar contraseña',
+                            style: AppText.heading(context),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        _currentStep == 4 ? '¡Listo!' : 'Recuperar contraseña',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: context.colors.ink,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   if (_currentStep != 4)
                     IconButton(
-                      icon: const Icon(Icons.close, size: 20),
+                      icon: const Icon(Icons.close_outlined, size: 20),
                       onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
                       color: context.colors.inkMuted,
                     ),
@@ -360,11 +355,11 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
               if (_currentStep < 4) ...[
                 Row(
                   children: [
-                    _buildStepIndicator(1, 'Correo', _currentStep >= 1, isDark),
-                    _buildStepDivider(_currentStep >= 2, isDark),
-                    _buildStepIndicator(2, 'Código', _currentStep >= 2, isDark),
-                    _buildStepDivider(_currentStep >= 3, isDark),
-                    _buildStepIndicator(3, 'Nueva', _currentStep >= 3, isDark),
+                    _buildStepIndicator(1, 'Correo', _currentStep >= 1),
+                    _buildStepDivider(_currentStep >= 2),
+                    _buildStepIndicator(2, 'Código', _currentStep >= 2),
+                    _buildStepDivider(_currentStep >= 3),
+                    _buildStepIndicator(3, 'Nueva', _currentStep >= 3),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -382,12 +377,12 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline_rounded, color: context.colors.danger, size: 20),
+                      Icon(Icons.error_outline_outlined, color: context.colors.danger, size: 20),
                       const SizedBox(width: AppSpace.sm + 2),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: TextStyle(color: context.colors.ink, fontSize: 13.5, height: 1.35),
+                          style: TextStyle(color: context.colors.ink, fontSize: AppText.sizeBody, height: 1.35),
                         ),
                       ),
                     ],
@@ -396,10 +391,10 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
               ],
 
               // Contenido según el paso activo
-              if (_currentStep == 1) _buildStep1(isDark, primaryColor),
-              if (_currentStep == 2) _buildStep2(isDark, primaryColor),
-              if (_currentStep == 3) _buildStep3(isDark, primaryColor),
-              if (_currentStep == 4) _buildStep4(isDark, primaryColor),
+              if (_currentStep == 1) _buildStep1(primaryColor),
+              if (_currentStep == 2) _buildStep2(primaryColor),
+              if (_currentStep == 3) _buildStep3(primaryColor),
+              if (_currentStep == 4) _buildStep4(primaryColor),
             ],
           ),
         ),
@@ -407,7 +402,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
     );
   }
 
-  Widget _buildStepIndicator(int step, String label, bool isActive, bool isDark) {
+  Widget _buildStepIndicator(int step, String label, bool isActive) {
     final primaryColor = context.colors.accent;
     final isCurrent = _currentStep == step;
 
@@ -420,17 +415,13 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isActive
-                  ? primaryColor
-                  : (context.colors.line),
+              color: isActive ? primaryColor : (context.colors.line),
             ),
             child: Text(
               '$step',
               style: TextStyle(
-                color: isActive
-                    ? context.colors.onAccent
-                    : (context.colors.inkMuted),
-                fontSize: 12,
+                color: isActive ? context.colors.onAccent : (context.colors.inkMuted),
+                fontSize: AppText.sizeCaption,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -439,11 +430,9 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: AppText.sizeCaption,
               fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-              color: isCurrent
-                  ? (context.colors.ink)
-                  : (context.colors.inkMuted),
+              color: isCurrent ? (context.colors.ink) : (context.colors.inkMuted),
             ),
             textAlign: TextAlign.center,
           ),
@@ -452,19 +441,17 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
     );
   }
 
-  Widget _buildStepDivider(bool isActive, bool isDark) {
+  Widget _buildStepDivider(bool isActive) {
     return Container(
       width: 24,
       height: 2,
       margin: const EdgeInsets.only(bottom: 18),
-      color: isActive
-          ? context.colors.accent
-          : (context.colors.line),
+      color: isActive ? context.colors.accent : (context.colors.line),
     );
   }
 
   // --- PASO 1: Ingreso de correo ---
-  Widget _buildStep1(bool isDark, Color primaryColor) {
+  Widget _buildStep1(Color primaryColor) {
     return Form(
       key: _emailFormKey,
       child: Column(
@@ -473,7 +460,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
           Text(
             'Ingresa tu correo registrado',
             style: TextStyle(
-              fontSize: 15,
+              fontSize: AppText.sizeBodyLarge,
               fontWeight: FontWeight.bold,
               color: context.colors.ink,
             ),
@@ -482,7 +469,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
           Text(
             'Te enviaremos un código de seguridad de 6 dígitos para verificar tu identidad y restablecer tu clave.',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: AppText.sizeSmall,
               color: context.colors.inkMuted,
               height: 1.4,
             ),
@@ -518,7 +505,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                     )
                   : const Text(
                       'Enviar código de seguridad',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.bold),
                     ),
             ),
           ),
@@ -528,7 +515,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
   }
 
   // --- PASO 2: Ingreso de código OTP ---
-  Widget _buildStep2(bool isDark, Color primaryColor) {
+  Widget _buildStep2(Color primaryColor) {
     final email = _emailController.text.trim();
 
     return Form(
@@ -539,7 +526,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
           Text(
             'Código de verificación',
             style: TextStyle(
-              fontSize: 15,
+              fontSize: AppText.sizeBodyLarge,
               fontWeight: FontWeight.bold,
               color: context.colors.ink,
             ),
@@ -548,7 +535,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
           RichText(
             text: TextSpan(
               style: TextStyle(
-                fontSize: 13,
+                fontSize: AppText.sizeSmall,
                 color: context.colors.inkMuted,
                 height: 1.4,
               ),
@@ -573,7 +560,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             maxLength: 6,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             style: const TextStyle(
-              fontSize: 24,
+              fontSize: AppText.sizePage,
               letterSpacing: 8,
               fontWeight: FontWeight.bold,
             ),
@@ -608,18 +595,18 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                 Text(
                   'Reenviar código en $_resendCountdown s',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: AppText.sizeCaption,
                     color: context.colors.inkMuted,
                   ),
                 ),
               ] else ...[
                 TextButton.icon(
                   onPressed: _isLoading ? null : _handleResendOtp,
-                  icon: const Icon(Icons.refresh, size: 16),
+                  icon: const Icon(Icons.refresh_outlined, size: 16),
                   label: const Text('Reenviar código ahora'),
                   style: TextButton.styleFrom(
                     foregroundColor: primaryColor,
-                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    textStyle: const TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -648,7 +635,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.arrow_back_rounded,
+                          Icons.arrow_back_outlined,
                           size: 14,
                           color: context.colors.inkMuted,
                         ),
@@ -657,7 +644,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                           'Cambiar correo',
                           style: TextStyle(
                             color: context.colors.inkMuted,
-                            fontSize: 13,
+                            fontSize: AppText.sizeSmall,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -681,7 +668,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                           fit: BoxFit.scaleDown,
                           child: Text(
                             'Verificar código',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                            style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.bold),
                           ),
                         ),
                 ),
@@ -694,7 +681,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
   }
 
   // --- PASO 3: Nueva contraseña ---
-  Widget _buildStep3(bool isDark, Color primaryColor) {
+  Widget _buildStep3(Color primaryColor) {
     return Form(
       key: _passwordFormKey,
       child: Column(
@@ -703,7 +690,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
           Text(
             'Crea tu nueva contraseña',
             style: TextStyle(
-              fontSize: 15,
+              fontSize: AppText.sizeBodyLarge,
               fontWeight: FontWeight.bold,
               color: context.colors.ink,
             ),
@@ -712,7 +699,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
           Text(
             'Ingresa tu nueva clave de acceso personal. Se actualizará para todos tus negocios.',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: AppText.sizeSmall,
               color: context.colors.inkMuted,
               height: 1.4,
             ),
@@ -748,7 +735,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             obscureText: _obscureConfirmPassword,
             decoration: InputDecoration(
               labelText: 'Repite la contraseña',
-              prefixIcon: Icon(Icons.lock_reset, color: context.colors.inkMuted),
+              prefixIcon: Icon(Icons.lock_reset_outlined, color: context.colors.inkMuted),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -776,7 +763,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                     )
                   : const Text(
                       'Guardar nueva contraseña',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.bold),
                     ),
             ),
           ),
@@ -791,7 +778,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
               ),
               child: Text(
                 'Esa ya es tu contraseña actual. Puedes ingresar con ella o escribir una diferente arriba.',
-                style: TextStyle(fontSize: 13, color: context.colors.info, height: 1.4),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: context.colors.info, height: 1.4),
               ),
             ),
             const SizedBox(height: 10),
@@ -814,7 +801,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
   }
 
   // --- PASO 4: Éxito ---
-  Widget _buildStep4(bool isDark, Color primaryColor) {
+  Widget _buildStep4(Color primaryColor) {
     final email = _emailController.text.trim();
 
     return Column(
@@ -829,7 +816,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             shape: BoxShape.circle,
           ),
           child: Icon(
-            Icons.check_circle_rounded,
+            Icons.check_circle_outlined,
             color: primaryColor,
             size: 48,
           ),
@@ -838,7 +825,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
         Text(
           _keptCurrentPassword ? 'Mantienes tu contraseña' : '¡Contraseña actualizada!',
           style: TextStyle(
-            fontSize: 18,
+            fontSize: AppText.sizeHeading,
             fontWeight: FontWeight.bold,
             color: context.colors.ink,
           ),
@@ -850,7 +837,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
               ? 'Tu correo quedó verificado y tu contraseña no cambió. Ingresa con la que ya usabas.'
               : 'Tu contraseña ha sido restablecida exitosamente. Ahora puedes ingresar con tus nuevas credenciales.',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: AppText.sizeSmall,
             color: context.colors.inkMuted,
             height: 1.4,
           ),
@@ -867,7 +854,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             },
             child: const Text(
               'Ir a iniciar sesión',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.bold),
             ),
           ),
         ),

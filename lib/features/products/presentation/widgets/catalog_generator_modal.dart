@@ -349,10 +349,10 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Catálogo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink)),
+                        Text('Catálogo', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
                         Text(
                           'Para compartir por WhatsApp o redes',
-                          style: TextStyle(fontSize: 13, color: c.inkMuted),
+                          style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                         ),
                       ],
                     ),
@@ -360,7 +360,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                   IconButton(
                     tooltip: 'Cerrar',
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close_rounded, color: c.inkMuted),
+                    icon: Icon(Icons.close_outlined, color: c.inkMuted),
                   ),
                 ],
               ),
@@ -428,7 +428,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(color: c.successSoft, borderRadius: BorderRadius.circular(AppRadius.control)),
-                  child: Icon(Icons.picture_as_pdf_rounded, color: c.success),
+                  child: Icon(Icons.picture_as_pdf_outlined, color: c.success),
                 ),
                 const SizedBox(width: AppSpace.md),
                 Expanded(
@@ -440,12 +440,12 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                         '${p.basename(file.path)} · ${_getFileSize(file)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                       ),
                       if (_savedPathLabel != null)
                         Text(
                           _isPublicDownload ? 'Guardado en $_savedPathLabel' : 'Copia en $_savedPathLabel',
-                          style: TextStyle(fontSize: 12, color: c.inkMuted),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                         ),
                     ],
                   ),
@@ -456,7 +456,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           const SizedBox(height: AppSpace.lg),
           FilledButton.icon(
             onPressed: _shareFile,
-            icon: const Icon(Icons.share_rounded),
+            icon: const Icon(Icons.share_outlined),
             label: const Text('Compartir'),
           ),
           const SizedBox(height: AppSpace.sm),
@@ -473,7 +473,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _isSavingToDownloads ? null : _manualSaveToDownloads,
-                  icon: const Icon(Icons.download_rounded),
+                  icon: const Icon(Icons.download_outlined),
                   label: const Text('Descargas'),
                 ),
               ),
@@ -535,7 +535,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
               Expanded(
                 child: PrimaryActionButton(
                   label: count == 0 ? 'Sin productos' : 'PDF · $count',
-                  icon: Icons.picture_as_pdf_rounded,
+                  icon: Icons.picture_as_pdf_outlined,
                   onPressed: count == 0 ? null : _generatePdf,
                 ),
               ),
@@ -561,7 +561,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           const ProCrown(size: 18),
           const SizedBox(width: AppSpace.sm),
           Expanded(
-            child: Text('Probando opciones Pro', style: TextStyle(fontSize: 13, color: c.ink)),
+            child: Text('Probando opciones Pro', style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink)),
           ),
           TextButton(
             onPressed: () => _update(_chosenStyle.effective(pro: false)),
@@ -584,7 +584,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (title != null) ...[
-            Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+            Text(title, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.md),
           ],
           child,
@@ -622,7 +622,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           ],
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.checklist_rounded, color: c.inkMuted),
+            leading: Icon(Icons.checklist_outlined, color: c.inkMuted),
             title: Text(
               manual ? '${_style.selectedProductIds.length} elegidos a mano' : 'Elegir productos a mano',
               style: TextStyle(color: c.ink, fontWeight: FontWeight.w600),
@@ -633,7 +633,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                     onPressed: () => _update(_style.copyWith(selectedProductIds: {})),
                     child: const Text('Quitar'),
                   )
-                : Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                : Icon(Icons.chevron_right_outlined, color: c.inkFaint),
             onTap: _pickProducts,
           ),
           SwitchListTile(
@@ -675,7 +675,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Plantilla', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          Text('Plantilla', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
           const SizedBox(height: AppSpace.sm),
           Wrap(
             spacing: AppSpace.sm,
@@ -691,7 +691,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
             ],
           ),
           const SizedBox(height: AppSpace.lg),
-          Text('Color', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          Text('Color', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
           const SizedBox(height: AppSpace.sm),
           Wrap(
             spacing: AppSpace.sm,
@@ -713,7 +713,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
             ],
           ),
           const SizedBox(height: AppSpace.lg),
-          Text('Fondo', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          Text('Fondo', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
           const SizedBox(height: AppSpace.sm),
           SegmentedButton<bool>(
             segments: [
@@ -730,7 +730,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           ),
           if (_style.template != 'lista') ...[
           const SizedBox(height: AppSpace.lg),
-          Text('Productos por página', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          Text('Productos por página', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
           const SizedBox(height: AppSpace.sm),
           SegmentedButton<int>(
             showSelectedIcon: false,
@@ -745,7 +745,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           ),
           ],
           const SizedBox(height: AppSpace.lg),
-          _field(c, _titleController, 'Título de la portada', 'Ej.: Colección de temporada', Icons.title_rounded),
+          _field(c, _titleController, 'Título de la portada', 'Ej.: Colección de temporada', Icons.title_outlined),
         ],
       ),
     );
@@ -766,9 +766,9 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
           const SizedBox(height: AppSpace.md),
           _field(c, _addressController, 'Dirección', 'Opcional', Icons.place_outlined),
           const SizedBox(height: AppSpace.md),
-          _field(c, _hoursController, 'Horario', 'Ej.: Lun a Sáb, 8 a. m. – 6 p. m.', Icons.schedule_rounded),
+          _field(c, _hoursController, 'Horario', 'Ej.: Lun a Sáb, 8 a. m. – 6 p. m.', Icons.schedule_outlined),
           const SizedBox(height: AppSpace.md),
-          _field(c, _socialController, 'Redes', 'Ej.: @mitienda', Icons.alternate_email_rounded),
+          _field(c, _socialController, 'Redes', 'Ej.: @mitienda', Icons.alternate_email_outlined),
         ],
       ),
     );
@@ -789,7 +789,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
     Widget toggle(String label, bool value, CatalogStyle Function(bool) apply) => SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: Text(label, style: TextStyle(color: c.ink, fontSize: 15)),
+          title: Text(label, style: TextStyle(color: c.ink, fontSize: AppText.sizeBodyLarge)),
           value: value,
           onChanged: (v) => _update(apply(v)),
         );
@@ -808,7 +808,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
             dense: true,
             title: Row(
               children: [
-                Flexible(child: Text('Pie "Hecho con Stockealo"', style: TextStyle(color: c.ink, fontSize: 15))),
+                Flexible(child: Text('Pie "Hecho con Stockealo"', style: TextStyle(color: c.ink, fontSize: AppText.sizeBodyLarge))),
                 if (!_pro) ...[
                   const SizedBox(width: AppSpace.xs),
                   const ProCrown(),
@@ -866,10 +866,10 @@ class _ColorDot extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               child: selected
-                  ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+                  ? const Icon(Icons.check_outlined, size: 18, color: Colors.white)
                   : locked
                       ? const Center(child: ProCrown(size: 16))
-                      : (isBusiness ? const Icon(Icons.storefront_rounded, size: 16, color: Colors.white) : null),
+                      : (isBusiness ? const Icon(Icons.storefront_outlined, size: 16, color: Colors.white) : null),
             ),
           ),
         ),
@@ -951,7 +951,7 @@ class _CatalogPreview extends StatelessWidget {
                           Text(business.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                              style: const TextStyle(color: Colors.white, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700)),
                           if (style.template == 'promo')
                             Container(
                               margin: const EdgeInsets.only(top: 2),
@@ -961,13 +961,13 @@ class _CatalogPreview extends StatelessWidget {
                               child: Text(title.toUpperCase(),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: accent, fontSize: 7, fontWeight: FontWeight.w700)),
+                                  style: TextStyle(color: accent, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700)),
                             )
                           else
                             Text(title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontSize: 8)),
+                                style: const TextStyle(color: Colors.white, fontSize: AppText.sizeCaption)),
                         ],
                       ),
                     ),
@@ -1024,10 +1024,10 @@ class _CatalogPreview extends StatelessWidget {
                                 Text(prod.name,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: ink, fontSize: 8, fontWeight: FontWeight.w700)),
+                                    style: TextStyle(color: ink, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700)),
                                 if (style.showPrice)
                                   Text(CurrencyFormatter.format(prod.salePrice),
-                                      style: TextStyle(color: price, fontSize: 8, fontWeight: FontWeight.w700)),
+                                      style: TextStyle(color: price, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700)),
                               ],
                             ),
                           ),
@@ -1044,7 +1044,7 @@ class _CatalogPreview extends StatelessWidget {
                 ].join(' · '),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: muted, fontSize: 7),
+                style: TextStyle(color: muted, fontSize: AppText.sizeCaption),
               ),
             ],
           ),
@@ -1056,7 +1056,7 @@ class _CatalogPreview extends StatelessWidget {
   Widget _badge(String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
         decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(4)),
-        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 5, fontWeight: FontWeight.w700)),
+        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700)),
       );
 
   /// Plantilla "Vitrina": foto grande y precio en una píldora
@@ -1075,7 +1075,7 @@ class _CatalogPreview extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: TextStyle(color: ink, fontSize: 8, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: ink, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700)),
         if (style.showPrice)
           Center(child: _badge(CurrencyFormatter.format(prod.salePrice))),
       ],
@@ -1109,11 +1109,11 @@ class _CatalogPreview extends StatelessWidget {
                     child: Text(products[i].name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: ink, fontSize: 8, fontWeight: FontWeight.w700)),
+                        style: TextStyle(color: ink, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700)),
                   ),
                   if (style.showPrice)
                     Text(CurrencyFormatter.format(products[i].salePrice),
-                        style: TextStyle(color: price, fontSize: 8, fontWeight: FontWeight.w700)),
+                        style: TextStyle(color: price, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
@@ -1179,7 +1179,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                 children: [
                   Expanded(
                     child: Text('Elegir productos',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+                        style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
                   ),
                   TextButton(
                     onPressed: () => setState(() {
@@ -1198,7 +1198,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
               padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
               child: TextField(
                 onChanged: (v) => setState(() => _query = v.trim()),
-                decoration: const InputDecoration(hintText: 'Buscar', prefixIcon: Icon(Icons.search_rounded)),
+                decoration: const InputDecoration(hintText: 'Buscar', prefixIcon: Icon(Icons.search_outlined)),
               ),
             ),
             const SizedBox(height: AppSpace.sm),
@@ -1226,7 +1226,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                 width: double.infinity,
                 child: PrimaryActionButton(
                   label: _selected.isEmpty ? 'Usar todos' : 'Listo · ${_selected.length}',
-                  icon: Icons.check_rounded,
+                  icon: Icons.check_outlined,
                   onPressed: () => Navigator.pop(context, _selected),
                 ),
               ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/modern_dialog.dart';
+import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/status_pill.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/theme/app_tokens.dart';
 
 /// Cambio de contraseña: pide la actual (se verifica con Supabase Auth) y la nueva.
 class ChangePasswordDialog {
@@ -12,11 +15,10 @@ class ChangePasswordDialog {
     await showDialog(
       context: context,
       builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return ModernDialog(
-          icon: Icons.lock_reset_rounded,
-          iconColor: const Color(0xFF059669),
-          title: 'Cambiar Contraseña',
+        return AppDialog(
+          icon: Icons.lock_reset_outlined,
+          tone: AppTone.accent,
+          title: 'Cambiar contraseña',
           subtitle: 'Actualiza tu clave de acceso de manera segura',
           maxWidth: 440,
           content: Column(
@@ -36,7 +38,7 @@ class ChangePasswordDialog {
                 obscureText: true,
                 decoration: const InputDecoration(
                   labelText: 'Nueva Contraseña',
-                  prefixIcon: Icon(Icons.lock_reset),
+                  prefixIcon: Icon(Icons.lock_reset_outlined),
                 ),
               ),
               const SizedBox(height: 14),
@@ -45,7 +47,7 @@ class ChangePasswordDialog {
                 obscureText: true,
                 decoration: const InputDecoration(
                   labelText: 'Confirmar Nueva Contraseña',
-                  prefixIcon: Icon(Icons.check_circle_outline),
+                  prefixIcon: Icon(Icons.check_circle_outline_outlined),
                 ),
               ),
             ],
@@ -55,7 +57,7 @@ class ChangePasswordDialog {
               style: OutlinedButton.styleFrom(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 side: BorderSide(
-                  color: isDark ? const Color(0xFF26214A) : const Color(0xFFCBD5E1),
+                  color: context.colors.lineStrong,
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
@@ -63,7 +65,7 @@ class ChangePasswordDialog {
               child: Text(
                 'Cancelar',
                 style: TextStyle(
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  color: context.colors.inkMuted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -71,16 +73,14 @@ class ChangePasswordDialog {
             const SizedBox(width: 10),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
+                backgroundColor: context.colors.accent,
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
               onPressed: () async {
                 if (newPassController.text != confirmPassController.text) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Las contraseñas no coinciden'), backgroundColor: Colors.orange),
-                  );
+                  AppToast.show(context, message: 'Las contraseñas no coinciden', type: ToastType.warning);
                   return;
                 }
                 try {
@@ -91,15 +91,11 @@ class ChangePasswordDialog {
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Contraseña actualizada correctamente'), backgroundColor: Color(0xFF059669)),
-                    );
+                    AppToast.show(context, message: 'Contraseña actualizada correctamente', type: ToastType.success);
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red),
-                    );
+                    AppToast.show(context, message: e.toString().replaceAll('Exception: ', ''), type: ToastType.error);
                   }
                 }
               },

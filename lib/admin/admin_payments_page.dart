@@ -95,7 +95,7 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
                   IconButton(
                     tooltip: 'Copiar referencia',
                     onPressed: () => adminCopy(context, p.reference, 'Referencia'),
-                    icon: Icon(Icons.copy_rounded, size: 18, color: c.inkMuted),
+                    icon: Icon(Icons.copy_outlined, size: 18, color: c.inkMuted),
                   ),
                 ],
               ),

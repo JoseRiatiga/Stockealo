@@ -116,7 +116,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final c = context.colors;
     Widget title(String t) => Padding(
           padding: const EdgeInsets.fromLTRB(0, AppSpace.lg, 0, AppSpace.sm),
-          child: Text(t, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+          child: Text(t, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
         );
     final allChecked = _sections.length == _available.length;
 
@@ -143,7 +143,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           children: [
             Text(
               'Elige qué quieres descargar en Excel. Puedes bajarlo todo junto o cada parte por separado.',
-              style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted),
+              style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
             ),
             title('1. ¿Qué incluir?'),
             // Material y no Container: las casillas dibujan su toque sobre él (Flutter 3.47 lo exige)
@@ -170,7 +170,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       value: _sections.contains(s),
                       onChanged: (v) => setState(() => v == true ? _sections.add(s) : _sections.remove(s)),
                       title: Text(s.label),
-                      subtitle: Text(s.description, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                      subtitle: Text(s.description, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                     ),
                 ],
               ),
@@ -193,7 +193,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       onSelected: (_) => setState(() => _choice = choice),
                     ),
                   ChoiceChip(
-                    avatar: const Icon(Icons.date_range_rounded, size: 18),
+                    avatar: const Icon(Icons.date_range_outlined, size: 18),
                     label: Text(_choice == _PeriodChoice.custom ? _period.label : 'Elegir fechas'),
                     selected: _choice == _PeriodChoice.custom,
                     onSelected: (_) => _pickRange(),
@@ -204,7 +204,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 padding: const EdgeInsets.only(top: AppSpace.sm),
                 child: Text(
                   'Aplica a ventas, movimientos y ganancias. El inventario y los clientes salen como están hoy.',
-                  style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                 ),
               ),
             ],
@@ -225,7 +225,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     : _singleFile
                         ? 'Un archivo con ${_sections.length} hojas, una por cada parte.'
                         : '${_sections.length} archivos separados.',
-                style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
               ),
             ),
             const SizedBox(height: AppSpace.xl),
@@ -234,13 +234,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
               onPressed: _sections.isEmpty || _working ? null : _download,
               icon: _working
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.download_rounded),
+                  : const Icon(Icons.download_outlined),
               label: Text(_working ? 'Preparando…' : 'Descargar'),
             ),
             if (_sections.isEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: AppSpace.sm),
-                child: Text('Marca al menos una parte.', style: TextStyle(fontSize: 12.5, color: c.warning)),
+                child: Text('Marca al menos una parte.', style: TextStyle(fontSize: AppText.sizeSmall, color: c.warning)),
               ),
           ],
         ),
@@ -303,7 +303,7 @@ class _ReportsTabState extends State<ReportsTab> {
                 child: SegmentedButton<bool>(
                   showSelectedIcon: false,
                   segments: const [
-                    ButtonSegment(value: false, icon: Icon(Icons.insights_rounded), label: Text('Ganancias')),
+                    ButtonSegment(value: false, icon: Icon(Icons.insights_outlined), label: Text('Ganancias')),
                     ButtonSegment(value: true, icon: Icon(Icons.table_chart_outlined), label: Text('Descargar Excel')),
                   ],
                   selected: {_excel},

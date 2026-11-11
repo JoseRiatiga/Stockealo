@@ -68,13 +68,13 @@ class _StockealoSplashScreenState extends State<StockealoSplashScreen> with Sing
             const SizedBox(height: AppSpace.xl),
             Text(
               'Stockealo',
-              style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -0.6, color: c.ink),
+              style: AppText.display(context, color: c.ink).copyWith(letterSpacing: -0.6),
             ),
             const SizedBox(height: AppSpace.xs),
             Text(
               widget.statusMessage ?? 'Preparando tu inventario…',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: c.inkMuted),
+              style: AppText.body(context, color: c.inkMuted),
             ),
             const SizedBox(height: AppSpace.xxl),
             SizedBox(

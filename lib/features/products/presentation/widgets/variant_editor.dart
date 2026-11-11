@@ -7,8 +7,9 @@ import '../../../../core/design/color_swatch_dot.dart';
 import '../../../../core/utils/eyedropper.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../models/product_variant.dart';
-import '../screens/barcode_scanner_screen.dart';
 import 'photo_color_picker.dart';
+import '../../../../core/codes/code_reader.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Un color: nombre libre ("Blanco con rojo") y su muestra.
 class VariantColor {
@@ -528,10 +529,7 @@ class _VariantEditorState extends State<VariantEditor> {
   }
 
   Future<void> _scan(String key) async {
-    final code = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
-    );
+    final code = await CodeReader.pick(context, title: 'Código de la talla o el color', caption: 'Producto');
     if (code != null && code.trim().isNotEmpty) ctrl.setBarcode(key, code.trim());
   }
 
@@ -539,7 +537,7 @@ class _VariantEditorState extends State<VariantEditor> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final label = ctrl.attributeName;
-    final section = TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.ink);
+    final section = TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: c.ink);
 
     return Container(
       padding: const EdgeInsets.all(AppSpace.md + 2),
@@ -559,13 +557,13 @@ class _VariantEditorState extends State<VariantEditor> {
               Expanded(child: Text('${label}s', style: section)),
               ActionChip(
                 visualDensity: VisualDensity.compact,
-                label: const Text('Ropa', style: TextStyle(fontSize: 11)),
+                label: const Text('Ropa', style: TextStyle(fontSize: AppText.sizeCaption)),
                 onPressed: () => ctrl.setSizes(['S', 'M', 'L', 'XL']),
               ),
               const SizedBox(width: 4),
               ActionChip(
                 visualDensity: VisualDensity.compact,
-                label: const Text('Calzado', style: TextStyle(fontSize: 11)),
+                label: const Text('Calzado', style: TextStyle(fontSize: AppText.sizeCaption)),
                 onPressed: () => ctrl.setSizes(['36', '37', '38', '39', '40']),
               ),
             ],
@@ -593,7 +591,7 @@ class _VariantEditorState extends State<VariantEditor> {
               isDense: true,
               suffixIcon: IconButton(
                 tooltip: 'Agregar',
-                icon: const Icon(Icons.add_rounded),
+                icon: const Icon(Icons.add_outlined),
                 onPressed: _addSizeFromInput,
               ),
             ),
@@ -629,7 +627,7 @@ class _VariantEditorState extends State<VariantEditor> {
           const SizedBox(height: 2),
           Text(
             'Si una ${label.toLowerCase()} viene en varios colores, toca "+ Color" en esa ${label.toLowerCase()}.',
-            style: TextStyle(fontSize: 12, color: c.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
           ),
           const SizedBox(height: AppSpace.sm),
           if (ctrl.sizes.isEmpty)
@@ -659,12 +657,12 @@ class _VariantEditorState extends State<VariantEditor> {
         children: [
           Text(
             'Parece que escribiste el color dentro de la talla, como "M (Rojo)".',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.ink),
+            style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.ink),
           ),
           const SizedBox(height: 2),
           Text(
             '¿Separarlos en talla y color? Las existencias de cada una se conservan.',
-            style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
           ),
           Align(
             alignment: Alignment.centerRight,
@@ -695,12 +693,12 @@ class _VariantEditorState extends State<VariantEditor> {
                 child: Text(
                   title,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.ink),
+                  style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w700, color: c.ink),
                 ),
               ),
               TextButton.icon(
                 onPressed: () => _addColor(size),
-                icon: const Icon(Icons.add_rounded, size: 18),
+                icon: const Icon(Icons.add_outlined, size: 18),
                 label: const Text('Color'),
                 style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               ),
@@ -708,7 +706,7 @@ class _VariantEditorState extends State<VariantEditor> {
                 IconButton(
                   visualDensity: VisualDensity.compact,
                   tooltip: 'Quitar la ${ctrl.attributeName.toLowerCase()} $size',
-                  icon: Icon(Icons.delete_outline_rounded, size: 18, color: c.inkMuted),
+                  icon: Icon(Icons.delete_outline_outlined, size: 18, color: c.inkMuted),
                   onPressed: () => ctrl.removeSize(size),
                 ),
             ],
@@ -719,7 +717,7 @@ class _VariantEditorState extends State<VariantEditor> {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
                       'Agrega tallas arriba o toca "+ Color" si solo varía por color.',
-                      style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                     ),
                   )
                 : _row(c, size: size, color: null)
@@ -748,7 +746,7 @@ class _VariantEditorState extends State<VariantEditor> {
             child: color == null
                 ? Text(
                     'Sin color',
-                    style: TextStyle(fontSize: 13.5, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeBody, color: c.inkMuted),
                   )
                 : InkWell(
                     onTap: () => _editColor(size, color),
@@ -763,7 +761,7 @@ class _VariantEditorState extends State<VariantEditor> {
                             child: Text(
                               color.name,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.ink),
+                              style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w600, color: c.ink),
                             ),
                           ),
                         ],
@@ -785,7 +783,7 @@ class _VariantEditorState extends State<VariantEditor> {
             visualDensity: VisualDensity.compact,
             tooltip: hasCode ? 'Código: ${cell.barcode}' : 'Escanear código',
             icon: Icon(
-              hasCode ? Icons.qr_code_2_rounded : Icons.qr_code_scanner_rounded,
+              hasCode ? Icons.qr_code_2_outlined : Icons.qr_code_scanner_outlined,
               size: 18,
               color: hasCode ? c.accent : c.inkMuted,
             ),
@@ -794,7 +792,7 @@ class _VariantEditorState extends State<VariantEditor> {
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: color == null ? 'Quitar la ${ctrl.attributeName.toLowerCase()} $size' : 'Quitar ${color.name} de esta ${ctrl.attributeName.toLowerCase()}',
-            icon: Icon(Icons.close_rounded, size: 18, color: c.inkMuted),
+            icon: Icon(Icons.close_outlined, size: 18, color: c.inkMuted),
             onPressed: () => ctrl.removeCombo(key),
           ),
         ],
@@ -812,7 +810,7 @@ class _VariantEditorState extends State<VariantEditor> {
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: AppText.sizeCaption,
               fontWeight: strong ? FontWeight.w700 : FontWeight.w600,
               color: strong ? c.success : c.inkMuted,
             ),
@@ -1008,7 +1006,7 @@ class _ColorDialogState extends State<_ColorDialog> {
               runSpacing: 4,
               children: [
                 ActionChip(
-                  avatar: Icon(_slidersFor == target ? Icons.expand_less_rounded : Icons.tune_rounded, size: 18),
+                  avatar: Icon(_slidersFor == target ? Icons.expand_less_outlined : Icons.tune_outlined, size: 18),
                   label: const Text('Más colores'),
                   visualDensity: VisualDensity.compact,
                   onPressed: () => setState(() => _slidersFor = _slidersFor == target ? null : target),
@@ -1022,7 +1020,7 @@ class _ColorDialogState extends State<_ColorDialog> {
                   ),
                 if (canUseEyeDropper)
                   ActionChip(
-                    avatar: const Icon(Icons.colorize_rounded, size: 18),
+                    avatar: const Icon(Icons.colorize_outlined, size: 18),
                     label: const Text('Tomar de la pantalla'),
                     visualDensity: VisualDensity.compact,
                     onPressed: () => _fromScreen(target),
@@ -1056,13 +1054,11 @@ class _ColorDialogState extends State<_ColorDialog> {
         );
 
     final canSave = _name.text.trim().isNotEmpty;
-    return AlertDialog(
-      title: Text(
-        widget.initial == null
+    return AppDialog(
+title: widget.initial == null
             ? (widget.sizeLabel == null ? 'Agregar color' : 'Agregar color a la ${widget.sizeLabel!.toLowerCase()}')
             : 'Editar color',
-      ),
-      content: SizedBox(
+content: SizedBox(
         width: 380,
         child: SingleChildScrollView(
           child: Column(
@@ -1070,7 +1066,7 @@ class _ColorDialogState extends State<_ColorDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (widget.suggestions.isNotEmpty) ...[
-                Text('Ya usados', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.ink)),
+                Text('Ya usados', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: c.ink)),
                 const SizedBox(height: AppSpace.sm),
                 Wrap(
                   spacing: 6,
@@ -1086,7 +1082,7 @@ class _ColorDialogState extends State<_ColorDialog> {
                   ],
                 ),
                 const SizedBox(height: AppSpace.md),
-                Text('O uno nuevo', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.ink)),
+                Text('O uno nuevo', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: c.ink)),
                 const SizedBox(height: AppSpace.sm),
               ],
               Row(
@@ -1106,7 +1102,7 @@ class _ColorDialogState extends State<_ColorDialog> {
                         hintText: 'Ej. Rojo, Azul bajito, Blanco con rojo',
                         helperText: _customNameHint,
                         helperMaxLines: 2,
-                        helperStyle: TextStyle(fontSize: 11.5, color: c.inkMuted),
+                        helperStyle: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                       ),
                       onChanged: _nameChanged,
                     ),
@@ -1114,7 +1110,7 @@ class _ColorDialogState extends State<_ColorDialog> {
                 ],
               ),
               const SizedBox(height: AppSpace.lg),
-              Text('Muestra', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.ink)),
+              Text('Muestra', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: c.ink)),
               const SizedBox(height: AppSpace.sm),
               paletteFor(_hex),
               const SizedBox(height: AppSpace.sm),
@@ -1150,7 +1146,7 @@ class _ColorDialogState extends State<_ColorDialog> {
                   // "Código del color (hexadecimal)" quedaba cortada contra el título
                   childrenPadding: const EdgeInsets.only(top: AppSpace.lg, bottom: AppSpace.sm),
                   initiallyExpanded: false,
-                  title: Text('Opciones avanzadas', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                  title: Text('Opciones avanzadas', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                   children: [
                     hexField(_hex, 'Código del color (hexadecimal)'),
                     if (_twoTones && !_multi) ...[
@@ -1164,7 +1160,7 @@ class _ColorDialogState extends State<_ColorDialog> {
           ),
         ),
       ),
-      actions: [
+actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: canSave
@@ -1183,6 +1179,6 @@ class _ColorDialogState extends State<_ColorDialog> {
           child: const Text('Guardar'),
         ),
       ],
-    );
+);
   }
 }

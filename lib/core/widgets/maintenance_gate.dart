@@ -103,9 +103,9 @@ class _MaintenanceGateState extends State<MaintenanceGate> {
               padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.sm),
               child: Row(
                 children: [
-                  Icon(Icons.construction_rounded, size: 18, color: c.warning),
+                  Icon(Icons.construction_outlined, size: 18, color: c.warning),
                   const SizedBox(width: AppSpace.sm),
-                  Expanded(child: Text(text, style: TextStyle(fontSize: 12.5, color: c.ink))),
+                  Expanded(child: Text(text, style: AppText.small(context, color: c.ink))),
                 ],
               ),
             ),
@@ -136,12 +136,12 @@ class _MaintenanceGateState extends State<MaintenanceGate> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(Icons.construction_rounded, color: c.warning, size: 32),
+                      Icon(Icons.construction_outlined, color: c.warning, size: 32),
                       const SizedBox(height: AppSpace.sm),
                       Text(dialog.title, textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+                          style: AppText.heading(context)),
                       const SizedBox(height: AppSpace.md),
-                      Text(dialog.body, style: TextStyle(fontSize: 14, height: 1.4, color: c.ink)),
+                      Text(dialog.body, style: AppText.body(context)),
                       const SizedBox(height: AppSpace.lg),
                       FilledButton(onPressed: () => _markSeen(s), child: const Text('Entendido')),
                     ],
@@ -176,14 +176,14 @@ class _ClosedScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.card),
                     child: Image.asset('assets/icon/app_icon.png', width: 64, height: 64),
                   ),
                   const SizedBox(height: AppSpace.lg),
                   Text(
                     'Estamos en mantenimiento',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: c.ink),
+                    style: AppText.page(context),
                   ),
                   const SizedBox(height: AppSpace.sm),
                   Text(
@@ -191,16 +191,16 @@ class _ClosedScreen extends StatelessWidget {
                         ? 'Mantenimiento ${MaintenanceText.describe(state.startsAt!, state.endsAt!)}. Tus datos están a salvo.'
                         : 'Volvemos ${MaintenanceGate.when(state.endsAt)}. Tus datos están a salvo.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 15, height: 1.4, color: c.inkMuted),
+                    style: AppText.bodyLarge(context, color: c.inkMuted),
                   ),
                   if (note.isNotEmpty) ...[
                     const SizedBox(height: AppSpace.md),
-                    Text(note, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: c.ink)),
+                    Text(note, textAlign: TextAlign.center, style: AppText.body(context)),
                   ],
                   const SizedBox(height: AppSpace.xl),
                   OutlinedButton.icon(
                     onPressed: MaintenanceService.instance.refresh,
-                    icon: const Icon(Icons.refresh_rounded),
+                    icon: const Icon(Icons.refresh_outlined),
                     label: const Text('Volver a intentar'),
                   ),
                 ],

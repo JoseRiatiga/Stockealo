@@ -33,14 +33,6 @@ abstract final class ActivityAction {
   static const roleChange = 'role_change';
 }
 
-/// Forma de pago en palabras, para las frases del registro
-String activityPaymentLabel(String method) => switch (method.toUpperCase()) {
-      'EFECTIVO' => 'efectivo',
-      'TRANSFERENCIA' => 'transferencia',
-      'FIADO' => 'fiado',
-      'TARJETA' => 'tarjeta',
-      _ => method.toLowerCase(),
-    };
 
 /// Una anotación del registro de actividad
 class ActivityEntry {

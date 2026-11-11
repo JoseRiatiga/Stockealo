@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Tocar la prenda en la foto del producto y tomar ese color. Funciona igual en el
 /// celular y en el computador. Devuelve el color o null si se cancela.
@@ -115,7 +116,7 @@ class _PhotoColorPickerState extends State<PhotoColorPicker> {
         children: [
           Text(
             'Toca la parte de la prenda que tiene el color.',
-            style: TextStyle(fontSize: 13, color: c.inkMuted),
+            style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
           ),
           const SizedBox(height: AppSpace.sm),
           ConstrainedBox(
@@ -161,16 +162,16 @@ class _PhotoColorPickerState extends State<PhotoColorPicker> {
         ],
       );
     }
-    return AlertDialog(
-      title: const Text('Color de la foto'),
-      content: SizedBox(width: 420, child: SingleChildScrollView(child: body)),
-      actions: [
+    return AppDialog(
+title: 'Color de la foto',
+content: SizedBox(width: 420, child: SingleChildScrollView(child: body)),
+actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: _picked == null ? null : () => Navigator.pop(context, _picked),
           child: const Text('Usar este color'),
         ),
       ],
-    );
+);
   }
 }

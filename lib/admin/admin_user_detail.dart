@@ -184,7 +184,7 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
                 onPressed: () => launchUrl(Uri.parse('https://wa.me/$wa'), webOnlyWindowName: '_blank'),
               ),
             ActionChip(
-              avatar: const Icon(Icons.copy_rounded, size: 18),
+              avatar: const Icon(Icons.copy_outlined, size: 18),
               label: const Text('Copiar correo'),
               onPressed: () => adminCopy(context, d.email, 'Correo'),
             ),
@@ -233,7 +233,7 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
                 trailing: ProAdminService.instance.canSupport
                     ? IconButton(
                         tooltip: 'Borrar nota',
-                        icon: Icon(Icons.delete_outline_rounded, size: 18, color: c.inkMuted),
+                        icon: Icon(Icons.delete_outline_outlined, size: 18, color: c.inkMuted),
                         onPressed: () => _deleteNote((n['id'] as num).toInt()),
                       )
                     : null,

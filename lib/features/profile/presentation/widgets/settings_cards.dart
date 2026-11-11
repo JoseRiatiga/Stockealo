@@ -29,7 +29,7 @@ class SettingsGroup extends StatelessWidget {
               padding: const EdgeInsets.only(left: AppSpace.lg, bottom: AppSpace.sm),
               child: Text(
                 label!.toUpperCase(),
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: c.inkFaint),
+                style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: c.inkFaint),
               ),
             ),
           Container(
@@ -71,11 +71,11 @@ class SettingsPanel extends StatelessWidget {
                 Expanded(
                   child: Text(
                     label.toUpperCase(),
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: c.inkFaint),
+                    style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: c.inkFaint),
                   ),
                 ),
                 if (value != null)
-                  Text(value!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.accent)),
+                  Text(value!, style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.accent)),
               ],
             ),
           ),
@@ -108,7 +108,7 @@ class SettingsIcon extends StatelessWidget {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: tint.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.12),
+        color: tint.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, size: 19, color: tint),
@@ -177,21 +177,21 @@ class SettingsRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: color ?? c.ink)),
+                    Text(title, style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w600, color: color ?? c.ink)),
                     if (subtitle != null) ...[
                       const SizedBox(height: 2),
                       Text(
                         subtitle!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13, color: c.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                       ),
                     ],
                   ],
                 ),
               ),
               const SizedBox(width: AppSpace.sm),
-              trailing ?? (onTap != null ? Icon(Icons.chevron_right_rounded, color: c.inkFaint) : const SizedBox()),
+              trailing ?? (onTap != null ? Icon(Icons.chevron_right_outlined, color: c.inkFaint) : const SizedBox()),
             ],
           ),
         ),
@@ -351,10 +351,10 @@ class ReviewChangesSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppSpace.lg),
-              Text('Revisar cambios', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink)),
+              Text('Revisar cambios', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
               Text(
                 changes.length == 1 ? '1 cambio listo para aplicar' : '${changes.length} cambios listos para aplicar',
-                style: TextStyle(fontSize: 13, color: c.inkMuted),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
               ),
               const SizedBox(height: AppSpace.md),
               for (final change in changes)

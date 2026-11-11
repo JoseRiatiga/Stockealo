@@ -9,6 +9,7 @@ import '../../data/supplier_whatsapp.dart';
 import '../../models/supplier_order.dart';
 import 'purchase_detail_screen.dart';
 import 'purchase_entry_screen.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Mensaje para pedir de nuevo lo que no llegó
 String missingItemsText({required String businessName, required SupplierOrder order}) {
@@ -72,18 +73,18 @@ class _SupplierOrdersScreenState extends State<SupplierOrdersScreen> {
   Future<void> _close(SupplierOrder o) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Cerrar el pedido?'),
-        content: Text(
+      builder: (ctx) => AppDialog(
+title: '¿Cerrar el pedido?',
+content: Text(
           o.missingUnits > 0
               ? 'Ya no esperas las ${o.missingUnits} unidades que faltan. El pedido deja de aparecer como pendiente.'
               : 'El pedido deja de aparecer como pendiente.',
         ),
-        actions: [
+actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cerrar pedido')),
         ],
-      ),
+),
     );
     if (ok != true) return;
     await _repo.closeOrder(o);
@@ -144,7 +145,7 @@ class _SupplierOrdersScreenState extends State<SupplierOrdersScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
-                child: Text(o.statusLabel, style: TextStyle(color: fg, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                child: Text(o.statusLabel, style: TextStyle(color: fg, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -154,12 +155,12 @@ class _SupplierOrdersScreenState extends State<SupplierOrdersScreen> {
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 children: [
-                  Expanded(child: Text(i.label, style: TextStyle(color: c.ink, fontSize: 13))),
+                  Expanded(child: Text(i.label, style: TextStyle(color: c.ink, fontSize: AppText.sizeSmall))),
                   Text(
                     o.status == SupplierOrder.sent ? 'pedido ${i.quantity}' : 'llegó ${i.received} de ${i.quantity}',
                     style: TextStyle(
                       color: o.status != SupplierOrder.sent && i.missing > 0 ? c.danger : c.inkMuted,
-                      fontSize: 12.5,
+                      fontSize: AppText.sizeSmall,
                       fontWeight: i.missing > 0 && o.status != SupplierOrder.sent ? FontWeight.w600 : FontWeight.normal,
                     ),
                   ),
@@ -180,7 +181,7 @@ class _SupplierOrdersScreenState extends State<SupplierOrdersScreen> {
                 if (o.status == SupplierOrder.partial)
                   OutlinedButton.icon(
                     onPressed: () => _askMissing(o),
-                    icon: const Icon(Icons.send_rounded, size: 16),
+                    icon: const Icon(Icons.send_outlined, size: 16),
                     label: const Text('Pedir lo que faltó'),
                   ),
                 TextButton(onPressed: () => _close(o), child: const Text('Cerrar pedido')),

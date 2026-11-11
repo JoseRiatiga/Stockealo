@@ -5,6 +5,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../business/models/business.dart';
 import '../../../profile/presentation/widgets/settings_cards.dart';
 import '../../data/profit_report_repository.dart';
+import '../../../sales/models/payment_method.dart';
 
 /// Reporte de ganancias y pérdidas del negocio por periodo
 class ProfitReportScreen extends StatefulWidget {
@@ -67,11 +68,11 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Ganancias y pérdidas',
-                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: c.ink)),
+                                style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w800, color: c.ink)),
                             Text(widget.business.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                           ],
                         ),
                       ),
@@ -101,7 +102,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return const _Message(
-                          icon: Icons.error_outline_rounded,
+                          icon: Icons.error_outline_outlined,
                           title: 'No se pudo armar el reporte',
                           body: 'Intenta de nuevo en un momento.',
                         );
@@ -110,7 +111,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
                       if (report == null) return const Center(child: CircularProgressIndicator());
                       if (report.isEmpty) {
                         return const _Message(
-                          icon: Icons.insights_rounded,
+                          icon: Icons.insights_outlined,
                           title: 'Sin movimientos en este periodo',
                           body: 'Cuando registres ventas, aquí verás cuánto ganaste y en qué se fue el dinero.',
                         );
@@ -150,7 +151,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
                   padding: const EdgeInsets.only(top: AppSpace.sm),
                   child: Text(
                     'Diste ${_money(r.discounts)} en descuentos (ya restados de las ventas).',
-                    style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                   ),
                 ),
             ],
@@ -161,7 +162,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
           child: r.belowCostLoss == 0 && r.shrinkageLoss == 0
               ? Row(
                   children: [
-                    Icon(Icons.check_circle_rounded, color: c.success, size: 20),
+                    Icon(Icons.check_circle_outlined, color: c.success, size: 20),
                     const SizedBox(width: AppSpace.sm),
                     Expanded(child: Text('Sin pérdidas en este periodo', style: TextStyle(color: c.ink))),
                   ],
@@ -207,7 +208,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
           child: Text(
             'No incluye gastos como arriendo, servicios o sueldos. Las mermas se calculan con el costo actual de cada producto.',
-            style: TextStyle(fontSize: 12, height: 1.4, color: c.inkFaint),
+            style: TextStyle(fontSize: AppText.sizeCaption, height: 1.4, color: c.inkFaint),
           ),
         ),
       ],
@@ -228,7 +229,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Ganancia neta · ${_period.label.toLowerCase()}', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          Text('Ganancia neta · ${_period.label.toLowerCase()}', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
           const SizedBox(height: AppSpace.xs),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -260,7 +261,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
   Widget _pill(String text, Color background, Color foreground) => Container(
         padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm + 2, vertical: 4),
         decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(AppRadius.pill)),
-        child: Text(text, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: foreground)),
+        child: Text(text, style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: foreground)),
       );
 
   Widget _divider() => Divider(height: AppSpace.lg, color: context.colors.line);
@@ -277,8 +278,8 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label,
-                    style: TextStyle(fontSize: 14.5, fontWeight: strong ? FontWeight.w700 : FontWeight.w500, color: c.ink)),
-                if (hint != null) Text(hint, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                    style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: strong ? FontWeight.w700 : FontWeight.w500, color: c.ink)),
+                if (hint != null) Text(hint, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
               ],
             ),
           ),
@@ -292,14 +293,6 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
     );
   }
 
-  static String _methodLabel(String method) => switch (method.toUpperCase()) {
-        'EFECTIVO' => 'Efectivo',
-        'TRANSFERENCIA' => 'Transferencia',
-        'FIADO' => 'Fiado',
-        'TARJETA' => 'Tarjeta',
-        _ => method.isEmpty ? 'Otro' : method[0].toUpperCase() + method.substring(1).toLowerCase(),
-      };
-
   Widget _methodBar(String method, double amount, double total) {
     final c = context.colors;
     final share = total > 0 ? (amount / total).clamp(0.0, 1.0) : 0.0;
@@ -310,8 +303,8 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
         children: [
           Row(
             children: [
-              Expanded(child: Text(_methodLabel(method), style: TextStyle(fontSize: 14.5, color: c.ink))),
-              Text('${(share * 100).toStringAsFixed(0)}%  ', style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+              Expanded(child: Text(PaymentMethod.label(method), style: TextStyle(fontSize: AppText.sizeBodyLarge, color: c.ink))),
+              Text('${(share * 100).toStringAsFixed(0)}%  ', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
               Text(_money(amount), style: AppText.amount(context, size: 14.5)),
             ],
           ),
@@ -343,10 +336,10 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
                 Text(p.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: c.ink)),
+                    style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w600, color: c.ink)),
                 Text(
                   '${p.quantity} ${p.quantity == 1 ? 'unidad' : 'unidades'} · margen ${p.margin.toStringAsFixed(0)}%',
-                  style: TextStyle(fontSize: 12.5, color: warn ? c.warning : c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: warn ? c.warning : c.inkMuted),
                 ),
               ],
             ),
@@ -379,7 +372,7 @@ class _BackButton extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(color: c.surface, shape: BoxShape.circle, border: Border.all(color: c.line)),
-            child: Icon(Icons.arrow_back_rounded, color: c.ink, size: 22),
+            child: Icon(Icons.arrow_back_outlined, color: c.ink, size: 22),
           ),
         ),
       ),
@@ -405,9 +398,9 @@ class _Message extends StatelessWidget {
           children: [
             Icon(icon, size: 44, color: c.inkFaint),
             const SizedBox(height: AppSpace.md),
-            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.ink)),
+            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.xs),
-            Text(body, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, height: 1.4, color: c.inkMuted)),
+            Text(body, textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted)),
           ],
         ),
       ),

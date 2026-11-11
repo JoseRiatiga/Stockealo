@@ -44,7 +44,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
     try {
       await BusinessRepository.instance.updateBusiness(id: widget.business.id, cashRegisterEnabled: on);
       if (mounted) {
-        AppToast.showSuccess(context, on ? 'Caja encendida: la encuentras en Ventas › Caja.' : 'Caja apagada.');
+        AppToast.showSuccess(context, on ? 'Caja encendida: la encuentras en el menú, en Caja.' : 'Caja apagada.');
       }
     } catch (e) {
       if (mounted) {
@@ -87,10 +87,10 @@ class _ModulesScreenState extends State<ModulesScreen> {
                       if (pro) ...[const SizedBox(width: AppSpace.xs), const ProCrown(size: 15)],
                     ],
                   ),
-                  Text(what, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                  Text(what, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                   const SizedBox(height: 2),
                   Text('$status · $where',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: on ? c.success : c.inkFaint)),
+                      style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: on ? c.success : c.inkFaint)),
                 ],
               ),
             ),
@@ -114,13 +114,13 @@ class _ModulesScreenState extends State<ModulesScreen> {
             padding: const EdgeInsets.all(AppSpace.lg),
             children: [
               Text('Todo lo que puedes usar en ${widget.business.name} y dónde lo encuentras.',
-                  style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
               const SizedBox(height: AppSpace.md),
               _module(
-                icon: Icons.point_of_sale_rounded,
+                icon: Icons.point_of_sale_outlined,
                 title: 'Caja (arqueo)',
                 what: 'Abre el turno con una base, registra entradas y salidas y cierra contando el dinero.',
-                where: 'Ventas › Caja',
+                where: 'Caja, en el menú',
                 status: _cash ? 'Encendida' : 'Apagada',
                 on: _cash,
                 trailing: Switch(
@@ -132,7 +132,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 icon: Icons.view_kanban_outlined,
                 title: 'Servicios',
                 what: 'Para lavaderos, barberías y talleres: tablero, asistencia, comisiones y precios por servicio.',
-                where: pro.services ? 'pestaña Servicios' : 'incluido en Pro Servicios',
+                where: pro.services ? 'Servicios, en el menú' : 'incluido en Pro Servicios',
                 status: pro.services ? 'Activo' : 'No incluido en tu plan',
                 on: pro.services,
                 pro: true,
@@ -142,7 +142,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 icon: Icons.storefront_outlined,
                 title: 'Tienda en línea',
                 what: 'Tu catálogo con carrito; los pedidos te llegan por WhatsApp.',
-                where: 'Inventario › Tienda en línea',
+                where: 'Tienda en línea, en el menú',
                 status: pro.active ? 'Incluida en tu plan' : 'Con Stockealo Pro',
                 on: pro.active,
                 pro: true,
@@ -152,14 +152,14 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 icon: Icons.move_to_inbox_outlined,
                 title: 'Proveedores y entradas',
                 what: 'Pedidos por WhatsApp, mercancía que llega y lo que debes a cada proveedor.',
-                where: 'Inventario › Proveedores y entradas',
+                where: 'Clientes y proveedores, en el menú',
                 status: 'Siempre disponible',
               ),
               _module(
-                icon: Icons.menu_book_rounded,
+                icon: Icons.menu_book_outlined,
                 title: 'Catálogos',
                 what: 'Catálogo en PDF e historias para compartir tus productos.',
-                where: 'Inventario › Catálogo',
+                where: 'Productos › Catálogo',
                 status: 'Siempre disponible',
               ),
               _module(
@@ -170,7 +170,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 status: 'Siempre disponible',
               ),
               _module(
-                icon: Icons.insert_chart_outlined_rounded,
+                icon: Icons.insert_chart_outlined_outlined,
                 title: 'Reportes',
                 what: 'Ganancias del periodo y descargas en Excel.',
                 where: 'pestaña Reportes',
@@ -180,7 +180,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpace.sm),
                   child: Text('Solo el dueño o un administrador pueden encender o apagar módulos.',
-                      style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                 ),
             ],
           ),

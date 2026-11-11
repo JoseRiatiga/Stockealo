@@ -15,7 +15,6 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../models/product_variant.dart';
-import 'barcode_scanner_screen.dart';
 import '../widgets/category_name_dialog.dart';
 import '../widgets/manage_categories_modal.dart';
 import '../widgets/product_image_view.dart';
@@ -23,6 +22,9 @@ import '../widgets/variant_editor.dart';
 import '../../../../core/widgets/image_source_picker_modal.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../team/data/team_repository.dart';
+import '../../../../core/codes/code_reader.dart';
+import '../../../../core/codes/barcode_check.dart';
+import '../../../../core/design/app_dialog.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -58,6 +60,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   late TextEditingController _descriptionController;
   late TextEditingController _purchasePriceController;
   late TextEditingController _salePriceController;
+
+  /// Precio de antes (oferta en la tienda en línea)
+  late TextEditingController _comparePriceController;
   late TextEditingController _stockController;
   late TextEditingController _minStockController;
 
@@ -97,6 +102,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     );
     _salePriceController = TextEditingController(
       text: p != null && p.salePrice > 0 ? p.salePrice.toStringAsFixed(0) : '',
+    );
+    _comparePriceController = TextEditingController(
+      text: p?.comparePrice != null && p!.comparePrice! > 0 ? p.comparePrice!.toStringAsFixed(0) : '',
     );
     _stockController = TextEditingController(text: p?.stock.toString() ?? '0');
     _minStockController = TextEditingController(text: p?.minStock.toString() ?? '5');
@@ -153,12 +161,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             userEmail: user.email,
           );
       if (role == 'CASHIER' && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Acceso restringido: Solo administradores pueden gestionar productos'),
-            backgroundColor: Color(0xFFEF4444),
-          ),
-        );
+        AppToast.show(context, message: 'Acceso restringido: Solo administradores pueden gestionar productos', type: ToastType.error);
         Navigator.pop(context);
       }
     }
@@ -171,6 +174,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _descriptionController.dispose();
     _purchasePriceController.dispose();
     _salePriceController.dispose();
+    _comparePriceController.dispose();
     _stockController.dispose();
     _minStockController.dispose();
     _variants.dispose();
@@ -276,10 +280,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _photoPickerOpen = false;
   }
 
+  /// El lector de códigos con la revisión del último número y el aviso si otro
+  /// producto ya tiene ese código
   Future<void> _scanBarcode() async {
-    final scannedCode = await Navigator.push<String>(
+    final scannedCode = await CodeReader.pick(
       context,
-      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+      caption: widget.productToEdit == null ? 'Nuevo producto' : 'Editar producto',
+      initial: _codeController.text.trim().isEmpty ? null : _codeController.text.trim(),
+      ownerOf: (code) async {
+        final other = await _repository.getProductByCode(code, widget.businessId);
+        return other == null || other.id == widget.productToEdit?.id ? null : other.name;
+      },
+      confirmLabel: 'Usar este código',
     );
     if (scannedCode != null && scannedCode.isNotEmpty) {
       setState(() {
@@ -318,12 +330,21 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedCategory == null || _selectedCategory!.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor crea o selecciona una categoría pulsando el botón +'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppToast.show(context, message: 'Por favor crea o selecciona una categoría pulsando el botón +', type: ToastType.warning);
+      return;
+    }
+
+    // El código: que cuadre el último número y que no lo tenga otro producto
+    final code = _codeController.text.trim();
+    final check = BarcodeCheck.of(code);
+    if (!check.valid) {
+      AppToast.showWarning(context, 'El código no cuadra: el último número debería ser ${check.expected}. Revísalo con el lector.');
+      return;
+    }
+    final other = await _repository.getProductByCode(code, widget.businessId);
+    if (!mounted) return;
+    if (other != null && other.id != widget.productToEdit?.id) {
+      AppToast.showError(context, 'Ese código ya lo tiene «${other.name}». Usa otro o genera uno nuevo.');
       return;
     }
 
@@ -341,9 +362,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     if (_hasVariants) {
       final problem = _variants.validate();
       if (problem != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$problem O desactiva la opción de variantes.')),
-        );
+        AppToast.show(context, message: '$problem O desactiva la opción de variantes.', type: ToastType.info);
         setState(() => _isLoading = false);
         return;
       }
@@ -369,6 +388,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       category: _selectedCategory!,
       purchasePrice: purchasePrice,
       salePrice: salePrice,
+      comparePrice: (double.tryParse(_comparePriceController.text.trim()) ?? 0) > salePrice
+          ? double.tryParse(_comparePriceController.text.trim())
+          : null,
       stock: totalStock,
       minStock: minStock,
       photoPath: _photoPath,
@@ -394,24 +416,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isEditing ? 'Producto actualizado con éxito' : '¡Producto guardado exitosamente!',
-            ),
-            backgroundColor: const Color(0xFF059669),
-          ),
-        );
+        AppToast.show(context, message: isEditing ? 'Producto actualizado con éxito' : '¡Producto guardado exitosamente!', type: ToastType.success);
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al guardar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppToast.show(context, message: 'Error al guardar: $e', type: ToastType.error);
       }
     } finally {
       if (mounted) {
@@ -453,10 +463,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             width: 130,
                             height: 130,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
+                              color: context.colors.surface,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                                color: context.colors.lineStrong,
                                 width: 1.5,
                               ),
                               boxShadow: [
@@ -478,14 +488,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                 : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(Icons.add_a_photo_outlined, size: 40, color: Color(0xFF059669)),
+                                      Icon(Icons.add_a_photo_outlined, size: 40, color: context.colors.accent),
                                       const SizedBox(height: 6),
                                       Text(
                                         'Agregar Foto',
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: AppText.sizeCaption,
                                           fontWeight: FontWeight.bold,
-                                          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                          color: context.colors.inkMuted,
                                         ),
                                       ),
                                     ],
@@ -508,9 +518,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             right: 0,
                             child: CircleAvatar(
                               radius: 18,
-                              backgroundColor: const Color(0xFF059669),
+                              backgroundColor: context.colors.accent,
                               child: Icon(
-                                (_photoPath != null && _photoPath!.trim().isNotEmpty) ? Icons.edit : Icons.camera_alt,
+                                (_photoPath != null && _photoPath!.trim().isNotEmpty) ? Icons.edit_outlined : Icons.camera_alt_outlined,
                                 size: 18,
                                 color: Colors.white,
                               ),
@@ -525,10 +535,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   // 2. Nombre del Producto (campo principal)
                   TextFormField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Nombre del Producto *',
                       hintText: 'Ej. Café Colombiano 500g, Llavero Acrílico...',
-                      prefixIcon: Icon(Icons.shopping_bag_outlined, color: Color(0xFF64748B)),
+                      prefixIcon: Icon(Icons.shopping_bag_outlined, color: context.colors.inkMuted),
                     ),
                     validator: (v) => v == null || v.trim().isEmpty ? 'Ingresa el nombre del producto' : null,
                   ),
@@ -542,9 +552,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         children: [
                           Expanded(
                             child: InputDecorator(
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Categoría *',
-                                prefixIcon: Icon(Icons.category_outlined, color: Color(0xFF64748B)),
+                                prefixIcon: Icon(Icons.category_outlined, color: context.colors.inkMuted),
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
@@ -555,7 +565,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                     _categories.isEmpty
                                         ? 'Sin categorías (Toca + para crear)'
                                         : 'Selecciona una categoría',
-                                    style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                                    style: TextStyle(fontSize: AppText.sizeBody, color: context.colors.inkMuted),
                                   ),
                                   isDense: true,
                                   isExpanded: true,
@@ -579,7 +589,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           const SizedBox(width: 8),
                           IconButton.filledTonal(
                             onPressed: _showAddCategoryDialog,
-                            icon: const Icon(Icons.add),
+                            icon: const Icon(Icons.add_outlined),
                             tooltip: 'Nueva categoría',
                             style: IconButton.styleFrom(
                               backgroundColor: context.colors.accent.withValues(alpha: 0.12),
@@ -590,7 +600,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           const SizedBox(width: 8),
                           IconButton.filledTonal(
                             onPressed: _openManageCategoriesModal,
-                            icon: const Icon(Icons.tune, size: 20),
+                            icon: const Icon(Icons.tune_outlined, size: 20),
                             tooltip: 'Gestionar categorías',
                             style: IconButton.styleFrom(
                               backgroundColor: context.colors.surfaceMuted,
@@ -601,17 +611,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         ],
                       ),
                       if (_categories.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 6, left: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 4),
                           child: Row(
                             children: [
-                              Icon(Icons.info_outline, size: 14, color: Color(0xFF059669)),
-                              SizedBox(width: 4),
+                              Icon(Icons.info_outline, size: 14, color: context.colors.accent),
+                              const SizedBox(width: 4),
                               Text(
                                 'Aún no tienes categorías. Toca + para crear una.',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF059669),
+                                  fontSize: AppText.sizeCaption,
+                                  color: context.colors.accent,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -658,6 +668,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  // Oferta en la tienda en línea: el precio de antes se ve tachado
+                  TextFormField(
+                    controller: _comparePriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Precio de antes (opcional)',
+                      prefixText: r'$ ',
+                      hintText: 'Para mostrar «Oferta» en la tienda en línea',
+                    ),
+                    validator: (v) {
+                      final before = double.tryParse((v ?? '').trim());
+                      final now = double.tryParse(_salePriceController.text.trim()) ?? 0;
+                      if (before != null && before > 0 && before <= now) return 'Debe ser mayor al precio de venta';
+                      return null;
+                    },
+                  ),
                   const SizedBox(height: 8),
 
                   // Tarjeta dinámica de Ganancia y Margen %
@@ -666,13 +693,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
                         color: margin >= 0
-                            ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
-                            : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : const Color(0xFFFEE2E2)),
+                            ? (context.colors.successSoft)
+                            : (context.colors.dangerSoft),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: margin >= 0
-                              ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
-                              : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFFEF4444) : const Color(0xFFFECACA)),
+                              ? (context.colors.successSoft)
+                              : (context.colors.dangerSoft),
                         ),
                       ),
                       child: Row(
@@ -681,19 +708,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           Row(
                             children: [
                               Icon(
-                                margin >= 0 ? Icons.trending_up : Icons.trending_down,
+                                margin >= 0 ? Icons.trending_up_outlined : Icons.trending_down_outlined,
                                 size: 18,
-                                color: margin >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                color: margin >= 0 ? context.colors.accent : context.colors.danger,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'Ganancia unitaria: ${CurrencyFormatter.format(profit)}',
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: AppText.sizeSmall,
                                   fontWeight: FontWeight.bold,
                                   color: margin >= 0
-                                      ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46))
-                                      : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                                      ? (context.colors.success)
+                                      : (context.colors.danger),
                                 ),
                               ),
                             ],
@@ -701,9 +728,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           Text(
                             'Margen: ${margin.toStringAsFixed(1)}%',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: AppText.sizeSmall,
                               fontWeight: FontWeight.bold,
-                              color: margin >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                              color: margin >= 0 ? context.colors.accent : context.colors.danger,
                             ),
                           ),
                         ],
@@ -734,14 +761,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           const Flexible(
                             child: Text(
                               '¿Tiene variantes? (tallas, colores…)',
-                              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                              style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
                       ),
                       subtitle: Text(
                         'Actívalo si vendes este producto en varias tallas o colores, cada uno con sus existencias.',
-                        style: TextStyle(fontSize: 11, color: context.colors.inkMuted),
+                        style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.inkMuted),
                       ),
                       value: _hasVariants,
                       onChanged: (val) {
@@ -766,7 +793,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                   ? 'Stock Actual *'
                                   : (widget.onCreatedForPurchase != null ? 'Cantidad que llegó *' : 'Stock Inicial *'),
                               hintText: '0',
-                              prefixIcon: const Icon(Icons.inventory_2_outlined, size: 20, color: Color(0xFF64748B)),
+                              prefixIcon: Icon(Icons.inventory_2_outlined, size: 20, color: context.colors.inkMuted),
                               prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                             ),
                             validator: (v) {
@@ -782,11 +809,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           child: TextFormField(
                             controller: _minStockController,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Stock Mínimo',
                               hintText: '5',
-                              prefixIcon: Icon(Icons.notifications_active_outlined, size: 20, color: Color(0xFF64748B)),
-                              prefixIconConstraints: BoxConstraints(minWidth: 38, minHeight: 38),
+                              prefixIcon: Icon(Icons.notifications_active_outlined, size: 20, color: context.colors.inkMuted),
+                              prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                             ),
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) return 'Requerido';
@@ -805,10 +832,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     TextFormField(
                       controller: _minStockController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Alerta de Stock Mínimo Global',
                         hintText: '5',
-                        prefixIcon: Icon(Icons.notifications_active_outlined, size: 20, color: Color(0xFF64748B)),
+                        prefixIcon: Icon(Icons.notifications_active_outlined, size: 20, color: context.colors.inkMuted),
                       ),
                     ),
                   ],
@@ -823,17 +850,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         decoration: InputDecoration(
                           labelText: 'Código de Barras / SKU',
                           hintText: 'Ej. STK-12345',
-                          prefixIcon: const Icon(Icons.qr_code_2, color: Color(0xFF64748B)),
+                          prefixIcon: Icon(Icons.qr_code_2_outlined, color: context.colors.inkMuted),
                           suffixIcon: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF059669)),
-                                tooltip: 'Escanear código de barras con la cámara',
+                                icon: Icon(Icons.qr_code_scanner_outlined, color: context.colors.accent),
+                                tooltip: 'Leer el código: cámara, foto o a mano',
                                 onPressed: _scanBarcode,
                               ),
                               IconButton(
-                                icon: const Icon(Icons.refresh, color: Color(0xFF94A3B8), size: 20),
+                                icon: Icon(Icons.refresh_outlined, color: context.colors.inkFaint, size: 20),
                                 tooltip: 'Generar otro código automático',
                                 onPressed: () {
                                   setState(() {
@@ -847,11 +874,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
                       ),
                       const SizedBox(height: 4),
-                      const Padding(
-                        padding: EdgeInsets.only(left: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
                         child: Text(
                           'Código único automático. Toca el escáner si tu producto ya tiene código de barras impreso.',
-                          style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.inkMuted),
                         ),
                       ),
                     ],
@@ -886,7 +913,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       icon: const Icon(Icons.save_outlined),
                       label: Text(
                         isEditing ? 'Guardar Cambios' : 'Crear Producto',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -931,9 +958,9 @@ class _PhotoLinkDialogState extends State<_PhotoLinkDialog> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return AlertDialog(
-      title: const Text('Foto desde un enlace'),
-      content: SizedBox(
+    return AppDialog(
+title: 'Foto desde un enlace',
+content: SizedBox(
         width: 420,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -942,7 +969,7 @@ class _PhotoLinkDialogState extends State<_PhotoLinkDialog> {
             Text(
               'Pega el enlace de la página del producto (Shein, Temu, Mercado Libre, Amazon…) '
               'o el de la imagen. Traemos la foto principal y la guardamos con tu producto.',
-              style: TextStyle(fontSize: 13, height: 1.4, color: c.inkMuted),
+              style: TextStyle(fontSize: AppText.sizeSmall, height: 1.4, color: c.inkMuted),
             ),
             const SizedBox(height: AppSpace.md),
             TextField(
@@ -954,7 +981,7 @@ class _PhotoLinkDialogState extends State<_PhotoLinkDialog> {
                 hintText: 'https://…',
                 suffixIcon: IconButton(
                   tooltip: 'Pegar',
-                  icon: const Icon(Icons.content_paste_rounded),
+                  icon: const Icon(Icons.content_paste_outlined),
                   onPressed: _pasteFromClipboard,
                 ),
               ),
@@ -964,18 +991,18 @@ class _PhotoLinkDialogState extends State<_PhotoLinkDialog> {
             const SizedBox(height: AppSpace.sm),
             Text(
               'Usa fotos que tengas permiso de usar.',
-              style: TextStyle(fontSize: 12, color: c.inkFaint),
+              style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
             ),
           ],
         ),
       ),
-      actions: [
+actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: _link.text.trim().isEmpty ? null : _submit,
           child: const Text('Traer foto'),
         ),
       ],
-    );
+);
   }
 }

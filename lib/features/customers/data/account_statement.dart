@@ -12,6 +12,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../business/models/business.dart';
 import '../../reports/data/catalog_pdf_service.dart';
 import '../models/customer.dart';
+import '../../sales/models/payment_method.dart';
 
 /// Un renglón del estado de cuenta: una venta fiada (cargo) o un abono
 class StatementEntry {
@@ -96,11 +97,7 @@ class AccountStatement {
   }
 
   static String _paymentDescription(Map<String, dynamic> p) {
-    final method = switch (p['payment_method']) {
-      'EFECTIVO' => 'en efectivo',
-      'TRANSFERENCIA' => 'por transferencia',
-      _ => '',
-    };
+    final method = PaymentMethod.phrase(p['payment_method'] as String?);
     final notes = (p['notes'] as String? ?? '').trim();
     return ['Abono${method.isEmpty ? '' : ' $method'}', if (notes.isNotEmpty) notes].join(' · ');
   }
@@ -114,7 +111,7 @@ class AccountStatementService {
   Future<AccountStatement> load(Customer customer) async {
     final db = await AppDatabase.instance.database;
     final sales = await db.query(
-      'sales',
+      'sales_ok',
       where: 'customer_id = ? AND business_id = ? AND payment_method = ?',
       whereArgs: [customer.id, customer.businessId, 'FIADO'],
     );

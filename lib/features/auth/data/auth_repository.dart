@@ -506,8 +506,8 @@ class AuthRepository {
 
   String _translateAuthError(Object e) => translateAuthError(e);
 
-  /// Convierte errores de Supabase Auth y de red en mensajes para el usuario
-  @visibleForTesting
+  /// Convierte cualquier error del ingreso (Supabase Auth, red o la base del
+  /// dispositivo) en un mensaje para el usuario. Nunca devuelve el error crudo.
   static String translateAuthError(Object e) {
     if (e is Exception && e is! AuthException && e.toString().startsWith('Exception: ')) {
       return e.toString().replaceFirst('Exception: ', '');
@@ -534,6 +534,14 @@ class AuthRepository {
     if (msg.contains('socketexception') || msg.contains('failed host lookup') ||
         msg.contains('clientexception') || msg.contains('network')) {
       return 'Necesitas conexión a internet. Verifica tu red e inténtalo de nuevo.';
+    }
+    // La base del dispositivo no abrió (en la web: el navegador no cargó sus archivos,
+    // sin internet o con el almacenamiento bloqueado). Nunca mostrar el error crudo.
+    if (msg.contains('databaseexception') || msg.contains('getdatabasespath') || msg.contains('sqlite')) {
+      debugPrint('No abrió la base del dispositivo: $e');
+      return 'No pudimos abrir los datos guardados en este dispositivo. '
+          'Revisa tu conexión a internet y recarga la página (o cierra y abre la app). '
+          'Si sigue pasando, escríbenos.';
     }
     debugPrint('Error de autenticación sin traducir: $e');
     return 'No se pudo completar la operación. Inténtalo de nuevo.';

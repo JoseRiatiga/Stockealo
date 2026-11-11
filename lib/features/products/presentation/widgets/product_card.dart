@@ -6,7 +6,7 @@ import '../../models/product.dart';
 import 'barcode_modal.dart';
 import 'product_image_view.dart';
 
-/// Cómo se muestran los productos en Inventario
+/// Cómo se muestran los productos en Productos y Stock
 enum ProductLayout { list, grid }
 
 /// Tarjeta de producto de V1. Toda la tarjeta abre el detalle; las acciones (vender,
@@ -44,7 +44,7 @@ class ProductCard extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(AppSpace.sm, 0, AppSpace.sm, AppSpace.md),
-                child: Text(product.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                child: Text(product.name, style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
               ),
               if (onSale != null && !product.isOutOfStock)
                 ListTile(
@@ -65,7 +65,7 @@ class ProductCard extends StatelessWidget {
                   },
                 ),
               ListTile(
-                leading: const Icon(Icons.qr_code_2_rounded),
+                leading: const Icon(Icons.qr_code_2_outlined),
                 title: const Text('Ver código'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -73,7 +73,7 @@ class ProductCard extends StatelessWidget {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.open_in_new_rounded),
+                leading: const Icon(Icons.open_in_new_outlined),
                 title: const Text('Ver detalle'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -94,7 +94,7 @@ class ProductCard extends StatelessWidget {
 
   Widget _moreButton(BuildContext context) {
     return IconButton(
-      icon: Icon(Icons.more_horiz_rounded, color: context.colors.inkMuted),
+      icon: Icon(Icons.more_horiz_outlined, color: context.colors.inkMuted),
       tooltip: 'Acciones de ${product.name}',
       visualDensity: VisualDensity.compact,
       onPressed: () => _showActions(context),
@@ -124,7 +124,7 @@ class ProductCard extends StatelessWidget {
                   product.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.25, color: c.ink),
+                  style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w600, height: 1.25, color: c.ink),
                 ),
                 const SizedBox(height: 4),
                 Wrap(
@@ -133,7 +133,7 @@ class ProductCard extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     StockPill(product: product),
-                    Text(product.category, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                    Text(product.category, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                   ],
                 ),
               ],
@@ -175,7 +175,7 @@ class ProductCard extends StatelessWidget {
                   product.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.25, color: c.ink),
+                  style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w600, height: 1.25, color: c.ink),
                 ),
                 const SizedBox(height: 4),
                 Row(
@@ -219,7 +219,7 @@ class StockPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
-      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
+      child: Text(label, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: fg)),
     );
   }
 }

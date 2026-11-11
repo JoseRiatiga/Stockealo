@@ -134,7 +134,7 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
           shrinkWrap: true,
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
           children: [
-            Text('Recibir ${_t.unit.toLowerCase()}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
+            Text('Recibir ${_t.unit.toLowerCase()}', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.md),
             if (_t.usesIdentifier)
               TextField(
@@ -145,7 +145,7 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
                 decoration: InputDecoration(
                   labelText: _t.identifierLabel,
                   hintText: _t.identifier == IdentifierKind.plate ? 'ABC12D' : null,
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const Icon(Icons.search_outlined),
                 ),
               ),
             if (visits != null)
@@ -154,12 +154,12 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
                 child: Text(
                   'Ya vino: ${visits.customerName ?? visits.title}, la última vez el '
                   '${visits.createdAt.day}/${visits.createdAt.month}. Completamos sus datos.',
-                  style: TextStyle(fontSize: 12.5, color: c.success),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: c.success),
                 ),
               ),
             if (_t.usesVehicleKinds) ...[
               const SizedBox(height: AppSpace.md),
-              Text('Tipo de vehículo', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.inkMuted)),
+              Text('Tipo de vehículo', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
               const SizedBox(height: AppSpace.xs),
               Wrap(
                 spacing: AppSpace.sm,
@@ -193,7 +193,7 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
               decoration: const InputDecoration(labelText: 'WhatsApp del cliente (opcional)', helperText: 'Para avisarle cuando esté listo'),
             ),
             const SizedBox(height: AppSpace.md),
-            Text('Servicios', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.inkMuted)),
+            Text('Servicios', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
             const SizedBox(height: AppSpace.xs),
             if (_t.usesVehicleKinds && _kind == null)
               Text('Elige el tipo de vehículo para ver los servicios y sus precios.', style: TextStyle(color: c.inkMuted))

@@ -13,9 +13,9 @@ void main() {
 
   test('el buscador encuentra funciones por palabras, también sin tildes', () {
     final caja = findFunctions('caja', role: 'CASHIER', services: false);
-    expect(caja.map((f) => f.where), contains('Ventas › Caja'));
+    expect(caja.map((f) => f.where), contains('Caja'));
     expect(findFunctions('cotización', role: 'CASHIER', services: false).single.title, 'Cotizaciones');
-    expect(findFunctions('proveedor', role: 'OWNER', services: false).single.where, 'Inventario › Proveedores y entradas');
+    expect(findFunctions('proveedor', role: 'OWNER', services: false).single.where, 'Clientes y proveedores › Proveedores');
     expect(findFunctions('modo oscuro', role: 'CASHIER', services: false).single.title, 'Apariencia');
   });
 
@@ -48,7 +48,7 @@ void main() {
           padding: const EdgeInsets.all(16),
           child: QuickAccessRow(items: [
             for (final label in ['Catálogo', 'Tienda en línea', 'Proveedores y entradas', 'Importar desde Excel'])
-              QuickAccessItem(icon: Icons.star_outline, label: label, onTap: () {}),
+              QuickAccessItem(icon: Icons.star_outline_outlined, label: label, onTap: () {}),
           ]),
         ),
       ),

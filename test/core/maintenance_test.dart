@@ -82,7 +82,7 @@ void main() {
     testWidgets('sin mantenimiento no se ve nada extra', (tester) async {
       await tester.pumpWidget(_app(const MaintenanceGate(child: Text('Inventario'))));
       expect(find.text('Inventario'), findsOneWidget);
-      expect(find.byIcon(Icons.construction_rounded), findsNothing);
+      expect(find.byIcon(Icons.construction_outlined), findsNothing);
     });
   });
 

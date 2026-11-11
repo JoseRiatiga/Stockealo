@@ -2,15 +2,12 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import '../theme/app_tokens.dart';
-import '../theme/theme_controller.dart';
 
-/// Decide si se dibuja el cristal. Se apaga (barras sólidas) si el usuario lo pidió en
-/// Ajustes o si el sistema pide alto contraste o reducir animaciones.
+/// Decide si se dibuja el cristal. Desde el re-diseño siempre es no (barras sólidas).
 bool useGlassEffect(BuildContext context) {
-  final media = MediaQuery.maybeOf(context);
-  if (ThemeController.instance.reduceTransparency) return false;
-  if (media != null && (media.highContrast || media.disableAnimations)) return false;
-  return true;
+  // Re-diseño 0.13.0: el diseño aprobado no usa cristal ni desenfoque. Encabezado,
+  // barras y botones son superficies sólidas con borde fino.
+  return false;
 }
 
 /// Superficie de cristal para lo que flota sobre el contenido: encabezado, barra de

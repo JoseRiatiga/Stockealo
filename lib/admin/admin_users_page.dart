@@ -111,9 +111,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                   IconButton(
                     tooltip: 'Copiar correo',
                     onPressed: () => adminCopy(context, u.email, 'Correo'),
-                    icon: Icon(Icons.copy_rounded, size: 18, color: c.inkMuted),
+                    icon: Icon(Icons.copy_outlined, size: 18, color: c.inkMuted),
                   ),
-                  Icon(Icons.chevron_right_rounded, color: c.inkFaint),
+                  Icon(Icons.chevron_right_outlined, color: c.inkFaint),
                 ],
               ),
             ),

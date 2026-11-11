@@ -274,6 +274,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         userId: widget.userId,
         onNavigateToInventory: () => _navigateToTab(1),
         onNavigateToSales: () => _navigateToTab(2),
+        onNavigateToTab: _navigateToTab,
         onLogout: widget.onLogout,
       ),
       ProductsListScreen(

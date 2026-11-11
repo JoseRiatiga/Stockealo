@@ -1090,16 +1090,20 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
         if (color != AppPalette.brand) AppPalette.toHex(color),
     ];
     return [
+      // Un solo interruptor: claro u oscuro (sin «Automático», pedido del dueño).
+      // Mientras la persona no elija, se ve como su equipo; al tocarlo queda fijo.
       SettingsGroup(children: [
-        SettingsRow.toggle(
-          icon: Icons.brightness_auto_outlined,
-          title: 'Automático',
-          subtitle: 'Claro u oscuro según tu dispositivo',
-          value: theme.themeMode == ThemeMode.system,
-          onChanged: (v) => theme.setThemeMode(v
-              ? ThemeMode.system
-              : (MediaQuery.platformBrightnessOf(context) == Brightness.dark ? ThemeMode.dark : ThemeMode.light)),
-        ),
+        Builder(builder: (context) {
+          final dark = theme.themeMode == ThemeMode.dark ||
+              (theme.themeMode == ThemeMode.system && MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+          return SettingsRow.toggle(
+            icon: dark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+            title: 'Modo oscuro',
+            subtitle: dark ? 'Activado' : 'Desactivado: la app se ve en modo claro',
+            value: dark,
+            onChanged: (v) => theme.setThemeModeNow(v ? ThemeMode.dark : ThemeMode.light),
+          );
+        }),
       ]),
       SettingsPanel(
         label: 'Color del tema',

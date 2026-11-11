@@ -31,7 +31,6 @@ class GlobalSearchDialog extends StatefulWidget {
   }) {
     return showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.65),
       builder: (_) => GlobalSearchDialog(
         businessId: businessId,
         onNavigateToTab: onNavigateToTab,
@@ -93,410 +92,249 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF131126) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0);
-    final cardBg = isDark ? const Color(0xFF18152F) : const Color(0xFFF8FAFC);
-    final textMain = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-
+    final c = context.colors;
     return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      backgroundColor: c.surface,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.xxl),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.sheet),
+        side: BorderSide(color: c.line),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640, maxHeight: 600),
-        child: Container(
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: borderColor, width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.6 : 0.15),
-                blurRadius: 36,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Barra de Entrada del Buscador
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF8B5CF6).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.search_rounded, color: Color(0xFFA78BFA), size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        autofocus: true,
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textMain),
-                        decoration: InputDecoration(
-                          hintText: 'Buscar por nombre, código o categoría...',
-                          hintStyle: TextStyle(fontSize: 13.5, color: textMuted),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          filled: false,
-                          contentPadding: EdgeInsets.zero,
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.close_rounded, size: 18, color: textMuted),
-                                  onPressed: () => _searchController.clear(),
-                                )
-                              : null,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF231E44) : const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'ESC',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: textMuted,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: borderColor),
-
-              // Área de Contenido
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B5CF6)))
-                    : Builder(builder: (context) {
-                        // Funciones de la app: el buscador lleva a su único lugar (0.12.0)
-                        final query = _searchController.text.trim();
-                        final functions = findFunctions(
-                          query,
-                          role: widget.userRole ?? 'CASHIER',
-                          services: ProService.instance.status.value.services,
-                        );
-                        if (query.isEmpty) {
-                          return _buildQuickShortcuts(functions, isDark, cardBg, borderColor, textMain, textMuted);
-                        }
-                        if (_results.isEmpty && functions.isEmpty) return _buildEmptyResults(textMuted);
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (functions.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                                child: Column(
-                                  children: [
-                                    for (final f in functions.take(3)) ...[
-                                      _functionTile(f, isDark, cardBg, borderColor, textMain),
-                                      const SizedBox(height: 8),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            if (_results.isNotEmpty)
-                              Expanded(child: _buildResultsList(isDark, cardBg, borderColor, textMain, textMuted)),
-                          ],
-                        );
-                      }),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Sin escribir: todas las funciones de la app y dónde viven
-  Widget _buildQuickShortcuts(
-    List<AppFunction> functions,
-    bool isDark,
-    Color cardBg,
-    Color borderColor,
-    Color textMain,
-    Color textMuted,
-  ) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 10),
-          child: Text(
-            'DÓNDE ESTÁ CADA COSA',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
-              color: textMuted,
-            ),
-          ),
-        ),
-        for (final f in functions) ...[
-          _functionTile(f, isDark, cardBg, borderColor, textMain),
-          const SizedBox(height: 8),
-        ],
-      ],
-    );
-  }
-
-  Widget _functionTile(AppFunction f, bool isDark, Color cardBg, Color borderColor, Color textMain) => _buildShortcutTile(
-        icon: f.icon,
-        iconColor: context.colors.accent,
-        title: f.title,
-        subtitle: 'Está en ${f.where}',
-        onTap: () {
-          Navigator.pop(context);
-          widget.onNavigateToTab?.call(f.tab);
-        },
-        isDark: isDark,
-        cardBg: cardBg,
-        borderColor: borderColor,
-        textMain: textMain,
-      );
-
-  Widget _buildShortcutTile({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    required bool isDark,
-    required Color cardBg,
-    required Color borderColor,
-    required Color textMain,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Campo de búsqueda
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.sm, AppSpace.sm),
+              child: Row(
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: textMain),
+                  Icon(Icons.search_rounded, color: c.inkMuted, size: 22),
+                  const SizedBox(width: AppSpace.md),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      autofocus: true,
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.ink),
+                      decoration: InputDecoration(
+                        hintText: 'Busca un producto o una función',
+                        hintStyle: TextStyle(fontSize: 14, color: c.inkFaint),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  if (_searchController.text.isNotEmpty)
+                    IconButton(
+                      tooltip: 'Borrar',
+                      icon: Icon(Icons.close_rounded, size: 18, color: c.inkMuted),
+                      onPressed: () => _searchController.clear(),
+                    ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cerrar'),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B), size: 18),
+            Divider(height: 1, color: c.line),
+
+            // Contenido
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Builder(builder: (context) {
+                      // Funciones de la app: el buscador lleva a su único lugar (0.12.0)
+                      final query = _searchController.text.trim();
+                      final functions = findFunctions(
+                        query,
+                        role: widget.userRole ?? 'CASHIER',
+                        services: ProService.instance.status.value.services,
+                      );
+                      if (query.isEmpty) return _buildAllFunctions(functions);
+                      if (_results.isEmpty && functions.isEmpty) return _buildEmptyResults();
+                      return ListView(
+                        padding: const EdgeInsets.all(AppSpace.lg),
+                        children: [
+                          if (functions.isNotEmpty) ...[
+                            _sectionLabel('Funciones'),
+                            for (final f in functions.take(3)) ...[
+                              _functionTile(f),
+                              const SizedBox(height: AppSpace.sm),
+                            ],
+                          ],
+                          if (_results.isNotEmpty) ...[
+                            if (functions.isNotEmpty) const SizedBox(height: AppSpace.sm),
+                            _sectionLabel('Productos'),
+                            for (final p in _results) ...[
+                              _productTile(p),
+                              const SizedBox(height: AppSpace.sm),
+                            ],
+                          ],
+                        ],
+                      );
+                    }),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyResults(Color textMuted) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.search_off_rounded, size: 48, color: textMuted.withOpacity(0.5)),
-          const SizedBox(height: 12),
-          Text(
-            'Sin resultados encontrados',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textMuted),
+  Widget _sectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(left: AppSpace.xs, bottom: AppSpace.sm),
+        child: Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.colors.inkMuted)),
+      );
+
+  /// Sin escribir: todas las funciones de la app y dónde viven
+  Widget _buildAllFunctions(List<AppFunction> functions) {
+    return ListView(
+      padding: const EdgeInsets.all(AppSpace.lg),
+      children: [
+        _sectionLabel('Dónde está cada cosa'),
+        for (final f in functions) ...[
+          _functionTile(f),
+          const SizedBox(height: AppSpace.sm),
+        ],
+      ],
+    );
+  }
+
+  Widget _functionTile(AppFunction f) {
+    final c = context.colors;
+    return Material(
+      color: c.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        side: BorderSide(color: c.line),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        onTap: () {
+          Navigator.pop(context);
+          widget.onNavigateToTab?.call(f.tab);
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.md),
+          child: Row(
+            children: [
+              Icon(f.icon, color: c.accent, size: 22),
+              const SizedBox(width: AppSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(f.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.ink)),
+                    const SizedBox(height: 2),
+                    Text('Está en ${f.where}', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: c.inkFaint, size: 20),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Intenta con otro término, código de barras o categoría',
-            style: TextStyle(fontSize: 12, color: textMuted.withOpacity(0.8)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyResults() {
+    final c = context.colors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off_rounded, size: 40, color: c.inkFaint),
+            const SizedBox(height: AppSpace.md),
+            Text('No encontramos nada', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: c.ink)),
+            const SizedBox(height: AppSpace.xs),
+            Text('Prueba con otra palabra, el código de barras o la categoría.',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: c.inkMuted)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _productTile(Product product) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        border: Border.all(color: c.line),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            child: ProductImageView(imagePath: product.photoPath, width: 48, height: 48, iconSize: 22),
+          ),
+          const SizedBox(width: AppSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: c.ink)),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: AppSpace.sm,
+                  runSpacing: AppSpace.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(CurrencyFormatter.format(product.salePrice), style: AppText.amount(context, size: 14)),
+                    StockStatusBadge(product: product),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpace.sm),
+          OutlinedButton(
+            onPressed: () => _openProduct(product),
+            style: OutlinedButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
+            ),
+            child: const Text('Ver'),
+          ),
+          const SizedBox(width: AppSpace.xs),
+          FilledButton(
+            onPressed: () => _sellProduct(product),
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
+            ),
+            child: const Text('Vender'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildResultsList(
-    bool isDark,
-    Color cardBg,
-    Color borderColor,
-    Color textMain,
-    Color textMuted,
-  ) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(14),
-      itemCount: _results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final product = _results[index];
+  /// Se toma el navegador antes de cerrar el buscador: después de cerrarlo, su
+  /// propio contexto ya no sirve para abrir otra pantalla.
+  Future<void> _openProduct(Product product) async {
+    final nav = Navigator.of(context);
+    nav.pop();
+    await nav.push(MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)));
+  }
 
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            children: [
-              // Foto
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: ProductImageView(
-                  imagePath: product.photoPath,
-                  width: 48,
-                  height: 48,
-                  iconSize: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-
-              // Información
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: textMain,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Text(
-                          'Cod: ${product.code}',
-                          style: TextStyle(fontSize: 11, color: textMuted),
-                        ),
-                        const SizedBox(width: 8),
-                        StockStatusBadge(product: product),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Precio y Acciones
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    CurrencyFormatter.format(product.salePrice),
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF10B981),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Botón Ver
-                      InkWell(
-                        onTap: () async {
-                          Navigator.pop(context);
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ProductDetailScreen(product: product),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF26214A) : const Color(0xFFE2E8F0),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.visibility_outlined, size: 14, color: textMuted),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Ver',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // Botón Vender
-                      InkWell(
-                        onTap: () async {
-                          Navigator.pop(context);
-                          await QuickSaleDialog.show(context, product);
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF059669),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.shopping_bag_outlined, size: 14, color: Colors.white),
-                              SizedBox(width: 4),
-                              Text(
-                                'Vender',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  Future<void> _sellProduct(Product product) async {
+    final nav = Navigator.of(context);
+    nav.pop();
+    await QuickSaleDialog.show(nav.context, product);
   }
 }

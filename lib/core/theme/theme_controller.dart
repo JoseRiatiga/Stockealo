@@ -137,9 +137,21 @@ class ThemeController extends ChangeNotifier {
   void setTextScale(double scale) => _update(_current.copyWith(textScale: scale));
   void setReduceTransparency(bool value) => _update(_current.copyWith(reduceTransparency: value));
 
-  /// Atajo del encabezado: cambia y guarda en el acto, sin pasar por la revisión
-  Future<void> toggleTheme() async {
-    final mode = isDarkMode ? ThemeMode.light : ThemeMode.dark;
+  /// Claro u oscuro: se aplica y se guarda en el acto (interruptor de Apariencia)
+  Future<void> setThemeModeNow(ThemeMode mode) async {
+    _saved = _saved.copyWith(themeMode: mode);
+    _update(_current.copyWith(themeMode: mode));
+    notifyListeners();
+    await _persist({_themeModeKey: _modeValue(mode)});
+  }
+
+  /// Atajo del encabezado: cambia y guarda en el acto, sin pasar por la revisión.
+  /// [current] es lo que se ve ahora: en Automático depende del sistema, así que
+  /// se pasa al contrario de lo que se ve (antes no cambiaba nada si el sistema
+  /// estaba en oscuro).
+  Future<void> toggleTheme({Brightness? current}) async {
+    final dark = current == null ? isDarkMode : current == Brightness.dark;
+    final mode = dark ? ThemeMode.light : ThemeMode.dark;
     _saved = _saved.copyWith(themeMode: mode);
     _update(_current.copyWith(themeMode: mode));
     await _persist({_themeModeKey: _modeValue(mode)});

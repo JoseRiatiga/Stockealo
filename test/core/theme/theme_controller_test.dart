@@ -53,4 +53,26 @@ void main() {
     expect(ThemeController.accentLabel('#4338CA'), 'Índigo');
     expect(ThemeController.accentLabel('#7C4A1E'), 'Café');
   });
+
+  group('claro u oscuro (0.12.1)', () {
+    tearDown(() async => theme.setThemeModeNow(ThemeMode.system));
+
+    test('el interruptor de Apariencia aplica y guarda en el acto, sin dejar cambios pendientes', () async {
+      await theme.setThemeModeNow(ThemeMode.dark);
+      expect(theme.themeMode, ThemeMode.dark);
+      expect(theme.hasPendingChanges, isFalse);
+      await theme.setThemeModeNow(ThemeMode.light);
+      expect(theme.themeMode, ThemeMode.light);
+      expect(theme.hasPendingChanges, isFalse);
+    });
+
+    test('el acceso rápido cambia lo que se ve aunque la app siga al sistema', () async {
+      await theme.setThemeModeNow(ThemeMode.system);
+      // El sistema está en oscuro: antes no cambiaba nada; ahora pasa a claro
+      await theme.toggleTheme(current: Brightness.dark);
+      expect(theme.themeMode, ThemeMode.light);
+      await theme.toggleTheme(current: Brightness.light);
+      expect(theme.themeMode, ThemeMode.dark);
+    });
+  });
 }

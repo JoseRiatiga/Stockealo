@@ -67,6 +67,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   String _selectedCategory = 'Todos';
   String _sortOption = 'name_asc';
   String _stockFilterOption = 'all';
+
+  /// Marca dónde empieza la lista, para bajar hasta ella al filtrar desde el resumen
+  final _listStartKey = GlobalKey();
   Map<String, dynamic> _stats = {};
   bool _isLoading = true;
   String _effectiveRole = 'OWNER';
@@ -340,6 +343,29 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     await AppDatabase.instance.setSetting(_layoutKey, layout.name);
   }
 
+  /// «Ver cuáles» del resumen: filtra lo que hay que reponer y baja hasta la lista.
+  /// Antes filtraba sin moverse y la lista quedaba fuera de la vista.
+  Future<void> _showToRestock() async {
+    setState(() {
+      _stockFilterOption = 'to_restock';
+      _currentPage = 1;
+    });
+    await _loadData(silent: true);
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _listStartKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+      }
+    });
+  }
+
+  static const _stockFilterLabels = {
+    'low_stock': 'stock bajo',
+    'out_of_stock': 'agotados',
+    'to_restock': 'por reponer',
+  };
+
   bool get _hasActiveFilters => _sortOption != 'name_asc' || _stockFilterOption != 'all';
 
   ProductCard _card(Product product) => ProductCard(
@@ -514,6 +540,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
 
                 // Orden y filtros (un solo botón) + vista lista o cuadrícula
                 SliverToBoxAdapter(
+                  key: _listStartKey,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(hPadding, AppSpace.sm, hPadding, 0),
                     child: Row(
@@ -549,6 +576,29 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                     ),
                   ),
                 ),
+
+                // Filtro de stock activo, a la vista y fácil de quitar
+                if (_stockFilterLabels[_stockFilterOption] != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.sm, hPadding, 0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: InputChip(
+                          avatar: Icon(Icons.filter_alt_outlined, size: 16, color: c.accent),
+                          label: Text('Mostrando: ${_stockFilterLabels[_stockFilterOption]} (${_products.length})'),
+                          deleteButtonTooltipMessage: 'Quitar filtro',
+                          onDeleted: () {
+                            setState(() {
+                              _stockFilterOption = 'all';
+                              _currentPage = 1;
+                            });
+                            _loadData(silent: true);
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
 
                 // Categorías, con "Editar" al final (antes había un segundo botón de filtros)
                 SliverToBoxAdapter(
@@ -709,10 +759,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
               child: InkWell(
                 borderRadius: BorderRadius.circular(AppRadius.control),
                 // El pedido vive en Proveedores y entradas: aquí solo se filtran los que faltan
-                onTap: () {
-                  setState(() => _stockFilterOption = 'to_restock');
-                  _loadData();
-                },
+                onTap: _showToRestock,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
                   child: Row(

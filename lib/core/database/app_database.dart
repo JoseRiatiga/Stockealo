@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 13;
+  static const int _schemaVersion = 14;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -571,11 +571,18 @@ class AppDatabase {
       await db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('where_moved_pending', '1')");
     }
     if (oldVersion < 13 && newVersion >= 13) await salesV13(db);
+    if (oldVersion < 14 && newVersion >= 14) await schedulesV14(db);
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
   /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
   /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  /// 0.13.1: horario de los empleados (del negocio y propio de cada uno)
+  static Future<void> schedulesV14(Database db) async {
+    await _addColumnIfMissing(db, 'staff', 'schedule', 'TEXT');
+    await _addColumnIfMissing(db, 'businesses', 'services_schedule', 'TEXT');
+  }
+
   static Future<void> salesV13(Database db) async {
     for (final column in ['voided_at', 'void_reason', 'voided_by', 'payment_split']) {
       await _addColumnIfMissing(db, 'sales', column, 'TEXT');
@@ -867,6 +874,7 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_members_email ON business_members(email)');
     await db.execute('CREATE INDEX idx_quotations_biz ON quotations(business_id)');
     await salesV13(db);
+    await schedulesV14(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

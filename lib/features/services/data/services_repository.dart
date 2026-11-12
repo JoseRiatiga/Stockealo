@@ -10,6 +10,7 @@ import '../../team/data/activity_repository.dart';
 import '../models/service_models.dart';
 import 'commissions_repository.dart';
 import 'service_board.dart';
+import '../models/work_schedule.dart';
 
 /// Catálogo de servicios, empleados y tablero de órdenes. Todo se guarda primero
 /// en el equipo y sube a la nube con la cola, como el resto de la app.
@@ -586,18 +587,39 @@ class ServicesRepository {
   }
 
   /// Todo lo del tablero de hoy, listo para las reglas
+  /// «Habilitar múltiples servicios»: sin límite de servicios a la vez por empleado
+  /// (por defecto, hasta [ServiceBoard.defaultMax]). Se guarda en este equipo.
+  static String _multiKey(String businessId) => 'services_multi_$businessId';
+
+  /// Horario del negocio para los empleados (null si no tiene)
+  Future<WorkSchedule?> globalSchedule(String businessId) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query('businesses', columns: ['services_schedule'], where: 'id = ?', whereArgs: [businessId], limit: 1);
+    return rows.isEmpty ? null : WorkSchedule.decode(rows.first['services_schedule'] as String?);
+  }
+
+  Future<bool> multipleServices(String businessId) async =>
+      await _dbProvider.getSetting(_multiKey(businessId)) == '1';
+
+  Future<void> setMultipleServices(String businessId, bool on) =>
+      _dbProvider.setSetting(_multiKey(businessId), on ? '1' : null);
+
   Future<ServiceBoard> loadBoard(String businessId, {DateTime? now}) async {
     final results = await Future.wait([
       getBoard(businessId, now: now),
       getStaff(businessId),
       getServices(businessId, includeInactive: true),
       getAttendance(businessId, day: now),
+      multipleServices(businessId),
+      globalSchedule(businessId),
     ]);
     return ServiceBoard(
       orders: results[0] as List<WorkOrder>,
       staff: results[1] as List<StaffMember>,
       services: results[2] as List<ShopService>,
       attendance: results[3] as List<StaffAttendance>,
+      maxPerStaff: (results[4] as bool) ? null : ServiceBoard.defaultMax,
+      globalSchedule: results[5] as WorkSchedule?,
     );
   }
 }

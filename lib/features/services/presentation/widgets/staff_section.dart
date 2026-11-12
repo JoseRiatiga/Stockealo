@@ -6,6 +6,9 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
 import '../../data/services_repository.dart';
 import '../../models/service_models.dart';
+import '../../models/work_schedule.dart';
+import 'schedule_editor.dart';
+import '../../../../core/design/app_dialog.dart';
 
 /// Ajustes › Equipo › Personas que hacen los servicios (Pro Servicios).
 /// No necesitan cuenta en la app. La comisión es la de cada servicio.
@@ -44,14 +47,7 @@ class _StaffSectionState extends State<StaffSection> {
   }
 
   Future<void> _edit([StaffMember? person]) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => _StaffEditor(business: widget.business, person: person),
-    );
-    if (saved == true) await _load();
+    if (await StaffEditor.show(context, business: widget.business, person: person)) await _load();
   }
 
   @override
@@ -128,22 +124,49 @@ class _StaffSectionState extends State<StaffSection> {
   }
 }
 
-class _StaffEditor extends StatefulWidget {
+/// LA hoja para agregar o editar a una persona que hace los servicios. Se abre
+/// desde Ajustes › Equipo y desde Servicios › Empleados (la misma, sin copias).
+class StaffEditor extends StatefulWidget {
   final Business business;
   final StaffMember? person;
 
-  const _StaffEditor({required this.business, this.person});
+  const StaffEditor({super.key, required this.business, this.person});
+
+  /// true si se guardó
+  static Future<bool> show(BuildContext context, {required Business business, StaffMember? person}) async {
+    final saved = await AppSheet.show<bool>(
+      context: context,
+      title: person == null ? 'Agregar empleado' : 'Editar empleado',
+      subtitle: 'No necesita cuenta en la app. Qué servicios hace se elige en Catálogo y precios.',
+      builder: (_) => StaffEditor(business: business, person: person),
+    );
+    return saved == true;
+  }
 
   @override
-  State<_StaffEditor> createState() => _StaffEditorState();
+  State<StaffEditor> createState() => _StaffEditorState();
 }
 
-class _StaffEditorState extends State<_StaffEditor> {
+class _StaffEditorState extends State<StaffEditor> {
   late final _name = TextEditingController(text: widget.person?.name ?? '');
   late final _phone = TextEditingController(text: widget.person?.phone ?? '');
   late final _document = TextEditingController(text: widget.person?.document ?? '');
   late bool _active = widget.person?.isActive ?? true;
+
+  /// Horario propio; null = usa el del negocio
+  late WorkSchedule? _schedule = WorkSchedule.decode(widget.person?.schedule);
   bool _saving = false;
+
+  Future<void> _editSchedule() async {
+    final picked = await ScheduleEditor.show(
+      context,
+      title: 'Horario propio',
+      subtitle: 'Reemplaza al horario del negocio solo para esta persona.',
+      initial: _schedule,
+      removeLabel: 'Usar el horario del negocio',
+    );
+    if (picked != null && mounted) setState(() => _schedule = picked.isEmpty ? null : picked);
+  }
 
   @override
   void dispose() {
@@ -174,6 +197,7 @@ class _StaffEditorState extends State<_StaffEditor> {
       commissionPct: null,
       isActive: _active,
       memberEmail: base.memberEmail,
+      schedule: _schedule?.encode(),
       createdAt: base.createdAt,
       updatedAt: DateTime.now(),
     ));
@@ -182,16 +206,10 @@ class _StaffEditorState extends State<_StaffEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(widget.person == null ? 'Agregar persona' : 'Editar persona',
-              style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
-          const SizedBox(height: AppSpace.md),
           TextField(
             controller: _name,
             autofocus: widget.person == null,
@@ -209,6 +227,13 @@ class _StaffEditorState extends State<_StaffEditor> {
             controller: _document,
             decoration: const InputDecoration(labelText: 'Documento (opcional)'),
           ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.schedule_outlined),
+            title: const Text('Horario'),
+            subtitle: Text(_schedule == null ? 'Usa el horario del negocio' : _schedule!.describe()),
+            trailing: TextButton(onPressed: _editSchedule, child: Text(_schedule == null ? 'Poner uno propio' : 'Cambiar')),
+          ),
           if (widget.person != null)
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -218,9 +243,8 @@ class _StaffEditorState extends State<_StaffEditor> {
               subtitle: const Text('Apágalo si ya no trabaja; su historial se conserva'),
             ),
           const SizedBox(height: AppSpace.md),
-          FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Guardando...' : 'Guardar')),
+          FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Guardando…' : 'Guardar')),
         ],
-      ),
     );
   }
 }

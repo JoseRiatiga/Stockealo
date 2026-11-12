@@ -227,7 +227,7 @@ void main() {
       await tester.tapAt(const Offset(5, 5));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Asistencia'));
+      await tester.tap(find.text('Empleados'));
       await settle(tester, find.text('Juan Gómez'));
       expect(find.text('Llegó'), findsOneWidget);
       expect(find.text('No vino'), findsOneWidget);

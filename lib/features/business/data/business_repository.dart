@@ -184,6 +184,9 @@ class BusinessRepository extends ChangeNotifier {
     bool? servicesEnabled,
     String? serviceType,
     String? serviceMessages,
+
+    /// Horario de los empleados (JSON); '' lo quita
+    String? servicesSchedule,
   }) async {
     final db = await _dbProvider.database;
     final Map<String, dynamic> updateData = {
@@ -198,6 +201,7 @@ class BusinessRepository extends ChangeNotifier {
       if (servicesEnabled != null) 'services_enabled': servicesEnabled ? 1 : 0,
       if (serviceType != null) 'service_type': serviceType,
       if (serviceMessages != null) 'service_messages': serviceMessages,
+      if (servicesSchedule != null) 'services_schedule': servicesSchedule.isEmpty ? null : servicesSchedule,
     };
 
     await db.update(

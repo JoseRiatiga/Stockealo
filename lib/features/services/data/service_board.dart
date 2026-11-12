@@ -1,4 +1,5 @@
 import '../models/service_models.dart';
+import '../models/work_schedule.dart';
 
 /// Estado de un empleado en el día
 enum StaffState {
@@ -11,7 +12,7 @@ enum StaffState {
   /// Vino y está libre
   available,
 
-  /// Está haciendo un servicio
+  /// Tiene todos los servicios que puede hacer a la vez
   busy,
 
   /// En pausa (almuerzo, permiso)
@@ -37,7 +38,8 @@ typedef LineRef = ({WorkOrder order, int index});
 ///
 ///   • Ningún servicio empieza sin un empleado que haya venido hoy, esté libre y
 ///     esté habilitado para ese servicio.
-///   • Un empleado tiene un solo servicio activo a la vez.
+///   • Un empleado hace hasta [ServiceBoard.defaultMax] servicios a la vez (0.13.1);
+///     con «Habilitar múltiples servicios» no hay límite.
 ///   • Si no hay nadie libre, el servicio queda en cola por orden de llegada.
 ///   • Cuando alguien se libera, se le sugiere el primer servicio de la cola que
 ///     puede hacer (el cajero confirma).
@@ -49,11 +51,22 @@ class ServiceBoard {
   /// Asistencia de hoy por empleado
   final Map<String, StaffAttendance> attendance;
 
+  /// Servicios a la vez por empleado; null = sin límite («Habilitar múltiples servicios»)
+  final int? maxPerStaff;
+
+  /// Horario del negocio (para quien no tiene uno propio)
+  final WorkSchedule? globalSchedule;
+
+  /// Límite normal (decisión del dueño, 11 nov 2026)
+  static const defaultMax = 2;
+
   ServiceBoard({
     required this.orders,
     required this.staff,
     required this.services,
     required List<StaffAttendance> attendance,
+    this.maxPerStaff = defaultMax,
+    this.globalSchedule,
   }) : attendance = {for (final a in attendance) a.staffId: a};
 
   ShopService? serviceOf(String serviceId) {
@@ -70,30 +83,63 @@ class ServiceBoard {
     return null;
   }
 
-  /// Servicio que el empleado está haciendo ahora (si hay)
-  LineRef? activeLineOf(String staffId) {
-    for (final o in orders) {
-      if (!o.isOpen) continue;
-      for (var i = 0; i < o.lines.length; i++) {
-        final l = o.lines[i];
-        if (l.isInProgress && l.staffIds.contains(staffId)) return (order: o, index: i);
-      }
-    }
-    return null;
-  }
+  /// Servicios que el empleado está haciendo ahora
+  List<LineRef> activeLinesOf(String staffId) => [
+        for (final o in orders)
+          if (o.isOpen)
+            for (var i = 0; i < o.lines.length; i++)
+              if (o.lines[i].isInProgress && o.lines[i].staffIds.contains(staffId)) (order: o, index: i),
+      ];
+
+  /// El primer servicio que el empleado está haciendo ahora (si hay)
+  LineRef? activeLineOf(String staffId) => activeLinesOf(staffId).firstOrNull;
+
+  /// Puede tomar otro servicio sin pasar su límite
+  bool hasRoom(String staffId) => maxPerStaff == null || activeLinesOf(staffId).length < maxPerStaff!;
 
   StaffState stateOf(String staffId) {
     final a = attendance[staffId];
     if (a == null) return StaffState.notMarked;
     if (a.isAbsent) return StaffState.absent;
     if (a.hasLeft) return StaffState.left;
-    if (activeLineOf(staffId) != null) return StaffState.busy;
+    if (!hasRoom(staffId)) return StaffState.busy;
     if (a.onPause) return StaffState.paused;
     return StaffState.available;
   }
 
-  /// Vino, no se ha ido, no está en pausa y no tiene otro servicio activo
+  /// Vino, no se ha ido, no está en pausa y le cabe otro servicio
   bool isFree(String staffId) => stateOf(staffId) == StaffState.available;
+
+  /// Horario de un empleado: el propio o, si no tiene, el del negocio
+  WorkSchedule? scheduleOf(String staffId) => WorkSchedule.decode(staffOf(staffId)?.schedule) ?? globalSchedule;
+
+  /// Está trabajando (llegó y no se ha ido) por fuera de su turno: solo se avisa
+  bool outOfShift(String staffId, DateTime now) {
+    final schedule = scheduleOf(staffId);
+    if (schedule == null || schedule.isEmpty) return false;
+    final a = attendance[staffId];
+    if (a == null || a.isAbsent || a.hasLeft) return false;
+    final state = schedule.stateAt(now);
+    return state == ShiftState.dayOff || state == ShiftState.before || state == ShiftState.after;
+  }
+
+  /// Aviso del turno (solo avisa, no bloquea): fuera de turno o tarde. null = nada que decir
+  String? shiftWarning(String staffId, DateTime now) {
+    final schedule = scheduleOf(staffId);
+    if (schedule == null || schedule.isEmpty) return null;
+    final shift = schedule.on(now);
+    final m = now.hour * 60 + now.minute;
+    if (outOfShift(staffId, now)) {
+      if (shift == null) return 'Hoy no le toca: está fuera de turno';
+      if (m < shift.start) return 'Fuera de turno: entra a las ${ShiftTime.clock(shift.start)}';
+      return 'Terminó su turno a las ${ShiftTime.clock(shift.end)}';
+    }
+    // 15 minutos de margen antes de avisar que no ha llegado
+    if (stateOf(staffId) == StaffState.notMarked && shift != null && m >= shift.start + 15 && m < shift.end) {
+      return 'Debía llegar a las ${ShiftTime.clock(shift.start)}';
+    }
+    return null;
+  }
 
   /// Está habilitado para hacer ese servicio
   bool canDo(String staffId, String serviceId) {
@@ -120,11 +166,13 @@ class ServiceBoard {
     if (person == null || !person.isActive) return '$name ya no está en el equipo.';
     if (!canDo(staffId, line.serviceId)) return '$name no hace ${line.name}.';
     return switch (stateOf(staffId)) {
-      StaffState.notMarked => 'Primero marca la llegada de $name en Asistencia.',
+      StaffState.notMarked => 'Primero marca la llegada de $name en Empleados.',
       StaffState.absent => '$name no vino hoy.',
       StaffState.left => '$name ya se fue.',
       StaffState.paused => '$name está en pausa.',
-      StaffState.busy => '$name ya está haciendo otro servicio.',
+      StaffState.busy => maxPerStaff == null
+          ? '$name ya está haciendo otro servicio.'
+          : '$name ya tiene $maxPerStaff servicios a la vez. Si hay mucha cola, activa «Habilitar múltiples servicios» en Empleados.',
       StaffState.available => null,
     };
   }

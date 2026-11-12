@@ -12,6 +12,7 @@ import 'package:stockealo/features/sales/data/sales_repository.dart';
 import 'package:stockealo/features/services/data/service_board.dart';
 import 'package:stockealo/features/services/data/services_repository.dart';
 import 'package:stockealo/features/services/models/service_models.dart';
+import 'package:stockealo/features/services/models/work_schedule.dart';
 
 /// Reglas del módulo Servicios de la 0.12.0: plantillas, precio por vehículo,
 /// asistencia, un servicio activo por empleado, cola, retroceder y anular cobro
@@ -156,11 +157,26 @@ void main() {
       final started = await repo.startLine(o1, 0, [juan.id], board: board, now: now);
       expect(started.status, WorkOrder.inProgress);
       board = await repo.loadBoard(businessId, now: now);
+      // Con un servicio todavía le cabe otro (hasta 2 a la vez)
+      expect(board.stateOf(juan.id), StaffState.available);
+      expect(board.whyNotStart(started, 1, juan.id), isNull);
+      final both = await repo.startLine(started, 1, [juan.id], board: board, now: now);
+      board = await repo.loadBoard(businessId, now: now);
+      expect(board.activeLinesOf(juan.id), hasLength(2));
       expect(board.stateOf(juan.id), StaffState.busy);
 
-      // Un solo servicio activo por empleado
-      expect(board.whyNotStart(started, 1, juan.id), contains('ya está haciendo otro servicio'));
-      expect(() => repo.startLine(started, 1, [juan.id], board: board, now: now), throwsStateError);
+      // Con 2 ya no recibe un tercero, salvo con «Habilitar múltiples servicios»
+      final o2 = await repo.createOrder(
+          businessId: businessId, plate: 'XYZ98Z', vehicleKind: 'MOTO', lines: [lineOf(lavado, 'MOTO')], now: now);
+      expect(board.whyNotStart(o2, 0, juan.id), contains('ya tiene 2 servicios'));
+      expect(() => repo.startLine(o2, 0, [juan.id], board: board, now: now), throwsStateError);
+      await repo.setMultipleServices(businessId, true);
+      board = await repo.loadBoard(businessId, now: now);
+      expect(board.maxPerStaff, isNull);
+      expect(board.whyNotStart(o2, 0, juan.id), isNull);
+      await repo.setMultipleServices(businessId, false);
+      board = await repo.loadBoard(businessId, now: now);
+      expect(both.status, WorkOrder.inProgress);
 
       // Ana no vino: no recibe trabajo
       await repo.markAbsent(businessId, ana.id, now: now);
@@ -282,5 +298,23 @@ void main() {
     expect((await repo.searchHistory(businessId, '3001112')).length, 1);
     expect(await repo.searchHistory(businessId, 'nadie'), isEmpty);
     expect((await repo.lastVisit(businessId, 'XYZ98K'))?.customerName, 'Carlos Gómez');
+  });
+
+  test('horarios: el propio reemplaza al del negocio y fuera de turno solo se avisa', () async {
+    final (juan, pedro, _, _) = await setUpTeam();
+    final db = await appDb.database;
+    await db.update('businesses', {'services_schedule': WorkSchedule.typical.encode()}, where: 'id = ?', whereArgs: [businessId]);
+    await repo.saveStaff(juan.copyWith(schedule: const WorkSchedule({2: ShiftTime(600, 840)}).encode()));
+    var board = await repo.loadBoard(businessId, now: now);
+    expect(board.scheduleOf(pedro.id)?.describe(), 'Lun a sáb · 8:00 a. m. – 6:00 p. m.');
+    expect(board.shiftWarning(pedro.id, now), isNull);
+    // Juan llegó a las 9 y su turno propio empieza a las 10: avisa, pero puede trabajar
+    expect(board.outOfShift(juan.id, now), isTrue);
+    expect(board.shiftWarning(juan.id, now), contains('entra a las 10:00 a. m.'));
+    expect(board.stateOf(juan.id), StaffState.available);
+    final late = DateTime(2026, 11, 10, 18, 30);
+    expect(board.shiftWarning(pedro.id, late), 'Terminó su turno a las 6:00 p. m.');
+    expect(WorkSchedule.decode(WorkSchedule.typical.encode())?.days, WorkSchedule.typical.days);
+    expect(WorkSchedule.decode('no es json'), isNull);
   });
 }

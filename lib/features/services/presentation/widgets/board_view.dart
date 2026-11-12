@@ -292,7 +292,7 @@ actions: [
 title: 'Nadie libre para este servicio',
 content: Text(
             reasons.isEmpty
-                ? 'Agrega a las personas que hacen los servicios en Ajustes › Equipo.'
+                ? 'Agrega a los empleados en Servicios › Empleados.'
                 : '${line.name} queda en cola y se le sugiere a quien se libere primero.\n\n${reasons.join('\n')}',
           ),
 actions: [
@@ -302,7 +302,7 @@ actions: [
                   Navigator.pop(ctx);
                   widget.onOpenAttendance!();
                 },
-                child: const Text('Ir a Asistencia'),
+                child: const Text('Ir a Empleados'),
               ),
             FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Entendido')),
           ],
@@ -389,7 +389,7 @@ actions: [
                           Icon(Icons.how_to_reg_outlined, color: c.warning),
                           const SizedBox(width: AppSpace.md),
                           Expanded(
-                            child: Text('Marca quién vino hoy en Asistencia: sin eso nadie puede empezar servicios.',
+                            child: Text('Marca quién vino hoy en Empleados: sin eso nadie puede empezar servicios.',
                                 style: TextStyle(color: c.ink)),
                           ),
                           Icon(Icons.chevron_right_outlined, color: c.inkFaint),
@@ -472,7 +472,7 @@ actions: [
     if (people.isEmpty) {
       return AppCard(
         color: c.warningSoft,
-        child: Text('Aún no hay personas para hacer los servicios. Agrégalas en Ajustes › Equipo.',
+        child: Text('Aún no hay empleados. Agrégalos en Servicios › Empleados.',
             style: TextStyle(color: c.ink)),
       );
     }
@@ -489,13 +489,14 @@ actions: [
               StaffState.paused => (c.warning, c.warningSoft),
               _ => (c.inkMuted, c.surfaceMuted),
             };
-            final active = board.activeLineOf(s.id);
+            final active = board.activeLinesOf(s.id);
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
               child: Text(
-                '${s.name.split(' ').first} · ${state.label}'
-                '${active == null ? '' : ' (${active.order.title})'}',
+                '${s.name.split(' ').first} · ${active.isNotEmpty && state == StaffState.available ? 'Con ${active.length}' : state.label}'
+                '${active.isEmpty ? '' : ' (${active.map((r) => r.order.title).join(', ')})'}'
+                '${board.outOfShift(s.id, DateTime.now()) ? ' · fuera de turno' : ''}',
                 style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: fg),
               ),
             );

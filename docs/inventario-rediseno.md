@@ -515,3 +515,14 @@ El dueño pidió publicar lo hecho para una presentación y anotar lo que falta.
    - liquidación de comisiones y orden de servicio como tiquete.
 5. **Probar en equipos reales:** la cámara y la foto del lector de códigos, y el tiquete compartido como imagen en el celular.
 6. **Comportamiento nuevo a confirmar con el dueño:** anular un servicio desde Ventas anula todo el cobro de esa orden.
+
+7. **Anotación del dueño (11 nov):** poder agregar personas que hacen los servicios desde el mismo módulo Servicios (Asistencia o tablero), no solo desde Ajustes › Equipo. Para la 0.14.0, reutilizando la misma hoja de «Agregar» (nada duplicado).
+8. **Anotación del dueño (11 nov):** en el tablero de Servicios la tarjeta del vehículo se mueve completa; pidió que cada servicio sea individual (0.14.0). Y el tablero se ve cortado a la izquierda (sin margen) en la 0.13.0: corregir en la 0.13.x.
+
+## 9. PRIORIDAD ALTA (11 nov, tras la presentación al cliente interesado)
+
+Van antes que todo lo de la sección 8:
+1. Agregar empleados desde el mismo módulo Servicios (una sola hoja, también en Ajustes › Equipo).
+2. Horarios de los empleados: global del negocio o individual por empleado (ej. Juan de 8 a. m. a 12 p. m.).
+3. Un empleado puede tener varios servicios a la vez si es el único disponible.
+4. «Asistencia» pasa a «Empleados», con las comisiones de cada uno a la vista sin cerrar la caja (alguien se puede ir antes).

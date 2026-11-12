@@ -69,31 +69,13 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Stockealo con diseño nuevo
-            - Más claro y ordenado, con el color de tu negocio en lo importante. El modo oscuro sigue a un toque.
-            - Un solo menú que sigue el día: Inicio, Vender, Ventas, Caja, Productos, Stock, Clientes y proveedores, Reportes y Ajustes. En el celular se abre con ☰.
-            - «Nueva venta», el buscador (Ctrl K) y el estado de la caja siempre arriba.
+            ### Servicios: Empleados (antes «Asistencia»)
+            - Agrega y edita empleados desde Servicios › Empleados, sin ir a Ajustes.
+            - Cada empleado ve cuánto lleva hoy: servicios cobrados, comisión y propinas, sin cerrar la caja.
+            - Un empleado puede hacer hasta 2 servicios a la vez. Si hay pocos empleados y mucha cola, activa «Habilitar múltiples servicios».
 
-            ### Inicio
-            - Las cifras del día: ventas de hoy frente a la semana pasada, ganancia del mes, fiados y efectivo en caja.
-            - «Necesita atención»: lo agotado, los fiados vencidos y la caja sin cerrar, con la solución a un toque (pedir al proveedor, cobrar por WhatsApp).
-
-            ### Vender, como un punto de venta
-            - Busca, escanea (también con lector USB) y toca: la cuenta queda a la vista.
-            - Efectivo con el vuelto, Nequi, transferencia, tarjeta, fiado y pago mixto. F9 cobra.
-            - Ventas en espera y cotizar desde ahí mismo.
-            - Si tu negocio usa caja, primero se abre la caja.
-
-            ### Caja y ventas
-            - El cierre muestra el resultado en grande: «La caja está justa», «Faltan» o «Sobran».
-            - Anular una venta ya no la borra: queda en Ventas como «Anulada», con el motivo.
-
-            ### Comprobantes y códigos
-            - Un tiquete nuevo que «sale de la impresora», con sello (Pagado, Fiado, Anulada, Cotización, Abono, Caja justa) y se envía como imagen.
-            - Nuevo lector de códigos: cámara, foto o a mano, y avisa si el código está mal escrito o repetido.
-
-            ### Tienda en línea
-            - Dos plantillas: Clásica y Moda (con filtros por talla, color y precio, y ofertas).
-            - Al pedir, el cliente recibe su tiquete «Por confirmar».
+            ### Horarios
+            - Horario del negocio para todos, o un horario propio por empleado (por ejemplo, de 8:00 a. m. a 12:00 p. m.).
+            - Avisos sin bloquear: «Debía llegar a las…», «Fuera de turno» y «Terminó su turno». En el tablero se ve quién está fuera de turno.
           draft: false
           prerelease: false

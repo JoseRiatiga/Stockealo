@@ -141,6 +141,9 @@ class StaffMember {
 
   /// Cuenta del equipo vinculada (opcional, para que vea sus comisiones)
   final String? memberEmail;
+
+  /// Horario propio (JSON de [WorkSchedule]); null = usa el del negocio
+  final String? schedule;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -153,6 +156,7 @@ class StaffMember {
     this.commissionPct,
     this.isActive = true,
     this.memberEmail,
+    this.schedule,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -171,6 +175,8 @@ class StaffMember {
     bool clearCommission = false,
     bool? isActive,
     DateTime? updatedAt,
+    String? schedule,
+    bool clearSchedule = false,
   }) =>
       StaffMember(
         id: id,
@@ -181,6 +187,7 @@ class StaffMember {
         commissionPct: clearCommission ? null : (commissionPct ?? this.commissionPct),
         isActive: isActive ?? this.isActive,
         memberEmail: memberEmail,
+        schedule: clearSchedule ? null : (schedule ?? this.schedule),
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -194,6 +201,7 @@ class StaffMember {
         'commission_pct': commissionPct,
         'is_active': isActive ? 1 : 0,
         'member_email': memberEmail,
+        'schedule': schedule,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };
@@ -207,6 +215,7 @@ class StaffMember {
         commissionPct: (m['commission_pct'] as num?)?.toDouble(),
         isActive: m['is_active'] == true || m['is_active'] == 1,
         memberEmail: m['member_email'] as String?,
+        schedule: m['schedule'] as String?,
         createdAt: DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now(),
         updatedAt: DateTime.tryParse(m['updated_at'] as String? ?? '') ?? DateTime.now(),
       );

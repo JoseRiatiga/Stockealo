@@ -589,6 +589,7 @@ class SupabaseService {
               'service_messages': b['service_messages'] == null
                   ? null
                   : (b['service_messages'] is String ? b['service_messages'] : jsonEncode(b['service_messages'])),
+              'services_schedule': b['services_schedule'],
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
               'deleted_at': b['deleted_at'],
               'created_at': b['created_at'] ?? DateTime.now().toIso8601String(),
@@ -1153,7 +1154,15 @@ class SupabaseService {
       case 'upsert_cash_movement':
         await db.from('cash_movements').upsert(boolRow(p, const []), onConflict: 'id');
       case 'upsert_staff':
-        await db.from('staff').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
+        final staffRow = boolRow(p, const ['is_active']);
+        try {
+          await db.from('staff').upsert(staffRow, onConflict: 'id');
+        } catch (e) {
+          // La nube todavía no tiene la columna del horario: se guarda lo demás
+          if (!e.toString().contains('schedule') && !e.toString().contains('42703')) rethrow;
+          staffRow.remove('schedule');
+          await db.from('staff').upsert(staffRow, onConflict: 'id');
+        }
       case 'upsert_work_order':
         await db.from('work_orders').upsert(workOrderCloudRow(p), onConflict: 'id');
       case 'upsert_supplier_order':
@@ -1280,6 +1289,7 @@ class SupabaseService {
           'service_type': b['service_type'],
           if (b['service_messages'] != null)
             'service_messages': b['service_messages'] is String ? jsonDecode(b['service_messages'] as String) : b['service_messages'],
+          if (b['services_schedule'] != null) 'services_schedule': b['services_schedule'],
         },
         'is_deleted': (b['is_deleted'] as int?) ?? 0,
       };

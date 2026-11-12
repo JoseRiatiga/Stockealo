@@ -7,7 +7,7 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
 import '../../data/services_repository.dart';
 import '../../models/service_models.dart';
-import '../widgets/attendance_view.dart';
+import '../widgets/employees_view.dart';
 import '../widgets/board_view.dart';
 import '../widgets/catalog_view.dart';
 import '../widgets/commissions_view.dart';
@@ -17,7 +17,7 @@ import '../widgets/messages_view.dart';
 /// Secciones de la pestaña Servicios
 enum ServicesSection {
   board('Tablero', Icons.view_kanban_outlined),
-  attendance('Asistencia', Icons.how_to_reg_outlined),
+  employees('Empleados', Icons.badge_outlined),
   history('Historial', Icons.history_outlined),
   commissions('Comisiones', Icons.payments_outlined),
   catalog('Catálogo y precios', Icons.sell_outlined),
@@ -30,8 +30,8 @@ enum ServicesSection {
 }
 
 /// Pestaña Servicios (Pro Servicios). La primera vez el negocio elige su tipo y
-/// recibe la plantilla; después: Tablero, Asistencia, Historial y Catálogo.
-/// Las personas que hacen los servicios se agregan en Ajustes › Equipo.
+/// recibe la plantilla; después: Tablero, Empleados, Historial y Catálogo.
+/// Los empleados se agregan en Empleados (o en Ajustes › Equipo, la misma hoja).
 class ServicesTab extends StatefulWidget {
   final Business? business;
   final String userRole;
@@ -132,12 +132,13 @@ class _ServicesTabState extends State<ServicesTab> {
                   key: ValueKey('board-${b.id}'),
                   business: b,
                   template: template,
-                  onOpenAttendance: () => setState(() => _section = ServicesSection.attendance),
+                  onOpenAttendance: () => setState(() => _section = ServicesSection.employees),
                 ),
-              ServicesSection.attendance => AttendanceView(
-                  key: ValueKey('attendance-${b.id}'),
+              ServicesSection.employees => EmployeesView(
+                  key: ValueKey('employees-${b.id}'),
                   business: b,
-                  onOpenTeam: widget.onOpenTeam,
+                  canEdit: _canConfigure,
+                  onOpenCommissions: _canConfigure ? () => setState(() => _section = ServicesSection.commissions) : null,
                 ),
               ServicesSection.history => HistoryView(key: ValueKey('history-${b.id}'), business: b, template: template),
               ServicesSection.commissions => CommissionsView(key: ValueKey('commissions-${b.id}'), business: b),

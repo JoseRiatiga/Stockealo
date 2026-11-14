@@ -25,12 +25,13 @@ extension AttentionLook on AttentionItem {
         AttentionKind.cashLeftOpen => Icons.point_of_sale_outlined,
         AttentionKind.storeOrders => Icons.storefront_outlined,
         AttentionKind.toDeliver => Icons.local_shipping_outlined,
+        AttentionKind.bookings => Icons.event_available_outlined,
       };
 
   AppTone get tone => switch (kind) {
         AttentionKind.outOfStock || AttentionKind.cashLeftOpen => AppTone.danger,
         AttentionKind.overdueDebt || AttentionKind.lowStock || AttentionKind.toDeliver => AppTone.warning,
-        AttentionKind.storeOrders => AppTone.info,
+        AttentionKind.storeOrders || AttentionKind.bookings => AppTone.info,
       };
 
   String get title => switch (kind) {
@@ -41,6 +42,7 @@ extension AttentionLook on AttentionItem {
         AttentionKind.storeOrders =>
           count == 1 ? '1 pedido de la tienda por confirmar' : '$count pedidos de la tienda por confirmar',
         AttentionKind.toDeliver => count == 1 ? '1 pedido por entregar' : '$count pedidos por entregar',
+        AttentionKind.bookings => count == 1 ? '1 reserva por confirmar' : '$count reservas por confirmar',
       };
 
   String get detail => switch (kind) {
@@ -51,6 +53,7 @@ extension AttentionLook on AttentionItem {
         AttentionKind.cashLeftOpen => 'Desde el ${DateFormat("d MMM, h:mm a", 'es_CO').format(since!)}',
         AttentionKind.storeOrders => 'Llegaron de tu tienda en línea · vencen a los 7 días',
         AttentionKind.toDeliver => 'Ya se cobraron: recoge después o envío',
+        AttentionKind.bookings => 'Pedidas desde tu tienda en línea',
       };
 
   String get pill => switch (kind) {
@@ -60,6 +63,7 @@ extension AttentionLook on AttentionItem {
         AttentionKind.cashLeftOpen => 'Sin cerrar',
         AttentionKind.storeOrders => 'Por confirmar',
         AttentionKind.toDeliver => 'Por entregar',
+        AttentionKind.bookings => 'Por confirmar',
       };
 }
 
@@ -127,6 +131,20 @@ class _PanelBody extends StatelessWidget {
       AttentionKind.cashLeftOpen => _cash(context),
       AttentionKind.storeOrders => _orders(context),
       AttentionKind.toDeliver => _deliveries(context),
+      AttentionKind.bookings => [
+          const _Reason(
+            icon: '?',
+            tone: AppTone.info,
+            title: 'Qué es',
+            text: 'Clientes que pidieron una cita desde tu tienda en línea. Confírmala para que el cliente sepa que lo esperas.',
+          ),
+          _Solution(
+            title: 'Confirmar las citas',
+            detail: 'Ábrelas en Servicios › Agenda y toca «Confirmar».',
+            primary: 'Ir a Servicios',
+            onPrimary: () => _go(context, AppPlace.servicios),
+          ),
+        ],
     };
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: children);
   }

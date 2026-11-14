@@ -1,7 +1,7 @@
 # Plan: avisos de pedidos y notificaciones
 
 **Fecha:** 14 nov 2026. Lo pidió el dueño después de probar la 0.13.4.
-**Estado:** A, B y C HECHAS en código (14 nov, rama feat/0.13.5). D (Firebase) queda para después. Tiempo real: `store_orders` agregada a `supabase_realtime` (migración aplicada).
+**Estado:** A, B y C HECHAS en código (14 nov, rama feat/0.13.5). D (Firebase) quedó en la **0.16.0 · Tienda y crecimiento**, punto 11 de `docs/plan-fases.md`. Tiempo real: `store_orders` agregada a `supabase_realtime` (migración aplicada).
 
 ## Lo que hay hoy
 

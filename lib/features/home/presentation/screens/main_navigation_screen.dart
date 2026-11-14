@@ -39,6 +39,9 @@ import '../../../../core/design/status_pill.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../store/data/store_orders_repository.dart';
+import 'package:intl/intl.dart';
+import '../../../services/data/appointments_repository.dart';
+import '../../../services/models/service_template.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -115,7 +118,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   /// Baja los pedidos nuevos de la tienda; avisa de los nuevos y de los que esperan
   Future<void> _pullOrders() async {
     final biz = _activeBusiness;
-    if (biz != null) await StoreOrdersRepository.instance.pull(biz.id);
+    if (biz == null) return;
+    await StoreOrdersRepository.instance.pull(biz.id);
+    await AppointmentsRepository.instance.pullOnline(biz.id);
   }
 
   /// Conecta los avisos de pedidos con la campana y el celular (una vez por negocio)
@@ -139,7 +144,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
       );
       PhoneAlertsService.instance.showOrderReminder(id: o.id, code: o.code, name: o.name);
     };
-    NotificationService.instance.onStoreOrder = () => StoreOrdersRepository.instance.pull(businessId);
+    // Reserva en línea nueva: campana y celular («Nueva reserva de Ana · sáb 3:00 p. m.»)
+    AppointmentsRepository.onNewBooking = (a) {
+      final when = DateFormat("EEE d, h:mm a", 'es_CO').format(a.startsAt);
+      NotificationService.instance.addNotification(
+        title: 'Nueva reserva de ${a.customerName}',
+        message: '$when · ${a.serviceNames}. Confírmala en Servicios › Agenda.',
+        type: NotificationType.order,
+        data: {'business_id': businessId, 'appointment_id': a.id},
+      );
+      PhoneAlertsService.instance.showBooking(id: a.id, name: a.customerName, when: when, services: a.serviceNames);
+    };
+    NotificationService.instance.onStoreOrder = () async {
+      await StoreOrdersRepository.instance.pull(businessId);
+      await AppointmentsRepository.instance.pullOnline(businessId);
+    };
   }
 
   /// La primera vez en el celular: explica los avisos y pide el permiso del sistema.
@@ -235,6 +254,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         // Pedidos de la tienda: aviso al llegar y número en Ventas (0.13.5)
         _wireOrderAlerts(biz.id);
         StoreOrdersRepository.instance.pull(biz.id);
+        AppointmentsRepository.instance.pullOnline(biz.id);
       }
       if (mounted) {
         setState(() {
@@ -328,7 +348,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     });
   }
 
-  bool get _showServices => ProService.instance.status.value.services;
+  /// Servicios se ve con Pro Servicios y, desde la 0.14.0, gratis (hasta 3 empleados)
+  /// en los negocios de servicios: los que eligieron un tipo de servicio al crearse o
+  /// ya lo usan
+  bool get _showServices {
+    final b = _activeBusiness;
+    return ProService.instance.status.value.services ||
+        (b != null && (b.servicesEnabled || ServiceTemplate.suggestedFor(b.icon) != null));
+  }
 
   /// Ajustes › Equipo, donde se agregan las personas que hacen los servicios
   Future<void> _openTeam() async {

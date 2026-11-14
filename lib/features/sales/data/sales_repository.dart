@@ -445,6 +445,9 @@ class SalesRepository {
     /// Propina para quienes atendieron (se reparte en partes iguales)
     double tipAmount = 0,
     DateTime? now,
+
+    /// Pago mixto (0.14.0): cuánto entró por cada medio; debe sumar el total
+    Map<String, double>? paymentSplit,
   }) async {
     final lines = order.lines;
     if (lines.isEmpty) throw Exception('La orden no tiene servicios para cobrar.');
@@ -531,6 +534,10 @@ class SalesRepository {
           'notes': note.isEmpty ? null : note,
           'invoice_number': invoiceNumber,
           'discount_amount': lineDiscount,
+          // Pago mixto: cada línea guarda su parte de cada medio (la caja cuenta el efectivo)
+          'payment_split': paymentSplit == null || finalTotal <= 0
+              ? null
+              : PaymentMethod.encodeSplit({for (final e in paymentSplit.entries) e.key: e.value * lineTotal / finalTotal}),
           'service_id': line.serviceId,
           'work_order_id': order.id,
           'staff_ids': staffJson,
@@ -554,6 +561,9 @@ class SalesRepository {
           serviceId: line.serviceId,
           workOrderId: order.id,
           staffIds: staffJson,
+          paymentSplit: paymentSplit == null || finalTotal <= 0
+              ? null
+              : PaymentMethod.encodeSplit({for (final e in paymentSplit.entries) e.key: e.value * lineTotal / finalTotal}),
         ));
       }
     });
@@ -889,14 +899,17 @@ class SalesRepository {
   /// quién la anuló) y deja de contar en totales, caja, reportes y fiados.
   /// Anula todas las líneas de la misma venta (mismo número) y devuelve su stock.
   /// Si ya estaba anulada no hace nada.
-  Future<void> voidSale(Sale sale, {String? reason}) async {
+  ///
+  /// [onlyThisLine] (0.14.0): anula solo esa línea (por ejemplo, un servicio cobrado por
+  /// error) y deja cobrado lo demás de la venta, incluida la propina.
+  Future<void> voidSale(Sale sale, {String? reason, bool onlyThisLine = false}) async {
     final db = await _dbProvider.database;
     final user = AuthRepository.instance.currentUser;
     final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
     final cleanReason = (reason ?? '').trim().isEmpty ? null : reason!.trim();
     final now = DateTime.now().toIso8601String();
 
-    final invoice = (sale.invoiceNumber ?? '').isEmpty ? null : sale.invoiceNumber;
+    final invoice = onlyThisLine || (sale.invoiceNumber ?? '').isEmpty ? null : sale.invoiceNumber;
     final rows = await db.query(
       'sales',
       where: invoice == null

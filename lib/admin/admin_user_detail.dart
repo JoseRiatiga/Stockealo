@@ -15,8 +15,14 @@ class AdminUserDetailDialog extends StatefulWidget {
   final String email;
   const AdminUserDetailDialog({super.key, required this.email});
 
-  static Future<void> show(BuildContext context, String email) =>
-      showDialog<void>(context: context, builder: (_) => AdminUserDetailDialog(email: email));
+  /// Re-diseño: la ficha entra por la derecha (en el celular sube desde abajo)
+  static Future<void> show(BuildContext context, String email) => AppSidePanel.show<void>(
+        context: context,
+        title: email,
+        subtitle: 'Ficha de soporte de la cuenta',
+        width: 560,
+        builder: (_) => AdminUserDetailDialog(email: email),
+      );
 
   @override
   State<AdminUserDetailDialog> createState() => _AdminUserDetailDialogState();
@@ -138,10 +144,17 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
     } else {
       body = _content(c, d);
     }
-    return AppDialog(
-      title: d?.name?.trim().isNotEmpty == true ? d!.name!.trim() : widget.email,
-      content: SizedBox(width: 560, child: SingleChildScrollView(child: body)),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (d?.name?.trim().isNotEmpty == true)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpace.sm),
+            child: Text(d!.name!.trim(), style: AppText.title(context)),
+          ),
+        body,
+      ],
     );
   }
 

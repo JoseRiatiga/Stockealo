@@ -69,13 +69,29 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Avisos de pedidos de tu tienda
-            - Cuando llega un pedido de tu tienda en línea, te avisa al instante con sonido: «Nuevo pedido T-0003 de Ana».
-            - Un número en Ventas y en Cotizaciones te dice cuántos pedidos no has visto; se quita al abrirlas.
-            - Cada pedido sin abrir lleva la marca «Nuevo», y si pasan 2 horas te lo recordamos una vez.
+            ### Servicios para tu tipo de negocio
+            - Al crear un negocio te preguntamos «¿Para qué usarás Stockealo?» y te sugerimos la plantilla: lavadero, barbería, spa, taller, servicio técnico o lavandería.
+            - Servicios ahora es gratis hasta 3 empleados: catálogo, tablero, agenda y cobro.
+            - En el tablero cada servicio tiene su propia tarjeta y se mueve por separado.
 
-            ### Avisos encendidos
-            - Pedidos, stock bajo y resumen del día ya vienen encendidos. Al abrir la app te pedimos el permiso una sola vez.
-            - Puedes apagar cada uno en Ajustes › Avisos.
+            ### Agenda y reservas
+            - Agenda de citas por día, con aviso si dos citas chocan. Al llegar el cliente, la cita se vuelve una orden.
+            - Con Pro Servicios, tus clientes reservan desde tu tienda en línea y te llega el aviso al instante.
+            - Historial de cada cliente: cuántas veces viene, cuánto ha gastado y qué pide.
+
+            ### Taller, servicio técnico y lavandería
+            - Estados como «Esperando aprobación» o «Esperando repuesto», y fecha de entrega.
+            - Presupuesto por WhatsApp o aprobado en el local.
+            - Recepción con fotos, accesorios recibidos y garantía. En la lavandería se cobra por kilo o por prenda.
+
+            ### Cobro y empleados
+            - Pago mixto (efectivo + Nequi) y fiado con abono.
+            - Vende productos o repuestos dentro del mismo cobro; salen del inventario.
+            - Alquiler de silla: el empleado paga un fijo por día, semana o mes y se queda con sus servicios.
+            - La liquidación de comisiones y la orden de servicio salen como tiquete.
+            - Anula solo un servicio o todo el cobro; la venta queda como «Anulada», no se borra.
+
+            ### Panel de administración renovado
+            - Menú por grupos, búsqueda con Ctrl K y el mismo diseño del resto de la app.
           draft: false
           prerelease: false

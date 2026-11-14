@@ -9,6 +9,8 @@ import '../../models/service_models.dart';
 import '../../models/work_schedule.dart';
 import 'schedule_editor.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../pro/data/pro_service.dart';
+import '../../../../core/design/filter_tabs.dart';
 
 /// Ajustes › Equipo › Personas que hacen los servicios (Pro Servicios).
 /// No necesitan cuenta en la app. La comisión es la de cada servicio.
@@ -133,7 +135,22 @@ class StaffEditor extends StatefulWidget {
   const StaffEditor({super.key, required this.business, this.person});
 
   /// true si se guardó
+  /// Empleados sin Pro Servicios (0.14.0)
+  static const freeLimit = 3;
+
   static Future<bool> show(BuildContext context, {required Business business, StaffMember? person}) async {
+    // Plan gratis: hasta 3 empleados activos
+    if (person == null && !ProService.instance.status.value.services) {
+      final active = (await ServicesRepository.instance.getStaff(business.id)).where((s) => s.isActive).length;
+      if (active >= freeLimit) {
+        if (context.mounted) {
+          AppToast.showWarning(context,
+              'Con el plan gratis puedes tener hasta $freeLimit empleados. Con Pro Servicios, sin límite y con comisiones.');
+        }
+        return false;
+      }
+    }
+    if (!context.mounted) return false;
     final saved = await AppSheet.show<bool>(
       context: context,
       title: person == null ? 'Agregar empleado' : 'Editar empleado',
@@ -155,6 +172,12 @@ class _StaffEditorState extends State<StaffEditor> {
 
   /// Horario propio; null = usa el del negocio
   late WorkSchedule? _schedule = WorkSchedule.decode(widget.person?.schedule);
+
+  /// Alquiler de silla (0.14.0, Pro Servicios)
+  late bool _rents = widget.person?.rentsChair ?? false;
+  late final _rent = TextEditingController(
+      text: (widget.person?.chairRent ?? 0) > 0 ? widget.person!.chairRent!.round().toString() : '');
+  late String _period = widget.person?.rentPeriod ?? 'SEMANA';
   bool _saving = false;
 
   Future<void> _editSchedule() async {
@@ -170,7 +193,7 @@ class _StaffEditorState extends State<StaffEditor> {
 
   @override
   void dispose() {
-    for (final c in [_name, _phone, _document]) {
+    for (final c in [_name, _phone, _document, _rent]) {
       c.dispose();
     }
     super.dispose();
@@ -198,6 +221,8 @@ class _StaffEditorState extends State<StaffEditor> {
       isActive: _active,
       memberEmail: base.memberEmail,
       schedule: _schedule?.encode(),
+      chairRent: _rents ? double.tryParse(_rent.text.trim()) : null,
+      rentPeriod: _rents ? _period : null,
       createdAt: base.createdAt,
       updatedAt: DateTime.now(),
     ));
@@ -227,13 +252,48 @@ class _StaffEditorState extends State<StaffEditor> {
             controller: _document,
             decoration: const InputDecoration(labelText: 'Documento (opcional)'),
           ),
-          ListTile(
+          // Horario propio: Pro Servicios
+          if (ProService.instance.status.value.services) ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.schedule_outlined),
             title: const Text('Horario'),
             subtitle: Text(_schedule == null ? 'Usa el horario del negocio' : _schedule!.describe()),
             trailing: TextButton(onPressed: _editSchedule, child: Text(_schedule == null ? 'Poner uno propio' : 'Cambiar')),
           ),
+          // ¿Cómo gana? Comisión por servicio o alquiler de silla (Pro Servicios)
+          if (ProService.instance.status.value.services) ...[
+            const SizedBox(height: AppSpace.sm),
+            Text('¿Cómo gana?', style: AppText.small(context, weight: FontWeight.w700)),
+            const SizedBox(height: AppSpace.xs),
+            FilterTabs<bool>(
+              options: const {false: 'Comisión por servicio', true: 'Alquila la silla'},
+              value: _rents,
+              onChanged: (v) => setState(() => _rents = v),
+            ),
+            if (_rents) ...[
+              const SizedBox(height: AppSpace.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _rent,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Alquiler', prefixText: '\$ '),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.sm),
+                  FilterTabs<String>(
+                    options: const {'DIA': 'Día', 'SEMANA': 'Semana', 'MES': 'Mes'},
+                    value: _period,
+                    onChanged: (v) => setState(() => _period = v),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.xs),
+              Text('Se queda con todo lo de sus servicios; al pagarle se descuenta el alquiler.',
+                  style: AppText.caption(context)),
+            ],
+          ],
           if (widget.person != null)
             SwitchListTile(
               contentPadding: EdgeInsets.zero,

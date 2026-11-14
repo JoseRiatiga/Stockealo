@@ -250,7 +250,7 @@ class BusinessIconField extends StatelessWidget {
     final radius = BorderRadius.circular(AppRadius.control);
     return Semantics(
       button: true,
-      label: 'Ícono del negocio: ${kind.label}. Cambiar',
+      label: '¿Para qué usarás Stockealo? ${kind.label}. Cambiar',
       excludeSemantics: true,
       child: InkWell(
         borderRadius: radius,
@@ -274,7 +274,9 @@ class BusinessIconField extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Ícono del negocio', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
+                    // 0.14.0: el tipo de negocio es la respuesta a «¿Para qué usarás Stockealo?».
+                    // Queda guardada y con ella Servicios sugiere su plantilla.
+                    Text('¿Para qué usarás Stockealo?', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                     Text(kind.label, style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w600, color: c.ink)),
                   ],
                 ),

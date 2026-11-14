@@ -7,6 +7,7 @@ import '../core/widgets/app_toast.dart';
 import '../core/widgets/maintenance_gate.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import 'admin_widgets.dart';
+import '../core/design/filter_tabs.dart';
 
 /// Programar o activar el mantenimiento: nivel, partes, horario y mensaje
 class AdminMaintenancePage extends StatefulWidget {
@@ -370,13 +371,10 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
               title: Text(title),
             ),
           label('3. Cuándo (hora Colombia)'),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: true, label: Text('Ahora')),
-              ButtonSegment(value: false, label: Text('Programar')),
-            ],
-            selected: {_startNow},
-            onSelectionChanged: (v) => setState(() => _startNow = v.first),
+          FilterTabs<bool>(
+            options: const {true: 'Ahora', false: 'Programar'},
+            value: _startNow,
+            onChanged: (v) => setState(() => _startNow = v),
           ),
           const SizedBox(height: AppSpace.sm),
           if (_startNow)

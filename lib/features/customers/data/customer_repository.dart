@@ -42,6 +42,14 @@ class CustomerRepository {
   }
 
   /// Obtiene un cliente por su ID
+  /// El cliente con ese nombre (sin importar mayúsculas), o null
+  Future<Customer?> findByName(String businessId, String name) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query('customers',
+        where: 'business_id = ? AND LOWER(name) = ?', whereArgs: [businessId, name.trim().toLowerCase()], limit: 1);
+    return rows.isEmpty ? null : Customer.fromMap(rows.first);
+  }
+
   Future<Customer?> getCustomerById(String id) async {
     final db = await _dbProvider.database;
     final maps = await db.query('customers', where: 'id = ?', whereArgs: [id], limit: 1);

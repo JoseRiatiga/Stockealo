@@ -11,6 +11,7 @@ import '../models/service_models.dart';
 import 'commissions_repository.dart';
 import 'service_board.dart';
 import '../models/work_schedule.dart';
+import '../models/order_extra.dart';
 
 /// Catálogo de servicios, empleados y tablero de órdenes. Todo se guarda primero
 /// en el equipo y sube a la nube con la cola, como el resto de la app.
@@ -241,6 +242,17 @@ class ServicesRepository {
     _cloud.upsertWorkOrderToCloud(row);
   }
 
+  /// Cambia los datos extra de la orden (0.14.0): estado propio, presupuesto, entrega…
+  Future<WorkOrder> setExtra(WorkOrder order, OrderExtra extra, {String? note}) async {
+    final at = DateTime.now();
+    final notes = note == null
+        ? order.notes
+        : [if ((order.notes ?? '').trim().isNotEmpty) order.notes!.trim(), note].join('\n');
+    final updated = order.copyWith(extra: extra, notes: notes, updatedAt: at);
+    await _store(updated);
+    return updated;
+  }
+
   /// Guarda cambios de la orden (servicios, empleados, datos del cliente)
   Future<WorkOrder> updateOrder(WorkOrder order) async {
     final updated = order.copyWith(
@@ -403,7 +415,7 @@ class ServicesRepository {
     if (!order.isPaid) return order;
     for (final id in order.saleIds) {
       final sale = await SalesRepository.instance.getSaleById(id);
-      if (sale != null) await SalesRepository.instance.voidSale(sale);
+      if (sale != null) await SalesRepository.instance.voidSale(sale, reason: note);
     }
     await CommissionsRepository.instance.onOrderReopened(order.id, now: now);
     final at = now ?? DateTime.now();
@@ -471,6 +483,40 @@ class ServicesRepository {
   }
 
   /// Último trabajo de una placa, nombre o teléfono, para completar los datos al recibir
+  /// Todo lo de un cliente (por placa, teléfono o nombre): sus visitas, cuánto ha
+  /// gastado, cada cuánto viene, lo que más pide y con quién (0.14.0)
+  Future<CustomerProfile> customerProfile(String businessId, WorkOrder o) async {
+    final key = (o.plate ?? '').isNotEmpty
+        ? o.plate!
+        : ((o.customerPhone ?? '').isNotEmpty ? o.customerPhone! : (o.customerName ?? ''));
+    final visits = key.isEmpty ? [o] : await searchHistory(businessId, key, limit: 200);
+    final done = visits.where((v) => v.status != WorkOrder.cancelled).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    int? everyDays;
+    if (done.length >= 2) {
+      final span = done.first.createdAt.difference(done.last.createdAt).inDays;
+      everyDays = (span / (done.length - 1)).round();
+    }
+    final services = <String, int>{};
+    final staff = <String, int>{};
+    for (final v in done) {
+      for (final l in v.lines) {
+        services[l.name] = (services[l.name] ?? 0) + 1;
+        for (final s in l.staffIds) {
+          staff[s] = (staff[s] ?? 0) + 1;
+        }
+      }
+    }
+    List<String> top(Map<String, int> m) => (m.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).map((e) => e.key).take(3).toList();
+    return CustomerProfile(
+      visits: done,
+      spent: done.where((v) => v.isPaid).fold(0.0, (s, v) => s + v.total),
+      everyDays: everyDays,
+      topServices: top(services),
+      topStaffIds: top(staff),
+    );
+  }
+
   Future<WorkOrder?> lastVisit(String businessId, String query) async {
     final found = await searchHistory(businessId, query, limit: 1);
     return found.isEmpty ? null : found.first;
@@ -598,11 +644,23 @@ class ServicesRepository {
     return rows.isEmpty ? null : WorkSchedule.decode(rows.first['services_schedule'] as String?);
   }
 
-  Future<bool> multipleServices(String businessId) async =>
-      await _dbProvider.getSetting(_multiKey(businessId)) == '1';
+  /// «Habilitar múltiples servicios» (0.14.0: en el negocio y en la nube, para todo el
+  /// equipo). Lo que había quedado guardado solo en el aparato se pasa una vez.
+  Future<bool> multipleServices(String businessId) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query('businesses', columns: ['services_multi'], where: 'id = ?', whereArgs: [businessId], limit: 1);
+    if (rows.isNotEmpty && rows.first['services_multi'] == 1) return true;
+    if (await _dbProvider.getSetting(_multiKey(businessId)) == '1') {
+      await setMultipleServices(businessId, true);
+      return true;
+    }
+    return false;
+  }
 
-  Future<void> setMultipleServices(String businessId, bool on) =>
-      _dbProvider.setSetting(_multiKey(businessId), on ? '1' : null);
+  Future<void> setMultipleServices(String businessId, bool on) async {
+    await _dbProvider.setSetting(_multiKey(businessId), null);
+    await BusinessRepository.instance.updateBusiness(id: businessId, servicesMulti: on);
+  }
 
   Future<ServiceBoard> loadBoard(String businessId, {DateTime? now}) async {
     final results = await Future.wait([
@@ -622,4 +680,24 @@ class ServicesRepository {
       globalSchedule: results[5] as WorkSchedule?,
     );
   }
+}
+
+/// Historial de un cliente de servicios
+class CustomerProfile {
+  /// Visitas, la más reciente primero (sin las canceladas)
+  final List<WorkOrder> visits;
+  final double spent;
+
+  /// Cada cuántos días viene, en promedio (null con una sola visita)
+  final int? everyDays;
+  final List<String> topServices;
+  final List<String> topStaffIds;
+
+  const CustomerProfile({
+    required this.visits,
+    required this.spent,
+    this.everyDays,
+    this.topServices = const [],
+    this.topStaffIds = const [],
+  });
 }

@@ -107,10 +107,10 @@ class PhaseMessages {
     int? waitMinutes,
   }) {
     final kind = order.vehicleKind;
-    final unit = template.usesVehicleKinds && kind != null
+    final unit = template.usesVehicleKinds && template.kindsAreVehicles && kind != null
         ? template.vehicleLabel(kind).toLowerCase()
         : (template.unit == 'Cliente' ? 'servicio' : template.unit.toLowerCase());
-    final feminine = template.usesVehicleKinds && kind != null
+    final feminine = template.usesVehicleKinds && template.kindsAreVehicles && kind != null
         ? ServiceTemplate.vehicleFeminine(kind)
         : (template.unit == 'Cliente' ? false : template.feminine);
     final who = {for (final l in order.lines) ...l.staffIds}.map((id) => (staffNames[id] ?? '').split(' ').first).where((n) => n.isNotEmpty);

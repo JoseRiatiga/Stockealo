@@ -14,10 +14,14 @@ import '../widgets/commissions_view.dart';
 import '../widgets/history_view.dart';
 import '../widgets/messages_view.dart';
 import '../../../../core/design/filter_tabs.dart';
+import '../../../../core/design/status_pill.dart';
+import '../widgets/agenda_view.dart';
+import '../../../pro/data/pro_service.dart';
 
 /// Secciones de la pestaña Servicios
 enum ServicesSection {
   board('Tablero', Icons.view_kanban_outlined),
+  agenda('Agenda', Icons.event_outlined),
   employees('Empleados', Icons.badge_outlined),
   history('Historial', Icons.history_outlined),
   commissions('Comisiones', Icons.payments_outlined),
@@ -90,10 +94,15 @@ class _ServicesTabState extends State<ServicesTab> {
       return TemplatePicker(business: b, canConfigure: _canConfigure);
     }
     final template = ServiceTemplate.of(b.serviceType);
+    // Gratis (0.14.0): catálogo, tablero, agenda, empleados (hasta 3) y cobro.
+    // Comisiones y mensajes son de Pro Servicios.
+    final pro = ProService.instance.status.value.services;
     final sections = [
       for (final s in ServicesSection.values)
         // Comisiones y catálogo: solo dueño o administrador
-        if (!const {ServicesSection.catalog, ServicesSection.commissions, ServicesSection.messages}.contains(s) || _canConfigure) s,
+        if ((!const {ServicesSection.catalog, ServicesSection.commissions, ServicesSection.messages}.contains(s) || _canConfigure) &&
+            (pro || !const {ServicesSection.commissions, ServicesSection.messages}.contains(s)))
+          s,
     ];
 
     return Scaffold(
@@ -122,6 +131,11 @@ class _ServicesTabState extends State<ServicesTab> {
                   business: b,
                   template: template,
                   onOpenAttendance: () => setState(() => _section = ServicesSection.employees),
+                ),
+              ServicesSection.agenda => AgendaView(
+                  key: ValueKey('agenda-${b.id}'),
+                  business: b,
+                  onOpenBoard: () => setState(() => _section = ServicesSection.board),
                 ),
               ServicesSection.employees => EmployeesView(
                   key: ValueKey('employees-${b.id}'),
@@ -178,6 +192,7 @@ class _TemplatePickerState extends State<TemplatePicker> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final suggested = ServiceTemplate.suggestedFor(widget.business.icon);
     return Scaffold(
       backgroundColor: c.paper,
       body: ContentWidth(
@@ -195,16 +210,30 @@ class _TemplatePickerState extends State<TemplatePicker> {
               style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
             ),
             const SizedBox(height: AppSpace.lg),
-            for (final t in ServiceTemplate.all) ...[
+            // La sugerida (por lo que respondió al crear el negocio) va primero y marcada
+            for (final t in [
+              if (suggested != null) suggested,
+              for (final x in ServiceTemplate.all)
+                if (x != suggested) x,
+            ]) ...[
               AppCard(
                 onTap: widget.canConfigure && !_saving ? () => _choose(t) : null,
+                borderColor: t == suggested ? c.accent : null,
                 child: Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(t.label, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+                          Row(
+                            children: [
+                              Flexible(child: Text(t.label, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink))),
+                              if (t == suggested) ...[
+                                const SizedBox(width: AppSpace.sm),
+                                const StatusPill('Sugerida para tu negocio', tone: AppTone.accent, compact: true),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 2),
                           Text(
                             [

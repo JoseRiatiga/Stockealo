@@ -9,9 +9,14 @@ import 'package:stockealo/features/auth/data/auth_repository.dart';
 import 'package:stockealo/features/auth/models/app_user.dart';
 import 'package:stockealo/features/business/models/business.dart';
 import 'package:stockealo/features/sales/data/sales_repository.dart';
+import 'package:stockealo/features/sales/models/payment_method.dart';
 import 'package:stockealo/features/services/data/service_board.dart';
 import 'package:stockealo/features/services/data/services_repository.dart';
 import 'package:stockealo/features/services/models/service_models.dart';
+import 'package:stockealo/features/services/data/appointments_repository.dart';
+import 'package:stockealo/features/services/data/commissions_repository.dart';
+import 'package:stockealo/features/services/models/appointment.dart';
+import 'package:stockealo/features/services/models/order_extra.dart';
 import 'package:stockealo/features/services/models/work_schedule.dart';
 
 /// Reglas del módulo Servicios de la 0.12.0: plantillas, precio por vehículo,
@@ -129,6 +134,21 @@ void main() {
       final s = (await repo.getServices(businessId)).single;
       expect(s.priceFor('MOTO'), 12000);
       expect(s.offeredFor('CARRO'), isFalse);
+    });
+
+    test('barbería: precio según el largo del cabello, opcional al recibir (0.14.0)', () {
+      const t = ServiceTemplate.barberia;
+      expect(t.usesVehicleKinds, isTrue);
+      expect(t.kindsRequired, isFalse);
+      expect(t.kindsTitle, 'Largo del cabello');
+      final corte = ShopService(
+        id: 'c', businessId: businessId, name: 'Corte', price: 15000, prices: const {'LARGO': 20000},
+        createdAt: now, updatedAt: now,
+      );
+      expect(corte.priceFor('LARGO'), 20000);
+      expect(corte.priceFor('CORTO') ?? corte.price, 15000, reason: 'sin precio propio cobra el general');
+      expect(corte.priceFor(null) ?? corte.price, 15000);
+      expect(ServiceTemplate.lavadero.kindsRequired, isTrue);
     });
 
     test('un servicio sin precios por vehículo cobra lo mismo para todos', () {
@@ -288,6 +308,136 @@ void main() {
     });
   });
 
+  test('anular solo un servicio deja cobrado lo demás de la orden (0.14.0)', () async {
+    final (juan, _, lavado, polichado) = await setUpTeam();
+    var o = await repo.createOrder(
+        businessId: businessId, vehicleKind: 'MOTO', lines: [lineOf(lavado, 'MOTO'), lineOf(polichado, 'MOTO')], now: now);
+    var board = await repo.loadBoard(businessId, now: now);
+    o = await repo.startLine(o, 0, [juan.id], board: board, now: now);
+    o = await repo.finishLine(o, 0, now: now);
+    board = await repo.loadBoard(businessId, now: now);
+    o = await repo.startLine(o, 1, [juan.id], board: board, now: now);
+    o = await repo.finishLine(o, 1, now: now);
+    final sales = await SalesRepository.instance.recordServiceSale(order: o, paymentMethod: 'EFECTIVO', now: now);
+    final polish = sales.firstWhere((s) => s.productName.contains('Polichado'));
+    await SalesRepository.instance.voidSale(polish, reason: 'No se hizo', onlyThisLine: true);
+    final db = await appDb.database;
+    final ok = await db.query('sales_ok');
+    expect(ok.map((r) => r['product_name']), isNot(contains(polish.productName)));
+    expect(ok, hasLength(sales.length - 1), reason: 'el lavado sigue cobrado');
+  });
+
+  test('historial del cliente: visitas, gasto, cada cuánto viene y qué pide (0.14.0)', () async {
+    final (_, _, lavado, polichado) = await setUpTeam();
+    WorkOrder? last;
+    for (final days in [20, 10, 0]) {
+      last = await repo.createOrder(
+          businessId: businessId, plate: 'QWE12R', vehicleKind: 'MOTO',
+          lines: [lineOf(lavado, 'MOTO'), if (days == 0) lineOf(polichado, 'MOTO')], now: now.subtract(Duration(days: days)));
+    }
+    final p = await repo.customerProfile(businessId, last!);
+    expect(p.visits, hasLength(3));
+    expect(p.everyDays, 10);
+    expect(p.topServices.first, 'Lavado');
+  });
+
+  test('agenda: avisa si se cruza con otra cita y al llegar pasa al tablero (0.14.0)', () async {
+    final (juan, _, lavado, polichado) = await setUpTeam();
+    final agenda = AppointmentsRepository.instance;
+    Appointment cita(String name, int hour) {
+      final base = agenda.newAppointment(businessId, startsAt: DateTime(now.year, now.month, now.day, hour));
+      return Appointment(
+        id: base.id, businessId: businessId, customerName: name, customerPhone: '3001112233',
+        serviceIds: [lavado.id, polichado.id], serviceNames: 'Lavado, Polichado', staffId: juan.id,
+        startsAt: base.startsAt, durationMin: 60, createdAt: base.createdAt, updatedAt: base.updatedAt,
+      );
+    }
+    await agenda.save(cita('Ana', 10));
+    expect(await agenda.conflictWith(cita('Luis', 10)), isNotNull, reason: 'Juan ya tiene cita a las 10');
+    expect(await agenda.conflictWith(cita('Luis', 11)), isNull);
+    final day = await agenda.forDay(businessId, now);
+    expect(day.single.customerName, 'Ana');
+
+    final order = await agenda.arrive(day.single, now: now);
+    expect(order.lines.map((l) => l.name), ['Lavado', 'Polichado']);
+    expect(order.customerName, 'Ana');
+    final after = await agenda.forDay(businessId, now);
+    expect(after.single.status, Appointment.arrived);
+    expect(after.single.workOrderId, order.id);
+  });
+
+  test('taller: el presupuesto se aprueba antes de empezar; entrega, garantía y kilos se guardan (0.14.0)', () async {
+    final (juan, _, lavado, _) = await setUpTeam();
+    var o = await repo.createOrder(businessId: businessId, plate: 'TLL123', vehicleKind: 'CARRO', lines: [lineOf(lavado, 'CARRO')], now: now);
+    o = await repo.setExtra(o, OrderExtra(
+      quoteStatus: OrderExtra.quotePending,
+      stage: 'ESPERANDO_APROBACION',
+      dueAt: DateTime(2026, 11, 12, 17),
+      accessories: 'Llaves y tapete',
+      warrantyDays: 30,
+      photos: const ['https://x/foto1.jpg'],
+    ));
+    var board = await repo.loadBoard(businessId, now: now);
+    expect(board.whyNotStart(o, 0, juan.id), contains('apruebe el presupuesto'));
+    o = await repo.setExtra(o, o.extra.copyWith(quoteStatus: OrderExtra.quoteApproved, quoteNote: 'Aprobado por WhatsApp', clearStage: true),
+        note: 'Aprobado por WhatsApp');
+    board = await repo.loadBoard(businessId, now: now);
+    expect(board.whyNotStart(o, 0, juan.id), isNull);
+
+    // Se guarda y se lee igual (columna extra)
+    final again = (await repo.searchHistory(businessId, 'TLL123')).single;
+    expect(again.extra.accessories, 'Llaves y tapete');
+    expect(again.extra.warrantyDays, 30);
+    expect(again.extra.photos, ['https://x/foto1.jpg']);
+    expect(again.extra.stage, isNull);
+    expect(again.extra.isLate(DateTime(2026, 11, 13)), isTrue);
+    expect(again.notes, contains('Aprobado por WhatsApp'));
+
+    // Lavandería: la línea por kilos
+    const kilos = WorkOrderLine(serviceId: 's', name: 'Lavado por kilo', price: 17500, quantity: 3.5, unit: 'kg');
+    expect(WorkOrderLine.fromJson(kilos.toJson()).quantityLabel, '3,5 kg');
+    expect(ServiceTemplate.lavanderia.byWeight, isTrue);
+    expect(ServiceTemplate.taller.usesQuote, isTrue);
+    expect(ServiceTemplate.barberia.usesQuote, isFalse);
+  });
+
+  test('pago mixto al cobrar servicios: cada línea guarda su parte de cada medio (0.14.0)', () async {
+    final (juan, _, lavado, polichado) = await setUpTeam();
+    var o = await repo.createOrder(
+        businessId: businessId, vehicleKind: 'MOTO', lines: [lineOf(lavado, 'MOTO'), lineOf(polichado, 'MOTO')], now: now);
+    var board = await repo.loadBoard(businessId, now: now);
+    for (final i in [0, 1]) {
+      board = await repo.loadBoard(businessId, now: now);
+      o = await repo.startLine(o, i, [juan.id], board: board, now: now);
+      o = await repo.finishLine(o, i, now: now);
+    }
+    final total = o.subtotal; // 10.000 + 25.000
+    final sales = await SalesRepository.instance.recordServiceSale(
+        order: o, paymentMethod: 'MIXTO', paymentSplit: {'EFECTIVO': 15000, 'NEQUI': total - 15000}, now: now);
+    final cash = sales.fold(0.0, (t, s) => t + (PaymentMethod.decodeSplit(s.paymentSplit)['EFECTIVO'] ?? 0));
+    expect(cash, closeTo(15000, 0.01));
+    // Las comisiones se guardan sin esperar: se deja terminar antes de cerrar la base
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+  });
+
+  test('alquiler de silla: se queda con todo y al pagarle se descuenta por semana (0.14.0)', () async {
+    final (juan, _, lavado, _) = await setUpTeam();
+    await repo.saveStaff(juan.copyWith().copyWithRent(50000, 'SEMANA'));
+    var o = await repo.createOrder(businessId: businessId, vehicleKind: 'MOTO', lines: [lineOf(lavado, 'MOTO')], now: now);
+    final board = await repo.loadBoard(businessId, now: now);
+    o = await repo.startLine(o, 0, [juan.id], board: board, now: now);
+    o = await repo.finishLine(o, 0, now: now);
+    final sales = await SalesRepository.instance.recordServiceSale(order: o, paymentMethod: 'EFECTIVO', now: now);
+    await repo.markPaid(o, saleIds: [for (final s in sales) s.id], paymentMethod: 'EFECTIVO', total: 10000, now: now);
+    final comm = CommissionsRepository.instance;
+    final pending = (await comm.pending(businessId)).firstWhere((e) => e.staffId == juan.id);
+    expect(pending.commissions, 10000, reason: 'el 100 % del lavado');
+    final staff = (await repo.getStaff(businessId)).firstWhere((s) => s.id == juan.id);
+    expect(CommissionsRepository.chairRentFor(staff, pending).periods, 1);
+    final net = await comm.withChairRent(businessId, pending, staff);
+    expect(net.total, 10000 - 50000, reason: 'esa semana trabajó poco: queda debiendo el resto del alquiler');
+  });
+
   test('historial en vivo por placa, nombre o teléfono', () async {
     final (_, _, lavado, _) = await setUpTeam();
     await repo.createOrder(
@@ -317,4 +467,12 @@ void main() {
     expect(WorkSchedule.decode(WorkSchedule.typical.encode())?.days, WorkSchedule.typical.days);
     expect(WorkSchedule.decode('no es json'), isNull);
   });
+}
+
+extension on StaffMember {
+  StaffMember copyWithRent(double rent, String period) => StaffMember(
+        id: id, businessId: businessId, name: name, phone: phone, document: document, commissionPct: commissionPct,
+        isActive: isActive, memberEmail: memberEmail, schedule: schedule, chairRent: rent, rentPeriod: period,
+        createdAt: createdAt, updatedAt: updatedAt,
+      );
 }

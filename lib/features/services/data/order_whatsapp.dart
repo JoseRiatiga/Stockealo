@@ -16,7 +16,7 @@ class OrderWhatsApp {
     final who = (order.customerName ?? '').trim().isEmpty ? '' : ' ${order.customerName!.trim().split(' ').first}';
     final id = (order.plate ?? '').isEmpty ? '' : ' ${order.plate}';
     final String what;
-    if (t.usesVehicleKinds && order.vehicleKind != null) {
+    if (t.usesVehicleKinds && t.kindsAreVehicles && order.vehicleKind != null) {
       final kind = t.vehicleLabel(order.vehicleKind).toLowerCase();
       final ready = ServiceTemplate.vehicleFeminine(order.vehicleKind) ? 'lista' : 'listo';
       what = 'tu $kind$id ya está $ready';

@@ -170,6 +170,18 @@ class NotificationService extends ChangeNotifier {
           ),
           callback: (_) => onStoreOrder?.call(),
         )
+        // Reserva en línea nueva (0.14.0): se baja igual que los pedidos
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'appointments',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'business_id',
+            value: businessId,
+          ),
+          callback: (_) => onStoreOrder?.call(),
+        )
         ..subscribe();
 
       debugPrint('Realtime: Escuchando ventas para empresa $businessId');

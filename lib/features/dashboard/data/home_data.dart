@@ -4,6 +4,7 @@ import '../../../core/database/app_database.dart';
 import '../../cash/data/cash_register_repository.dart';
 import '../../sales/data/sales_repository.dart';
 import '../../store/data/store_orders_repository.dart';
+import '../../services/data/appointments_repository.dart';
 
 /// Rango del gráfico de ventas del Inicio
 enum HomeRange { days14, month, year }
@@ -21,7 +22,7 @@ class HomeBar {
 }
 
 /// Qué pide atención en el Inicio, de lo más urgente a lo menos
-enum AttentionKind { outOfStock, cashLeftOpen, overdueDebt, lowStock, storeOrders, toDeliver }
+enum AttentionKind { outOfStock, cashLeftOpen, overdueDebt, lowStock, storeOrders, toDeliver, bookings }
 
 /// Un aviso de «Necesita atención». Trae lo necesario para explicar por qué pasó
 /// y para resolverlo desde su panel, sin volver a consultar.
@@ -243,6 +244,10 @@ class HomeRepository {
       final pendingOrders = await StoreOrdersRepository.instance.pendingCount(businessId);
       if (pendingOrders > 0) {
         orders.add(AttentionItem(kind: AttentionKind.storeOrders, refId: 'store', name: 'Pedidos', count: pendingOrders));
+      }
+      final bookings = await AppointmentsRepository.instance.pendingCount(businessId);
+      if (bookings > 0) {
+        orders.add(AttentionItem(kind: AttentionKind.bookings, refId: 'bookings', name: 'Reservas', count: bookings));
       }
       final deliveries = await SalesRepository.instance.pendingDeliveries(businessId);
       if (deliveries.isNotEmpty) {

@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -184,6 +186,54 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  // 0.14.0: cada tipo de negocio se ve bien en celular y computador, claro y oscuro
+  for (final t in ServiceTemplate.all) {
+    for (final width in [360.0, 1200.0]) {
+      for (final brightness in Brightness.values) {
+        testWidgets('plantilla ${t.code} a ${width.toInt()} px en ${brightness.name}', (tester) async {
+          tester.view.physicalSize = Size(width, 1800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final b = Business.fromMap({...business.toMap(), 'service_type': t.code});
+          late String title;
+          await tester.runAsync(() async {
+            final db = await appDb.database;
+            await db.update('businesses', {'service_type': t.code}, where: 'id = ?', whereArgs: [businessId]);
+            await repo.seedTemplate(businessId, t);
+            // «Otro» no trae ejemplos: se crea uno
+            if (t.examples.isEmpty) await repo.saveService(repo.newService(businessId, name: 'Servicio general', price: 10000));
+            final first = (await repo.getServices(businessId)).first;
+            final order = await repo.createOrder(
+              businessId: businessId,
+              plate: t.kindsRequired ? 'XYZ12A' : null,
+              vehicleKind: t.usesVehicleKinds ? t.vehicleKinds.first.code : null,
+              customerName: 'Cliente Prueba',
+              lines: [WorkOrderLine(serviceId: first.id, name: first.name, price: first.price)],
+            );
+            title = order.title;
+          });
+          await tester.pumpWidget(MaterialApp(
+            theme: AppTheme.build(brightness),
+            home: ServicesTab(business: b, userRole: 'OWNER'),
+          ));
+          await settle(tester, find.text(title));
+          expect(find.text(title), findsWidgets);
+          expect(tester.takeException(), isNull, reason: 'tablero de ${t.code}');
+
+          await tester.tap(find.text('Recibir').first);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: 'recibir de ${t.code}');
+          await tester.tapAt(const Offset(5, 5));
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.text('Catálogo y precios'));
+          await settle(tester, find.text((await tester.runAsync(() => repo.getServices(businessId)))!.first.name));
+          expect(tester.takeException(), isNull, reason: 'catálogo de ${t.code}');
+        });
+      }
+    }
+  }
+
   for (final width in [360.0, 1200.0]) {
     testWidgets('pestaña Servicios: tablero, recibir, asistencia, historial y catálogo a ${width.toInt()} px', (tester) async {
       tester.view.physicalSize = Size(width, 1800);
@@ -198,19 +248,33 @@ void main() {
           businessId: businessId,
           plate: 'ABC12D',
           vehicleKind: 'MOTO',
-          lines: [WorkOrderLine(serviceId: completo.id, name: completo.name, price: 15000)],
+          lines: [
+            WorkOrderLine(serviceId: completo.id, name: completo.name, price: 15000),
+            WorkOrderLine(serviceId: completo.id, name: 'Polichado', price: 25000),
+          ],
         );
       });
 
+      final shot = GlobalKey();
       await tester.pumpWidget(MaterialApp(
         theme: AppTheme.build(Brightness.light),
-        home: ServicesTab(business: business, userRole: 'OWNER'),
+        home: RepaintBoundary(key: shot, child: ServicesTab(business: business, userRole: 'OWNER')),
       ));
       await settle(tester, find.text('ABC12D'));
+      final out = Platform.environment['PREVIEW_OUT'];
+      if (out != null) {
+        await tester.runAsync(() async {
+          final image = await (shot.currentContext!.findRenderObject()! as RenderRepaintBoundary).toImage();
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          File('$out/tablero_${tester.view.physicalSize.width.toInt()}.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+        });
+      }
 
-      // Tablero: el trabajo con su servicio pendiente y el aviso de marcar asistencia
-      expect(find.text('ABC12D'), findsOneWidget);
-      expect(find.text('Empezar'), findsOneWidget);
+      // Tablero (0.14.0): cada servicio con su propia tarjeta, cada una con su vehículo
+      expect(find.text('ABC12D'), findsNWidgets(2));
+      expect(find.text('Lavado completo'), findsOneWidget);
+      expect(find.text('Polichado'), findsOneWidget);
+      expect(find.text('Empezar'), findsNWidgets(2));
       expect(find.textContaining('Marca quién vino hoy'), findsOneWidget);
       expect(find.text('Juan · Sin marcar'), findsOneWidget);
       expect(tester.takeException(), isNull);

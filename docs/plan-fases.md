@@ -41,6 +41,17 @@ Invita y gana, contador de cupos de fundador, prueba gratis de Pro.
 Va antes que Pro Servicios, para no hacer pantallas dos veces. Bloques y detalle: `docs/plan-rediseno.md`, sección 9. Diseño final aprobado: https://claude.ai/artifact/JQtmF7vnoWhwMBujRAMitb
 Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ventas se rehacen).
 
+## PRIORIDAD · Re-diseño del panel admin (antes de la 0.14.0, pedido del dueño el 14 nov) — HECHO el 14 nov (rama feat/0.14.0)
+
+- En la 0.13.2 el panel admin solo pasó la letra y las ventanas al sistema de diseño (bloque 8b). **La distribución sigue siendo la vieja.**
+- Rehacerlo con el diseño aprobado de la app:
+  - menú lateral como el de la app;
+  - cifras en tarjetas (`StatCard`) en Resumen y Salud;
+  - pestañas `FilterTabs` en los filtros;
+  - listas de usuarios, negocios, suscripciones, pagos y tiendas con el estilo de Clientes;
+  - el detalle en panel lateral (`AppSidePanel`);
+  - modo oscuro, y probado a 1200 px y en el celular.
+
 ## 0.14.0 · Pro Servicios para cualquier negocio (antes 0.13.0)
 
 **Objetivo:** que Pro Servicios sirva igual a un lavadero, una barbería, un spa, un taller, un servicio técnico o una lavandería. Detalle en `docs/plan-servicios-tipos.md`.
@@ -48,37 +59,49 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 ### Bloque A · Barbería, peluquería y spa (primero)
 
-1. **Agenda de citas:**
+1. HECHO (14 nov). **Agenda de citas:**
    - por persona y por día, con la duración de cada servicio;
    - «Confirmada» y «No vino»;
    - recordatorio por WhatsApp (Pro Servicios);
    - al llegar el cliente, la cita pasa al tablero.
-2. **Reservas en línea desde la tienda** (Pro Servicios):
+2. HECHO (14 nov). **Reservas en línea desde la tienda** (Pro Servicios):
    - solo horas libres, según horario, duración, citas existentes y margen;
    - la nube nunca deja dos citas a la vez;
    - confirmación automática y el cliente puede cancelar hasta cierto tiempo antes;
    - el dueño ve quién creó o cambió cada cita y cuándo.
-3. **Precio por variante para todos:** corto/largo, moto/carro, pequeño/grande.
-4. **Historial del cliente por teléfono:** qué se hizo, con quién y cada cuánto viene.
-5. **Productos vendidos dentro del servicio:** pomada, shampoo. Salen del inventario.
-6. **Alquiler de silla:** opción por persona, además de la comisión (Pro Servicios).
-7. **Abono y pago mixto:** por ejemplo, efectivo + Nequi. Cuadra con la caja y los reportes.
-8. **Anular sin borrar:** la venta queda «Anulada» en el historial y en los reportes, con el stock repuesto. Hoy «anular el cobro» de Servicios la borra.
-9. **Servicios gratis hasta 3 personas:** catálogo, tablero, agenda y cobro. Pro Servicios: sin límite.
+3. HECHO (14 nov). **Precio por variante para todos:** corto/largo, moto/carro, pequeño/grande.
+4. HECHO (14 nov). **Historial del cliente por teléfono:** qué se hizo, con quién y cada cuánto viene.
+5. HECHO (14 nov), al cobrar. **Productos vendidos dentro del servicio:** pomada, shampoo. Salen del inventario.
+6. HECHO (14 nov). **Alquiler de silla:** opción por persona, además de la comisión (Pro Servicios).
+7. HECHO (14 nov). **Abono y pago mixto:** por ejemplo, efectivo + Nequi. Cuadra con la caja y los reportes.
+8. HECHO (14 nov). **Anular sin borrar:** la venta queda «Anulada» en el historial y en los reportes, con el stock repuesto. Hoy «anular el cobro» de Servicios la borra.
+9. HECHO (14 nov). **Servicios gratis hasta 3 personas:** catálogo, tablero, agenda y cobro. Pro Servicios: sin límite.
 
 ### Bloque B · Taller, servicio técnico y lavandería
 
-10. **Estados según el tipo de negocio**, por ejemplo «Esperando aprobación», «Esperando repuesto» o «Lista para recoger». También fecha de entrega y cantidad con decimales (por kilo).
-11. **Presupuesto:** por WhatsApp si el cliente no está, o aprobado en el local. Queda quién lo aprobó y cuándo.
-12. **Recepción con fotos**, accesorios recibidos y garantía.
-13. **Repuestos que salen del inventario** y se cobran en la orden.
+10. HECHO (14 nov). **Estados según el tipo de negocio**, por ejemplo «Esperando aprobación», «Esperando repuesto» o «Lista para recoger». También fecha de entrega y cantidad con decimales (por kilo).
+11. HECHO (14 nov). **Presupuesto:** por WhatsApp si el cliente no está, o aprobado en el local. Queda quién lo aprobó y cuándo.
+12. HECHO (14 nov). **Recepción con fotos**, accesorios recibidos y garantía.
+13. HECHO (14 nov), al cobrar. **Repuestos que salen del inventario** y se cobran en la orden.
 
 ### Para todos los tipos
 
-14. **Revisar cada plantilla:** nombres, servicios de ejemplo, mensajes de WhatsApp y precios de referencia.
-15. **Una prueba completa por tipo de negocio**, en el celular (360 px) y en el computador (1200 px), en claro y en oscuro.
+14. HECHO (14 nov). **Revisar cada plantilla:** nombres, servicios de ejemplo, mensajes de WhatsApp y precios de referencia.
+15. HECHO (14 nov). **Una prueba completa por tipo de negocio**, en el celular (360 px) y en el computador (1200 px), en claro y en oscuro.
 
 **Supabase:** sí (citas, reservas, pagos, ventas anuladas, órdenes). Cada migración, con permiso.
+
+### Pendientes que se suman (14 nov)
+
+16. HECHO (14 nov). **Cada servicio con su propia tarjeta en el tablero:** se mueve cada servicio, no el vehículo completo. Lo pidió el lavadero. **Prioridad.**
+17. HECHO (14 nov). **«Habilitar múltiples servicios» en la nube:** hoy se guarda solo en el aparato.
+18. HECHO (14 nov). **Liquidación de comisiones y orden de servicio como tiquete.**
+19. HECHO (14 nov): preguntar «solo este servicio o todo el cobro». **Antes de programar, preguntar al dueño:** ¿anular un servicio desde Ventas anula todo el cobro de esa orden?
+20. HECHO (14 nov). **«¿Para qué usarás Stockealo?» al crear un negocio nuevo** (decidido el 14 nov):
+    - **La respuesta queda guardada** en el negocio. Se puede saltar con «Ahora no» y responder después en Ajustes › Tu negocio.
+    - **Si compra Pro Servicios**, al abrir Servicios la plantilla que corresponde sale **marcada por defecto como sugerencia**. Por ejemplo, quien eligió «Lavadero» ve «Lavadero» ya marcado, y puede cambiarlo.
+    - Si eligió un tipo de productos, Servicios no marca ninguna.
+    - Las plantillas de productos (licorera, vapers…) llegan en la 0.16.0 (punto 16).
 
 ## 0.15.0 · Equipo y planes (antes 0.14.0)
 
@@ -111,6 +134,14 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 19. Cierre del día por WhatsApp: a mano en gratis, automático con Pro.
 20. Recordatorio en el celular para cerrar la caja.
 
+### Pendientes que se suman (14 nov)
+
+18. **Descuento por línea en Vender**, además del descuento a toda la venta.
+19. **Las ventas en espera no se pierden al cerrar la app:** hoy viven solo en memoria.
+20. **El tiquete con NIT, dirección y despedida propia del negocio.**
+21. **Stocky:** límite mayor para Pro (50 preguntas al día) y las claves de respaldo (Gemini y OpenRouter).
+22. **Seguridad:** el código del correo vence a los 10 minutos (revisar en Supabase).
+
 ## 0.16.0 · Tienda y crecimiento (antes 0.15.0)
 
 ### Calidad y confianza
@@ -125,20 +156,62 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 ### Tienda y pedidos (Pro)
 
-8. Pedidos con número, sección Pedidos y «Convertir en venta».
-9. Aviso de pedido nuevo.
-10. Nombre obligatorio y precio por unidad en el mensaje.
-11. QR de la tienda y compartir un producto.
-12. «Personalizar tienda»: portada, color, destacados, horario, modo oscuro, datos de pago y vista previa.
-13. Estadísticas de la tienda.
+8. ~~Pedidos con número, sección Pedidos y «Convertir en venta».~~ HECHO en la 0.13.4 (T-0001, Cotizaciones «Tienda», «Por entregar»).
+9. ~~Aviso de pedido nuevo.~~ HECHO en la 0.13.5 con la app abierta o en segundo plano (`docs/plan-avisos.md`).
+10. ~~Nombre obligatorio y precio por unidad en el mensaje.~~ HECHO en la 0.13.3.
+11. **Avisos con la app cerrada (Firebase), fase D de `docs/plan-avisos.md`:**
+    - el pedido de la tienda avisa aunque la app esté cerrada del todo;
+    - sirve también para los demás avisos que lleguen de la nube.
+    - Hace falta:
+      - crear el proyecto de Firebase;
+      - poner `google-services.json` en la app;
+      - guardar el token de cada celular en la nube;
+      - una función que mande el aviso al crearse un pedido (`create_store_order`).
+12. QR de la tienda y compartir un producto.
+13. **Plantillas de tienda nuevas** (decidido el 14 nov; van todas):
+    - **Mercado:** lista compacta con botón +, para tiendas de barrio, misceláneas y droguerías.
+    - **Menú:** cada categoría como sección de una carta, para comidas, panaderías y heladerías.
+    - **Boutique:** fotos grandes y mucho espacio, para joyería, cosméticos y artesanías.
+    - Con Clásica y Moda quedan 5, con vista previa usando los productos del negocio.
+14. **Catálogos al día y a juego con la tienda:**
+    - las 4 plantillas actuales (Clásica, Vitrina, Lista de precios y Promoción) pasan al diseño nuevo, con la cinta de promociones;
+    - se agregan **Moda** y **Menú**;
+    - el catálogo sale por defecto con el mismo estilo de la tienda.
+15. **Instagram** (decidido el 14 nov). Hoy solo hay historias 9:16:
+    - **Formatos:** historia 9:16, publicación cuadrada 1:1, vertical 4:5 y **carrusel** (hasta 10 imágenes, una por producto).
+    - **Enlace:** el link o el QR de la tienda en la imagen («Pide en stockealo.online/tienda/…»).
+    - **Texto listo para copiar:** nombre, precios, promoción, link y hashtags del negocio.
+    - **Compartir directo:** «Compartir en Instagram» abre Instagram con la imagen; en Android, directo a la historia.
+    - **Estilo:** las mismas plantillas de la tienda y del catálogo, y con Pro la cinta de promociones.
+16. **Plantillas por tipo de negocio que vende productos** (decidido el 14 nov):
+    - **Cómo se activa:** es una opción, igual que el módulo Servicios, que la primera vez pregunta «¿Qué tipo de negocio es?». La pregunta es **«¿Para qué usarás Stockealo?»**, y según la respuesta se carga la plantilla.
+    - **Qué carga:** categorías sugeridas (se pueden quitar), variantes útiles, avisos y el estilo de la tienda y del catálogo.
+    - **Primeros tipos:**
+      - **Licorera:** categorías, presentación en ml, aviso +18 y tienda «Mercado».
+      - **Vapers** (tipo nuevo): desechables, pods, líquidos y accesorios; sabor y nicotina en mg como variantes; aviso +18; tienda «Boutique».
+      - **Droguería:** categorías, vencimiento por lote y tienda «Mercado».
+      - **Ropa y calzado:** tallas y colores como variantes, y tienda «Moda».
+      - **Comidas y panadería:** categorías tipo carta y tienda «Menú».
+      - **Tienda de barrio o miscelánea:** categorías de barrio y tienda «Mercado».
+    - La pregunta «¿Para qué usarás Stockealo?» al crear el negocio se hace en la **0.14.0** (punto 20). Aquí solo se suman las opciones de productos.
+    - Las plantillas de servicios (Lavadero, Barbería, Spa, Taller, Servicio técnico y Lavandería) ya funcionan así y se revisan en la 0.14.0.
+17. «Personalizar tienda»: portada, color, destacados, horario, modo oscuro, datos de pago y vista previa.
+18. Estadísticas de la tienda.
 
 ### Crecimiento
 
-14. Guías de instalación para Android, web e iPhone.
-15. Página de novedades.
-16. Meta de ventas.
-17. Entrar con Google (y Apple).
-18. Cupones desde el panel.
+19. Guías de instalación para Android, web e iPhone.
+20. Página de novedades.
+21. Meta de ventas.
+22. Entrar con Google (y Apple).
+23. Cupones desde el panel.
+
+### Pendientes que se suman (14 nov)
+
+24. **Dirección limpia de la tienda:** quitar el `?t=` de la barra con `history.replaceState`.
+25. **Panel «Resolver» de Inicio:** los interruptores «Recordarme si no llega» y «Ocultarlo en Vender».
+26. **Lector de códigos:** arrastrar o pegar una foto.
+27. **Correo propio (SMTP)**, cuando crezcan los usuarios o haya errores de límite de envío.
 
 ## 0.17.0 · Sedes y negocio (antes 0.16.0)
 

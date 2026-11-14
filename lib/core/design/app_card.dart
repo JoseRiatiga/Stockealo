@@ -11,6 +11,9 @@ class AppCard extends StatelessWidget {
   /// Color de fondo distinto, por ejemplo un aviso suave (`context.colors.warningSoft`)
   final Color? color;
 
+  /// Borde de otro color (por ejemplo, la opción sugerida)
+  final Color? borderColor;
+
   const AppCard({
     super.key,
     required this.child,
@@ -18,6 +21,7 @@ class AppCard extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.color,
+    this.borderColor,
   });
 
   @override
@@ -26,7 +30,7 @@ class AppCard extends StatelessWidget {
     final radius = BorderRadius.circular(AppRadius.card);
     return Material(
       color: color ?? c.surface,
-      shape: RoundedRectangleBorder(borderRadius: radius, side: BorderSide(color: c.line)),
+      shape: RoundedRectangleBorder(borderRadius: radius, side: BorderSide(color: borderColor ?? c.line, width: borderColor == null ? 1 : 1.6)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,

@@ -6,6 +6,7 @@ import '../core/widgets/app_toast.dart';
 import '../features/feedback/data/feedback_service.dart';
 import 'admin_widgets.dart';
 import '../core/design/app_dialog.dart';
+import '../core/design/filter_tabs.dart';
 
 /// Panel › Sugerencias y fallos: lo que envían los usuarios desde Ajustes › Ayuda.
 /// Se cambia el estado y se responde; la respuesta la ve quien escribió.
@@ -148,36 +149,23 @@ class _AdminFeedbackPageState extends State<AdminFeedbackPage> {
       subtitle: 'Lo que escriben los usuarios desde Ajustes › Ayuda',
       onRefresh: _load,
       children: [
-        Wrap(
-          spacing: AppSpace.sm,
-          runSpacing: AppSpace.sm,
-          children: [
-            for (final (value, label) in const [('NUEVO', 'Nuevos'), ('REVISION', 'En revisión'), ('RESUELTO', 'Resueltos'), ('DESCARTADO', 'Descartados'), (null, 'Todos')])
-              ChoiceChip(
-                label: Text(label),
-                selected: _status == value,
-                onSelected: (_) {
-                  setState(() => _status = value);
-                  _load();
-                },
-              ),
-          ],
+        // Filtros con las pestañas de la app (re-diseño)
+        FilterTabs<String?>(
+          options: const {'NUEVO': 'Nuevos', 'REVISION': 'En revisión', 'RESUELTO': 'Resueltos', 'DESCARTADO': 'Descartados', null: 'Todos'},
+          value: _status,
+          onChanged: (v) {
+            setState(() => _status = v);
+            _load();
+          },
         ),
         const SizedBox(height: AppSpace.sm),
-        Wrap(
-          spacing: AppSpace.sm,
-          runSpacing: AppSpace.sm,
-          children: [
-            for (final (value, label) in const [(null, 'Todo'), ('FALLO', 'Fallos'), ('IDEA', 'Ideas'), ('PREGUNTA', 'Preguntas')])
-              ChoiceChip(
-                label: Text(label),
-                selected: _kind == value,
-                onSelected: (_) {
-                  setState(() => _kind = value);
-                  _load();
-                },
-              ),
-          ],
+        FilterTabs<String?>(
+          options: const {null: 'Todo', 'FALLO': 'Fallos', 'IDEA': 'Ideas', 'PREGUNTA': 'Preguntas'},
+          value: _kind,
+          onChanged: (v) {
+            setState(() => _kind = v);
+            _load();
+          },
         ),
         const SizedBox(height: AppSpace.md),
         if (state.blocking)

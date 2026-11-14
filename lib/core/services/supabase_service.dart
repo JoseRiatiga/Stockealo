@@ -591,6 +591,7 @@ class SupabaseService {
                   ? null
                   : (b['service_messages'] is String ? b['service_messages'] : jsonEncode(b['service_messages'])),
               'services_schedule': b['services_schedule'],
+              'services_multi': b['services_multi'] == true ? 1 : 0,
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
               'deleted_at': b['deleted_at'],
               'created_at': b['created_at'] ?? DateTime.now().toIso8601String(),
@@ -973,6 +974,7 @@ class SupabaseService {
         ('cash_sessions', <String>[]),
         ('cash_movements', <String>[]),
         ('promotions', ['is_active']),
+        ('appointments', <String>[]),
       ]) {
         try {
           final List<dynamic> rows = await client!.from(table).select();
@@ -1184,6 +1186,10 @@ class SupabaseService {
         await db.from('cash_movements').upsert(boolRow(p, const []), onConflict: 'id');
       case 'update_store_order':
         await db.from('store_orders').update({'status': p['status']}).eq('id', p['id'] as String);
+      case 'upsert_appointment':
+        await db.from('appointments').upsert(boolRow(p, const []), onConflict: 'id');
+      case 'delete_appointment':
+        await db.from('appointments').delete().eq('id', p['id'] as String);
       case 'upsert_promotion':
         await db.from('promotions').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
       case 'delete_promotion':
@@ -1193,9 +1199,15 @@ class SupabaseService {
         try {
           await db.from('staff').upsert(staffRow, onConflict: 'id');
         } catch (e) {
-          // La nube todavía no tiene la columna del horario: se guarda lo demás
-          if (!e.toString().contains('schedule') && !e.toString().contains('42703')) rethrow;
-          staffRow.remove('schedule');
+          // La nube todavía no tiene las columnas nuevas: se guarda lo demás
+          if (!e.toString().contains('schedule') && !e.toString().contains('chair_rent') &&
+              !e.toString().contains('rent_period') && !e.toString().contains('42703')) {
+            rethrow;
+          }
+          staffRow
+            ..remove('schedule')
+            ..remove('chair_rent')
+            ..remove('rent_period');
           await db.from('staff').upsert(staffRow, onConflict: 'id');
         }
       case 'upsert_work_order':
@@ -1325,6 +1337,7 @@ class SupabaseService {
           if (b['service_messages'] != null)
             'service_messages': b['service_messages'] is String ? jsonDecode(b['service_messages'] as String) : b['service_messages'],
           if (b['services_schedule'] != null) 'services_schedule': b['services_schedule'],
+          if (b['services_multi'] != null) 'services_multi': b['services_multi'] == 1 || b['services_multi'] == true,
         },
         'is_deleted': (b['is_deleted'] as int?) ?? 0,
       };
@@ -1671,6 +1684,10 @@ class SupabaseService {
   /// Pedido de la tienda confirmado (pasó a venta) o rechazado (0.13.4)
   Future<void> updateStoreOrderInCloud(String id, String status) => _write('update_store_order', {'id': id, 'status': status});
 
+  /// Agenda de citas (0.14.0)
+  Future<void> upsertAppointmentToCloud(Map<String, dynamic> row) => _write('upsert_appointment', row);
+  Future<void> deleteAppointmentFromCloud(String id) => _write('delete_appointment', {'id': id});
+
   /// Promociones (0.13.4)
   Future<void> upsertPromotionToCloud(Map<String, dynamic> row) => _write('upsert_promotion', row);
   Future<void> deletePromotionFromCloud(String id) => _write('delete_promotion', {'id': id});
@@ -1701,6 +1718,12 @@ class SupabaseService {
     row['lines'] = json(r['lines'], const []);
     row['status_times'] = json(r['status_times'], const {});
     row['sale_ids'] = json(r['sale_ids'], const []);
+    // Datos extra (0.14.0): solo viajan si hay algo, así la nube vieja no falla
+    if (r['extra'] == null) {
+      row.remove('extra');
+    } else {
+      row['extra'] = json(r['extra'], const {});
+    }
     return row;
   }
 
@@ -1771,6 +1794,7 @@ class SupabaseService {
       'lines': text(r['lines'], const []),
       'status_times': text(r['status_times'], const {}),
       'sale_ids': text(r['sale_ids'], const []),
+      'extra': r['extra'] == null ? null : text(r['extra'], const {}),
     };
   }
 

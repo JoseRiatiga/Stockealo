@@ -12,6 +12,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../business/models/business.dart';
 import '../../products/models/product.dart';
 import '../models/catalog_style.dart';
+import '../../sales/models/promotion.dart';
 
 class CatalogPdfService {
   static final CatalogPdfService instance = CatalogPdfService._internal();
@@ -77,6 +78,15 @@ class CatalogPdfService {
   }
 
   /// Genera el catálogo en PDF con el estilo elegido
+  /// Promociones vigentes que muestran los catálogos (solo con Pro; las pone el
+  /// generador de catálogos al abrirse). Las usan el PDF y las historias.
+  List<Promotion> promotions = const [];
+
+  /// El precio del producto, con su promoción si tiene
+  String priceOf(Product p) =>
+      Promotion.catalogLabel(promotions, productId: p.id, category: p.category, price: p.salePrice, money: CurrencyFormatter.format) ??
+      CurrencyFormatter.format(p.salePrice);
+
   Future<File> generateCatalogPdf({
     required Business business,
     required List<Product> products,
@@ -406,7 +416,7 @@ class CatalogPdfService {
                   children: [
                     if (style.showPrice)
                       pw.Text(
-                        CurrencyFormatter.format(product.salePrice),
+                        priceOf(product),
                         style: pw.TextStyle(fontSize: priceSize, fontWeight: pw.FontWeight.bold, color: colors.accent),
                       )
                     else
@@ -490,7 +500,7 @@ class CatalogPdfService {
                 borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
               ),
               child: pw.Text(
-                CurrencyFormatter.format(product.salePrice),
+                priceOf(product),
                 style: pw.TextStyle(fontSize: priceSize, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
               ),
             ),
@@ -552,7 +562,7 @@ class CatalogPdfService {
                   ),
                   if (style.showPrice)
                     pw.Text(
-                      CurrencyFormatter.format(products[i].salePrice),
+                      priceOf(products[i]),
                       style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: colors.accent),
                     ),
                 ],

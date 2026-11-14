@@ -110,6 +110,41 @@ class StoreVariant {
       );
 }
 
+/// Promoción vigente de un producto en la tienda (0.13.4)
+class StorePromo {
+  final String name;
+  final bool isPercent;
+  final double percentOff;
+  final int buyQty;
+  final int payQty;
+  final DateTime? endsAt;
+
+  const StorePromo({
+    required this.name,
+    required this.isPercent,
+    this.percentOff = 0,
+    this.buyQty = 2,
+    this.payQty = 1,
+    this.endsAt,
+  });
+
+  /// En la cinta: «−20 %» o «2×1»
+  String get badge => isPercent ? '−${percentOff.round()} %' : '$buyQty×$payQty';
+
+  static StorePromo? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final j = Map<String, dynamic>.from(raw);
+    return StorePromo(
+      name: j['name'] as String? ?? 'Promoción',
+      isPercent: j['kind'] == 'PERCENT',
+      percentOff: (j['percent_off'] as num?)?.toDouble() ?? 0,
+      buyQty: (j['buy_qty'] as num?)?.toInt() ?? 2,
+      payQty: (j['pay_qty'] as num?)?.toInt() ?? 1,
+      endsAt: DateTime.tryParse('${j['ends_at'] ?? ''}')?.toLocal(),
+    );
+  }
+}
+
 /// Un producto de la tienda pública
 class StoreProduct {
   final String id;
@@ -130,6 +165,9 @@ class StoreProduct {
   /// Quedan 3 o menos (producto sin tallas ni colores)
   final bool few;
 
+  /// Promoción vigente (con % el [price] ya viene rebajado y [oldPrice] es el de antes)
+  final StorePromo? promo;
+
   const StoreProduct({
     required this.id,
     required this.name,
@@ -140,6 +178,7 @@ class StoreProduct {
     this.oldPrice,
     this.variants = const [],
     this.few = false,
+    this.promo,
   });
 
   /// Tallas y colores que todavía se pueden pedir
@@ -152,19 +191,28 @@ class StoreProduct {
   List<String> get sizes => [for (final s in available.map((v) => v.size).whereType<String>().toSet()) s];
   List<String> get colorHexes => [for (final h in available.map((v) => v.hex).whereType<String>().toSet()) h];
 
-  factory StoreProduct.fromJson(Map<String, dynamic> j) => StoreProduct(
+  factory StoreProduct.fromJson(Map<String, dynamic> j) {
+    final promo = StorePromo.fromJson(j['promo']);
+    final base = (j['price'] as num?)?.toDouble() ?? 0;
+    final before = (j['old_price'] as num?)?.toDouble();
+    // Con % de descuento: se cobra rebajado y se tacha el precio normal
+    final pct = promo != null && promo.isPercent && promo.percentOff > 0;
+    final price = pct ? (base * (100 - promo.percentOff) / 100).roundToDouble() : base;
+    return StoreProduct(
         id: j['id'] as String,
         name: j['name'] as String? ?? '',
         category: (j['category'] as String? ?? '').trim(),
-        price: (j['price'] as num?)?.toDouble() ?? 0,
+        price: price,
         imageUrl: j['image_url'] as String?,
         stock: (j['stock'] as num?)?.toInt(),
-        oldPrice: (j['old_price'] as num?)?.toDouble(),
+        oldPrice: pct ? ((before ?? 0) > base ? before : base) : before,
         few: j['few'] == true,
+        promo: promo,
         variants: [
           for (final v in (j['variants'] as List? ?? const [])) StoreVariant.fromJson(Map<String, dynamic>.from(v as Map)),
         ],
       );
+  }
 }
 
 /// Lo que ve el comprador en stockealo.online/tienda/<slug>
@@ -235,7 +283,14 @@ class CartLine {
   static String keyOf(StoreProduct p, StoreVariant? v) => v == null ? p.id : '${p.id}:${v.id}';
   String get name => variant == null ? product.name : '${product.name} (${variant!.label})';
   double get unitPrice => product.price + (variant?.extra ?? 0);
-  double get subtotal => unitPrice * quantity;
+
+  /// Con «lleva X, paga Y» se descuentan las unidades de regalo (0.13.4)
+  double get subtotal {
+    final promo = product.promo;
+    if (promo == null || promo.isPercent || promo.buyQty <= promo.payQty) return unitPrice * quantity;
+    final free = (quantity ~/ promo.buyQty) * (promo.buyQty - promo.payQty);
+    return unitPrice * (quantity - free);
+  }
   int? get stock => variant?.stock ?? product.stock;
 }
 

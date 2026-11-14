@@ -36,6 +36,11 @@ class Sale {
   /// Pago mixto: cuánto entró por cada medio en esta línea (JSON)
   final String? paymentSplit;
 
+  /// Promoción que se aplicó a la línea (0.13.4) y cuánto descontó
+  final String? promotionId;
+  final String? promotionName;
+  final double promotionDiscount;
+
   bool get isService => serviceId != null || productId.isEmpty;
   bool get isVoided => voidedAt != null;
 
@@ -65,6 +70,9 @@ class Sale {
     this.voidReason,
     this.voidedBy,
     this.paymentSplit,
+    this.promotionId,
+    this.promotionName,
+    this.promotionDiscount = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -94,6 +102,9 @@ class Sale {
       'void_reason': voidReason,
       'voided_by': voidedBy,
       'payment_split': paymentSplit,
+      'promotion_id': promotionId,
+      'promotion_name': promotionName,
+      'promotion_discount': promotionDiscount,
     };
   }
 
@@ -124,6 +135,9 @@ class Sale {
       voidReason: map['void_reason'] as String?,
       voidedBy: map['voided_by'] as String?,
       paymentSplit: map['payment_split'] as String?,
+      promotionId: map['promotion_id'] as String?,
+      promotionName: map['promotion_name'] as String?,
+      promotionDiscount: (map['promotion_discount'] as num?)?.toDouble() ?? 0,
     );
   }
 }

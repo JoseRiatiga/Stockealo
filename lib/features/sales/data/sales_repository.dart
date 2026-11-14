@@ -209,7 +209,9 @@ class SalesRepository {
       }
     }
 
-    final double totalSubtotal = items.fold(0.0, (sum, i) => sum + i.subtotal);
+    // Con promoción: cada línea ya trae su descuento; el descuento a toda la venta se
+    // reparte sobre lo que queda (0.13.4)
+    final double totalSubtotal = items.fold(0.0, (sum, i) => sum + i.netSubtotal);
     final double finalDiscount = discountAmount > 0
         ? discountAmount
         : (discountPercent > 0 ? (totalSubtotal * (discountPercent / 100.0)) : 0.0);
@@ -282,9 +284,10 @@ class SalesRepository {
         final saleId = const Uuid().v4();
 
         // Proporción del descuento asignado a este ítem
-        final double itemProportion = totalSubtotal > 0 ? (item.subtotal / totalSubtotal) : (1.0 / items.length);
+        final double itemProportion = totalSubtotal > 0 ? (item.netSubtotal / totalSubtotal) : (1.0 / items.length);
         final double itemDiscount = finalDiscount * itemProportion;
-        final double itemTotal = (item.subtotal - itemDiscount).clamp(0.0, double.infinity);
+        final double itemTotal = (item.netSubtotal - itemDiscount).clamp(0.0, double.infinity);
+        final promo = item.promoDiscount > 0 ? item.promotion : null;
         final double itemProfit = itemTotal - item.totalCost;
         // Cada línea guarda su parte de cada medio, para que la caja sepa cuánto fue en efectivo
         final String? itemSplit = mixed && finalTotal > 0
@@ -345,10 +348,13 @@ class SalesRepository {
           'payment_status': paymentMethod == 'FIADO' ? 'PENDIENTE' : 'PAGADO',
           'notes': notes,
           'invoice_number': invoiceNumber,
-          'discount_amount': itemDiscount,
+          'discount_amount': itemDiscount + (promo == null ? 0 : item.promoDiscount),
           'variant_id': item.variant?.id,
           'variant_name': item.variant?.label,
           'payment_split': itemSplit,
+          'promotion_id': promo?.id,
+          'promotion_name': promo?.name,
+          'promotion_discount': promo == null ? 0.0 : item.promoDiscount,
           'created_at': now.toIso8601String(),
           'is_synced': 0,
         });
@@ -383,6 +389,9 @@ class SalesRepository {
           variantName: item.variant?.label,
           invoiceNumber: invoiceNumber,
           paymentSplit: itemSplit,
+          promotionId: promo?.id,
+          promotionName: promo?.name,
+          promotionDiscount: promo == null ? 0 : item.promoDiscount,
         );
 
         createdSales.add(sale);

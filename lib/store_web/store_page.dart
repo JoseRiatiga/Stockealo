@@ -358,7 +358,10 @@ class _StorePageState extends State<StorePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (offers) const SectionLabel('HAY OFERTAS', padding: EdgeInsets.only(bottom: AppSpace.xs)),
+                  if (_promoLine(store) != null)
+                    SectionLabel(_promoLine(store)!.toUpperCase(), padding: const EdgeInsets.only(bottom: AppSpace.xs))
+                  else if (offers)
+                    const SectionLabel('HAY OFERTAS', padding: EdgeInsets.only(bottom: AppSpace.xs)),
                   Text(
                     (store.heroTitle ?? '').trim().isEmpty ? store.businessName : store.heroTitle!,
                     maxLines: 2,
@@ -440,6 +443,20 @@ class _StorePageState extends State<StorePage> {
       ),
       bottomNavigationBar: _lines.isEmpty || wide ? null : _cartBar(context, store),
     );
+  }
+
+  /// La franja de la promoción que termina primero: «Fin de mes · termina en 3 días»
+  String? _promoLine(PublicStore store) {
+    StorePromo? first;
+    for (final p in store.products) {
+      final promo = p.promo;
+      if (promo?.endsAt == null) continue;
+      if (first == null || promo!.endsAt!.isBefore(first.endsAt!)) first = promo;
+    }
+    if (first == null) return null;
+    final left = first.endsAt!.difference(DateTime.now());
+    final when = left.inHours < 24 ? 'termina hoy' : 'termina en ${left.inDays} ${left.inDays == 1 ? 'día' : 'días'}';
+    return '${first.name} · $when';
   }
 
   Widget _navLink(String label, VoidCallback onTap, {bool active = false}) {
@@ -903,14 +920,16 @@ class _ProductCard extends StatelessWidget {
                       ? Image.network(p.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder(c))
                       : _placeholder(c),
                 ),
-                if (p.onOffer)
+                if (p.onOffer || p.promo != null)
                   Positioned(
                     top: AppSpace.md,
                     right: AppSpace.md,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm + 2, vertical: 4),
                       decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(AppRadius.pill)),
-                      child: Text('OFERTA', style: AppText.caption(context, weight: FontWeight.w800, color: c.onAccent)),
+                      // Con promoción: «−20 %» o «2×1»
+                      child: Text(p.promo?.badge ?? 'OFERTA',
+                          style: AppText.caption(context, weight: FontWeight.w800, color: c.onAccent)),
                     ),
                   ),
                 if (quantity > 0)

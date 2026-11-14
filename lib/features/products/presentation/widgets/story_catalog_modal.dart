@@ -6,13 +6,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_tokens.dart';
-import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
 import '../../../business/presentation/business_identity.dart';
 import '../../../reports/models/catalog_style.dart';
 import '../../models/product.dart';
 import 'product_image_view.dart';
+import '../../../reports/data/catalog_pdf_service.dart';
 
 /// Historias verticales 9:16 para Estados de WhatsApp e Instagram, con el mismo
 /// estilo del catálogo en PDF.
@@ -322,7 +322,7 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
         if (style.showPrice)
           Expanded(
             child: Text(
-              CurrencyFormatter.format(p.salePrice),
+              CatalogPdfService.instance.priceOf(p),
               maxLines: 1,
               style: TextStyle(fontSize: size, fontWeight: FontWeight.w800, color: _colors.price),
             ),

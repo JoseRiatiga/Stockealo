@@ -7,6 +7,7 @@ import '../../../profile/presentation/widgets/settings_cards.dart';
 import '../../data/profit_report_repository.dart';
 import '../../../sales/models/payment_method.dart';
 import '../../../../core/design/filter_tabs.dart';
+import '../../../sales/data/promotions_repository.dart';
 
 /// Reporte de ganancias y pérdidas del negocio por periodo
 class ProfitReportScreen extends StatefulWidget {
@@ -200,6 +201,26 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
             label: 'Margen bajo (menos de 15%)',
             child: Column(children: [for (final p in r.lowMarginProducts) _productRow(p, warn: true)]),
           ),
+        // Cuánto vendió y cuánto descontó cada promoción en el periodo (0.13.4)
+        FutureBuilder(
+          future: () {
+            final range = _period.range(widget.now ?? DateTime.now());
+            return PromotionsRepository.instance.results(widget.business.id, range.from, range.to);
+          }(),
+          builder: (context, snap) {
+            final list = snap.data ?? const [];
+            if (list.isEmpty) return const SizedBox.shrink();
+            return SettingsPanel(
+              label: 'Promociones',
+              child: Column(
+                children: [
+                  for (final p in list)
+                    _line(p.name, _money(p.sold), hint: '${p.units} ${p.units == 1 ? 'unidad' : 'unidades'} · descontó ${_money(p.discount)}'),
+                ],
+              ),
+            );
+          },
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
           child: Text(

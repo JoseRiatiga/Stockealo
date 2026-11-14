@@ -21,6 +21,8 @@ import 'package:stockealo/features/sales/data/sales_repository.dart';
 import 'package:stockealo/features/sales/data/sell_cart.dart';
 import 'package:stockealo/features/sales/models/cart_item.dart';
 import 'package:stockealo/features/sales/models/payment_method.dart';
+import 'package:stockealo/features/sales/data/promotions_repository.dart';
+import 'package:stockealo/features/sales/models/promotion.dart';
 import 'package:stockealo/features/sales/presentation/screens/sell_screen.dart';
 
 /// Vender (bloque 4): pago mixto, caja obligatoria, anular sin borrar y cómo se
@@ -108,6 +110,45 @@ void main() {
     await cash.openSession(businessId: businessId, openingAmount: 100000, openedBy: 'Rosa');
     final done = await sales.recordMultiProductSale(businessId: businessId, items: await items({'gaseosa': 1}), paymentMethod: PaymentMethod.nequi);
     expect(done.single.paymentMethod, 'NEQUI');
+  });
+
+  test('promoción 2×1 en Bebidas: Vender la aplica sola y la venta guarda cuánto descontó', () async {
+    await cash.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Rosa');
+    final repo = PromotionsRepository.instance;
+    final now = DateTime.now();
+    final base = repo.newPromotion(businessId, name: '2×1 en gaseosas', kind: Promotion.buyXPayY);
+    await repo.save(Promotion(
+      id: base.id,
+      businessId: businessId,
+      name: base.name,
+      kind: Promotion.buyXPayY,
+      scope: Promotion.scopeCategory,
+      category: 'Bebidas',
+      startsAt: now.subtract(const Duration(days: 1)),
+      endsAt: now.add(const Duration(days: 1)),
+      createdAt: now,
+      updatedAt: now,
+    ));
+    final cart = SellCart.instance..reset();
+    cart.setPromotions(await repo.live(businessId));
+    final gaseosa = (await ProductRepository.instance.getProductById('gaseosa', businessId))!;
+    final huevos = (await ProductRepository.instance.getProductById('huevos', businessId))!;
+    cart.add(gaseosa);
+    cart.add(gaseosa);
+    cart.add(huevos);
+    expect(cart.promoDiscount, 5600, reason: 'una gaseosa de regalo; los huevos no son Bebidas');
+    expect(cart.total, 5600 * 2 + 18900 - 5600);
+
+    final done = await sales.recordMultiProductSale(businessId: businessId, items: cart.lines, paymentMethod: PaymentMethod.cash);
+    final line = done.firstWhere((s) => s.productId == 'gaseosa');
+    expect(line.promotionName, '2×1 en gaseosas');
+    expect(line.promotionDiscount, 5600);
+    expect(line.totalAmount, 5600);
+    expect(done.firstWhere((s) => s.productId == 'huevos').promotionName, isNull);
+    final results = await repo.results(businessId, now.subtract(const Duration(days: 1)), now.add(const Duration(days: 1)));
+    expect(results.single.discount, 5600);
+    cart.reset();
+    cart.setPromotions(const []);
   });
 
   test('pago mixto: cada medio suma lo suyo y la caja solo cuenta el efectivo', () async {

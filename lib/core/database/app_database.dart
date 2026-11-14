@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 14;
+  static const int _schemaVersion = 15;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -572,11 +572,38 @@ class AppDatabase {
     }
     if (oldVersion < 13 && newVersion >= 13) await salesV13(db);
     if (oldVersion < 14 && newVersion >= 14) await schedulesV14(db);
+    if (oldVersion < 15 && newVersion >= 15) await promotionsV15(db);
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
   /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
   /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  /// 0.13.4: promociones (% de descuento y lleva X, paga Y) y su rastro en cada venta
+  static Future<void> promotionsV15(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS promotions (
+        id TEXT PRIMARY KEY,
+        business_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        percent_off REAL NOT NULL DEFAULT 0,
+        buy_qty INTEGER NOT NULL DEFAULT 2,
+        pay_qty INTEGER NOT NULL DEFAULT 1,
+        scope TEXT NOT NULL DEFAULT 'ALL',
+        category TEXT,
+        product_ids TEXT,
+        starts_at TEXT NOT NULL,
+        ends_at TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _addColumnIfMissing(db, 'sales', 'promotion_id', 'TEXT');
+    await _addColumnIfMissing(db, 'sales', 'promotion_name', 'TEXT');
+    await _addColumnIfMissing(db, 'sales', 'promotion_discount', 'REAL NOT NULL DEFAULT 0');
+  }
+
   /// 0.13.1: horario de los empleados (del negocio y propio de cada uno)
   static Future<void> schedulesV14(Database db) async {
     await _addColumnIfMissing(db, 'staff', 'schedule', 'TEXT');
@@ -875,6 +902,7 @@ class AppDatabase {
     await db.execute('CREATE INDEX idx_quotations_biz ON quotations(business_id)');
     await salesV13(db);
     await schedulesV14(db);
+    await promotionsV15(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

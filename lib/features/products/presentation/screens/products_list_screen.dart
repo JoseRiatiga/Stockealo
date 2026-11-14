@@ -32,6 +32,7 @@ import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/design/stat_card.dart';
+import '../../../sales/presentation/screens/promotions_screen.dart';
 
 /// Productos (el catálogo) y, en [ProductsListMode.stock], el lugar Stock: la
 /// misma lista arrancando en «por reponer», con el aviso del proveedor que pasa
@@ -427,6 +428,13 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                           caption: 'PDF e historias',
                           onTap: _openCatalogModal,
                         ),
+                        if (canEditProducts && _activeBusiness != null)
+                          QuickAccessItem(
+                            icon: Icons.local_offer_outlined,
+                            label: 'Promociones',
+                            caption: '% y 2×1 con fechas',
+                            onTap: () => PromotionsScreen.open(context, business: _activeBusiness!),
+                          ),
                         if (canEditProducts)
                           QuickAccessItem(
                             icon: Icons.upload_file_outlined,

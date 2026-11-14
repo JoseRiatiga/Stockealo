@@ -16,6 +16,7 @@ import '../../../reports/presentation/screens/profit_report_screen.dart';
 import '../../../sales/presentation/widgets/quotations_list_modal.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
 import '../../data/dashboard_repository.dart';
+import '../../../sales/presentation/screens/promotions_screen.dart';
 
 /// «Accesos rápidos» de Inicio (volvieron en la 0.12.1, a pedido del dueño):
 /// llevan a una función en un toque. Salen de `kAppFunctions`, la misma lista
@@ -87,6 +88,8 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
         await GuidedImportScreen.open(context, businessId: biz.id);
       case 'catalog':
         await CatalogGeneratorModal.show(context: context, business: biz);
+      case 'promotions':
+        await PromotionsScreen.open(context, business: biz);
       case 'profits':
         await ProfitReportScreen.open(context, biz);
       case 'team':

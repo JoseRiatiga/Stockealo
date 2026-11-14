@@ -821,6 +821,7 @@ class SupabaseService {
           for (final r in await db.query('sales', columns: [
             'id', 'variant_id', 'variant_name', 'seller_name', 'invoice_number', 'product_photo_path', 'discount_amount',
             'service_id', 'work_order_id', 'staff_ids', 'voided_at', 'void_reason', 'voided_by', 'payment_split',
+            'promotion_id', 'promotion_name', 'promotion_discount',
           ]))
             r['id'] as String: r,
         };
@@ -916,6 +917,9 @@ class SupabaseService {
               'void_reason': s['void_reason'] ?? local?['void_reason'],
               'voided_by': s['voided_by'] ?? local?['voided_by'],
               'payment_split': s['payment_split'] ?? local?['payment_split'],
+              'promotion_id': s['promotion_id'] ?? local?['promotion_id'],
+              'promotion_name': s['promotion_name'] ?? local?['promotion_name'],
+              'promotion_discount': s['promotion_discount'] ?? local?['promotion_discount'] ?? 0.0,
               'seller_name': local?['seller_name'],
               'invoice_number': local?['invoice_number'],
               'product_photo_path': local?['product_photo_path'],
@@ -965,6 +969,7 @@ class SupabaseService {
         ('staff_payouts', <String>[]),
         ('cash_sessions', <String>[]),
         ('cash_movements', <String>[]),
+        ('promotions', ['is_active']),
       ]) {
         try {
           final List<dynamic> rows = await client!.from(table).select();
@@ -1174,6 +1179,10 @@ class SupabaseService {
         await db.from('cash_sessions').upsert(cashSessionCloudRow(p), onConflict: 'id');
       case 'upsert_cash_movement':
         await db.from('cash_movements').upsert(boolRow(p, const []), onConflict: 'id');
+      case 'upsert_promotion':
+        await db.from('promotions').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
+      case 'delete_promotion':
+        await db.from('promotions').delete().eq('id', p['id'] as String);
       case 'upsert_staff':
         final staffRow = boolRow(p, const ['is_active']);
         try {
@@ -1410,11 +1419,13 @@ class SupabaseService {
         ..._saleV13Fields(s),
       };
 
-  static const _saleV13Columns = ['voided_at', 'void_reason', 'voided_by', 'payment_split'];
+  static const _saleV13Columns = ['voided_at', 'void_reason', 'voided_by', 'payment_split', 'promotion_id', 'promotion_name'];
 
   static Map<String, dynamic> _saleV13Fields(Map<String, dynamic> s) => {
         for (final c in _saleV13Columns)
           if ((s[c] as String?)?.isNotEmpty == true) c: s[c],
+        // Promoción (0.13.4): cuánto se descontó en la línea
+        if (((s['promotion_discount'] as num?) ?? 0) > 0) 'promotion_discount': s['promotion_discount'],
       };
 
   Future<void> _sendSale(SupabaseClient db, Map<String, dynamic> s) async {
@@ -1648,6 +1659,10 @@ class SupabaseService {
   /// Servicio del catálogo, empleado u orden del tablero
   Future<void> upsertServiceToCloud(Map<String, dynamic> row) => _write('upsert_service', row);
   Future<void> upsertStaffToCloud(Map<String, dynamic> row) => _write('upsert_staff', row);
+
+  /// Promociones (0.13.4)
+  Future<void> upsertPromotionToCloud(Map<String, dynamic> row) => _write('upsert_promotion', row);
+  Future<void> deletePromotionFromCloud(String id) => _write('delete_promotion', {'id': id});
   Future<void> upsertWorkOrderToCloud(Map<String, dynamic> row) => _write('upsert_work_order', row);
   Future<void> upsertAttendanceToCloud(Map<String, dynamic> row) => _write('upsert_attendance', row);
   Future<void> upsertCommissionToCloud(Map<String, dynamic> row) => _write('upsert_commission', row);

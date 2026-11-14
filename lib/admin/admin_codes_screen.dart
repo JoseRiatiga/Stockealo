@@ -6,6 +6,7 @@ import '../core/widgets/app_toast.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import 'admin_widgets.dart';
 import '../core/design/app_dialog.dart';
+import '../core/design/filter_tabs.dart';
 
 /// Duraciones que se ofrecen; null = permanente
 const _durations = <int?>[1, 7, 30, 90, 365, null];
@@ -186,13 +187,10 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
         Text('Crear códigos', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
         const SizedBox(height: AppSpace.md),
         _label(c, 'Plan'),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'business', label: Text('Pro Negocio')),
-            ButtonSegment(value: 'services', label: Text('Pro Servicios')),
-          ],
-          selected: {_kind},
-          onSelectionChanged: (v) => setState(() => _kind = v.first),
+        FilterTabs<String>(
+          options: const {'business': 'Pro Negocio', 'services': 'Pro Servicios'},
+          value: _kind,
+          onChanged: (v) => setState(() => _kind = v),
         ),
         const SizedBox(height: AppSpace.lg),
         _label(c, 'Duración de Pro'),

@@ -9,6 +9,7 @@ import '../features/pro/data/pro_admin_service.dart';
 import '../features/pro/data/pro_service.dart' show proKindLabel;
 import 'admin_widgets.dart';
 import '../core/design/app_dialog.dart';
+import '../core/design/filter_tabs.dart';
 
 /// Negocios con Pro: quién, qué plan y hasta cuándo. Permite dar Pro a mano y terminarlo.
 class AdminSubscriptionsPage extends StatefulWidget {
@@ -100,14 +101,11 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
       children: [
         Align(
           alignment: Alignment.centerLeft,
-          child: SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: true, label: Text('Activas')),
-              ButtonSegment(value: false, label: Text('Todas')),
-            ],
-            selected: {_onlyActive},
-            onSelectionChanged: (v) {
-              _onlyActive = v.first;
+          child: FilterTabs<bool>(
+            options: const {true: 'Activas', false: 'Todas'},
+            value: _onlyActive,
+            onChanged: (v) {
+              _onlyActive = v;
               _load();
             },
           ),
@@ -254,14 +252,10 @@ class _GrantDialogState extends State<_GrantDialog> {
             Text('Para compensar un fallo, una cortesía o un pago recibido. Los días se suman a lo que ya tenga de ese plan.',
                 style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
             const SizedBox(height: AppSpace.md),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'business', label: Text('Pro Negocio')),
-                ButtonSegment(value: 'services', label: Text('Pro Servicios')),
-              ],
-              selected: {_kind},
-              showSelectedIcon: false,
-              onSelectionChanged: (v) => setState(() => _kind = v.first),
+            FilterTabs<String>(
+              options: const {'business': 'Pro Negocio', 'services': 'Pro Servicios'},
+              value: _kind,
+              onChanged: (v) => setState(() => _kind = v),
             ),
             if (_kind == 'services')
               Padding(

@@ -6,6 +6,8 @@ import 'admin_health_section.dart';
 import 'admin_usage_section.dart';
 import 'admin_shell.dart';
 import 'admin_widgets.dart';
+import '../core/design/status_pill.dart';
+import '../core/design/stat_card.dart';
 
 /// Portada del panel: las cifras importantes y lo que necesita atención
 class AdminSummaryPage extends StatefulWidget {
@@ -103,7 +105,13 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
                   return Wrap(
                     spacing: AppSpace.sm,
                     runSpacing: AppSpace.sm,
-                    children: [for (final t in tiles) SizedBox(width: tileWidth, child: _tile(c, t))],
+                    children: [
+                      for (final t in tiles)
+                        SizedBox(
+                          width: tileWidth,
+                          child: StatCard(title: t.label, value: t.value, detail: t.detail, actionLabel: 'Ver ›', onTap: t.onTap),
+                        ),
+                    ],
                   );
                 },
               ),
@@ -119,46 +127,16 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
     );
   }
 
-  Widget _alert(StockealoColors c, String text, String action, VoidCallback onTap) => Container(
-        margin: const EdgeInsets.only(bottom: AppSpace.md),
-        padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.sm, AppSpace.sm),
-        decoration: BoxDecoration(color: c.warningSoft, borderRadius: BorderRadius.circular(AppRadius.card)),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: c.warning),
-            const SizedBox(width: AppSpace.md),
-            Expanded(child: Text(text, style: TextStyle(color: c.ink))),
-            TextButton(onPressed: onTap, child: Text(action)),
-          ],
-        ),
-      );
-
-  Widget _tile(StockealoColors c, _Tile t) => Material(
-        color: c.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          side: BorderSide(color: c.line),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          onTap: t.onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpace.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(t.label, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted))),
-                    Icon(t.icon, size: 20, color: c.inkFaint),
-                  ],
-                ),
-                const SizedBox(height: AppSpace.sm),
-                Text(t.value, style: AppText.amount(context, size: 28, color: c.ink)),
-                Text(t.detail, maxLines: 2, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
-              ],
-            ),
+  /// «Necesita atención», con la misma fila del Inicio de la app
+  Widget _alert(StockealoColors c, String text, String action, VoidCallback onTap) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpace.sm),
+        child: Material(
+          color: c.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            side: BorderSide(color: c.line),
           ),
+          child: AttentionRow(icon: Icons.info_outline, tone: AppTone.warning, title: text, pill: action, onTap: onTap),
         ),
       );
 }

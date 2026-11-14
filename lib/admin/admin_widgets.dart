@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_toast.dart';
+import '../core/design/status_pill.dart';
 
 /// Piezas comunes de las secciones del panel de administrador
 
@@ -37,7 +38,7 @@ class AdminPage extends StatelessWidget {
     final c = context.colors;
     final width = MediaQuery.of(context).size.width;
     final list = ListView(
-      padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, AppSpace.xxl),
+      padding: EdgeInsets.fromLTRB(width >= 900 ? AppSpace.xl : AppSpace.lg, AppSpace.xl, width >= 900 ? AppSpace.xl : AppSpace.lg, AppSpace.xxl),
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,9 +47,8 @@ class AdminPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
-                  if (subtitle != null)
-                    Text(subtitle!, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
+                  Text(title, style: AppText.page(context)),
+                  if (subtitle != null) Text(subtitle!, style: AppText.small(context)),
                 ],
               ),
             ),
@@ -68,7 +68,7 @@ class AdminPage extends StatelessWidget {
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: width > 1100 ? 960 : double.infinity),
+        constraints: BoxConstraints(maxWidth: width > 1100 ? 1200 : double.infinity),
         child: onRefresh == null ? list : RefreshIndicator(onRefresh: onRefresh!, child: list),
       ),
     );
@@ -105,21 +105,18 @@ class AdminBadge extends StatelessWidget {
 
   const AdminBadge(this.text, {super.key, this.tone = AdminTone.neutral});
 
+  /// La misma pastilla de estado de la app (`StatusPill`)
   @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final (bg, fg) = switch (tone) {
-      AdminTone.good => (c.successSoft, c.success),
-      AdminTone.warn => (c.warningSoft, c.warning),
-      AdminTone.bad => (c.dangerSoft, c.danger),
-      AdminTone.neutral => (c.surfaceMuted, c.inkMuted),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
-      child: Text(text, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: fg)),
-    );
-  }
+  Widget build(BuildContext context) => StatusPill(
+        text,
+        tone: switch (tone) {
+          AdminTone.good => AppTone.success,
+          AdminTone.warn => AppTone.warning,
+          AdminTone.bad => AppTone.danger,
+          AdminTone.neutral => AppTone.neutral,
+        },
+        compact: true,
+      );
 }
 
 enum AdminTone { good, warn, bad, neutral }

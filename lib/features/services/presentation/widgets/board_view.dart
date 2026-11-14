@@ -15,6 +15,7 @@ import 'checkout_sheet.dart';
 import 'receive_sheet.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/status_pill.dart';
+import '../../../sales/presentation/widgets/sale_document.dart';
 
 /// Servicios › Tablero: los trabajos del día por columna, cada servicio con su
 /// estado y quién lo hace. Aplica las reglas de [ServiceBoard].
@@ -136,8 +137,42 @@ actions: [
     final saved = await ReceiveSheet.show(context, business: widget.business, template: _t);
     if (saved != null) {
       await _load();
-      await _offerPhase(saved, MessagePhase.received);
+      await _showOrderTicket(saved);
     }
+  }
+
+  /// La orden de servicio como tiquete (0.14.0): número, placa o cliente, servicios y
+  /// sello RECIBIDO. Se comparte como imagen o se envía el mensaje «Recibido».
+  Future<void> _showOrderTicket(WorkOrder o) async {
+    if (!mounted) return;
+    final doc = SaleDocument(
+      title: 'Orden de servicio',
+      number: o.number,
+      date: o.createdAt,
+      lines: [for (final l in o.lines) SaleDocumentLine(quantity: 1, name: l.name, unitPrice: l.price, total: l.price)],
+      total: o.subtotal,
+      totalLabel: 'Total estimado',
+      customerName: (o.customerName ?? '').isEmpty ? null : o.customerName,
+      notes: [
+        if ((o.plate ?? '').isNotEmpty) '${_t.identifierLabel ?? 'Placa'}: ${o.plate}',
+        if (o.vehicleKind != null) _t.vehicleLabel(o.vehicleKind),
+        if ((o.notes ?? '').isNotEmpty) o.notes!,
+      ].join(' · '),
+      closing: 'Te avisamos cuando esté listo.',
+      stamp: TicketStamp('RECIBIDO', detail: '${o.createdAt.day}/${o.createdAt.month} ${o.createdAt.hour}:${o.createdAt.minute.toString().padLeft(2, '0')}', tone: AppTone.info),
+    );
+    await TicketViewer.show(
+      context,
+      business: widget.business,
+      businessName: widget.business.name,
+      doc: doc,
+      headline: 'Orden recibida',
+      headlineTone: AppTone.info,
+      subline: o.title,
+      primary: (o.customerPhone ?? '').trim().isEmpty
+          ? null
+          : (label: 'Avisar «Recibido» por WhatsApp', icon: Icons.chat_outlined, onTap: () => _offerPhase(o, MessagePhase.received)),
+    );
   }
 
   Future<void> _start(WorkOrder order, int index) async {

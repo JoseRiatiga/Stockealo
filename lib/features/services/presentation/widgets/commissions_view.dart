@@ -11,6 +11,8 @@ import '../../data/services_repository.dart';
 import '../../models/commission_models.dart';
 import '../../models/service_models.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/status_pill.dart';
+import '../../../sales/presentation/widgets/sale_document.dart';
 
 /// Periodo para ver lo pendiente
 enum CommissionPeriod {
@@ -99,22 +101,39 @@ actions: [
       await _repo.pay(widget.business.id, e, staffName: name);
       if (!mounted) return;
       final staff = _staff[e.staffId];
-      if (staff != null) {
-        final send = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AppDialog(
-title: 'Pago registrado',
-content: Text('¿Le envías el detalle a $name por WhatsApp?'),
-actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Enviar')),
-            ],
-),
-        );
-        if (send == true) {
-          await CommissionsRepository.sendDetail(staff: staff, business: widget.business, earnings: e, paid: true);
-        }
-      }
+      // La liquidación como tiquete (0.14.0): cada servicio con su comisión, las
+      // propinas y el sello PAGADO. Se comparte como imagen o por WhatsApp.
+      final now = DateTime.now();
+      await TicketViewer.show(
+        context,
+        business: widget.business,
+        businessName: widget.business.name,
+        doc: SaleDocument(
+          title: 'Liquidación',
+          number: 'L-${now.year % 100}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}',
+          date: now,
+          lines: [
+            for (final c in e.items)
+              SaleDocumentLine(quantity: 1, name: c.isTip ? 'Propina' : c.label, unitPrice: c.amount, total: c.amount),
+          ],
+          total: e.total,
+          totalLabel: 'Total pagado',
+          customerName: name,
+          closing: '${e.services} ${e.services == 1 ? 'servicio' : 'servicios'} · comisiones ${CurrencyFormatter.format(e.commissions)}'
+              '${e.tips != 0 ? ' · propinas ${CurrencyFormatter.format(e.tips)}' : ''}',
+          stamp: TicketStamp('PAGADO', detail: '${now.day}/${now.month}/${now.year}', tone: AppTone.success),
+        ),
+        headline: 'Pago registrado',
+        headlineTone: AppTone.success,
+        subline: '${CurrencyFormatter.format(e.total)} a $name',
+        primary: staff == null || (staff.phone ?? '').trim().isEmpty
+            ? null
+            : (
+                label: 'Enviar detalle por WhatsApp',
+                icon: Icons.chat_outlined,
+                onTap: () => CommissionsRepository.sendDetail(staff: staff, business: widget.business, earnings: e, paid: true),
+              ),
+      );
     } on StateError catch (err) {
       if (mounted) AppToast.showWarning(context, err.message);
     }

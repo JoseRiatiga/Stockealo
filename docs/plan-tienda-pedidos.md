@@ -2,7 +2,7 @@
 
 **Fecha:** 14 nov 2026.
 **Origen:** anotaciones del dueño después de la 0.13.2.
-**Estado:** PLAN, sin aprobar. No se toca código hasta aprobarlo.
+**Estado:** TODO HECHO y publicado en la 0.13.4 (14 nov). El dueño pidió juntar las fases B, F, la segunda pasada, E, C y D en una sola versión.
 
 ## Lo que hay hoy
 

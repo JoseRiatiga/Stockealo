@@ -69,14 +69,25 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Tienda en línea
-            - La portada es más baja: los productos se ven de una, también en el celular.
-            - Las tallas y colores agotados se ven tachados, y cuando quedan pocos dice «Quedan pocas, pide pronto».
-            - El carrito sale a la derecha en el computador y como página completa en el celular.
-            - Para hacer un pedido hay que escribir el nombre.
+            ### Promociones (para todos)
+            - Crea promociones con el nombre que quieras: % de descuento o lleva X, paga Y (2×1, 3×2), con fechas.
+            - Para todo, una categoría o los productos que marques. Vender las aplica solas y se apagan solas al terminar.
+            - El tiquete dice qué promoción se usó y Reportes muestra cuánto vendió y descontó cada una.
+            - Con Pro, la tienda en línea y los catálogos las muestran con su cinta.
 
-            ### Stocky
-            - En el computador, el chat se abre en la esquina, encima de su botón.
-            - Ya no tapa los botones de Productos ni de Clientes y proveedores.
+            ### Pedidos de la tienda
+            - Cada pedido llega con su código (T-0001) a Ventas › Cotizaciones, y el código va en el WhatsApp.
+            - Al cobrar un pedido eliges cómo se entrega: ya se lo llevó, lo recoge después o envío.
+            - «Por entregar» en Ventas y en Inicio, hasta marcarlo entregado. Los pedidos sin confirmar vencen a los 7 días.
+
+            ### Sin conexión
+            - Si se va el internet, la venta se guarda y se sube sola al volver. Verás «Pendiente de subir» en Ventas.
+            - Nada se pierde: si algo no sube, queda para reintentar en Ajustes.
+
+            ### Más
+            - Nuevo diseño en Clientes y proveedores, Productos, Stock, Reportes y Servicios.
+            - Tienda: tallas y colores más claros, fotos de portada opcionales, carrito con el tema de la tienda.
+            - El lector de códigos ya no se queda leyendo en bucle y descarta lecturas malas.
+            - Al borrar un producto, una foto o tu cuenta, ya no quedan archivos guardados.
           draft: false
           prerelease: false

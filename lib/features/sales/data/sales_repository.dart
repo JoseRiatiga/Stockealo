@@ -445,6 +445,9 @@ class SalesRepository {
     /// Propina para quienes atendieron (se reparte en partes iguales)
     double tipAmount = 0,
     DateTime? now,
+
+    /// Pago mixto (0.14.0): cuánto entró por cada medio; debe sumar el total
+    Map<String, double>? paymentSplit,
   }) async {
     final lines = order.lines;
     if (lines.isEmpty) throw Exception('La orden no tiene servicios para cobrar.');
@@ -531,6 +534,10 @@ class SalesRepository {
           'notes': note.isEmpty ? null : note,
           'invoice_number': invoiceNumber,
           'discount_amount': lineDiscount,
+          // Pago mixto: cada línea guarda su parte de cada medio (la caja cuenta el efectivo)
+          'payment_split': paymentSplit == null || finalTotal <= 0
+              ? null
+              : PaymentMethod.encodeSplit({for (final e in paymentSplit.entries) e.key: e.value * lineTotal / finalTotal}),
           'service_id': line.serviceId,
           'work_order_id': order.id,
           'staff_ids': staffJson,
@@ -554,6 +561,9 @@ class SalesRepository {
           serviceId: line.serviceId,
           workOrderId: order.id,
           staffIds: staffJson,
+          paymentSplit: paymentSplit == null || finalTotal <= 0
+              ? null
+              : PaymentMethod.encodeSplit({for (final e in paymentSplit.entries) e.key: e.value * lineTotal / finalTotal}),
         ));
       }
     });

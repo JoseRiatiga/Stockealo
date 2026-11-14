@@ -9,6 +9,7 @@ import 'package:stockealo/features/auth/data/auth_repository.dart';
 import 'package:stockealo/features/auth/models/app_user.dart';
 import 'package:stockealo/features/business/models/business.dart';
 import 'package:stockealo/features/sales/data/sales_repository.dart';
+import 'package:stockealo/features/sales/models/payment_method.dart';
 import 'package:stockealo/features/services/data/service_board.dart';
 import 'package:stockealo/features/services/data/services_repository.dart';
 import 'package:stockealo/features/services/models/service_models.dart';
@@ -397,6 +398,25 @@ void main() {
     expect(ServiceTemplate.lavanderia.byWeight, isTrue);
     expect(ServiceTemplate.taller.usesQuote, isTrue);
     expect(ServiceTemplate.barberia.usesQuote, isFalse);
+  });
+
+  test('pago mixto al cobrar servicios: cada línea guarda su parte de cada medio (0.14.0)', () async {
+    final (juan, _, lavado, polichado) = await setUpTeam();
+    var o = await repo.createOrder(
+        businessId: businessId, vehicleKind: 'MOTO', lines: [lineOf(lavado, 'MOTO'), lineOf(polichado, 'MOTO')], now: now);
+    var board = await repo.loadBoard(businessId, now: now);
+    for (final i in [0, 1]) {
+      board = await repo.loadBoard(businessId, now: now);
+      o = await repo.startLine(o, i, [juan.id], board: board, now: now);
+      o = await repo.finishLine(o, i, now: now);
+    }
+    final total = o.subtotal; // 10.000 + 25.000
+    final sales = await SalesRepository.instance.recordServiceSale(
+        order: o, paymentMethod: 'MIXTO', paymentSplit: {'EFECTIVO': 15000, 'NEQUI': total - 15000}, now: now);
+    final cash = sales.fold(0.0, (t, s) => t + (PaymentMethod.decodeSplit(s.paymentSplit)['EFECTIVO'] ?? 0));
+    expect(cash, closeTo(15000, 0.01));
+    // Las comisiones se guardan sin esperar: se deja terminar antes de cerrar la base
+    await Future<void>.delayed(const Duration(milliseconds: 300));
   });
 
   test('historial en vivo por placa, nombre o teléfono', () async {

@@ -6,6 +6,7 @@ import '../../../business/models/business.dart';
 import '../../../profile/presentation/widgets/settings_cards.dart';
 import '../../data/profit_report_repository.dart';
 import '../../../sales/models/payment_method.dart';
+import '../../../../core/design/filter_tabs.dart';
 
 /// Reporte de ganancias y pérdidas del negocio por periodo
 class ProfitReportScreen extends StatefulWidget {
@@ -79,21 +80,16 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
                     ],
                   ),
                 ),
-                SizedBox(
-                  height: 48,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.xs),
-                    itemCount: ReportPeriod.values.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: AppSpace.sm),
-                    itemBuilder: (_, i) {
-                      final period = ReportPeriod.values[i];
-                      return ChoiceChip(
-                        label: Text(period.label),
-                        selected: period == _period,
-                        onSelected: (_) => _select(period),
-                      );
-                    },
+                // El periodo con las mismas pestañas de Clientes (re-diseño 0.13.4)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.xs, AppSpace.lg, AppSpace.sm),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilterTabs<ReportPeriod>(
+                      options: {for (final period in ReportPeriod.values) period: period.label},
+                      value: _period,
+                      onChanged: _select,
+                    ),
                   ),
                 ),
                 Expanded(

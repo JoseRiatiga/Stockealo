@@ -27,6 +27,7 @@ import '../../../../core/codes/code_reader.dart';
 import '../../../../core/services/sync_queue.dart';
 import '../widgets/deliveries.dart';
 import '../../../store/data/store_orders_repository.dart';
+import '../../../../core/design/status_pill.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -231,8 +232,39 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
       ),
     );
     other.dispose();
-    if (reason == null) return;
-    await _salesRepo.voidSale(sale, reason: reason);
+    if (reason == null || !mounted) return;
+    // 0.14.0: si es un servicio de una orden con más cosas, se pregunta qué anular
+    var onlyThis = false;
+    final lines = await _salesRepo.linesOf(sale);
+    if (sale.serviceId != null && lines.where((l) => !l.isVoided).length > 1 && mounted) {
+      final choice = await AppDialog.show<bool>(
+        context: context,
+        icon: Icons.content_cut_outlined,
+        tone: AppTone.danger,
+        title: '¿Qué anulas?',
+        subtitle: 'Este cobro tiene ${lines.length} líneas: servicios y propina.',
+        content: Builder(
+          builder: (ctx) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text('Solo «${sale.productName}»'),
+              ),
+              const SizedBox(height: AppSpace.sm),
+              OutlinedButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Todo el cobro, con la propina'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (choice == null) return;
+      onlyThis = choice;
+    }
+    await _salesRepo.voidSale(sale, reason: reason, onlyThisLine: onlyThis);
     await _loadSales();
     if (mounted) AppToast.showSuccess(context, 'Venta anulada. El stock volvió al inventario.');
   }

@@ -889,14 +889,17 @@ class SalesRepository {
   /// quién la anuló) y deja de contar en totales, caja, reportes y fiados.
   /// Anula todas las líneas de la misma venta (mismo número) y devuelve su stock.
   /// Si ya estaba anulada no hace nada.
-  Future<void> voidSale(Sale sale, {String? reason}) async {
+  ///
+  /// [onlyThisLine] (0.14.0): anula solo esa línea (por ejemplo, un servicio cobrado por
+  /// error) y deja cobrado lo demás de la venta, incluida la propina.
+  Future<void> voidSale(Sale sale, {String? reason, bool onlyThisLine = false}) async {
     final db = await _dbProvider.database;
     final user = AuthRepository.instance.currentUser;
     final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
     final cleanReason = (reason ?? '').trim().isEmpty ? null : reason!.trim();
     final now = DateTime.now().toIso8601String();
 
-    final invoice = (sale.invoiceNumber ?? '').isEmpty ? null : sale.invoiceNumber;
+    final invoice = onlyThisLine || (sale.invoiceNumber ?? '').isEmpty ? null : sale.invoiceNumber;
     final rows = await db.query(
       'sales',
       where: invoice == null

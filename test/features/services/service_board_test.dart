@@ -288,6 +288,25 @@ void main() {
     });
   });
 
+  test('anular solo un servicio deja cobrado lo demás de la orden (0.14.0)', () async {
+    final (juan, _, lavado, polichado) = await setUpTeam();
+    var o = await repo.createOrder(
+        businessId: businessId, vehicleKind: 'MOTO', lines: [lineOf(lavado, 'MOTO'), lineOf(polichado, 'MOTO')], now: now);
+    var board = await repo.loadBoard(businessId, now: now);
+    o = await repo.startLine(o, 0, [juan.id], board: board, now: now);
+    o = await repo.finishLine(o, 0, now: now);
+    board = await repo.loadBoard(businessId, now: now);
+    o = await repo.startLine(o, 1, [juan.id], board: board, now: now);
+    o = await repo.finishLine(o, 1, now: now);
+    final sales = await SalesRepository.instance.recordServiceSale(order: o, paymentMethod: 'EFECTIVO', now: now);
+    final polish = sales.firstWhere((s) => s.productName.contains('Polichado'));
+    await SalesRepository.instance.voidSale(polish, reason: 'No se hizo', onlyThisLine: true);
+    final db = await appDb.database;
+    final ok = await db.query('sales_ok');
+    expect(ok.map((r) => r['product_name']), isNot(contains(polish.productName)));
+    expect(ok, hasLength(sales.length - 1), reason: 'el lavado sigue cobrado');
+  });
+
   test('historial en vivo por placa, nombre o teléfono', () async {
     final (_, _, lavado, _) = await setUpTeam();
     await repo.createOrder(

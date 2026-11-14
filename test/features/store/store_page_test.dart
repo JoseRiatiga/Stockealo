@@ -115,6 +115,12 @@ void main() {
     await tester.tap(find.textContaining('Ver pedido'));
     await tester.pumpAndSettle();
     expect(find.text('Tu pedido'), findsOneWidget);
+    // Sin nombre no deja pedir
+    await tester.tap(find.text('Hacer el pedido'));
+    await tester.pumpAndSettle();
+    expect(find.text('Escribe tu nombre para que la tienda sepa quién pide'), findsOneWidget);
+    expect(find.text('POR CONFIRMAR'), findsNothing);
+    await tester.enterText(find.widgetWithText(TextField, 'Tu nombre'), 'Ana');
     await tester.tap(find.text('Hacer el pedido'));
     await tester.pumpAndSettle();
     // Sale el tiquete «Por confirmar» con el botón de WhatsApp
@@ -158,7 +164,7 @@ void main() {
     // Agregar pide la talla
     await tester.tap(find.byTooltip('Elegir talla o color').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ActionChip, 'S'));
+    await tester.tap(find.text('S').last);
     await tester.pumpAndSettle();
     expect(find.text('1 en tu pedido'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -170,5 +176,17 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Filtros'), findsOneWidget);
     await _save(tester, key, 'tienda_moda_celular');
+
+    // El carrito es una página completa con el total y «Hacer el pedido» fijos abajo
+    await tester.tap(find.byTooltip('Elegir talla o color').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('S').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Ver pedido'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Tu pedido'), findsOneWidget);
+    expect(find.text('Hacer el pedido'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _save(tester, key, 'tienda_carrito_celular');
   });
 }

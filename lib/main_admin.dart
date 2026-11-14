@@ -94,7 +94,7 @@ class _Message extends StatelessWidget {
             children: [
               Icon(Icons.lock_outline, size: 40, color: c.inkMuted),
               const SizedBox(height: AppSpace.md),
-              Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: c.ink)),
+              Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeBodyLarge, color: c.ink)),
               if (onSignOut != null) ...[
                 const SizedBox(height: AppSpace.lg),
                 OutlinedButton(onPressed: onSignOut, child: const Text('Cerrar sesión')),

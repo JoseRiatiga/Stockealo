@@ -6,6 +6,7 @@ import '../core/utils/currency_formatter.dart';
 import '../core/widgets/app_toast.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import 'admin_widgets.dart';
+import '../core/design/app_dialog.dart';
 
 /// Datos de pago (Nequi, WhatsApp), oferta Fundador y precios de los planes
 class AdminConfigPage extends StatefulWidget {
@@ -136,7 +137,7 @@ class _AdminConfigPageState extends State<AdminConfigPage> {
                         ? 'Los clientes ven los planes encendidos con su precio y pueden pagar.'
                         : 'Apagado: la app muestra lo que incluye cada plan y el canje de códigos, sin precios ni pagos. '
                             'Los planes se dan con «Dar Pro» o con códigos.',
-                    style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                   ),
                 ),
               ),
@@ -145,7 +146,7 @@ class _AdminConfigPageState extends State<AdminConfigPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Pago y contacto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                    Text('Pago y contacto', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
                     const SizedBox(height: AppSpace.md),
                     for (final e in _fields.entries) ...[
                       TextField(
@@ -165,7 +166,7 @@ class _AdminConfigPageState extends State<AdminConfigPage> {
                 ),
               ),
               const SizedBox(height: AppSpace.lg),
-              Text('Planes y precios', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+              Text('Planes y precios', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
               const SizedBox(height: AppSpace.sm),
               for (final p in _config!.plans)
                 AdminCard(
@@ -192,7 +193,7 @@ class _AdminConfigPageState extends State<AdminConfigPage> {
                                 if (p.regularPrice != null) 'antes ${CurrencyFormatter.formatIn(p.regularPrice!, p.currency)}',
                                 p.currency,
                               ].join(' · '),
-                              style: TextStyle(fontSize: 13, color: c.inkMuted),
+                              style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                             ),
                           ],
                         ),
@@ -250,8 +251,8 @@ class _PlanDialogState extends State<_PlanDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.plan.name),
+    return AppDialog(
+      title: widget.plan.name,
       content: SizedBox(
         width: 400,
         child: Column(

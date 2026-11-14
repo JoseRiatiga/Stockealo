@@ -5,6 +5,7 @@ import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_toast.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import 'admin_widgets.dart';
+import '../core/design/app_dialog.dart';
 
 /// Duraciones que se ofrecen; null = permanente
 const _durations = <int?>[1, 7, 30, 90, 365, null];
@@ -103,14 +104,14 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
   Future<void> _disable(ProCode code) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('¿Desactivar ${code.code}?'),
-        content: const Text('Nadie más podrá canjearlo. Quien ya lo canjeó conserva su Pro.'),
-        actions: [
+      builder: (ctx) => AppDialog(
+      title: '¿Desactivar ${code.code}?',
+      content: const Text('Nadie más podrá canjearlo. Quien ya lo canjeó conserva su Pro.'),
+      actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Desactivar')),
         ],
-      ),
+),
     );
     if (ok != true) return;
     try {
@@ -150,7 +151,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
         AdminCard(child: _form(c)),
         if (_created.isNotEmpty) _createdCard(c),
         const SizedBox(height: AppSpace.lg),
-        Text('Últimos códigos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+        Text('Últimos códigos', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
         const SizedBox(height: AppSpace.sm),
         AdminSearchField(
           hint: 'Buscar por código, nota o correo',
@@ -166,7 +167,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
 
   Widget _label(StockealoColors c, String text) => Padding(
         padding: const EdgeInsets.only(bottom: AppSpace.sm),
-        child: Text(text, style: TextStyle(fontSize: 13, color: c.inkMuted)),
+        child: Text(text, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
       );
 
   Widget _chips<T>(List<T> values, T selected, String Function(T) label, ValueChanged<T> onSelect) => Wrap(
@@ -182,13 +183,12 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Crear códigos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+        Text('Crear códigos', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
         const SizedBox(height: AppSpace.md),
         _label(c, 'Plan'),
         SegmentedButton<String>(
           segments: const [
             ButtonSegment(value: 'business', label: Text('Pro Negocio')),
-            ButtonSegment(value: 'global', label: Text('Pro Global')),
             ButtonSegment(value: 'services', label: Text('Pro Servicios')),
           ],
           selected: {_kind},
@@ -244,7 +244,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
               ),
               Expanded(
                 child: Text('$value',
-                    textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+                    textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
               ),
               IconButton(
                 tooltip: 'Más',
@@ -289,7 +289,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
               children: [
                 Expanded(
                   child: SelectableText(code.code,
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: c.ink)),
+                      style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: c.ink)),
                 ),
                 TextButton.icon(
                   onPressed: () => adminCopy(context, code.shareMessage(), 'Mensaje'),
@@ -339,10 +339,10 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
                     if (code.expiresAt != null) 'Canjear antes del ${adminDate(code.expiresAt)}',
                     if (code.note?.isNotEmpty == true) code.note!,
                   ].join(' · '),
-                  style: TextStyle(fontSize: 12, color: c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                 ),
                 if (code.redeemedBy != null)
-                  Text('Canjeado por ${code.redeemedBy}', style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                  Text('Canjeado por ${code.redeemedBy}', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
               ],
             ),
           ),

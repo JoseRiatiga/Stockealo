@@ -46,9 +46,9 @@ class AdminPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: c.ink)),
+                  Text(title, style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
                   if (subtitle != null)
-                    Text(subtitle!, style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                    Text(subtitle!, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                 ],
               ),
             ),
@@ -117,7 +117,7 @@ class AdminBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 2),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
-      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
+      child: Text(text, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: fg)),
     );
   }
 }

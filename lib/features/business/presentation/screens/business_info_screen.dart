@@ -113,7 +113,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
     if (_userRole != 'OWNER') {
       AppToast.showPermission(
         context,
-        'Solo el dueño fundador puede eliminar o enviar a la papelera esta empresa.',
+        'Solo el dueño fundador puede eliminar o enviar a la papelera este negocio.',
       );
       return;
     }

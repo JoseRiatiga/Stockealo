@@ -9,6 +9,7 @@ import 'admin_shell.dart';
 import 'admin_user_detail.dart';
 import 'admin_widgets.dart';
 import '../features/pro/data/pro_service.dart' show proKindLabel;
+import '../core/design/app_dialog.dart';
 
 /// Búsqueda global del panel: cuentas, negocios, códigos Pro y pagos en un solo lugar
 class AdminSearchDialog extends StatefulWidget {
@@ -83,7 +84,7 @@ class _AdminSearchDialogState extends State<AdminSearchDialog> {
 
     Widget header(String text) => Padding(
           padding: const EdgeInsets.only(top: AppSpace.md, bottom: 4),
-          child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.inkMuted)),
+          child: Text(text, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, color: c.inkMuted)),
         );
     Widget item(IconData icon, String title, String subtitle, VoidCallback onTap) => ListTile(
           dense: true,
@@ -94,8 +95,8 @@ class _AdminSearchDialogState extends State<AdminSearchDialog> {
           onTap: onTap,
         );
 
-    return AlertDialog(
-      title: const Text('Buscar'),
+    return AppDialog(
+      title: 'Buscar',
       content: SizedBox(
         width: 520,
         child: Column(
@@ -124,7 +125,7 @@ class _AdminSearchDialogState extends State<AdminSearchDialog> {
                     if (r == null && _error == null)
                       Padding(
                         padding: const EdgeInsets.only(top: AppSpace.md),
-                        child: Text('Escribe al menos 2 letras.', style: TextStyle(fontSize: 13, color: c.inkFaint)),
+                        child: Text('Escribe al menos 2 letras.', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkFaint)),
                       ),
                     if (empty)
                       Padding(

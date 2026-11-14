@@ -80,10 +80,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     const SizedBox(height: AppSpace.md),
                     Text('Stockealo · Administrador',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: c.ink)),
+                        style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
                     const SizedBox(height: AppSpace.xs),
                     Text('Solo para cuentas administradoras',
-                        textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                        textAlign: TextAlign.center, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                     const SizedBox(height: AppSpace.xl),
                     TextField(
                       controller: _emailController,
@@ -110,7 +110,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: AppSpace.md),
-                      Text(_error!, style: TextStyle(fontSize: 13, color: c.danger)),
+                      Text(_error!, style: TextStyle(fontSize: AppText.sizeSmall, color: c.danger)),
                     ],
                     const SizedBox(height: AppSpace.lg),
                     PrimaryActionButton(

@@ -98,12 +98,12 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                         Text(
                           [u.email, if (u.phone?.isNotEmpty == true) u.phone!].join(' · '),
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 13, color: c.inkMuted),
+                          style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                         ),
                         Text(
                           'Registro ${adminDate(u.createdAt)} · Último ingreso ${adminDate(u.lastSignInAt)} · '
                           '${u.businesses} ${u.businesses == 1 ? 'negocio' : 'negocios'}',
-                          style: TextStyle(fontSize: 12, color: c.inkFaint),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
                         ),
                       ],
                     ),

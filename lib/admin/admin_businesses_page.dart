@@ -141,7 +141,7 @@ class _AdminBusinessesPageState extends State<AdminBusinessesPage> {
                             if (b.country != null) countryByCode(b.country).name,
                           ].join(' · '),
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 13, color: c.inkMuted),
+                          style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                         ),
                       ],
                     ),

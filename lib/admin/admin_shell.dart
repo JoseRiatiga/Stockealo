@@ -141,7 +141,7 @@ class _Menu extends StatelessWidget {
             children: [
               Icon(Icons.admin_panel_settings_outlined, color: c.accent),
               const SizedBox(width: AppSpace.sm),
-              Text('Administrador', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.ink)),
+              Text('Administrador', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
             ],
           ),
         ),
@@ -194,12 +194,12 @@ class _Menu extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(email, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+              Text(email, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
               ValueListenableBuilder<String>(
                 valueListenable: ProAdminService.instance.role,
                 builder: (context, role, _) => Text(
                   switch (role) { 'OWNER' => 'Dueño', 'SUPPORT' => 'Soporte', _ => 'Solo lectura' },
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.inkFaint),
+                  style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: c.inkFaint),
                 ),
               ),
               const SizedBox(height: AppSpace.sm),

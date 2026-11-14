@@ -47,11 +47,11 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: AppSpace.xl),
-        Text('Uso de la app', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
-        Text('Solo totales: nunca el contenido de un negocio', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+        Text('Uso de la app', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
+        Text('Solo totales: nunca el contenido de un negocio', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
         const SizedBox(height: AppSpace.md),
         if (_error != null)
-          Text(_error!, style: TextStyle(fontSize: 12.5, color: c.inkFaint))
+          Text(_error!, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkFaint))
         else if (_funnel == null)
           const Padding(padding: EdgeInsets.all(AppSpace.lg), child: Center(child: CircularProgressIndicator()))
         else ...[
@@ -98,7 +98,7 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
                     Expanded(child: Text(label, style: TextStyle(color: c.ink))),
                     Text(
                       base > 0 && label != steps.first.$1 ? '$value · ${(value * 100 / base).round()} %' : '$value',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: c.inkMuted),
+                      style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted),
                     ),
                   ]),
                   const SizedBox(height: 4),
@@ -116,7 +116,7 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
             ),
           Text(
             'Desde "Agregaron productos", el porcentaje es sobre los ${n('businesses')} negocios.',
-            style: TextStyle(fontSize: 11.5, color: c.inkFaint),
+            style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
           ),
         ],
       ),
@@ -166,18 +166,18 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
                 ],
               ),
             ),
-            Text('Preguntas por día, últimos 14 días', style: TextStyle(fontSize: 11.5, color: c.inkFaint)),
+            Text('Preguntas por día, últimos 14 días', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
           ],
           if (providers.isNotEmpty) ...[
             const SizedBox(height: AppSpace.sm),
             Text(
               'Respuestas nuevas por proveedor (7 días): '
               '${providers.entries.map((e) => '${e.key} ${e.value}').join(' · ')}',
-              style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+              style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
             ),
             if (providers.keys.length == 1 && providers.containsKey('rules'))
               Text('Solo respondieron las reglas: puede que las IA gratis estén fallando.',
-                  style: TextStyle(fontSize: 12.5, color: c.warning)),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: c.warning)),
           ],
         ],
       ),
@@ -187,8 +187,8 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
   Widget _stat(StockealoColors c, String value, String label) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c.ink)),
-          Text(label, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+          Text(value, style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w800, color: c.ink)),
+          Text(label, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
         ],
       );
 
@@ -208,7 +208,7 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
           _title(c, Icons.system_update_outlined, 'Versiones en uso (últimos 60 días)'),
           if (v.isEmpty)
             Text('Aún no hay datos: las versiones se registran desde la 0.9.9 al abrir la app.',
-                style: TextStyle(fontSize: 12.5, color: c.inkMuted))
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted))
           else
             for (final row in v)
               Padding(
@@ -216,7 +216,7 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
                 child: Row(children: [
                   Expanded(child: Text('${platform('${row['platform']}')} ${row['version']}', style: TextStyle(color: c.ink))),
                   Text('${row['count']} ${row['count'] == 1 ? 'cuenta' : 'cuentas'}',
-                      style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                 ]),
               ),
         ],

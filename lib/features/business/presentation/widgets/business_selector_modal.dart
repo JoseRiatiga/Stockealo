@@ -196,7 +196,7 @@ actions: [
       if (mounted) {
         AppToast.showPermission(
           context,
-          'Solo el dueño o administradores pueden cambiar los datos de la empresa.',
+          'Solo el dueño o administradores pueden cambiar los datos del negocio.',
         );
       }
       return;
@@ -223,7 +223,7 @@ content: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'La empresa "${biz.name}" se moverá a la papelera. Tendrás 7 días para restaurarla antes de su eliminación definitiva.',
+                    'El negocio "${biz.name}" se moverá a la papelera. Tendrás 7 días para restaurarlo antes de su eliminación definitiva.',
                     style: TextStyle(
                       fontSize: AppText.sizeSmall,
                       color: context.colors.inkMuted,
@@ -231,7 +231,7 @@ content: Column(
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Para confirmar, escribe exactamente el nombre de la empresa:',
+                    'Para confirmar, escribe exactamente el nombre del negocio:',
                     style: TextStyle(
                       fontSize: AppText.sizeCaption,
                       fontWeight: FontWeight.bold,
@@ -303,7 +303,7 @@ actions: [
     if (confirmed == true) {
       await _businessRepo.softDeleteBusiness(biz.id);
       if (!mounted) return;
-      AppToast.show(context, message: 'Empresa "${biz.name}" movida a la papelera (conservada por 7 días)', type: ToastType.info);
+      AppToast.show(context, message: 'Negocio "${biz.name}" movido a la papelera (se conserva 7 días)', type: ToastType.info);
       await _loadBusinesses();
       if (_currentBusiness == null || _currentBusiness?.id == biz.id) {
         if (_businesses.isNotEmpty) {

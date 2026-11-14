@@ -65,6 +65,8 @@ const kAppFunctions = <AppFunction>[
       keywords: ['excel', 'descargar', 'exportar', 'reporte', 'xlsx'], managersOnly: true),
   AppFunction(id: 'services', title: 'Servicios', where: 'Servicios', tab: 5, icon: Icons.view_kanban_outlined,
       keywords: ['servicio', 'tablero', 'lavado', 'turno', 'cola', 'asistencia', 'comision', 'placa'], needsServices: true),
+  AppFunction(id: 'agenda', title: 'Agenda de citas', where: 'Servicios › Agenda', tab: 5, icon: Icons.event_outlined,
+      keywords: ['agenda', 'cita', 'citas', 'reserva', 'turno', 'calendario'], needsServices: true),
   AppFunction(id: 'team', title: 'Equipo', where: 'Ajustes › Equipo', tab: 3, icon: Icons.groups_2_outlined,
       keywords: ['equipo', 'empleado', 'cajero', 'invitar', 'permiso', 'rol']),
   AppFunction(id: 'modules', title: 'Módulos', where: 'Ajustes › Módulos', tab: 3, icon: Icons.widgets_outlined,

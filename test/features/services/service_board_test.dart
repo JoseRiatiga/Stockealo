@@ -12,6 +12,8 @@ import 'package:stockealo/features/sales/data/sales_repository.dart';
 import 'package:stockealo/features/services/data/service_board.dart';
 import 'package:stockealo/features/services/data/services_repository.dart';
 import 'package:stockealo/features/services/models/service_models.dart';
+import 'package:stockealo/features/services/data/appointments_repository.dart';
+import 'package:stockealo/features/services/models/appointment.dart';
 import 'package:stockealo/features/services/models/work_schedule.dart';
 
 /// Reglas del módulo Servicios de la 0.12.0: plantillas, precio por vehículo,
@@ -319,6 +321,31 @@ void main() {
     expect(p.visits, hasLength(3));
     expect(p.everyDays, 10);
     expect(p.topServices.first, 'Lavado');
+  });
+
+  test('agenda: avisa si se cruza con otra cita y al llegar pasa al tablero (0.14.0)', () async {
+    final (juan, _, lavado, polichado) = await setUpTeam();
+    final agenda = AppointmentsRepository.instance;
+    Appointment cita(String name, int hour) {
+      final base = agenda.newAppointment(businessId, startsAt: DateTime(now.year, now.month, now.day, hour));
+      return Appointment(
+        id: base.id, businessId: businessId, customerName: name, customerPhone: '3001112233',
+        serviceIds: [lavado.id, polichado.id], serviceNames: 'Lavado, Polichado', staffId: juan.id,
+        startsAt: base.startsAt, durationMin: 60, createdAt: base.createdAt, updatedAt: base.updatedAt,
+      );
+    }
+    await agenda.save(cita('Ana', 10));
+    expect(await agenda.conflictWith(cita('Luis', 10)), isNotNull, reason: 'Juan ya tiene cita a las 10');
+    expect(await agenda.conflictWith(cita('Luis', 11)), isNull);
+    final day = await agenda.forDay(businessId, now);
+    expect(day.single.customerName, 'Ana');
+
+    final order = await agenda.arrive(day.single, now: now);
+    expect(order.lines.map((l) => l.name), ['Lavado', 'Polichado']);
+    expect(order.customerName, 'Ana');
+    final after = await agenda.forDay(businessId, now);
+    expect(after.single.status, Appointment.arrived);
+    expect(after.single.workOrderId, order.id);
   });
 
   test('historial en vivo por placa, nombre o teléfono', () async {

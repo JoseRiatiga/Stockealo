@@ -974,6 +974,7 @@ class SupabaseService {
         ('cash_sessions', <String>[]),
         ('cash_movements', <String>[]),
         ('promotions', ['is_active']),
+        ('appointments', <String>[]),
       ]) {
         try {
           final List<dynamic> rows = await client!.from(table).select();
@@ -1185,6 +1186,10 @@ class SupabaseService {
         await db.from('cash_movements').upsert(boolRow(p, const []), onConflict: 'id');
       case 'update_store_order':
         await db.from('store_orders').update({'status': p['status']}).eq('id', p['id'] as String);
+      case 'upsert_appointment':
+        await db.from('appointments').upsert(boolRow(p, const []), onConflict: 'id');
+      case 'delete_appointment':
+        await db.from('appointments').delete().eq('id', p['id'] as String);
       case 'upsert_promotion':
         await db.from('promotions').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
       case 'delete_promotion':
@@ -1672,6 +1677,10 @@ class SupabaseService {
 
   /// Pedido de la tienda confirmado (pasó a venta) o rechazado (0.13.4)
   Future<void> updateStoreOrderInCloud(String id, String status) => _write('update_store_order', {'id': id, 'status': status});
+
+  /// Agenda de citas (0.14.0)
+  Future<void> upsertAppointmentToCloud(Map<String, dynamic> row) => _write('upsert_appointment', row);
+  Future<void> deleteAppointmentFromCloud(String id) => _write('delete_appointment', {'id': id});
 
   /// Promociones (0.13.4)
   Future<void> upsertPromotionToCloud(Map<String, dynamic> row) => _write('upsert_promotion', row);

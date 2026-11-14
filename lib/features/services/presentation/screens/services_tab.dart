@@ -15,10 +15,12 @@ import '../widgets/history_view.dart';
 import '../widgets/messages_view.dart';
 import '../../../../core/design/filter_tabs.dart';
 import '../../../../core/design/status_pill.dart';
+import '../widgets/agenda_view.dart';
 
 /// Secciones de la pestaña Servicios
 enum ServicesSection {
   board('Tablero', Icons.view_kanban_outlined),
+  agenda('Agenda', Icons.event_outlined),
   employees('Empleados', Icons.badge_outlined),
   history('Historial', Icons.history_outlined),
   commissions('Comisiones', Icons.payments_outlined),
@@ -123,6 +125,11 @@ class _ServicesTabState extends State<ServicesTab> {
                   business: b,
                   template: template,
                   onOpenAttendance: () => setState(() => _section = ServicesSection.employees),
+                ),
+              ServicesSection.agenda => AgendaView(
+                  key: ValueKey('agenda-${b.id}'),
+                  business: b,
+                  onOpenBoard: () => setState(() => _section = ServicesSection.board),
                 ),
               ServicesSection.employees => EmployeesView(
                   key: ValueKey('employees-${b.id}'),

@@ -78,6 +78,28 @@ class ServiceTemplate {
     this.examples = const [],
   });
 
+  /// Estados propios del negocio (0.14.0), además de los normales
+  List<(String, String)> get stages => switch (code) {
+        'TALLER' => const [('ESPERANDO_APROBACION', 'Esperando aprobación'), ('ESPERANDO_REPUESTO', 'Esperando repuesto')],
+        'TECNICO' => const [('ESPERANDO_APROBACION', 'Esperando aprobación'), ('ESPERANDO_REPUESTO', 'Esperando repuesto')],
+        'LAVANDERIA' => const [('SECANDO', 'Secando'), ('PLANCHANDO', 'Planchando')],
+        _ => const [],
+      };
+
+  String stageLabel(String? code) => stages.firstWhere((s) => s.$1 == code, orElse: () => (code ?? '', code ?? '')).$2;
+
+  /// Fecha de entrega al recibir
+  bool get usesDueDate => code == 'TALLER' || code == 'TECNICO' || code == 'LAVANDERIA';
+
+  /// Presupuesto que el cliente aprueba antes de empezar
+  bool get usesQuote => code == 'TALLER' || code == 'TECNICO';
+
+  /// Recepción con fotos, accesorios y garantía
+  bool get usesReception => code == 'TALLER' || code == 'TECNICO';
+
+  /// Se cobra por kilo (el precio del servicio es por kilo)
+  bool get byWeight => code == 'LAVANDERIA';
+
   /// Hay que elegir la variante antes de recibir (solo con vehículos)
   bool get kindsRequired => usesVehicleKinds && kindsAreVehicles;
 

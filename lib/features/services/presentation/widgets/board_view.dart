@@ -16,6 +16,7 @@ import 'receive_sheet.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/status_pill.dart';
 import '../../../sales/presentation/widgets/sale_document.dart';
+import '../../models/order_extra.dart';
 
 /// Servicios › Tablero: los trabajos del día por columna, cada servicio con su
 /// estado y quién lo hace. Aplica las reglas de [ServiceBoard].
@@ -149,7 +150,10 @@ actions: [
       title: 'Orden de servicio',
       number: o.number,
       date: o.createdAt,
-      lines: [for (final l in o.lines) SaleDocumentLine(quantity: 1, name: l.name, unitPrice: l.price, total: l.price)],
+      lines: [
+        for (final l in o.lines)
+          SaleDocumentLine(quantity: 1, name: l.quantityLabel == null ? l.name : '${l.name} (${l.quantityLabel})', unitPrice: l.price, total: l.price),
+      ],
       total: o.subtotal,
       totalLabel: 'Total estimado',
       customerName: (o.customerName ?? '').isEmpty ? null : o.customerName,
@@ -157,6 +161,10 @@ actions: [
         if ((o.plate ?? '').isNotEmpty) '${_t.identifierLabel ?? 'Placa'}: ${o.plate}',
         if (o.vehicleKind != null) _t.vehicleLabel(o.vehicleKind),
         if ((o.notes ?? '').isNotEmpty) o.notes!,
+        if (o.extra.dueAt != null) 'Entrega: ${o.extra.dueAt!.day}/${o.extra.dueAt!.month}/${o.extra.dueAt!.year}',
+        if ((o.extra.accessories ?? '').isNotEmpty) 'Deja: ${o.extra.accessories}',
+        if ((o.extra.warrantyDays ?? 0) > 0) 'Garantía: ${o.extra.warrantyDays} días desde la entrega',
+        if (o.extra.awaitingApproval) 'Presupuesto por aprobar',
       ].join(' · '),
       closing: 'Te avisamos cuando esté listo.',
       stamp: TicketStamp('RECIBIDO', detail: '${o.createdAt.day}/${o.createdAt.month} ${o.createdAt.hour}:${o.createdAt.minute.toString().padLeft(2, '0')}', tone: AppTone.info),
@@ -582,6 +590,65 @@ actions: [
     );
   }
 
+  /// Opciones del taller en el menú: presupuesto y estado propio (0.14.0)
+  List<PopupMenuEntry<String>> _extraMenu(WorkOrder o) => [
+        if (o.extra.awaitingApproval) ...[
+          if ((o.customerPhone ?? '').isNotEmpty) const PopupMenuItem(value: 'quote_send', child: Text('Enviar presupuesto por WhatsApp')),
+          const PopupMenuItem(value: 'quote_ok_local', child: Text('Presupuesto aprobado en el local')),
+          const PopupMenuItem(value: 'quote_ok_wa', child: Text('Presupuesto aprobado por WhatsApp')),
+          const PopupMenuItem(value: 'quote_no', child: Text('Presupuesto rechazado')),
+        ],
+        for (final (code, label) in _t.stages)
+          if (o.extra.stage != code) PopupMenuItem(value: 'stage:$code', child: Text('Marcar «$label»')),
+        if (o.extra.stage != null) const PopupMenuItem(value: 'stage_clear', child: Text('Quitar el estado')),
+      ];
+
+  Future<void> _onExtra(WorkOrder o, String v) async {
+    final now = DateTime.now();
+    final when = '${now.day}/${now.month} ${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+    if (v == 'quote_send') {
+      final lines = [for (final l in o.lines) '• ${l.name}${l.quantityLabel == null ? '' : ' (${l.quantityLabel})'}: ${CurrencyFormatter.format(l.price)}'];
+      final text = 'Hola ${(o.customerName ?? '').split(' ').first}, este es el presupuesto de ${o.title} en ${widget.business.name}:\n'
+          '${lines.join('\n')}\nTotal: ${CurrencyFormatter.format(o.subtotal)}\n\n¿Lo aprobamos? Responde SÍ para empezar.';
+      await OrderWhatsApp.send(o, widget.business, text);
+      return;
+    }
+    final extra = switch (v) {
+      'quote_ok_local' || 'quote_ok_wa' => o.extra.copyWith(
+          quoteStatus: OrderExtra.quoteApproved,
+          quoteNote: '${v == 'quote_ok_wa' ? 'Aprobado por WhatsApp' : 'Aprobado en el local'} · $when',
+          clearStage: o.extra.stage == 'ESPERANDO_APROBACION',
+        ),
+      'quote_no' => o.extra.copyWith(quoteStatus: OrderExtra.quoteRejected, quoteNote: 'Rechazado · $when'),
+      'stage_clear' => o.extra.copyWith(clearStage: true),
+      _ when v.startsWith('stage:') => o.extra.copyWith(stage: v.substring(6)),
+      _ => null,
+    };
+    if (extra == null) return;
+    await _run(() => _repo.setExtra(o, extra,
+        note: v.startsWith('quote') ? (extra.quoteNote ?? '') : null));
+    if (v == 'quote_no' && mounted) {
+      AppToast.showWarning(context, 'Presupuesto rechazado. Puedes cancelar el trabajo desde el menú si el cliente no sigue.');
+    }
+  }
+
+  /// Etiquetas del taller: presupuesto, estado propio y entrega
+  List<Widget> _extraPills(WorkOrder o) {
+    final x = o.extra;
+    final now = DateTime.now();
+    return [
+      if (x.awaitingApproval) const StatusPill('Presupuesto por aprobar', tone: AppTone.warning, compact: true),
+      if (x.quoteStatus == OrderExtra.quoteRejected) const StatusPill('Presupuesto rechazado', tone: AppTone.danger, compact: true),
+      if (x.stage != null && x.stage != 'ESPERANDO_APROBACION') StatusPill(_t.stageLabel(x.stage), tone: AppTone.warning, compact: true),
+      if (x.dueAt != null)
+        StatusPill(
+          x.isLate(now) && o.status != WorkOrder.ready ? 'Entrega atrasada' : 'Entrega ${x.dueAt!.day}/${x.dueAt!.month}',
+          tone: x.isLate(now) && o.status != WorkOrder.ready ? AppTone.danger : AppTone.info,
+          compact: true,
+        ),
+    ];
+  }
+
   /// La tarjeta de UN servicio (0.14.0): qué es, de qué vehículo o cliente, quién lo
   /// hace y su botón. Cada servicio avanza solo, sin mover el vehículo completo.
   Widget _serviceCard(ServiceBoard board, WorkOrder o, int i) {
@@ -619,7 +686,8 @@ actions: [
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(l.name, style: AppText.bodyLarge(context, weight: FontWeight.w700)),
+                      Text(l.quantityLabel == null ? l.name : '${l.name} · ${l.quantityLabel}',
+                          style: AppText.bodyLarge(context, weight: FontWeight.w700)),
                       // El vehículo o cliente, para saber de quién es
                       Text(o.title, style: AppText.body(context, weight: FontWeight.w600, color: c.accent)),
                       if (detail.isNotEmpty) Text(detail, style: AppText.caption(context)),
@@ -633,9 +701,10 @@ actions: [
                     'revert' => _revert(o),
                     'cancel' => _cancel(o),
                     'message' => _chooseMessage(o),
-                    _ => null,
+                    _ => _onExtra(o, v),
                   },
                   itemBuilder: (_) => [
+                    ..._extraMenu(o),
                     const PopupMenuItem(value: 'revert', child: Text('Retroceder un servicio')),
                     const PopupMenuItem(value: 'message', child: Text('Enviar mensaje por WhatsApp')),
                     PopupMenuItem(value: 'cancel', child: Text('Cancelar ${o.title}')),
@@ -650,6 +719,7 @@ actions: [
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 StatusPill(statusText, tone: tone, compact: true),
+                ..._extraPills(o),
                 if (delay != null) StatusPill('Demorado $delay min', tone: AppTone.danger, compact: true),
                 if (missing.isNotEmpty) StatusPill('Falta: ${missing.join(', ')}', tone: AppTone.warning, compact: true),
               ],

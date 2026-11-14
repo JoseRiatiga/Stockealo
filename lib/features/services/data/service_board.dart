@@ -161,6 +161,8 @@ class ServiceBoard {
   String? whyNotStart(WorkOrder order, int index, String staffId) {
     final line = order.lines[index];
     if (!line.isPending) return 'Ese servicio ya empezó.';
+    // 0.14.0: el presupuesto se aprueba antes de empezar
+    if (order.extra.awaitingApproval) return 'Falta que el cliente apruebe el presupuesto.';
     final person = staffOf(staffId);
     final name = person?.name ?? 'Esa persona';
     if (person == null || !person.isActive) return '$name ya no está en el equipo.';

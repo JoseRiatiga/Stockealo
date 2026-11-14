@@ -11,6 +11,7 @@ import '../models/service_models.dart';
 import 'commissions_repository.dart';
 import 'service_board.dart';
 import '../models/work_schedule.dart';
+import '../models/order_extra.dart';
 
 /// Catálogo de servicios, empleados y tablero de órdenes. Todo se guarda primero
 /// en el equipo y sube a la nube con la cola, como el resto de la app.
@@ -239,6 +240,17 @@ class ServicesRepository {
       await db.update('work_orders', row, where: 'id = ?', whereArgs: [order.id]);
     }
     _cloud.upsertWorkOrderToCloud(row);
+  }
+
+  /// Cambia los datos extra de la orden (0.14.0): estado propio, presupuesto, entrega…
+  Future<WorkOrder> setExtra(WorkOrder order, OrderExtra extra, {String? note}) async {
+    final at = DateTime.now();
+    final notes = note == null
+        ? order.notes
+        : [if ((order.notes ?? '').trim().isNotEmpty) order.notes!.trim(), note].join('\n');
+    final updated = order.copyWith(extra: extra, notes: notes, updatedAt: at);
+    await _store(updated);
+    return updated;
   }
 
   /// Guarda cambios de la orden (servicios, empleados, datos del cliente)

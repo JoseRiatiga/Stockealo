@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'service_template.dart';
+import 'order_extra.dart';
 
 export 'service_template.dart';
 
@@ -237,6 +238,12 @@ class WorkOrderLine {
   final DateTime? startedAt;
   final DateTime? finishedAt;
 
+  /// Cantidad (0.14.0): kilos en la lavandería; [price] ya es el total de la línea
+  final double quantity;
+
+  /// Unidad de la cantidad («kg»); null = un servicio
+  final String? unit;
+
   const WorkOrderLine({
     required this.serviceId,
     required this.name,
@@ -246,6 +253,8 @@ class WorkOrderLine {
     this.status = pending,
     this.startedAt,
     this.finishedAt,
+    this.quantity = 1,
+    this.unit,
   });
 
   bool get isPending => status == pending;
@@ -269,7 +278,12 @@ class WorkOrderLine {
         status: status ?? this.status,
         startedAt: clearTimes ? null : (startedAt ?? this.startedAt),
         finishedAt: clearTimes ? null : (finishedAt ?? this.finishedAt),
+        quantity: quantity,
+        unit: unit,
       );
+
+  /// «3,5 kg» o null si es un servicio sin cantidad
+  String? get quantityLabel => unit == null ? null : '${quantity.toStringAsFixed(quantity % 1 == 0 ? 0 : 1).replaceAll('.', ',')} $unit';
 
   Map<String, dynamic> toJson() => {
         'service_id': serviceId,
@@ -280,6 +294,8 @@ class WorkOrderLine {
         'status': status,
         if (startedAt != null) 'started_at': startedAt!.toIso8601String(),
         if (finishedAt != null) 'finished_at': finishedAt!.toIso8601String(),
+        if (unit != null) 'quantity': quantity,
+        if (unit != null) 'unit': unit,
       };
 
   /// [orderStatus] completa el estado de las líneas de la 0.11.0, que no lo guardaban
@@ -297,6 +313,8 @@ class WorkOrderLine {
             },
         startedAt: DateTime.tryParse('${j['started_at']}'),
         finishedAt: DateTime.tryParse('${j['finished_at']}'),
+        quantity: (j['quantity'] as num?)?.toDouble() ?? 1,
+        unit: j['unit'] as String?,
       );
 }
 
@@ -335,6 +353,10 @@ class WorkOrder {
   final String? paymentMethod;
   final List<String> saleIds;
   final String? createdBy;
+
+  /// Taller, servicio técnico y lavandería (0.14.0): estado propio, entrega,
+  /// presupuesto, fotos, accesorios y garantía
+  final OrderExtra extra;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -357,6 +379,7 @@ class WorkOrder {
     this.paymentMethod,
     this.saleIds = const [],
     this.createdBy,
+    this.extra = OrderExtra.none,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -424,6 +447,7 @@ class WorkOrder {
     String? paymentMethod,
     List<String>? saleIds,
     DateTime? updatedAt,
+    OrderExtra? extra,
   }) =>
       WorkOrder(
         id: id,
@@ -446,6 +470,7 @@ class WorkOrder {
         createdBy: createdBy,
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        extra: extra ?? this.extra,
       );
 
   Map<String, dynamic> toMap() => {
@@ -466,6 +491,7 @@ class WorkOrder {
         'tip': tip,
         'payment_method': paymentMethod,
         'sale_ids': jsonEncode(saleIds),
+        'extra': extra.isEmpty ? null : jsonEncode(extra.toJson()),
         'created_by': createdBy,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
@@ -510,6 +536,7 @@ class WorkOrder {
       paymentMethod: m['payment_method'] as String?,
       saleIds: [for (final s in sales) s.toString()],
       createdBy: m['created_by'] as String?,
+      extra: OrderExtra.fromJson(_json(m['extra'], const {})),
       createdAt: DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(m['updated_at'] as String? ?? '') ?? DateTime.now(),
     );

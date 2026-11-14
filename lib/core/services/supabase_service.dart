@@ -1712,6 +1712,12 @@ class SupabaseService {
     row['lines'] = json(r['lines'], const []);
     row['status_times'] = json(r['status_times'], const {});
     row['sale_ids'] = json(r['sale_ids'], const []);
+    // Datos extra (0.14.0): solo viajan si hay algo, así la nube vieja no falla
+    if (r['extra'] == null) {
+      row.remove('extra');
+    } else {
+      row['extra'] = json(r['extra'], const {});
+    }
     return row;
   }
 
@@ -1782,6 +1788,7 @@ class SupabaseService {
       'lines': text(r['lines'], const []),
       'status_times': text(r['status_times'], const {}),
       'sale_ids': text(r['sale_ids'], const []),
+      'extra': r['extra'] == null ? null : text(r['extra'], const {}),
     };
   }
 

@@ -9,6 +9,10 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
 import '../../data/services_repository.dart';
 import '../../models/service_models.dart';
+import '../../models/order_extra.dart';
+import '../../../products/data/product_image_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
 
 /// Recibir un trabajo: placa o serial (si la plantilla lo usa) con búsqueda en
 /// vivo que completa los datos del cliente si ya vino, tipo de vehículo (que
@@ -45,6 +49,52 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
   Timer? _debounce;
   bool _saving = false;
 
+  // 0.14.0: taller, servicio técnico y lavandería
+  final _kg = <String, TextEditingController>{};
+  DateTime? _due;
+  bool _needsQuote = false;
+  final _accessories = TextEditingController();
+  final _warranty = TextEditingController();
+  final List<String> _photos = [];
+  bool _uploading = false;
+  late final String _photoKey = 'orden-${DateTime.now().millisecondsSinceEpoch}';
+
+  double _kgOf(String serviceId) => double.tryParse((_kg[serviceId]?.text ?? '').trim().replaceAll(',', '.')) ?? 0;
+
+  TextEditingController _kgField(String serviceId) => _kg.putIfAbsent(serviceId, TextEditingController.new);
+
+  Future<void> _pickDue() async {
+    final now = DateTime.now();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _due ?? now.add(const Duration(days: 1)),
+      firstDate: now.subtract(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 365)),
+      helpText: '¿Cuándo se entrega?',
+    );
+    if (d != null) setState(() => _due = DateTime(d.year, d.month, d.day, 17));
+  }
+
+  /// Foto al recibir: queda en la nube con la orden
+  Future<void> _addPhoto(ImageSource source) async {
+    final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 80);
+    if (file == null || !mounted) return;
+    setState(() => _uploading = true);
+    try {
+      final url = await ProductImageService.instance.uploadBytes(
+        businessId: widget.business.id,
+        productId: '$_photoKey-${_photos.length + 1}',
+        bytes: await file.readAsBytes(),
+        mimeType: file.mimeType,
+      );
+      if (mounted) setState(() => _photos.add(url));
+    } catch (e) {
+      if (mounted) AppToast.showWarning(context, 'No se pudo subir la foto: $e');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   ServiceTemplate get _t => widget.template;
 
   @override
@@ -58,7 +108,7 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
   @override
   void dispose() {
     _debounce?.cancel();
-    for (final c in [_id, _name, _phone, _notes]) {
+    for (final c in [_id, _name, _phone, _notes, _accessories, _warranty, ..._kg.values]) {
       c.dispose();
     }
     super.dispose();
@@ -89,7 +139,10 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
 
   double _price(ShopService s) => s.priceFor(_t.usesVehicleKinds ? _kind : null) ?? s.price;
 
-  double get _total => _offered.where((s) => _selected.contains(s.id)).fold(0.0, (sum, s) => sum + _price(s));
+  /// Lo de la línea: en la lavandería, precio por kilo × kilos
+  double _lineTotal(ShopService s) => _t.byWeight ? _price(s) * _kgOf(s.id) : _price(s);
+
+  double get _total => _offered.where((s) => _selected.contains(s.id)).fold(0.0, (sum, s) => sum + _lineTotal(s));
 
   Future<void> _save() async {
     if (_t.kindsRequired && _kind == null) {
@@ -99,6 +152,10 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
     final chosen = _offered.where((s) => _selected.contains(s.id)).toList();
     if (chosen.isEmpty) {
       AppToast.showWarning(context, 'Elige al menos un servicio.');
+      return;
+    }
+    if (_t.byWeight && chosen.any((s) => _kgOf(s.id) <= 0)) {
+      AppToast.showWarning(context, 'Escribe los kilos de cada servicio.');
       return;
     }
     setState(() => _saving = true);
@@ -112,10 +169,27 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
         notes: _notes.text,
         lines: [
           for (final s in chosen)
-            WorkOrderLine(serviceId: s.id, name: s.name, price: _price(s), commissionPct: s.commissionPct),
+            WorkOrderLine(
+              serviceId: s.id,
+              name: s.name,
+              price: _lineTotal(s),
+              commissionPct: s.commissionPct,
+              quantity: _t.byWeight ? _kgOf(s.id) : 1,
+              unit: _t.byWeight ? 'kg' : null,
+            ),
         ],
       );
-      if (mounted) Navigator.pop(context, order);
+      // Entrega, presupuesto, fotos, accesorios y garantía (0.14.0)
+      final extra = OrderExtra(
+        dueAt: _due,
+        quoteStatus: _needsQuote ? OrderExtra.quotePending : null,
+        stage: _needsQuote ? 'ESPERANDO_APROBACION' : null,
+        accessories: _accessories.text.trim().isEmpty ? null : _accessories.text.trim(),
+        photos: List.of(_photos),
+        warrantyDays: int.tryParse(_warranty.text.trim()),
+      );
+      final saved = extra.isEmpty ? order : await _repo.setExtra(order, extra);
+      if (mounted) Navigator.pop(context, saved);
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -209,12 +283,77 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
                 children: [
                   for (final s in _offered)
                     FilterChip(
-                      label: Text('${s.name} · ${CurrencyFormatter.format(_price(s))}'),
+                      label: Text('${s.name} · ${CurrencyFormatter.format(_price(s))}${_t.byWeight ? ' el kilo' : ''}'),
                       selected: _selected.contains(s.id),
                       onSelected: (v) => setState(() => v ? _selected.add(s.id) : _selected.remove(s.id)),
                     ),
                 ],
               ),
+            // Lavandería: kilos de cada servicio elegido
+            if (_t.byWeight)
+              for (final s in _offered.where((s) => _selected.contains(s.id)))
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpace.sm),
+                  child: TextField(
+                    controller: _kgField(s.id),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(labelText: 'Kilos de ${s.name}', suffixText: 'kg', isDense: true),
+                  ),
+                ),
+            if (_t.usesDueDate) ...[
+              const SizedBox(height: AppSpace.md),
+              OutlinedButton.icon(
+                onPressed: _pickDue,
+                icon: const Icon(Icons.event_outlined, size: 18),
+                label: Text(_due == null ? '¿Cuándo se entrega? (opcional)' : 'Entrega: ${_due!.day}/${_due!.month}/${_due!.year}'),
+              ),
+            ],
+            if (_t.usesQuote)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _needsQuote,
+                onChanged: (v) => setState(() => _needsQuote = v),
+                title: const Text('El cliente debe aprobar el presupuesto'),
+                subtitle: const Text('No se empieza hasta que lo apruebe (en el local o por WhatsApp)'),
+              ),
+            if (_t.usesReception) ...[
+              const SizedBox(height: AppSpace.sm),
+              TextField(
+                controller: _accessories,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Accesorios que deja (opcional)', hintText: 'Cargador, estuche, llaves…'),
+              ),
+              const SizedBox(height: AppSpace.sm),
+              TextField(
+                controller: _warranty,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(labelText: 'Garantía (opcional)', suffixText: 'días'),
+              ),
+              const SizedBox(height: AppSpace.sm),
+              Wrap(
+                spacing: AppSpace.sm,
+                runSpacing: AppSpace.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  for (final url in _photos)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.control),
+                      child: Image.network(url, width: 64, height: 64, fit: BoxFit.cover),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _uploading ? null : () => _addPhoto(ImageSource.camera),
+                    icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                    label: Text(_uploading ? 'Subiendo…' : 'Tomar foto'),
+                  ),
+                  TextButton(
+                    onPressed: _uploading ? null : () => _addPhoto(ImageSource.gallery),
+                    child: const Text('Elegir foto'),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: AppSpace.md),
             TextField(
               controller: _notes,

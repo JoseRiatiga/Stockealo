@@ -14,6 +14,7 @@ import 'package:stockealo/features/services/data/services_repository.dart';
 import 'package:stockealo/features/services/models/service_models.dart';
 import 'package:stockealo/features/services/data/appointments_repository.dart';
 import 'package:stockealo/features/services/models/appointment.dart';
+import 'package:stockealo/features/services/models/order_extra.dart';
 import 'package:stockealo/features/services/models/work_schedule.dart';
 
 /// Reglas del módulo Servicios de la 0.12.0: plantillas, precio por vehículo,
@@ -361,6 +362,41 @@ void main() {
     final after = await agenda.forDay(businessId, now);
     expect(after.single.status, Appointment.arrived);
     expect(after.single.workOrderId, order.id);
+  });
+
+  test('taller: el presupuesto se aprueba antes de empezar; entrega, garantía y kilos se guardan (0.14.0)', () async {
+    final (juan, _, lavado, _) = await setUpTeam();
+    var o = await repo.createOrder(businessId: businessId, plate: 'TLL123', vehicleKind: 'CARRO', lines: [lineOf(lavado, 'CARRO')], now: now);
+    o = await repo.setExtra(o, OrderExtra(
+      quoteStatus: OrderExtra.quotePending,
+      stage: 'ESPERANDO_APROBACION',
+      dueAt: DateTime(2026, 11, 12, 17),
+      accessories: 'Llaves y tapete',
+      warrantyDays: 30,
+      photos: const ['https://x/foto1.jpg'],
+    ));
+    var board = await repo.loadBoard(businessId, now: now);
+    expect(board.whyNotStart(o, 0, juan.id), contains('apruebe el presupuesto'));
+    o = await repo.setExtra(o, o.extra.copyWith(quoteStatus: OrderExtra.quoteApproved, quoteNote: 'Aprobado por WhatsApp', clearStage: true),
+        note: 'Aprobado por WhatsApp');
+    board = await repo.loadBoard(businessId, now: now);
+    expect(board.whyNotStart(o, 0, juan.id), isNull);
+
+    // Se guarda y se lee igual (columna extra)
+    final again = (await repo.searchHistory(businessId, 'TLL123')).single;
+    expect(again.extra.accessories, 'Llaves y tapete');
+    expect(again.extra.warrantyDays, 30);
+    expect(again.extra.photos, ['https://x/foto1.jpg']);
+    expect(again.extra.stage, isNull);
+    expect(again.extra.isLate(DateTime(2026, 11, 13)), isTrue);
+    expect(again.notes, contains('Aprobado por WhatsApp'));
+
+    // Lavandería: la línea por kilos
+    const kilos = WorkOrderLine(serviceId: 's', name: 'Lavado por kilo', price: 17500, quantity: 3.5, unit: 'kg');
+    expect(WorkOrderLine.fromJson(kilos.toJson()).quantityLabel, '3,5 kg');
+    expect(ServiceTemplate.lavanderia.byWeight, isTrue);
+    expect(ServiceTemplate.taller.usesQuote, isTrue);
+    expect(ServiceTemplate.barberia.usesQuote, isFalse);
   });
 
   test('historial en vivo por placa, nombre o teléfono', () async {

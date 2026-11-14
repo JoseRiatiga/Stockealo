@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 18;
+  static const int _schemaVersion = 19;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -576,11 +576,17 @@ class AppDatabase {
     if (oldVersion < 16 && newVersion >= 16) await ordersSeenV16(db);
     if (oldVersion < 17 && newVersion >= 17) await servicesV17(db);
     if (oldVersion < 18 && newVersion >= 18) await appointmentsV18(db);
+    if (oldVersion < 19 && newVersion >= 19) await workOrdersV19(db);
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
   /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
   /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  /// 0.14.0: datos extra de la orden (taller, servicio técnico y lavandería)
+  static Future<void> workOrdersV19(Database db) async {
+    await _addColumnIfMissing(db, 'work_orders', 'extra', 'TEXT');
+  }
+
   /// 0.14.0: agenda de citas
   static Future<void> appointmentsV18(Database db) async {
     await db.execute('''
@@ -948,6 +954,7 @@ class AppDatabase {
     await ordersSeenV16(db);
     await servicesV17(db);
     await appointmentsV18(db);
+    await workOrdersV19(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

@@ -365,10 +365,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                 if (showStocky)
                   Positioned(
                     right: isWide ? AppSpace.xl : AppSpace.lg,
-                    // Productos y Clientes y proveedores tienen su botón abajo a la derecha: Stocky va encima
-                    bottom: (isWide ? AppSpace.xl : AppSpace.lg) +
-                        MediaQuery.of(context).padding.bottom +
-                        (_currentIndex == AppPlace.productos || _currentIndex == AppPlace.personas ? 72 : 0),
+                    bottom: (isWide ? AppSpace.xl : AppSpace.lg) + MediaQuery.of(context).padding.bottom,
                     child: StockyFloatingButton(businessId: _activeBusiness?.id, onNavigateToTab: _navigateToTab),
                   ),
               ],

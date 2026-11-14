@@ -245,7 +245,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
                   Text(
                     '$parts · ${_state == 'notice' ? 'empieza ${MaintenanceGate.when(starts)} · ' : ''}'
                     'termina solo ${MaintenanceGate.when(ends)}',
-                    style: TextStyle(fontSize: 13, color: c.inkMuted),
+                    style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                   ),
               ],
             ),
@@ -288,12 +288,12 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
               children: [
                 Icon(Icons.construction_outlined, size: 18, color: c.warning),
                 const SizedBox(width: AppSpace.sm),
-                Expanded(child: Text(banner, style: TextStyle(fontSize: 12.5, color: c.ink))),
+                Expanded(child: Text(banner, style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink))),
               ],
             ),
           )
         else
-          Text('Sin «App y web» marcada, la app no muestra franja.', style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+          Text('Sin «App y web» marcada, la app no muestra franja.', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
         if (_scopes.contains('app')) ...[
           const SizedBox(height: AppSpace.sm),
           Container(
@@ -308,7 +308,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
               children: [
                 Text('Ventana (sale una vez): ${dialog.title}', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
                 const SizedBox(height: AppSpace.xs),
-                Text(dialog.body, style: TextStyle(fontSize: 13, color: c.ink)),
+                Text(dialog.body, style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink)),
               ],
             ),
           ),
@@ -334,7 +334,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Nuevo mantenimiento', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: c.ink)),
+          Text('Nuevo mantenimiento', style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
           label('1. Nivel'),
           RadioGroup<int>(
             groupValue: _level,
@@ -351,7 +351,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
                     contentPadding: EdgeInsets.zero,
                     value: lvl,
                     title: Text(title),
-                    subtitle: Text(detail, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                    subtitle: Text(detail, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                   ),
               ],
             ),
@@ -425,7 +425,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
             padding: const EdgeInsets.only(top: AppSpace.sm),
             child: Text(
               'Dura ${MaintenanceText.duration(ends.difference(starts))} · termina solo, aunque se te olvide.',
-              style: TextStyle(fontSize: 12.5, color: ends.difference(starts) > const Duration(hours: 48) ? c.danger : c.inkMuted),
+              style: TextStyle(fontSize: AppText.sizeSmall, color: ends.difference(starts) > const Duration(hours: 48) ? c.danger : c.inkMuted),
             ),
           ),
           label('4. Mensaje'),

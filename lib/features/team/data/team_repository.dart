@@ -84,7 +84,7 @@ class TeamRepository {
     );
 
     if (existing.isNotEmpty) {
-      throw Exception('Este usuario ya forma parte del equipo de esta empresa.');
+      throw Exception('Este usuario ya forma parte del equipo de este negocio.');
     }
 
     // 1. Verificar si el usuario ya está registrado en la app localmente
@@ -332,9 +332,9 @@ class TeamRepository {
       joined = Map<String, dynamic>.from(result as Map);
     } on PostgrestException catch (e) {
       if (e.message.contains('code_not_found') || e.message.contains('invalid_code')) {
-        throw Exception('Código no encontrado. Verifica con el dueño o administrador de la empresa.');
+        throw Exception('Código no encontrado. Verifica con el dueño o administrador del negocio.');
       }
-      throw Exception('No se pudo unir a la empresa. Inténtalo de nuevo.');
+      throw Exception('No se pudo unir al negocio. Inténtalo de nuevo.');
     }
 
     final cloudBiz = Map<String, dynamic>.from(joined['business'] as Map);

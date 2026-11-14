@@ -80,11 +80,11 @@ class _AdminStoresPageState extends State<AdminStoresPage> {
                                 tone: s.live ? AdminTone.good : (s.enabled ? AdminTone.warn : AdminTone.neutral)),
                           ],
                         ),
-                        Text('stockealo.online/tienda/${s.slug}', style: TextStyle(fontSize: 13, color: c.accent)),
+                        Text('stockealo.online/tienda/${s.slug}', style: TextStyle(fontSize: AppText.sizeSmall, color: c.accent)),
                         Text(
                           '${s.products} productos con stock · ${s.ownerEmail ?? 'sin dueño'} · '
                           'actualizada ${adminDate(s.updatedAt)}',
-                          style: TextStyle(fontSize: 12, color: c.inkFaint),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
                         ),
                       ],
                     ),

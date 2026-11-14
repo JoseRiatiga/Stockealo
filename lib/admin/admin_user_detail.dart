@@ -7,6 +7,7 @@ import '../core/utils/currency_formatter.dart';
 import '../core/widgets/app_toast.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import 'admin_widgets.dart';
+import '../core/design/app_dialog.dart';
 
 /// Ficha de soporte de una cuenta: sus datos, sus negocios, su Pro, los códigos que
 /// canjeó y sus pagos. Nunca productos, ventas, clientes ni ganancias.
@@ -137,8 +138,8 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
     } else {
       body = _content(c, d);
     }
-    return AlertDialog(
-      title: Text(d?.name?.trim().isNotEmpty == true ? d!.name!.trim() : widget.email),
+    return AppDialog(
+      title: d?.name?.trim().isNotEmpty == true ? d!.name!.trim() : widget.email,
       content: SizedBox(width: 560, child: SingleChildScrollView(child: body)),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))],
     );
@@ -149,7 +150,7 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.ink)),
+            Text(title, style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: c.ink)),
             const SizedBox(height: AppSpace.sm),
             ...children,
           ],
@@ -158,7 +159,7 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
 
   Widget _line(StockealoColors c, String text, {Color? color}) => Padding(
         padding: const EdgeInsets.only(bottom: 4),
-        child: Text(text, style: TextStyle(fontSize: 13, color: color ?? c.inkMuted)),
+        child: Text(text, style: TextStyle(fontSize: AppText.sizeSmall, color: color ?? c.inkMuted)),
       );
 
   Widget _content(StockealoColors c, AdminUserDetail d) {
@@ -202,7 +203,7 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
 
         if (_notesAvailable)
           _section(c, 'Notas internas', [
-            Text('Solo las ve el equipo del panel.', style: TextStyle(fontSize: 12, color: c.inkFaint)),
+            Text('Solo las ve el equipo del panel.', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
             const SizedBox(height: AppSpace.sm),
             if (ProAdminService.instance.canSupport)
               Row(
@@ -270,7 +271,7 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
                             b.pro ? (b.proUntil == null ? 'Pro permanente' : 'Pro hasta ${adminDate(b.proUntil)}') : 'Sin Pro',
                             if (b.storeSlug != null) 'tienda ${b.storeEnabled ? 'publicada' : 'apagada'}',
                           ].join(' · '),
-                          style: TextStyle(fontSize: 12, color: c.inkFaint),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
                         ),
                       ],
                     ),
@@ -309,7 +310,7 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
           padding: const EdgeInsets.only(top: AppSpace.lg),
           child: Text(
             'Por privacidad, aquí no se ven productos, ventas, clientes ni ganancias de los negocios.',
-            style: TextStyle(fontSize: 11.5, color: c.inkFaint),
+            style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
           ),
         ),
       ],

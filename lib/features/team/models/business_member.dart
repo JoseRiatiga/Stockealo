@@ -52,7 +52,7 @@ class BusinessMember {
   String get roleDescription {
     switch (role) {
       case 'OWNER':
-        return 'Control total de la empresa y gestión del equipo.';
+        return 'Control total del negocio y gestión del equipo.';
       case 'ADMIN':
         return 'Puede gestionar productos, inventario y ventas. Puede ver costos.';
       case 'CASHIER':

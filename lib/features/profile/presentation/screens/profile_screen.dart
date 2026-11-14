@@ -619,7 +619,7 @@ actions: [
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Se borrarán por completo tus empresas, catálogo de productos, registro de ventas, clientes e historial contable tanto de este dispositivo como de la nube.\n\n'
+                  'Se borrarán por completo tus negocios, catálogo de productos, registro de ventas, clientes e historial contable tanto de este dispositivo como de la nube.\n\n'
                   'Para confirmar, escribe la palabra "ELIMINAR" a continuación:',
                   style: TextStyle(
                     fontSize: AppText.sizeSmall,

@@ -4,6 +4,7 @@ import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_toast.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import 'admin_widgets.dart';
+import '../core/design/app_dialog.dart';
 
 /// Quién administra el panel (con su rol) y qué se ha hecho desde él
 class AdminTeamPage extends StatefulWidget {
@@ -100,7 +101,7 @@ class _AdminTeamPageState extends State<AdminTeamPage> {
                             Text('${a['email']}', style: TextStyle(fontWeight: FontWeight.w600, color: c.ink)),
                             Text(
                               '${roles[a['role']]?.$1 ?? a['role']} · ${roles[a['role']]?.$2 ?? ''}',
-                              style: TextStyle(fontSize: 12.5, color: c.inkMuted),
+                              style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                             ),
                           ],
                         ),
@@ -114,8 +115,8 @@ class _AdminTeamPageState extends State<AdminTeamPage> {
                   ),
                 ),
               const SizedBox(height: AppSpace.xl),
-              Text('Registro de acciones', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
-              Text('Las últimas 100 cosas que se hicieron desde el panel', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+              Text('Registro de acciones', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
+              Text('Las últimas 100 cosas que se hicieron desde el panel', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
               const SizedBox(height: AppSpace.md),
               if (_actions.isEmpty)
                 Text('Todavía no hay acciones registradas.', style: TextStyle(color: c.inkFaint))
@@ -186,8 +187,8 @@ class _AdminDialogState extends State<_AdminDialog> {
   @override
   Widget build(BuildContext context) {
     final editing = widget.email != null;
-    return AlertDialog(
-      title: Text(editing ? 'Cambiar rol' : 'Agregar al panel'),
+    return AppDialog(
+      title: editing ? 'Cambiar rol' : 'Agregar al panel',
       content: SizedBox(
         width: 420,
         child: Column(

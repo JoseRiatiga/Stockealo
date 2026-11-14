@@ -30,8 +30,8 @@ class AdminHealthSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: AppSpace.xl),
-        Text('Salud de Stockealo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.ink)),
-        Text('A quién conviene escribirle hoy', style: TextStyle(fontSize: 13, color: c.inkMuted)),
+        Text('Salud de Stockealo', style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w700, color: c.ink)),
+        Text('A quién conviene escribirle hoy', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
         const SizedBox(height: AppSpace.md),
         if (h.allGood)
           AdminCard(
@@ -99,7 +99,7 @@ class AdminHealthSection extends StatelessWidget {
             child: Text(
               '${h.inactive30d} ${h.inactive30d == 1 ? 'cuenta no ha' : 'cuentas no han'} iniciado sesión en 30 días '
               '(quien deja la sesión abierta no cuenta como nuevo inicio).',
-              style: TextStyle(fontSize: 12, color: c.inkFaint),
+              style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
             ),
           ),
       ],
@@ -120,7 +120,7 @@ class AdminHealthSection extends StatelessWidget {
           ]),
           Padding(
             padding: const EdgeInsets.only(left: 36, top: 2, bottom: AppSpace.sm),
-            child: Text(hint, style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+            child: Text(hint, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
           ),
           for (final r in rows.take(5))
             Padding(
@@ -132,10 +132,10 @@ class AdminHealthSection extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(r.title, overflow: TextOverflow.ellipsis, style: TextStyle(color: c.ink)),
-                        Text(r.detail, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: c.inkFaint)),
+                        Text(r.detail, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
                         if (_contactedLabel(r.email) != null)
                           Text(_contactedLabel(r.email)!,
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.success)),
+                              style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600, color: c.success)),
                       ],
                     ),
                   ),
@@ -158,7 +158,7 @@ class AdminHealthSection extends StatelessWidget {
           if (rows.length > 5)
             Padding(
               padding: const EdgeInsets.only(left: 36, top: 4),
-              child: Text('y ${rows.length - 5} más', style: TextStyle(fontSize: 12, color: c.inkFaint)),
+              child: Text('y ${rows.length - 5} más', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
             ),
         ],
       ),
@@ -176,7 +176,7 @@ class AdminHealthSection extends StatelessWidget {
             Row(children: [
               Expanded(child: Text(label, style: TextStyle(color: c.ink))),
               Text('${AdminHealth.bytesLabel(used)} de ${AdminHealth.bytesLabel(limit)}',
-                  style: TextStyle(fontSize: 12.5, color: c.inkMuted)),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
             ]),
             const SizedBox(height: 6),
             ClipRRect(
@@ -190,7 +190,7 @@ class AdminHealthSection extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text('${(share * 100).toStringAsFixed(share < 0.1 ? 1 : 0)} % usado$extra',
-                style: TextStyle(fontSize: 12, color: c.inkFaint)),
+                style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
           ],
         ),
       );
@@ -210,7 +210,7 @@ class AdminHealthSection extends StatelessWidget {
           bar('Base de datos', h.dbBytes, h.dbLimitBytes, h.dbUse, ''),
           bar('Archivos (fotos y logos)', h.storageBytes, h.storageLimitBytes, h.storageUse,
               ' · ${h.storageObjects} ${h.storageObjects == 1 ? 'archivo' : 'archivos'}'),
-          Text('Límites del plan gratis de Supabase.', style: TextStyle(fontSize: 11.5, color: c.inkFaint)),
+          Text('Límites del plan gratis de Supabase.', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
         ],
       ),
     );

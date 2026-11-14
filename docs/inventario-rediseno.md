@@ -495,15 +495,15 @@ El dueño pidió publicar lo hecho para una presentación y anotar lo que falta.
 
 **Lo que falta del re-diseño (para la 0.13.x):**
 1. **Bloque 8b · Panel admin y portada (stockealo.online):**
-   - el panel admin (19 archivos) todavía tiene tamaños sueltos y 8 ventanas armadas a mano;
-   - la portada (`web_site/`) no se ha tocado.
+   - ~~el panel admin (19 archivos) todavía tiene tamaños sueltos y 8 ventanas armadas a mano;~~ **hecho el 14 nov (rama feat/0.13.2):** 79 tamaños pasados a la escala de AppText y las 8 ventanas a AppDialog. Candados: fontSize 26 (solo los 2 PDF impresos) · AlertDialog 0. Falta mirarlo en Chrome;
+   - ~~la portada (`web_site/`) no se ha tocado.~~ **hecho el 14 nov (feat/0.13.2):** `site.css` y `pago/` con la paleta nueva (gris claro, tarjetas con sombra suave, botones de esquina 12, pestañas como en la app); «Pro Global» cambiado por «Pro Servicios» en la portada, los términos de la web y los de la app. Mirado en claro y oscuro.
    - Repetir los scripts del bloque 7 (`estilo.py`, `colores.py`, `ventanas_titulo.py`, `quitar_const.py`).
 2. **Bloque 7, segunda pasada:**
    - las pantallas ya usan colores, letra, avisos y ventanas del sistema, pero no se rehízo la distribución de cada una (Productos, Stock, Clientes, Reportes, Ajustes, Servicios);
    - revisar en Chrome si algún título que creció (18 → 20) se corta.
 3. **Bloque 9 · Cierre:**
-   - textos: «empresa» → «negocio»;
-   - los textos legales todavía mencionan «Pro Global», que ya no existe;
+   - ~~textos: «empresa» → «negocio»;~~ **hecho el 14 nov (feat/0.13.2):** papelera, eliminar negocio, perfil, equipo y roles. Quedan solo comentarios del código y la palabra clave «empresa» del tipo Oficina (sirve para buscar);
+   - ~~los textos legales todavía mencionan «Pro Global»~~ **hecho:** términos de la web y de la app, portada, crear códigos del panel y mensaje de error. Se dejan las etiquetas que muestran suscripciones viejas guardadas como «global»;
    - revisión en la web y el APK.
 4. **Pendientes pequeños anotados en cada bloque:**
    - descuento por línea en Vender;

@@ -112,7 +112,7 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
               else if (_healthError != null)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpace.lg),
-                  child: Text('Salud de Stockealo: $_healthError', style: TextStyle(fontSize: 12.5, color: c.inkFaint)),
+                  child: Text('Salud de Stockealo: $_healthError', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkFaint)),
                 ),
               const AdminUsageSection(),
             ],
@@ -149,13 +149,13 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
               children: [
                 Row(
                   children: [
-                    Expanded(child: Text(t.label, style: TextStyle(fontSize: 13, color: c.inkMuted))),
+                    Expanded(child: Text(t.label, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted))),
                     Icon(t.icon, size: 20, color: c.inkFaint),
                   ],
                 ),
                 const SizedBox(height: AppSpace.sm),
                 Text(t.value, style: AppText.amount(context, size: 28, color: c.ink)),
-                Text(t.detail, maxLines: 2, style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                Text(t.detail, maxLines: 2, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
               ],
             ),
           ),

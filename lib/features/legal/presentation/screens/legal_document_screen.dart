@@ -128,7 +128,7 @@ class _TermsOfServiceView extends StatelessWidget {
               'Stockealo Pro es una suscripción opcional que suma funciones extra (por ejemplo, catálogos personalizados, cobro de fiados con recordatorios y estado de cuenta, más preguntas a Stocky y tienda en línea). Todo lo que hoy es gratis sigue siendo gratis.\n'
               '\n'
               '• Pago y activación: puedes pagar en línea con Wompi (Nequi, PSE, tarjeta o Bancolombia) y Pro se activa solo al aprobarse el pago, o por Nequi con comprobante y un código de activación. Stockealo no guarda los datos de tu tarjeta ni de tu cuenta: los maneja Wompi. Los planes semanales y mensuales no se renuevan solos: cada pago o código suma días.\n'
-              '• Alcance: Pro Negocio aplica a un negocio y a su equipo; Pro Global, a los negocios del titular. Los planes son semanales, mensuales o anuales y duran 7, 30 o 365 días desde que se activan.\n'
+              '• Alcance: Pro Negocio aplica a un negocio y a su equipo, y es semanal, mensual o anual (7, 30 o 365 días desde que se activa). Pro Servicios agrega a un negocio el módulo de Servicios (tablero, empleados y comisiones) y es mensual (30 días).\n'
               '• Precios: pueden cambiar para compras futuras; lo que ya pagaste se respeta.\n'
               '• Reembolsos y retracto: si tienes un problema con tu pago o quieres ejercer el derecho de retracto que te reconozca la ley, escríbenos al correo de soporte y revisaremos tu caso.',
         ),

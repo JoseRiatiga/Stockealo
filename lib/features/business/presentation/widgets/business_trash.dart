@@ -55,7 +55,7 @@ class BusinessTrash {
                           Icon(Icons.delete_outline_outlined, color: context.colors.danger),
                           const SizedBox(width: 8),
                           Text(
-                            'Papelera de Empresas',
+                            'Papelera de negocios',
                             style: TextStyle(
                               fontSize: AppText.sizeHeading,
                               fontWeight: FontWeight.bold,
@@ -81,7 +81,7 @@ class BusinessTrash {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Las empresas se conservan aquí durante 7 días antes de eliminarse de forma permanente.',
+                    'Los negocios se conservan aquí durante 7 días antes de eliminarse de forma permanente.',
                     style: TextStyle(
                       fontSize: AppText.sizeCaption,
                       color: context.colors.inkMuted,
@@ -93,7 +93,7 @@ class BusinessTrash {
                       padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Center(
                         child: Text(
-                          'No hay empresas en la papelera',
+                          'No hay negocios en la papelera',
                           style: TextStyle(color: context.colors.inkMuted, fontSize: AppText.sizeBody),
                         ),
                       ),
@@ -240,7 +240,7 @@ content: SingleChildScrollView(
                       border: Border.all(color: context.colors.dangerSoft),
                     ),
                     child: Text(
-                      'Se destruirán definitivamente todas las empresas en la papelera (${deleted.length} ${deleted.length == 1 ? "empresa" : "empresas"}) y todos sus datos en el teléfono y en la nube. Esta acción NO se puede deshacer.',
+                      'Se destruirán definitivamente todos los negocios de la papelera (${deleted.length} ${deleted.length == 1 ? "negocio" : "negocios"}) y todos sus datos en el teléfono y en la nube. Esta acción NO se puede deshacer.',
                       style: TextStyle(
                         fontSize: AppText.sizeCaption,
                         color: context.colors.danger,
@@ -428,7 +428,7 @@ content: SingleChildScrollView(
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '1. Escribe el nombre exacto de la empresa:',
+                    '1. Escribe el nombre exacto del negocio:',
                     style: TextStyle(
                       fontSize: AppText.sizeCaption,
                       fontWeight: FontWeight.bold,
@@ -556,7 +556,7 @@ actions: [
                           Navigator.pop(dialogCtx);
                         }
 
-                        AppToast.showWith(messenger, message: 'Empresa "${biz.name}" eliminada definitivamente.', type: ToastType.error);
+                        AppToast.showWith(messenger, message: 'Negocio "${biz.name}" eliminado definitivamente.', type: ToastType.error);
                       }
                     : null,
                 icon: isDeleting

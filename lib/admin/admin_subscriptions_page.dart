@@ -8,6 +8,7 @@ import '../core/widgets/app_toast.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import '../features/pro/data/pro_service.dart' show proKindLabel;
 import 'admin_widgets.dart';
+import '../core/design/app_dialog.dart';
 
 /// Negocios con Pro: quién, qué plan y hasta cuándo. Permite dar Pro a mano y terminarlo.
 class AdminSubscriptionsPage extends StatefulWidget {
@@ -47,15 +48,15 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
   Future<void> _end(AdminSubscription s) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Terminar esta suscripción?'),
-        content: Text('${s.businessName ?? s.ownerEmail} pierde ${s.kindLabel} desde ya. No se puede deshacer, '
+      builder: (ctx) => AppDialog(
+      title: '¿Terminar esta suscripción?',
+      content: Text('${s.businessName ?? s.ownerEmail} pierde ${s.kindLabel} desde ya. No se puede deshacer, '
             'pero puedes volver a darle Pro.'),
-        actions: [
+      actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Terminar')),
         ],
-      ),
+),
     );
     if (ok != true) return;
     try {
@@ -138,10 +139,10 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
                           ],
                         ),
                         Text('${s.kindLabel} · ${s.sourceLabel} · ${s.ownerEmail}',
-                            overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                            overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
                         Text(
                           'Desde ${adminDate(s.startsAt)} · ${s.endsAt == null ? 'Permanente' : 'Hasta ${adminDate(s.endsAt)}'}',
-                          style: TextStyle(fontSize: 12, color: c.inkFaint),
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),
                         ),
                       ],
                     ),
@@ -242,8 +243,8 @@ class _GrantDialogState extends State<_GrantDialog> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return AlertDialog(
-      title: const Text('Dar Pro'),
+    return AppDialog(
+      title: 'Dar Pro',
       content: SizedBox(
         width: 460,
         child: Column(
@@ -251,7 +252,7 @@ class _GrantDialogState extends State<_GrantDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('Para compensar un fallo, una cortesía o un pago recibido. Los días se suman a lo que ya tenga de ese plan.',
-                style: TextStyle(fontSize: 13, color: c.inkMuted)),
+                style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
             const SizedBox(height: AppSpace.md),
             SegmentedButton<String>(
               segments: const [
@@ -266,7 +267,7 @@ class _GrantDialogState extends State<_GrantDialog> {
               Padding(
                 padding: const EdgeInsets.only(top: AppSpace.xs),
                 child: Text('Todo Pro más el módulo Servicios (lavaderos, barberías, talleres), con soporte.',
-                    style: TextStyle(fontSize: 12, color: c.inkMuted)),
+                    style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
               ),
             const SizedBox(height: AppSpace.md),
             TextField(
@@ -286,7 +287,7 @@ class _GrantDialogState extends State<_GrantDialog> {
                 child: Text(
                   'No encontramos ese negocio. Revisa el nombre o el correo del dueño '
                   '(el negocio tiene que estar en la nube).',
-                  style: TextStyle(fontSize: 13, color: c.inkMuted),
+                  style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                 ),
               ),
             ConstrainedBox(
@@ -310,7 +311,7 @@ class _GrantDialogState extends State<_GrantDialog> {
             const SizedBox(height: AppSpace.sm),
             Text(
               _selected == null ? 'Elige el negocio en la lista.' : 'Le darás ${proKindLabel(_kind)} a ${_selected!.name}.',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _selected == null ? c.warning : c.ink),
+              style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: _selected == null ? c.warning : c.ink),
             ),
             const SizedBox(height: AppSpace.md),
             Wrap(

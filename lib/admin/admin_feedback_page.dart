@@ -5,6 +5,7 @@ import '../core/theme/app_tokens.dart';
 import '../core/widgets/app_toast.dart';
 import '../features/feedback/data/feedback_service.dart';
 import 'admin_widgets.dart';
+import '../core/design/app_dialog.dart';
 
 /// Panel › Sugerencias y fallos: lo que envían los usuarios desde Ajustes › Ayuda.
 /// Se cambia el estado y se responde; la respuesta la ve quien escribió.
@@ -50,9 +51,9 @@ class _AdminFeedbackPageState extends State<AdminFeedbackPage> {
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Text(f.kindLabel),
-          content: SizedBox(
+        builder: (ctx, setLocal) => AppDialog(
+      title: f.kindLabel,
+      content: SizedBox(
             width: 520,
             child: SingleChildScrollView(
               child: Column(
@@ -70,7 +71,7 @@ class _AdminFeedbackPageState extends State<AdminFeedbackPage> {
                       if (f.platform != null) f.platform!,
                       '${f.createdAt.day}/${f.createdAt.month}/${f.createdAt.year}',
                     ].join(' · '),
-                    style: const TextStyle(fontSize: 12),
+                    style: const TextStyle(fontSize: AppText.sizeCaption),
                   ),
                   if (f.contactPhone != null)
                     Align(
@@ -113,11 +114,11 @@ class _AdminFeedbackPageState extends State<AdminFeedbackPage> {
               ),
             ),
           ),
-          actions: [
+      actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cerrar')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar')),
           ],
-        ),
+),
       ),
     );
     final text = reply.text;
@@ -211,13 +212,13 @@ class _AdminFeedbackPageState extends State<AdminFeedbackPage> {
                               if (f.area != null) f.area!,
                               '${f.createdAt.day}/${f.createdAt.month}',
                             ].join(' · '),
-                            style: TextStyle(fontSize: 12, color: c.inkMuted),
+                            style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
                           ),
                         ],
                       ),
                     ),
                     Text(f.status == 'NUEVO' ? 'Nuevo' : f.statusLabel,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: f.status == 'NUEVO' ? c.warning : c.inkMuted)),
+                        style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, color: f.status == 'NUEVO' ? c.warning : c.inkMuted)),
                   ],
                 ),
               ),

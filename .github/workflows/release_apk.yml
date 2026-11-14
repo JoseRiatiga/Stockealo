@@ -69,13 +69,9 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Servicios: Empleados (antes «Asistencia»)
-            - Agrega y edita empleados desde Servicios › Empleados, sin ir a Ajustes.
-            - Cada empleado ve cuánto lleva hoy: servicios cobrados, comisión y propinas, sin cerrar la caja.
-            - Un empleado puede hacer hasta 2 servicios a la vez. Si hay pocos empleados y mucha cola, activa «Habilitar múltiples servicios».
-
-            ### Horarios
-            - Horario del negocio para todos, o un horario propio por empleado (por ejemplo, de 8:00 a. m. a 12:00 p. m.).
-            - Avisos sin bloquear: «Debía llegar a las…», «Fuera de turno» y «Terminó su turno». En el tablero se ve quién está fuera de turno.
+            ### Más ordenado
+            - Textos más claros: donde decía «empresa» ahora dice «negocio» (papelera, perfil y equipo).
+            - Los términos ya explican los planes actuales: Pro Negocio y Pro Servicios.
+            - La página stockealo.online estrena el mismo diseño de la app, en modo claro y oscuro.
           draft: false
           prerelease: false

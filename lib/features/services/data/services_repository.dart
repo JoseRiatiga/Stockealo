@@ -471,6 +471,40 @@ class ServicesRepository {
   }
 
   /// Último trabajo de una placa, nombre o teléfono, para completar los datos al recibir
+  /// Todo lo de un cliente (por placa, teléfono o nombre): sus visitas, cuánto ha
+  /// gastado, cada cuánto viene, lo que más pide y con quién (0.14.0)
+  Future<CustomerProfile> customerProfile(String businessId, WorkOrder o) async {
+    final key = (o.plate ?? '').isNotEmpty
+        ? o.plate!
+        : ((o.customerPhone ?? '').isNotEmpty ? o.customerPhone! : (o.customerName ?? ''));
+    final visits = key.isEmpty ? [o] : await searchHistory(businessId, key, limit: 200);
+    final done = visits.where((v) => v.status != WorkOrder.cancelled).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    int? everyDays;
+    if (done.length >= 2) {
+      final span = done.first.createdAt.difference(done.last.createdAt).inDays;
+      everyDays = (span / (done.length - 1)).round();
+    }
+    final services = <String, int>{};
+    final staff = <String, int>{};
+    for (final v in done) {
+      for (final l in v.lines) {
+        services[l.name] = (services[l.name] ?? 0) + 1;
+        for (final s in l.staffIds) {
+          staff[s] = (staff[s] ?? 0) + 1;
+        }
+      }
+    }
+    List<String> top(Map<String, int> m) => (m.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).map((e) => e.key).take(3).toList();
+    return CustomerProfile(
+      visits: done,
+      spent: done.where((v) => v.isPaid).fold(0.0, (s, v) => s + v.total),
+      everyDays: everyDays,
+      topServices: top(services),
+      topStaffIds: top(staff),
+    );
+  }
+
   Future<WorkOrder?> lastVisit(String businessId, String query) async {
     final found = await searchHistory(businessId, query, limit: 1);
     return found.isEmpty ? null : found.first;
@@ -634,4 +668,24 @@ class ServicesRepository {
       globalSchedule: results[5] as WorkSchedule?,
     );
   }
+}
+
+/// Historial de un cliente de servicios
+class CustomerProfile {
+  /// Visitas, la más reciente primero (sin las canceladas)
+  final List<WorkOrder> visits;
+  final double spent;
+
+  /// Cada cuántos días viene, en promedio (null con una sola visita)
+  final int? everyDays;
+  final List<String> topServices;
+  final List<String> topStaffIds;
+
+  const CustomerProfile({
+    required this.visits,
+    required this.spent,
+    this.everyDays,
+    this.topServices = const [],
+    this.topStaffIds = const [],
+  });
 }

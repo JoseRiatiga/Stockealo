@@ -307,6 +307,20 @@ void main() {
     expect(ok, hasLength(sales.length - 1), reason: 'el lavado sigue cobrado');
   });
 
+  test('historial del cliente: visitas, gasto, cada cuánto viene y qué pide (0.14.0)', () async {
+    final (_, _, lavado, polichado) = await setUpTeam();
+    WorkOrder? last;
+    for (final days in [20, 10, 0]) {
+      last = await repo.createOrder(
+          businessId: businessId, plate: 'QWE12R', vehicleKind: 'MOTO',
+          lines: [lineOf(lavado, 'MOTO'), if (days == 0) lineOf(polichado, 'MOTO')], now: now.subtract(Duration(days: days)));
+    }
+    final p = await repo.customerProfile(businessId, last!);
+    expect(p.visits, hasLength(3));
+    expect(p.everyDays, 10);
+    expect(p.topServices.first, 'Lavado');
+  });
+
   test('historial en vivo por placa, nombre o teléfono', () async {
     final (_, _, lavado, _) = await setUpTeam();
     await repo.createOrder(

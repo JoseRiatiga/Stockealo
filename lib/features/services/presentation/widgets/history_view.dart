@@ -11,6 +11,7 @@ import '../../../business/models/business.dart';
 import '../../data/services_repository.dart';
 import '../../models/service_models.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/stat_card.dart';
 
 /// Servicios › Historial: búsqueda en vivo por placa o serial, nombre o teléfono.
 /// Muestra las visitas, lo gastado, los servicios y quién atendió. Un trabajo ya
@@ -101,6 +102,72 @@ actions: [
     }
   }
 
+  /// Historial del cliente: visitas, gasto, cada cuánto viene, qué pide y con quién
+  Future<void> _openProfile(WorkOrder o) async {
+    final profile = await _repo.customerProfile(widget.business.id, o);
+    if (!mounted) return;
+    await AppSidePanel.show<void>(
+      context: context,
+      title: 'Historial de ${o.title}',
+      subtitle: [
+        if ((o.customerName ?? '').isNotEmpty && o.customerName != o.title) o.customerName!,
+        if ((o.customerPhone ?? '').isNotEmpty) o.customerPhone!,
+      ].join(' · ').ifEmptyNull,
+      builder: (ctx) {
+        final c = ctx.colors;
+        final p = profile;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(child: StatCard(title: 'Visitas', value: '${p.visits.length}', compact: true)),
+                const SizedBox(width: AppSpace.sm),
+                Expanded(child: StatCard(title: 'Ha gastado', value: CurrencyFormatter.format(p.spent), compact: true)),
+              ],
+            ),
+            const SizedBox(height: AppSpace.sm),
+            if (p.everyDays != null)
+              Text(
+                p.everyDays! <= 1 ? 'Viene casi todos los días.' : 'Viene cada ${p.everyDays} días, más o menos.',
+                style: AppText.body(ctx, weight: FontWeight.w600),
+              ),
+            if (p.topServices.isNotEmpty)
+              Text('Lo que más pide: ${p.topServices.join(', ')}', style: AppText.small(ctx)),
+            if (p.topStaffIds.isNotEmpty)
+              Text('Lo atiende más: ${p.topStaffIds.map((id) => _staffNames[id] ?? 'Empleado').join(', ')}',
+                  style: AppText.small(ctx)),
+            const SizedBox(height: AppSpace.md),
+            for (final v in p.visits.take(30))
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpace.xs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 70,
+                      child: Text('${v.createdAt.day}/${v.createdAt.month}/${v.createdAt.year % 100}', style: AppText.small(ctx)),
+                    ),
+                    Expanded(
+                      child: Text(
+                        [
+                          for (final l in v.lines)
+                            '${l.name}${l.staffIds.isEmpty ? '' : ' (${l.staffIds.map((id) => _staffNames[id] ?? 'Empleado').join(', ')})'}',
+                        ].join(', '),
+                        style: AppText.small(ctx, color: c.ink),
+                      ),
+                    ),
+                    Text(CurrencyFormatter.format(v.isPaid ? v.total : v.subtotal), style: AppText.small(ctx, weight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -144,6 +211,8 @@ actions: [
           for (final o in _orders) ...[
             AppCard(
               padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.sm, AppSpace.md),
+              // Toda la tarjeta abre el historial del cliente (0.14.0)
+              onTap: () => _openProfile(o),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -190,4 +259,8 @@ actions: [
       ),
     );
   }
+}
+
+extension on String {
+  String? get ifEmptyNull => isEmpty ? null : this;
 }

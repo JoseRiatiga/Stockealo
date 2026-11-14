@@ -1031,33 +1031,55 @@ class _CartFormState extends State<_CartForm> {
 
   /// Se intentó pedir sin nombre
   bool _nameMissing = false;
+  final _phone = TextEditingController();
+
+  /// Código del pedido guardado (T-0001)
+  String? _code;
+  bool _sending = false;
 
   @override
   void dispose() {
     _name.dispose();
     _note.dispose();
+    _phone.dispose();
     super.dispose();
   }
 
+  String _message(List<CartLine> lines) => OnlineStoreService.orderMessage(
+        businessName: widget.store.businessName,
+        lines: lines,
+        currency: widget.store.currency,
+        customerName: _name.text,
+        note: _note.text,
+        code: _code,
+        phone: _phone.text,
+      );
+
   Future<void> _sendWhatsApp(List<CartLine> lines) async {
-    final text = OnlineStoreService.orderMessage(
-      businessName: widget.store.businessName,
-      lines: lines,
-      currency: widget.store.currency,
-      customerName: _name.text,
-      note: _note.text,
-    );
+    final text = _message(lines);
     final uri = Uri.parse('https://wa.me/${widget.store.whatsapp}?text=${Uri.encodeComponent(text)}');
     await launchUrl(uri, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
   }
 
   /// El tiquete del pedido, con el sello POR CONFIRMAR
   Future<void> _showTicket(List<CartLine> lines) async {
+    if (_sending) return;
+    setState(() => _sending = true);
+    // El pedido se guarda en la tienda con su código; sin conexión sigue por WhatsApp
+    _code ??= await OnlineStoreService.instance.createOrder(
+      slug: widget.store.slug,
+      customerName: _name.text,
+      customerPhone: _phone.text,
+      note: _note.text,
+      lines: lines,
+    );
+    if (!mounted) return;
+    setState(() => _sending = false);
     final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
     final now = DateTime.now();
     final doc = SaleDocument(
       title: 'Pedido',
-      number: 'P-${now.millisecondsSinceEpoch.toString().substring(6)}',
+      number: _code ?? 'P-${now.millisecondsSinceEpoch.toString().substring(6)}',
       date: now,
       lines: [for (final l in lines) SaleDocumentLine(quantity: l.quantity, name: l.name, unitPrice: l.unitPrice, total: l.subtotal)],
       total: total,
@@ -1066,13 +1088,7 @@ class _CartFormState extends State<_CartForm> {
       closing: 'El negocio te confirma el precio final y la entrega.',
       stamp: const TicketStamp('POR CONFIRMAR', tone: AppTone.info),
     );
-    final text = OnlineStoreService.orderMessage(
-      businessName: widget.store.businessName,
-      lines: lines,
-      currency: widget.store.currency,
-      customerName: _name.text,
-      note: _note.text,
-    );
+    final text = _message(lines);
     Navigator.of(context).pop();
     final host = widget.storeContext;
     if (!host.mounted) return;
@@ -1113,7 +1129,7 @@ class _CartFormState extends State<_CartForm> {
           _showTicket(lines);
         },
         icon: const Icon(Icons.receipt_long_outlined),
-        label: const Text('Hacer el pedido'),
+        label: Text(_sending ? 'Guardando tu pedido…' : 'Hacer el pedido'),
       ),
       const SizedBox(height: AppSpace.sm),
       Text(
@@ -1170,6 +1186,12 @@ class _CartFormState extends State<_CartForm> {
               labelText: 'Tu nombre',
               errorText: _nameMissing ? 'Escribe tu nombre para que la tienda sepa quién pide' : null,
             ),
+          ),
+          const SizedBox(height: AppSpace.md),
+          TextField(
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(labelText: 'Tu celular (recomendado)', hintText: 'Para avisarte cuando esté listo'),
           ),
           const SizedBox(height: AppSpace.md),
           TextField(

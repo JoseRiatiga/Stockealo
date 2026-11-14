@@ -13,6 +13,8 @@ import '../../../products/presentation/widgets/restock_order_modal.dart';
 import '../../../suppliers/data/supplier_repository.dart';
 import '../../../suppliers/models/supplier.dart';
 import '../../data/home_data.dart';
+import '../../../sales/presentation/widgets/quotations_list_modal.dart';
+import '../../../sales/presentation/widgets/deliveries.dart';
 
 /// Cómo se ve cada aviso: ícono, tono, título, detalle y pastilla. Lo usan la fila
 /// del Inicio y su panel, para que digan siempre lo mismo.
@@ -21,11 +23,14 @@ extension AttentionLook on AttentionItem {
         AttentionKind.outOfStock || AttentionKind.lowStock => Icons.inventory_2_outlined,
         AttentionKind.overdueDebt => Icons.person_outline,
         AttentionKind.cashLeftOpen => Icons.point_of_sale_outlined,
+        AttentionKind.storeOrders => Icons.storefront_outlined,
+        AttentionKind.toDeliver => Icons.local_shipping_outlined,
       };
 
   AppTone get tone => switch (kind) {
         AttentionKind.outOfStock || AttentionKind.cashLeftOpen => AppTone.danger,
-        AttentionKind.overdueDebt || AttentionKind.lowStock => AppTone.warning,
+        AttentionKind.overdueDebt || AttentionKind.lowStock || AttentionKind.toDeliver => AppTone.warning,
+        AttentionKind.storeOrders => AppTone.info,
       };
 
   String get title => switch (kind) {
@@ -33,6 +38,9 @@ extension AttentionLook on AttentionItem {
         AttentionKind.lowStock => 'Quedan $stock de $name',
         AttentionKind.overdueDebt => '$name debe ${CurrencyFormatter.format(amount)}',
         AttentionKind.cashLeftOpen => 'La caja quedó abierta',
+        AttentionKind.storeOrders =>
+          count == 1 ? '1 pedido de la tienda por confirmar' : '$count pedidos de la tienda por confirmar',
+        AttentionKind.toDeliver => count == 1 ? '1 pedido por entregar' : '$count pedidos por entregar',
       };
 
   String get detail => switch (kind) {
@@ -41,6 +49,8 @@ extension AttentionLook on AttentionItem {
         AttentionKind.lowStock => 'Mínimo $minStock${soldThisWeek > 0 ? ' · vendiste $soldThisWeek esta semana' : ''}',
         AttentionKind.overdueDebt => neverPaid ? 'Hace $days días · no ha abonado' : 'Último abono hace $days días',
         AttentionKind.cashLeftOpen => 'Desde el ${DateFormat("d MMM, h:mm a", 'es_CO').format(since!)}',
+        AttentionKind.storeOrders => 'Llegaron de tu tienda en línea · vencen a los 7 días',
+        AttentionKind.toDeliver => 'Ya se cobraron: recoge después o envío',
       };
 
   String get pill => switch (kind) {
@@ -48,6 +58,8 @@ extension AttentionLook on AttentionItem {
         AttentionKind.lowStock => 'Quedan $stock',
         AttentionKind.overdueDebt => 'Vencido',
         AttentionKind.cashLeftOpen => 'Sin cerrar',
+        AttentionKind.storeOrders => 'Por confirmar',
+        AttentionKind.toDeliver => 'Por entregar',
       };
 }
 
@@ -113,6 +125,8 @@ class _PanelBody extends StatelessWidget {
       AttentionKind.outOfStock || AttentionKind.lowStock => _stock(context),
       AttentionKind.overdueDebt => _debt(context),
       AttentionKind.cashLeftOpen => _cash(context),
+      AttentionKind.storeOrders => _orders(context),
+      AttentionKind.toDeliver => _deliveries(context),
     };
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: children);
   }
@@ -209,6 +223,43 @@ class _PanelBody extends StatelessWidget {
           detail: 'Cuenta el efectivo, ciérralo y abre la caja de hoy.',
           primary: 'Ir a la caja',
           onPrimary: () => _go(context, AppPlace.caja),
+        ),
+      ];
+
+  List<Widget> _orders(BuildContext context) => [
+        const _Reason(
+          icon: '?',
+          tone: AppTone.info,
+          title: 'Qué es',
+          text: 'Clientes que hicieron un pedido en tu tienda en línea. Cada uno tiene su código (T-0001) y te llega '
+              'también por WhatsApp. Si nadie lo confirma, vence a los 7 días.',
+        ),
+        _Solution(
+          title: 'Confirmar y cobrar',
+          detail: 'Ábrelos en Cotizaciones y pásalos a venta con un toque.',
+          primary: 'Ver pedidos',
+          onPrimary: () {
+            Navigator.of(context).maybePop();
+            QuotationsListModal.show(host, businessId: business.id);
+          },
+        ),
+      ];
+
+  List<Widget> _deliveries(BuildContext context) => [
+        const _Reason(
+          icon: '?',
+          tone: AppTone.info,
+          title: 'Qué es',
+          text: 'Pedidos que ya se cobraron pero el cliente recoge después o van por envío. El stock ya se descontó.',
+        ),
+        _Solution(
+          title: 'Marcar lo entregado',
+          detail: 'Cuando el cliente lo recoja o le llegue el envío, márcalo como entregado.',
+          primary: 'Ver por entregar',
+          onPrimary: () {
+            Navigator.of(context).maybePop();
+            DeliveriesSheet.show(host, businessId: business.id);
+          },
         ),
       ];
 

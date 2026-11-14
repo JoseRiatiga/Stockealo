@@ -171,6 +171,10 @@ class SaleCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         const StatusPill('Anulada', tone: AppTone.danger, compact: true),
                       ],
+                      if (sale.pendingDelivery) ...[
+                        const SizedBox(height: 2),
+                        const StatusPill('Por entregar', tone: AppTone.warning, compact: true),
+                      ],
                       if (pendingUpload) ...[
                         const SizedBox(height: 2),
                         const StatusPill('Pendiente de subir', tone: AppTone.warning, compact: true),

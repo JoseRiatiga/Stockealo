@@ -27,6 +27,7 @@ import '../widgets/digital_ticket_modal.dart';
 import '../widgets/variant_picker.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../data/promotions_repository.dart';
+import '../widgets/deliveries.dart';
 
 /// Vender: el punto de venta. Buscar o escanear (también con lector USB: el código
 /// entra solo al carrito), tocar productos, cobrar con F9 y seguir con la
@@ -356,12 +357,16 @@ class _SellScreenState extends State<SellScreen> {
       AppToast.showError(context, 'No se puede cotizar por debajo del costo.');
       return;
     }
+    // ¿El cliente está aquí o lo pidió por WhatsApp? (0.13.4)
+    final source = await askQuotationSource(context);
+    if (source == null || !mounted) return;
     try {
       final q = await SalesRepository.instance.recordQuotation(
         businessId: widget.business.id,
         items: List.of(_cart.lines),
         customerName: _customer.text.trim().isEmpty ? null : _customer.text.trim(),
         discountAmount: _cart.discount,
+        source: source,
       );
       _cart.clear();
       if (mounted) AppToast.showSuccess(context, 'Cotización ${q.quotationNumber} guardada en Ventas › Cotizaciones');

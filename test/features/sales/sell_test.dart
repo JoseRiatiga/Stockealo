@@ -21,6 +21,7 @@ import 'package:stockealo/features/sales/data/sales_repository.dart';
 import 'package:stockealo/features/sales/data/sell_cart.dart';
 import 'package:stockealo/features/sales/models/cart_item.dart';
 import 'package:stockealo/features/sales/models/payment_method.dart';
+import 'package:stockealo/features/sales/models/sale.dart';
 import 'package:stockealo/features/sales/data/promotions_repository.dart';
 import 'package:stockealo/features/sales/models/promotion.dart';
 import 'package:stockealo/features/sales/presentation/screens/sell_screen.dart';
@@ -149,6 +150,28 @@ void main() {
     expect(results.single.discount, 5600);
     cart.reset();
     cart.setPromotions(const []);
+  });
+
+  test('pedido cobrado «Por entregar» queda en la lista hasta marcarlo entregado', () async {
+    await cash.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Rosa');
+    final done = await sales.recordMultiProductSale(
+      businessId: businessId,
+      items: await items({'gaseosa': 2, 'huevos': 1}),
+      paymentMethod: PaymentMethod.cash,
+      customerName: 'Ana',
+      deliveryStatus: Sale.toDeliver,
+      deliveryNote: 'Envío: Calle 10 # 5-20',
+    );
+    expect(done.every((s) => s.pendingDelivery), isTrue);
+    var pending = await sales.pendingDeliveries(businessId);
+    expect(pending, hasLength(1), reason: 'las dos líneas son una sola venta');
+    expect(pending.single.first.deliveryNote, 'Envío: Calle 10 # 5-20');
+    await sales.markDelivered(pending.single);
+    pending = await sales.pendingDeliveries(businessId);
+    expect(pending, isEmpty);
+    // Una venta normal de mostrador no queda por entregar
+    final normal = await sales.recordMultiProductSale(businessId: businessId, items: await items({'gaseosa': 1}), paymentMethod: PaymentMethod.cash);
+    expect(normal.single.pendingDelivery, isFalse);
   });
 
   test('pago mixto: cada medio suma lo suyo y la caja solo cuenta el efectivo', () async {

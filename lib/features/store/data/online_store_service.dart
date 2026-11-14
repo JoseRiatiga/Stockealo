@@ -396,24 +396,69 @@ class OnlineStoreService {
       !const ['app', 'admin', 'tienda', 'api', 'www', 'stockealo', 'soporte', 'ayuda'].contains(slug);
 
   /// Mensaje de WhatsApp con el pedido
+  /// Guarda el pedido en la nube con su código por negocio (T-0001). Devuelve el código,
+  /// o null si no se pudo (sin conexión o la nube aún no tiene pedidos): el pedido sigue
+  /// por WhatsApp como antes. (0.13.4)
+  Future<String?> createOrder({
+    required String slug,
+    required String customerName,
+    String? customerPhone,
+    String? note,
+    required List<CartLine> lines,
+  }) async {
+    final client = _client;
+    if (client == null) return null;
+    try {
+      final data = await client.rpc('create_store_order', params: {
+        'p_slug': slug,
+        'p_customer_name': customerName.trim(),
+        'p_customer_phone': customerPhone?.trim(),
+        'p_note': note?.trim(),
+        'p_lines': [
+          for (final l in lines)
+            {
+              'product_id': l.product.id,
+              'variant_id': l.variant?.id,
+              'variant_name': l.variant?.label,
+              'name': l.name,
+              'quantity': l.quantity,
+              'unit_price': l.unitPrice,
+              'subtotal': l.subtotal,
+            },
+        ],
+        'p_total': lines.fold<double>(0, (s, l) => s + l.subtotal),
+      });
+      return (data as Map)['code'] as String?;
+    } catch (e) {
+      debugPrint('No se pudo guardar el pedido: $e');
+      return null;
+    }
+  }
+
   static String orderMessage({
     required String businessName,
     required List<CartLine> lines,
     required String currency,
     String? customerName,
     String? note,
+
+    /// Código del pedido (T-0001), para buscarlo en Ventas › Cotizaciones
+    String? code,
+    String? phone,
   }) {
     String money(num v) => CurrencyFormatter.formatIn(v, currency);
     final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
     final name = customerName?.trim() ?? '';
     final extra = note?.trim() ?? '';
+    final cel = phone?.trim() ?? '';
     return [
-      'Hola $businessName, quiero hacer este pedido:',
+      code == null ? 'Hola $businessName, quiero hacer este pedido:' : 'Hola $businessName, quiero hacer el pedido $code:',
       '',
       for (final l in lines) '• ${l.quantity} × ${l.name} — ${money(l.subtotal)}',
       '',
       'Total: ${money(total)}',
       if (name.isNotEmpty) 'A nombre de: $name',
+      if (cel.isNotEmpty) 'Celular: $cel',
       if (extra.isNotEmpty) 'Nota: $extra',
       '',
       'Pedido hecho desde la tienda en línea (Stockealo).',

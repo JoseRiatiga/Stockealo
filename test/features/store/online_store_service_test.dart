@@ -88,4 +88,13 @@ void main() {
     // Sin la migración nueva la tienda sigue funcionando: nada agotado ni «pocas»
     expect(StoreProduct.fromJson({'id': 'p3', 'name': 'Gorra', 'price': 1}).runningLow, isFalse);
   });
+
+  test('el pedido de WhatsApp lleva su código T-0001 y el celular', () {
+    const line = CartLine(StoreProduct(id: 'p', name: 'Gorra', category: '', price: 20000), 2);
+    final text = OnlineStoreService.orderMessage(
+      businessName: 'Doña Ana', lines: [line], currency: 'COP', customerName: 'Luis', code: 'T-0012', phone: '3001234567');
+    expect(text, startsWith('Hola Doña Ana, quiero hacer el pedido T-0012:'));
+    expect(text, contains('Celular: 3001234567'));
+    expect(text, contains('A nombre de: Luis'));
+  });
 }

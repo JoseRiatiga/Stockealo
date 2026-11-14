@@ -602,6 +602,11 @@ class AppDatabase {
     await _addColumnIfMissing(db, 'sales', 'promotion_id', 'TEXT');
     await _addColumnIfMissing(db, 'sales', 'promotion_name', 'TEXT');
     await _addColumnIfMissing(db, 'sales', 'promotion_discount', 'REAL NOT NULL DEFAULT 0');
+    // Pedidos de la tienda y «Por entregar»: de dónde vino la cotización y la entrega
+    await _addColumnIfMissing(db, 'quotations', 'source', "TEXT NOT NULL DEFAULT 'LOCAL'");
+    await _addColumnIfMissing(db, 'sales', 'delivery_status', 'TEXT');
+    await _addColumnIfMissing(db, 'sales', 'delivery_note', 'TEXT');
+    await _addColumnIfMissing(db, 'sales', 'delivered_at', 'TEXT');
   }
 
   /// 0.13.1: horario de los empleados (del negocio y propio de cada uno)

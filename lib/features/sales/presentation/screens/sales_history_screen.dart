@@ -25,6 +25,7 @@ import '../../../sales/models/payment_method.dart';
 import '../widgets/digital_ticket_modal.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/services/sync_queue.dart';
+import '../widgets/deliveries.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -338,8 +339,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                         QuickAccessItem(
                           icon: Icons.request_quote_outlined,
                           label: 'Cotizaciones',
-                          caption: 'Proformas para tus clientes',
+                          caption: 'Pedidos y proformas',
                           onTap: _openQuotations,
+                        ),
+                        // Lo cobrado que falta entregar (0.13.4)
+                        QuickAccessItem(
+                          icon: Icons.local_shipping_outlined,
+                          label: 'Por entregar',
+                          caption: 'Recoge después o envío',
+                          onTap: () async {
+                            final bizId = widget.businessId ?? ActiveBusinessScope.read(context)?.id;
+                            if (bizId == null) return;
+                            await DeliveriesSheet.show(context, businessId: bizId);
+                            if (mounted) _loadSales();
+                          },
                         ),
                       ],
                     ),

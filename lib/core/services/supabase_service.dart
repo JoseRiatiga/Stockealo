@@ -821,7 +821,7 @@ class SupabaseService {
           for (final r in await db.query('sales', columns: [
             'id', 'variant_id', 'variant_name', 'seller_name', 'invoice_number', 'product_photo_path', 'discount_amount',
             'service_id', 'work_order_id', 'staff_ids', 'voided_at', 'void_reason', 'voided_by', 'payment_split',
-            'promotion_id', 'promotion_name', 'promotion_discount',
+            'promotion_id', 'promotion_name', 'promotion_discount', 'delivery_status', 'delivery_note', 'delivered_at',
           ]))
             r['id'] as String: r,
         };
@@ -920,6 +920,9 @@ class SupabaseService {
               'promotion_id': s['promotion_id'] ?? local?['promotion_id'],
               'promotion_name': s['promotion_name'] ?? local?['promotion_name'],
               'promotion_discount': s['promotion_discount'] ?? local?['promotion_discount'] ?? 0.0,
+              'delivery_status': s['delivery_status'] ?? local?['delivery_status'],
+              'delivery_note': s['delivery_note'] ?? local?['delivery_note'],
+              'delivered_at': s['delivered_at'] ?? local?['delivered_at'],
               'seller_name': local?['seller_name'],
               'invoice_number': local?['invoice_number'],
               'product_photo_path': local?['product_photo_path'],
@@ -1179,6 +1182,8 @@ class SupabaseService {
         await db.from('cash_sessions').upsert(cashSessionCloudRow(p), onConflict: 'id');
       case 'upsert_cash_movement':
         await db.from('cash_movements').upsert(boolRow(p, const []), onConflict: 'id');
+      case 'update_store_order':
+        await db.from('store_orders').update({'status': p['status']}).eq('id', p['id'] as String);
       case 'upsert_promotion':
         await db.from('promotions').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
       case 'delete_promotion':
@@ -1419,7 +1424,10 @@ class SupabaseService {
         ..._saleV13Fields(s),
       };
 
-  static const _saleV13Columns = ['voided_at', 'void_reason', 'voided_by', 'payment_split', 'promotion_id', 'promotion_name'];
+  static const _saleV13Columns = [
+    'voided_at', 'void_reason', 'voided_by', 'payment_split', 'promotion_id', 'promotion_name',
+    'delivery_status', 'delivery_note', 'delivered_at',
+  ];
 
   static Map<String, dynamic> _saleV13Fields(Map<String, dynamic> s) => {
         for (final c in _saleV13Columns)
@@ -1659,6 +1667,9 @@ class SupabaseService {
   /// Servicio del catálogo, empleado u orden del tablero
   Future<void> upsertServiceToCloud(Map<String, dynamic> row) => _write('upsert_service', row);
   Future<void> upsertStaffToCloud(Map<String, dynamic> row) => _write('upsert_staff', row);
+
+  /// Pedido de la tienda confirmado (pasó a venta) o rechazado (0.13.4)
+  Future<void> updateStoreOrderInCloud(String id, String status) => _write('update_store_order', {'id': id, 'status': status});
 
   /// Promociones (0.13.4)
   Future<void> upsertPromotionToCloud(Map<String, dynamic> row) => _write('upsert_promotion', row);

@@ -17,6 +17,8 @@ import '../../../auth/data/auth_repository.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/design/app_dialog.dart';
+import 'deliveries.dart';
+import '../../../store/data/store_orders_repository.dart';
 
 class QuotationsListModal extends StatefulWidget {
   final String businessId;
@@ -53,6 +55,8 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
   Future<void> _loadQuotations() async {
     setState(() => _isLoading = true);
     try {
+      // Los pedidos nuevos de la tienda en línea llegan como cotizaciones «Tienda»
+      await StoreOrdersRepository.instance.pull(widget.businessId);
       final list = await _salesRepo.getQuotations(businessId: widget.businessId);
       if (mounted) {
         setState(() {
@@ -109,6 +113,10 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
       AppToast.show(context, message: 'Esta cotización ya fue facturada.', type: ToastType.warning);
       return;
     }
+    if (q.isExpired) {
+      AppToast.show(context, message: 'Este pedido venció. Pídele al cliente que lo haga de nuevo.', type: ToastType.warning);
+      return;
+    }
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -129,6 +137,9 @@ actions: [
     );
 
     if (confirm != true || !mounted) return;
+    // Es un pedido: ¿se lo llevó ya, lo recoge después o va por envío?
+    final delivery = await DeliveryChoice.ask(context);
+    if (delivery == null || !mounted) return;
 
     try {
       // Reconstruir CartItems con productos frescos de la base de datos
@@ -174,6 +185,8 @@ actions: [
         customerName: q.customerName,
         discountAmount: q.discountAmount,
         notes: 'Facturada desde Cotización ${q.quotationNumber}',
+        deliveryStatus: delivery.status,
+        deliveryNote: delivery.note,
       );
 
       await _salesRepo.markQuotationAsBilled(q.id);
@@ -325,23 +338,16 @@ actions: [
                                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody, color: textMain),
                                         ),
                                         const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: isBilled
-                                                ? context.colors.accent.withValues(alpha: 0.15)
-                                                : context.colors.warning.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            q.status,
-                                            style: TextStyle(
-                                              fontSize: AppText.sizeCaption,
-                                              fontWeight: FontWeight.bold,
-                                              color: isBilled ? context.colors.accent : context.colors.warning,
-                                            ),
-                                          ),
+                                        StatusPill(
+                                          isBilled ? 'Facturada' : (q.isExpired ? 'Vencida' : 'Pendiente'),
+                                          tone: isBilled ? AppTone.success : (q.isExpired ? AppTone.neutral : AppTone.warning),
+                                          compact: true,
                                         ),
+                                        // De dónde vino (0.13.4)
+                                        if (q.source != Quotation.sourceLocal) ...[
+                                          const SizedBox(width: 6),
+                                          StatusPill(q.fromStore ? 'Tienda' : 'WhatsApp', tone: AppTone.info, compact: true),
+                                        ],
                                       ],
                                     ),
                                     Text(

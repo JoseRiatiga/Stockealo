@@ -83,7 +83,8 @@ void main() {
         containsAll(['is_deleted', 'deleted_at', 'description', 'country', 'icon', 'color', 'logo_url', 'cash_register_enabled']),
       );
       expect(await columnsOf('app_settings'), isNotEmpty);
-      expect(await db.getVersion(), 15);
+      expect(await db.getVersion(), 16);
+      expect(await columnsOf('quotations'), containsAll(['source', 'opened_at']));
       expect(await columnsOf('promotions'), containsAll(['name', 'kind', 'percent_off', 'buy_qty', 'pay_qty', 'scope', 'starts_at', 'ends_at']));
       expect(await columnsOf('sales'), containsAll(['promotion_id', 'promotion_name', 'promotion_discount']));
       expect(await columnsOf('services'), containsAll(['price', 'commission_pct', 'duration_min', 'prices', 'staff_ids']));

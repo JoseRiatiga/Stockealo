@@ -35,6 +35,10 @@ import '../widgets/global_search_dialog.dart';
 import '../widgets/notifications_modal.dart';
 import '../../../dashboard/presentation/widgets/stocky_floating_button.dart';
 import '../../../../core/widgets/sync_banner.dart';
+import '../../../../core/design/status_pill.dart';
+import '../../../../core/design/app_dialog.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../store/data/store_orders_repository.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -67,6 +71,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   /// Web: revisa cada cierto tiempo si se publicó una versión nueva
   Timer? _webUpdateTimer;
+
+  /// Revisa los pedidos de la tienda cada 2 minutos (por si el tiempo real se corta)
+  /// y así salen también los recordatorios de 2 horas
+  Timer? _ordersTimer;
   bool _webUpdateShown = false;
 
   @override
@@ -82,6 +90,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     _lifecycle = AppLifecycleListener(onResume: () {
       AutoBackupService.instance.runIfDue();
       _refreshPhoneAlerts();
+      _pullOrders();
       if (kIsWeb) _checkWebUpdate();
     });
     if (kIsWeb) {
@@ -93,6 +102,89 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) WhereThingsMovedSheet.showOnce(context);
     });
+    _ordersTimer = Timer.periodic(const Duration(minutes: 2), (_) => _pullOrders());
+    StoreOrdersRepository.instance.unseen.addListener(_onUnseenChanged);
+    // En el celular, la primera vez: «Activa los avisos» (0.13.5)
+    Future.delayed(const Duration(seconds: 3), _askForAlerts);
+  }
+
+  void _onUnseenChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Baja los pedidos nuevos de la tienda; avisa de los nuevos y de los que esperan
+  Future<void> _pullOrders() async {
+    final biz = _activeBusiness;
+    if (biz != null) await StoreOrdersRepository.instance.pull(biz.id);
+  }
+
+  /// Conecta los avisos de pedidos con la campana y el celular (una vez por negocio)
+  void _wireOrderAlerts(String businessId) {
+    OrderAlerts.onNewOrder = (o) {
+      final total = CurrencyFormatter.format(o.total);
+      NotificationService.instance.addNotification(
+        title: 'Nuevo pedido ${o.code}',
+        message: '${o.name ?? 'Un cliente'} · $total. Ábrelo en Ventas › Cotizaciones.',
+        type: NotificationType.order,
+        data: {'business_id': businessId, 'quotation_id': o.id},
+      );
+      PhoneAlertsService.instance.showStoreOrder(id: o.id, code: o.code, name: o.name, total: total);
+    };
+    OrderAlerts.onReminder = (o) {
+      NotificationService.instance.addNotification(
+        title: '${o.name ?? 'Un cliente'} sigue esperando',
+        message: 'El pedido ${o.code} lleva más de 2 horas sin abrir.',
+        type: NotificationType.order,
+        data: {'business_id': businessId, 'quotation_id': o.id},
+      );
+      PhoneAlertsService.instance.showOrderReminder(id: o.id, code: o.code, name: o.name);
+    };
+    NotificationService.instance.onStoreOrder = () => StoreOrdersRepository.instance.pull(businessId);
+  }
+
+  /// La primera vez en el celular: explica los avisos y pide el permiso del sistema.
+  /// Si la persona dice que no, no se vuelve a preguntar (queda en Ajustes › Avisos).
+  Future<void> _askForAlerts() async {
+    final alerts = PhoneAlertsService.instance;
+    if (!mounted || !alerts.isSupported || await alerts.promptShown()) return;
+    await alerts.setPromptShown();
+    if (await alerts.hasPermission() || !mounted) return;
+    final yes = await AppDialog.show<bool>(
+      context: context,
+      icon: Icons.notifications_active_outlined,
+      title: 'Activa los avisos',
+      subtitle: 'Para no perderte nada de tu negocio:',
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final t in const [
+            'Cuando llegue un pedido de tu tienda en línea',
+            'Cuando un producto llegue a su mínimo',
+            'El resumen de cómo te fue en el día',
+            'Cuando toque cobrar un fiado o pase un proveedor',
+          ])
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpace.xs),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.check_circle_outline, size: 18, color: context.colors.accent),
+                  const SizedBox(width: AppSpace.sm),
+                  Expanded(child: Text(t, style: AppText.body(context))),
+                ],
+              ),
+            ),
+          const SizedBox(height: AppSpace.xs),
+          Text('Puedes apagar cada uno cuando quieras en Ajustes › Avisos.', style: AppText.small(context)),
+        ],
+      ),
+      actions: [
+        Builder(builder: (ctx) => TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Ahora no'))),
+        Builder(builder: (ctx) => FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Activar avisos'))),
+      ],
+    );
+    if (yes == true) await alerts.ensurePermission();
   }
 
   void _onProChanged() {
@@ -103,6 +195,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   Future<void> _refreshPhoneAlerts() async {
     final alerts = PhoneAlertsService.instance;
     await alerts.init();
+    await alerts.seedDefaults();
     await alerts.refreshDailySummary();
     await alerts.refreshDebtReminders();
     await alerts.refreshVisitReminders();
@@ -113,6 +206,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     AppPlace.request.removeListener(_onPlaceRequest);
     _lifecycle.dispose();
     _webUpdateTimer?.cancel();
+    _ordersTimer?.cancel();
+    StoreOrdersRepository.instance.unseen.removeListener(_onUnseenChanged);
     ProService.instance.status.removeListener(_onProChanged);
     NotificationService.instance.stopRealtimeSalesListening();
     super.dispose();
@@ -137,6 +232,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         );
         // Estado Pro del negocio: decide si se ve el módulo Servicios (Pro Servicios)
         ProService.instance.refresh(biz.id);
+        // Pedidos de la tienda: aviso al llegar y número en Ventas (0.13.5)
+        _wireOrderAlerts(biz.id);
+        StoreOrdersRepository.instance.pull(biz.id);
       }
       if (mounted) {
         setState(() {
@@ -316,6 +414,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
             compact: compact,
             business: _activeBusiness,
             alertCount: NotificationService.instance.unreadCount,
+            menuBadge: StoreOrdersRepository.instance.unseen.value,
             onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
             onSearchTap: _openSearch,
             onNotificationsTap: _openNotifications,
@@ -340,6 +439,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
           },
           onLogout: widget.onLogout,
           inDrawer: inDrawer,
+          // Pedidos de la tienda sin ver (0.13.5)
+          badges: {
+            if (StoreOrdersRepository.instance.unseen.value > 0)
+              AppPlace.ventas: (count: StoreOrdersRepository.instance.unseen.value, tone: AppTone.info),
+          },
         );
 
     return CallbackShortcuts(

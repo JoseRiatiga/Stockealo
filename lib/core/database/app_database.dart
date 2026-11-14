@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 15;
+  static const int _schemaVersion = 16;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -573,11 +573,17 @@ class AppDatabase {
     if (oldVersion < 13 && newVersion >= 13) await salesV13(db);
     if (oldVersion < 14 && newVersion >= 14) await schedulesV14(db);
     if (oldVersion < 15 && newVersion >= 15) await promotionsV15(db);
+    if (oldVersion < 16 && newVersion >= 16) await ordersSeenV16(db);
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
   /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
   /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  /// 0.13.5: cuándo se abrió cada pedido (la marca «Nuevo» se quita al abrirlo)
+  static Future<void> ordersSeenV16(Database db) async {
+    await _addColumnIfMissing(db, 'quotations', 'opened_at', 'TEXT');
+  }
+
   /// 0.13.4: promociones (% de descuento y lleva X, paga Y) y su rastro en cada venta
   static Future<void> promotionsV15(Database db) async {
     await db.execute('''
@@ -908,6 +914,7 @@ class AppDatabase {
     await salesV13(db);
     await schedulesV14(db);
     await promotionsV15(db);
+    await ordersSeenV16(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

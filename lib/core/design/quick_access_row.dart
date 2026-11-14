@@ -9,10 +9,20 @@ class QuickAccessItem {
   final String? caption;
   final VoidCallback onTap;
 
+  /// Número en la esquina (por ejemplo, pedidos sin ver); 0 no se muestra
+  final int badge;
+
   /// Función de Pro: muestra la corona
   final bool pro;
 
-  const QuickAccessItem({required this.icon, required this.label, this.caption, required this.onTap, this.pro = false});
+  const QuickAccessItem({
+    required this.icon,
+    required this.label,
+    this.caption,
+    required this.onTap,
+    this.pro = false,
+    this.badge = 0,
+  });
 }
 
 /// Accesos de una pestaña (0.12.0): todos se ven sin deslizar. Cuadrícula que se
@@ -57,7 +67,11 @@ class QuickAccessRow extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              Icon(item.icon, size: 22, color: c.accent),
+                              Badge(
+                                isLabelVisible: item.badge > 0,
+                                label: Text(item.badge > 99 ? '99+' : '${item.badge}'),
+                                child: Icon(item.icon, size: 22, color: c.accent),
+                              ),
                               const Spacer(),
                               if (item.pro) const ProCrown(size: 16),
                             ],

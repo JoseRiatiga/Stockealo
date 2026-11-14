@@ -9,6 +9,9 @@ import 'supabase_service.dart';
 
 enum NotificationType {
   sale,
+
+  /// Pedido de la tienda en línea (0.13.5): data trae 'quotation_id'
+  order,
   stockAlert,
   team,
   system,
@@ -41,6 +44,9 @@ class NotificationService extends ChangeNotifier {
   final List<AppNotification> _notifications = [];
   RealtimeChannel? _salesChannel;
   Timer? _remoteRefreshTimer;
+
+  /// Llega un pedido de la tienda (tiempo real): se baja y se avisa. Lo conecta la navegación.
+  Future<void> Function()? onStoreOrder;
 
   /// Aumenta cada vez que llegan ventas de otro dispositivo y ya se descargaron;
   /// las pantallas de ventas lo escuchan para recargarse.
@@ -151,6 +157,18 @@ class NotificationService extends ChangeNotifier {
             );
             _scheduleRemoteRefresh(onRemoteSale);
           },
+        )
+        // Pedido nuevo de la tienda en línea (0.13.5)
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'store_orders',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'business_id',
+            value: businessId,
+          ),
+          callback: (_) => onStoreOrder?.call(),
         )
         ..subscribe();
 

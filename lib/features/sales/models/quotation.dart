@@ -70,6 +70,11 @@ class Quotation {
 
   bool get fromStore => source == sourceStore;
 
+  /// Cuándo se abrió (pedidos de la tienda): sin abrir lleva la marca «Nuevo»
+  final DateTime? openedAt;
+
+  bool get isNew => fromStore && openedAt == null && status == 'PENDIENTE';
+
   /// Ya pasó la fecha y nadie la confirmó (los pedidos de la tienda vencen a los 7 días)
   bool get isExpired => status == 'PENDIENTE' && validUntil != null && DateTime.now().isAfter(validUntil!);
 
@@ -88,6 +93,7 @@ class Quotation {
     this.sellerName,
     this.items = const [],
     this.source = sourceLocal,
+    this.openedAt,
   });
 
   Map<String, dynamic> toMap() => {
@@ -121,5 +127,6 @@ class Quotation {
     sellerName: map['seller_name'] as String?,
     items: items,
     source: map['source'] as String? ?? sourceLocal,
+    openedAt: DateTime.tryParse('${map['opened_at'] ?? ''}'),
   );
 }

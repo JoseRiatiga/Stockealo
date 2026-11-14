@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
+import '../../../sales/presentation/widgets/quotations_list_modal.dart';
 
 class NotificationsModal extends StatelessWidget {
   final Function(int tabIndex)? onNavigateToTab;
@@ -182,12 +183,24 @@ class NotificationsModal extends StatelessWidget {
       case NotificationType.system:
         iconColor = context.colors.accent;
         icon = Icons.auto_awesome_outlined;
+      case NotificationType.order:
+        iconColor = context.colors.info;
+        icon = Icons.storefront_outlined;
     }
 
     return InkWell(
       onTap: () {
         NotificationService.instance.markAsRead(notif.id);
+        final host = Navigator.of(context).context;
         Navigator.pop(context);
+
+        // Un pedido de la tienda abre Cotizaciones, donde está ese pedido (0.13.5)
+        final bizId = notif.data?['business_id'] as String?;
+        if (notif.type == NotificationType.order && bizId != null) {
+          onNavigateToTab?.call(AppPlace.ventas);
+          QuotationsListModal.show(host, businessId: bizId);
+          return;
+        }
 
         // Una venta lleva a Ventas; un aviso de stock, a Stock (lo que falta)
         if (notif.type == NotificationType.sale) {

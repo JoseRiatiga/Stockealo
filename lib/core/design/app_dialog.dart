@@ -223,13 +223,15 @@ class AppSidePanel {
     if (MediaQuery.sizeOf(context).width < wideFrom) {
       return AppSheet.show<T>(context: context, title: title, subtitle: subtitle, builder: builder);
     }
+    final themes = InheritedTheme.capture(from: context, to: Navigator.of(context).context);
     return showGeneralDialog<T>(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Cerrar',
       barrierColor: Colors.black.withValues(alpha: 0.28),
       transitionDuration: AppMotion.of(context, AppMotion.normal),
-      pageBuilder: (ctx, _, __) {
+      // Con el tema de quien lo abre (la tienda Moda es oscura)
+      pageBuilder: (_, __, ___) => themes.wrap(Builder(builder: (ctx) {
         final c = ctx.colors;
         return Align(
           alignment: Alignment.centerRight,
@@ -281,7 +283,7 @@ class AppSidePanel {
             ),
           ),
         );
-      },
+      })),
       transitionBuilder: (ctx, anim, _, child) => SlideTransition(
         position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: anim, curve: AppMotion.curve)),
         child: child,

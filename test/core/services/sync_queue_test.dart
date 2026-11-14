@@ -66,7 +66,7 @@ void main() {
     expect(left, 0);
   });
 
-  test('descarta una operación tras el máximo de intentos para no bloquear la cola', () async {
+  test('tras el máximo de intentos no bloquea la cola, pero NO se borra: espera «Reintentar»', () async {
     await queue.enqueue('upsert_sale', {'id': 'mala'});
     await queue.enqueue('upsert_sale', {'id': 'buena'});
     await db.update('pending_sync', {'attempts': SyncQueue.maxAttempts - 1}, where: 'id = 1');
@@ -79,6 +79,29 @@ void main() {
 
     expect(sent, ['buena']);
     expect(left, 0);
+    expect(await queue.failedCount(), 1);
+    expect(queue.status.value.failed, 1);
+    expect(await queue.pendingIds('upsert_sale'), {'mala'});
+
+    await queue.retryFailed();
+    expect(await queue.pendingCount(), 1);
+    final retried = <String>[];
+    await queue.flush((op, payload) async => retried.add(payload['id'] as String));
+    expect(retried, ['mala']);
+    expect(queue.status.value, const SyncStatus());
+  });
+
+  test('sin conexión no gasta intentos y avisa que está sin conexión', () async {
+    await queue.enqueue('upsert_sale', {'id': 'v1'});
+    for (var i = 0; i < SyncQueue.maxAttempts + 5; i++) {
+      await queue.flush((op, payload) async => throw Exception('SocketException: Failed host lookup'));
+    }
+    expect(await queue.failedCount(), 0);
+    expect(queue.status.value.offline, isTrue);
+    expect(queue.status.value.pending, 1);
+    await queue.flush((op, payload) async {});
+    expect(queue.status.value.offline, isFalse);
+    expect(queue.status.value.pending, 0);
   });
 
   test('dos envíos simultáneos no mandan la misma operación dos veces', () async {

@@ -93,6 +93,9 @@ class _StorePageState extends State<StorePage> {
   final Map<String, CartLine> _cart = {};
   final _filters = StoreFilters();
 
+  /// El contexto de la plantilla (con su tema): lo que se abre encima toma sus colores
+  BuildContext? _themed;
+
   @override
   void initState() {
     super.initState();
@@ -152,15 +155,12 @@ class _StorePageState extends State<StorePage> {
     _setLine(CartLine(p, current, variant), current + 1);
   }
 
-  Future<StoreVariant?> _pickVariant(StoreProduct p) => AppSheet.show<StoreVariant>(
-        context: context,
+  /// Elegir talla y color: a la derecha en el computador, desde abajo en el celular
+  Future<StoreVariant?> _pickVariant(StoreProduct p) => AppSidePanel.show<StoreVariant>(
+        context: _themed ?? context,
         title: p.name,
-        subtitle: 'Elige la talla o el color',
-        builder: (ctx) => Wrap(
-          spacing: AppSpace.sm,
-          runSpacing: AppSpace.sm,
-          children: [for (final v in p.variants) _VariantOption(variant: v, onTap: () => Navigator.pop(ctx, v))],
-        ),
+        subtitle: p.sizes.isNotEmpty && p.colorHexes.isNotEmpty ? 'Elige la talla y el color' : 'Elige una opción',
+        builder: (_) => _VariantPicker(product: p, currency: _store?.currency ?? 'COP'),
       );
 
   @override
@@ -185,6 +185,7 @@ class _StorePageState extends State<StorePage> {
       data: theme,
       child: Builder(
         builder: (context) {
+          _themed = context;
           final view = fashion ? _fashion(context, store) : _classic(context, store);
           return notice ? Column(children: [_MaintenanceNotice(maintenance: _maintenance), Expanded(child: view)]) : view;
         },
@@ -340,7 +341,7 @@ class _StorePageState extends State<StorePage> {
     );
 
     // Portada baja (0.13.3): título y fotos pequeñas; los productos quedan a la vista sin bajar
-    final photos = wide ? store.products.where((p) => p.imageUrl != null).take(3).toList() : const <StoreProduct>[];
+    final photos = wide && store.heroPhotos ? store.products.where((p) => p.imageUrl != null).take(3).toList() : const <StoreProduct>[];
     final hero = Padding(
       padding: EdgeInsets.symmetric(horizontal: side),
       child: Container(
@@ -1303,52 +1304,200 @@ class _MaintenancePage extends StatelessWidget {
   }
 }
 
-/// Una talla o un color al agregar al pedido, como las tiendas grandes: la agotada se ve
-/// tachada y no se puede elegir; si quedan pocas lo dice sin dar el número.
-class _VariantOption extends StatelessWidget {
-  final StoreVariant variant;
-  final VoidCallback onTap;
+/// Elegir talla y color como en las tiendas grandes: primero la talla y debajo los colores
+/// que hay en esa talla. Lo agotado se ve tachado y no se puede elegir; si quedan pocas,
+/// lo dice sin dar el número.
+class _VariantPicker extends StatefulWidget {
+  final StoreProduct product;
+  final String currency;
 
-  const _VariantOption({required this.variant, required this.onTap});
+  const _VariantPicker({required this.product, required this.currency});
+
+  @override
+  State<_VariantPicker> createState() => _VariantPickerState();
+}
+
+class _VariantPickerState extends State<_VariantPicker> {
+  String? _size;
+  StoreVariant? _chosen;
+
+  List<StoreVariant> get _all => widget.product.variants;
+  bool get _hasSizes => _all.any((v) => v.size != null);
+
+  /// Tallas en el orden en que se crearon
+  List<String> get _sizes => [for (final s in _all.map((v) => v.size).whereType<String>().toSet()) s];
+
+  /// Las opciones de la talla elegida (o todas si no hay tallas)
+  List<StoreVariant> get _options => _hasSizes ? _all.where((v) => v.size == _size).toList() : _all;
+
+  bool _sizeSoldOut(String size) => _all.where((v) => v.size == size).every((v) => v.soldOut);
+  bool _sizeFew(String size) => _all.any((v) => v.size == size && !v.soldOut && v.few);
+
+  @override
+  void initState() {
+    super.initState();
+    // Si solo hay una talla disponible, queda elegida
+    final open = _sizes.where((s) => !_sizeSoldOut(s)).toList();
+    if (_hasSizes && open.length == 1) _pickSize(open.single, rebuild: false);
+    if (!_hasSizes) {
+      final avail = _all.where((v) => !v.soldOut).toList();
+      if (avail.length == 1) _chosen = avail.single;
+    }
+  }
+
+  void _pickSize(String size, {bool rebuild = true}) {
+    void apply() {
+      _size = size;
+      final avail = _all.where((v) => v.size == size && !v.soldOut).toList();
+      // Sin colores (o uno solo): la talla ya es la opción
+      _chosen = avail.length == 1 ? avail.single : null;
+    }
+
+    rebuild ? setState(apply) : apply();
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final v = variant;
-    final out = v.soldOut;
+    final chosen = _chosen;
+    final colors = _options.where((v) => v.color != null || v.hex != null).toList();
+    final showColors = (!_hasSizes || _size != null) && colors.isNotEmpty;
+    final price = widget.product.price + (chosen?.extra ?? 0);
+
+    Widget label(String text) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSpace.sm, top: AppSpace.md),
+          child: Text(text, style: AppText.small(context, weight: FontWeight.w700, color: c.ink)),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_hasSizes) ...[
+          label('Talla'),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final size in _sizes)
+                _OptionChip(
+                  label: size,
+                  soldOut: _sizeSoldOut(size),
+                  few: _sizeFew(size),
+                  selected: _size == size,
+                  onTap: () => _pickSize(size),
+                ),
+            ],
+          ),
+        ],
+        if (showColors) ...[
+          label(_hasSizes ? 'Color en talla $_size' : 'Color'),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final v in colors)
+                _OptionChip(
+                  label: v.color ?? 'Color',
+                  hex: v.hex,
+                  soldOut: v.soldOut,
+                  few: v.few,
+                  selected: _chosen?.id == v.id,
+                  onTap: () => setState(() => _chosen = v),
+                ),
+            ],
+          ),
+        ] else if (!_hasSizes) ...[
+          // Sin tallas ni colores con nombre: cada opción tal cual
+          label('Opción'),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final v in _all)
+                _OptionChip(
+                  label: v.label.isEmpty ? 'Única' : v.label,
+                  soldOut: v.soldOut,
+                  few: v.few,
+                  selected: _chosen?.id == v.id,
+                  onTap: () => setState(() => _chosen = v),
+                ),
+            ],
+          ),
+        ],
+        const SizedBox(height: AppSpace.lg),
+        if ((chosen != null && chosen.few) || (chosen == null && _size != null && _sizeFew(_size!)))
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpace.sm),
+            child: Text(chosen != null ? 'Quedan pocas, pide pronto' : 'Quedan pocas en talla $_size, pide pronto',
+                style: AppText.small(context, weight: FontWeight.w700, color: c.warning)),
+          ),
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          onPressed: chosen == null ? null : () => Navigator.pop(context, chosen),
+          child: Text(chosen == null
+              ? (_hasSizes && _size == null ? 'Elige una talla' : 'Elige un color')
+              : 'Agregar al pedido · ${CurrencyFormatter.formatIn(price, widget.currency)}'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Una talla o un color: la elegida con el color del negocio, la agotada tachada
+class _OptionChip extends StatelessWidget {
+  final String label;
+  final String? hex;
+  final bool soldOut;
+  final bool few;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _OptionChip({
+    required this.label,
+    this.hex,
+    this.soldOut = false,
+    this.few = false,
+    this.selected = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final fg = soldOut ? c.inkFaint : (selected ? c.onAccent : c.ink);
     return Opacity(
-      opacity: out ? 0.5 : 1,
+      opacity: soldOut ? 0.55 : 1,
       child: Material(
-        color: out ? c.surfaceMuted : c.accent.withValues(alpha: 0.06),
+        color: selected ? c.accent : (soldOut ? c.surfaceMuted : c.surface),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.control),
-          side: BorderSide(color: out ? c.line : c.accent, width: out ? 1 : 1.4),
+          side: BorderSide(color: selected ? c.accent : c.line, width: selected ? 1.4 : 1),
         ),
         child: InkWell(
-          onTap: out ? null : onTap,
+          onTap: soldOut ? null : onTap,
           borderRadius: BorderRadius.circular(AppRadius.control),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.sm),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+          // Todas del mismo alto: lo agotado solo se tacha; «quedan pocas» va debajo al elegir
+          child: Tooltip(
+            message: soldOut ? 'Agotada' : (few ? 'Quedan pocas' : ''),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 44),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (ColorSwatchDot.hasSwatch(v.hex)) ...[ColorSwatchDot(hex: v.hex, size: 16), const SizedBox(width: AppSpace.xs)],
+                    if (ColorSwatchDot.hasSwatch(hex)) ...[ColorSwatchDot(hex: hex, size: 16), const SizedBox(width: AppSpace.xs)],
                     Text(
-                      v.label.isEmpty ? 'Única' : v.label,
-                      style: AppText.body(context, weight: FontWeight.w700, color: out ? c.inkFaint : c.ink).copyWith(
-                        decoration: out ? TextDecoration.lineThrough : null,
+                      label,
+                      style: AppText.body(context, weight: FontWeight.w700, color: fg).copyWith(
+                        decoration: soldOut ? TextDecoration.lineThrough : null,
                       ),
                     ),
                   ],
                 ),
-                if (out)
-                  Text('Agotada', style: AppText.caption(context))
-                else if (v.few)
-                  Text('Quedan pocas, pide pronto', style: AppText.caption(context, weight: FontWeight.w700, color: c.warning)),
-              ],
+              ),
             ),
           ),
         ),

@@ -101,6 +101,25 @@ class _CodeReaderState extends State<CodeReader> {
   String? _owner;
   bool _checkingOwner = false;
 
+  /// Lectura de la cámara que se está confirmando y cuántas veces seguidas salió igual
+  String? _candidate;
+  int _seen = 0;
+
+  /// Ya se leyó un código: la cámara se detiene hasta que se pida leer otro
+  bool _cameraDone = false;
+
+  /// Formatos que lee la cámara: los de productos y el QR. Sin los demás (ITF, Codabar…)
+  /// para que no confunda un código con otro.
+  static const _cameraFormats = [
+    BarcodeFormat.ean13,
+    BarcodeFormat.ean8,
+    BarcodeFormat.upcA,
+    BarcodeFormat.upcE,
+    BarcodeFormat.code128,
+    BarcodeFormat.code39,
+    BarcodeFormat.qrCode,
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -123,7 +142,36 @@ class _CodeReaderState extends State<CodeReader> {
   }
 
   void _startCamera() {
-    _camera ??= MobileScannerController(detectionSpeed: DetectionSpeed.noDuplicates);
+    _camera ??= MobileScannerController(detectionSpeed: DetectionSpeed.normal, formats: _cameraFormats);
+  }
+
+  /// Lo que ve la cámara. Solo se acepta una lectura confiable: la misma dos veces
+  /// seguidas y, en EAN y UPC-A, con el último número correcto. Así una lectura mala
+  /// de un cuadro borroso no llega al campo. Al aceptar se detiene la cámara.
+  void _onCamera(BarcodeCapture capture) {
+    if (_cameraDone) return;
+    final b = capture.barcodes.where((b) => (b.rawValue ?? '').trim().isNotEmpty).firstOrNull;
+    if (b == null) return;
+    final raw = b.rawValue!.trim();
+    const checked = {BarcodeFormat.ean13, BarcodeFormat.ean8, BarcodeFormat.upcA};
+    if (checked.contains(b.format) && !BarcodeCheck.of(raw).valid) return;
+    _seen = raw == _candidate ? _seen + 1 : 1;
+    _candidate = raw;
+    if (_seen < 2) return;
+    _cameraDone = true;
+    _camera?.stop();
+    _found(raw, via: CodeSource.camera);
+  }
+
+  /// Volver a leer con la cámara
+  void _rescan() {
+    setState(() {
+      _cameraDone = false;
+      _candidate = null;
+      _seen = 0;
+      _setHelp();
+    });
+    _camera?.start();
   }
 
   void _setHelp() {
@@ -139,6 +187,9 @@ class _CodeReaderState extends State<CodeReader> {
     if (s == _source) return;
     setState(() {
       _source = s;
+      _cameraDone = false;
+      _candidate = null;
+      _seen = 0;
       if (s == CodeSource.camera) {
         _startCamera();
       } else {
@@ -356,11 +407,13 @@ class _CodeReaderState extends State<CodeReader> {
                 if (_source == CodeSource.camera && _camera != null)
                   MobileScanner(
                     controller: _camera!,
-                    onDetect: (capture) {
-                      final found = capture.barcodes.where((b) => (b.rawValue ?? '').isNotEmpty).firstOrNull;
-                      if (found != null) _found(found.rawValue!, via: CodeSource.camera);
-                    },
+                    onDetect: _onCamera,
                     errorBuilder: (context, error, _) => _viewerMessage(Icons.no_photography_outlined, 'No se pudo abrir la cámara. Usa Foto o A mano.'),
+                  ),
+                if (_source == CodeSource.camera && _cameraDone)
+                  ColoredBox(
+                    color: AppPalette.paperDark,
+                    child: _viewerMessage(Icons.check_circle_outline, 'Código leído. Toca aquí para leer otro', onTap: _rescan),
                   ),
                 if (_source == CodeSource.photo)
                   _photo == null

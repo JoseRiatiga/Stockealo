@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -1083,11 +1084,29 @@ class SupabaseService {
       // Sin sesión, RLS rechazaría todo: se espera al próximo inicio de sesión
       if (client?.auth.currentSession == null) return await SyncQueue.instance.pendingCount();
       await ensureFreshSession();
-      return await SyncQueue.instance.flush(_send);
+      final left = await SyncQueue.instance.flush(_send);
+      _scheduleRetry(left > 0);
+      return left;
     } catch (e) {
       debugPrint('Error enviando cambios pendientes: $e');
+      if (SyncQueue.isNetworkError(e)) await SyncQueue.instance.refreshStatus(offline: true);
+      _scheduleRetry(true);
       return -1;
     }
+  }
+
+  /// Mientras quede algo sin subir, se reintenta solo cada 30 s: así lo hecho sin
+  /// conexión sube cuando vuelve, sin tocar nada (0.13.4)
+  Timer? _retryTimer;
+  static const retryEvery = Duration(seconds: 30);
+
+  void _scheduleRetry(bool pending) {
+    if (!pending) {
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      return;
+    }
+    _retryTimer ??= Timer.periodic(retryEvery, (_) => flushPendingSync());
   }
 
   static const String _editedAtKey = '_edited_at';
@@ -1116,6 +1135,8 @@ class SupabaseService {
         await _sendProduct(db, p);
       case 'delete_product':
         await db.from('products').delete().eq('id', p['id'] as String);
+        final bizId = p['business_id'] as String?;
+        if (bizId != null) await removeStorageFiles('product-images', bizId, prefix: p['id'] as String);
       case 'update_stock':
         // Ajuste manual o importación: el usuario fija el valor exacto
         await db.from('products').update({'current_stock': p['stock']}).eq('id', p['id'] as String);
@@ -1447,7 +1468,45 @@ class SupabaseService {
   }
 
   /// Elimina un producto de Supabase
-  Future<void> deleteProductFromCloud(String productId) => _write('delete_product', {'id': productId});
+  /// Borra el producto de la nube y también su foto (decisión del dueño, 14 nov 2026:
+  /// no se guarda la foto de un producto eliminado)
+  Future<void> deleteProductFromCloud(String productId, {String? businessId}) =>
+      _write('delete_product', {'id': productId, if (businessId != null) 'business_id': businessId});
+
+  /// Carpetas de la nube con archivos de un negocio (todas van como `<negocio>/<archivo>`)
+  static const storageBuckets = ['product-images', 'purchase-invoices'];
+
+  /// Borra archivos de la carpeta [folder] de [bucket]: los que se llaman `<prefix>.<algo>`
+  /// (una foto en cualquier formato) o, sin [prefix], todos. [keep] se deja.
+  /// Recorre por páginas, sin límite de cantidad. Nunca lanza error: un archivo que no se
+  /// pudo borrar no debe trabar lo demás. Devuelve cuántos borró.
+  Future<int> removeStorageFiles(String bucket, String folder, {String? prefix, String? keep}) async {
+    try {
+      if (!_isInitialized) await initialize();
+      final store = client?.storage.from(bucket);
+      if (store == null) return 0;
+      final paths = <String>[];
+      for (var offset = 0;; offset += 1000) {
+        final page = await store.list(
+          path: folder,
+          searchOptions: SearchOptions(limit: 1000, offset: offset, search: prefix),
+        );
+        for (final f in page) {
+          if (f.name == keep) continue;
+          if (prefix != null && !f.name.startsWith('$prefix.')) continue;
+          paths.add('$folder/${f.name}');
+        }
+        if (page.length < 1000) break;
+      }
+      for (var i = 0; i < paths.length; i += 1000) {
+        await store.remove(paths.sublist(i, i + 1000 > paths.length ? paths.length : i + 1000));
+      }
+      return paths.length;
+    } catch (e) {
+      debugPrint('No se pudieron borrar archivos de $bucket/$folder: $e');
+      return 0;
+    }
+  }
 
   /// Crea o actualiza un producto en Supabase (incluida su foto)
   Future<void> upsertProductToCloud(Map<String, dynamic> p) => _write('upsert_product', p);
@@ -1784,6 +1843,7 @@ class SupabaseService {
         ),
       );
 
+      await removeStorageFiles('product-images', businessId, prefix: productId, keep: '$productId.$extension');
       final publicUrl = client!.storage.from('product-images').getPublicUrl(storagePath);
       final urlWithTimestamp = '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
       return urlWithTimestamp;
@@ -1800,15 +1860,10 @@ class SupabaseService {
       if (!_isInitialized) await initialize();
       if (client == null) return;
 
-      // 1. Fotos primero: al borrar el negocio se pierde el permiso sobre su carpeta
-      try {
-        final files = await client!.storage.from('product-images').list(path: businessId);
-        if (files.isNotEmpty) {
-          final filePaths = files.map((f) => '$businessId/${f.name}').toList();
-          await client!.storage.from('product-images').remove(filePaths);
-        }
-      } catch (storageErr) {
-        debugPrint('Nota al eliminar fotos de Storage en Supabase: $storageErr');
+      // 1. Archivos primero (fotos, logo y facturas de compra), todos: al borrar el negocio
+      //    se pierde el permiso sobre sus carpetas. Según los términos no se queda nada.
+      for (final bucket in storageBuckets) {
+        await removeStorageFiles(bucket, businessId);
       }
 
       // 2. Borrar el negocio: ventas, clientes, productos, categorías y miembros caen

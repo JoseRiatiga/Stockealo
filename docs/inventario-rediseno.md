@@ -500,6 +500,7 @@ El dueño pidió publicar lo hecho para una presentación y anotar lo que falta.
    - Repetir los scripts del bloque 7 (`estilo.py`, `colores.py`, `ventanas_titulo.py`, `quitar_const.py`).
 2. **Bloque 7, segunda pasada:**
    - las pantallas ya usan colores, letra, avisos y ventanas del sistema, pero no se rehízo la distribución de cada una (Productos, Stock, Clientes, Reportes, Ajustes, Servicios);
+   - el dueño señaló (14 nov) que **Clientes y proveedores** se ve con diseño viejo: la tarjeta amarilla de «Fiados por cobrar», el buscador y los filtros «Todos / Con deuda / Al día». Empezar la segunda pasada por esa pantalla;
    - revisar en Chrome si algún título que creció (18 → 20) se corta.
 3. **Bloque 9 · Cierre:**
    - ~~textos: «empresa» → «negocio»;~~ **hecho el 14 nov (feat/0.13.2):** papelera, eliminar negocio, perfil, equipo y roles. Quedan solo comentarios del código y la palabra clave «empresa» del tipo Oficina (sirve para buscar);

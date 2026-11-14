@@ -84,12 +84,41 @@ Necesita una migración en la nube, que no se aplica sin permiso.
 7. **Nube:** una tabla nueva de promociones, con su sincronización, y la tienda pública la recibe. Es una migración que no se aplica sin permiso.
 8. **El «Precio de antes» actual se queda** para ofertas sueltas.
 
-## Orden recomendado
+### Fase F · Archivos que ya no se usan (decisiones del dueño, 14 nov)
 
-1. **A, en la 0.13.3:** la tienda (lista para publicar).
-2. **B, en la 0.13.4:** sin conexión. Perder ventas es lo más grave.
-3. **E, en la 0.13.5:** promociones. Va antes de los pedidos para que el pedido de la tienda ya guarde el precio con la promoción.
-4. **C y D juntas, en la 0.13.6:** pedido de la tienda como cotización con código, y «Por entregar».
+**Avance (14 nov, rama feat/0.13.4, sin commit):** puntos 1 a 3 hechos en la app con `SupabaseService.removeStorageFiles`, una sola función que borra por páginas y sin límite. `supabase/functions/delete-account` ya borra también `purchase-invoices`, pero **falta desplegarla**. El punto 4 necesita una función nueva con permisos completos.
+
+**Hoy:**
+- La foto de un producto eliminado se queda en la nube (`product-images`).
+- La foto vieja se queda si cambia el tipo de archivo (.jpg → .png).
+- Las facturas de compra (`purchase-invoices`) nunca se borran, ni con el negocio ni con la cuenta.
+- Al eliminar un negocio desde la app, solo se borran los primeros 100 archivos.
+
+**Decisiones:**
+1. **Producto eliminado:** se borra su foto de la nube. Da igual si el producto es nuevo o ya existía: no tiene sentido guardarla.
+   - **Negocio en la papelera:** no se borra nada mientras está ahí. Se borra todo cuando se cumple el plazo, como ya pasa.
+2. **Cambiar la foto** de un producto o el logo: se borra la anterior y se sube la nueva, aunque cambie el tipo de archivo.
+3. **Eliminar un negocio o la cuenta de forma definitiva:** NO se queda nada, como dicen los términos y condiciones.
+   - Se borran fotos de productos, logos y facturas de compra, sin límite de cantidad.
+   - Se hace en la app y en la función `delete-account`.
+4. **Pendiente de decidir:** una limpieza única de lo que ya quedó huérfano, con un botón en el panel admin que muestre cuánto espacio libera antes de borrar.
+
+## Orden recomendado (aprobado el 14 nov)
+
+1. **0.13.3, A:** la tienda. PUBLICADA.
+2. **0.13.4, B + F:**
+   - sin conexión y archivos que ya no se usan;
+   - el arreglo del lector de códigos;
+   - el carrito y la talla/color con el tema de la tienda;
+   - las fotos de portada opcionales.
+3. **0.13.5:** segunda pasada del re-diseño (`docs/inventario-rediseno.md` §8), en este orden:
+   1. **Clientes y proveedores**, que es lo que el dueño señaló;
+   2. Productos y Stock;
+   3. Reportes;
+   4. Ajustes;
+   5. Servicios.
+4. **0.13.6, E:** promociones.
+5. **0.13.7, C y D:** pedido de la tienda como cotización con código, y «Por entregar».
 
 ## Decisiones del dueño (14 nov)
 

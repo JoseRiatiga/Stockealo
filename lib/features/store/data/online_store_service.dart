@@ -23,6 +23,9 @@ class OnlineStoreConfig {
   /// Título grande de la portada (plantilla Moda): «Chaquetas y abrigos para el frío»
   final String? heroTitle;
 
+  /// La portada muestra fotos de los productos (plantilla Moda)
+  final bool heroPhotos;
+
   const OnlineStoreConfig({
     required this.slug,
     required this.enabled,
@@ -31,6 +34,7 @@ class OnlineStoreConfig {
     this.showStock = false,
     this.template = StoreTemplate.classic,
     this.heroTitle,
+    this.heroPhotos = true,
   });
 
   factory OnlineStoreConfig.fromJson(Map<String, dynamic> j) => OnlineStoreConfig(
@@ -41,6 +45,7 @@ class OnlineStoreConfig {
         showStock: j['show_stock'] == true,
         template: StoreTemplate.of(j['template'] as String?),
         heroTitle: j['hero_title'] as String?,
+        heroPhotos: j['hero_photos'] != false,
       );
 
   String get url => '$storeBaseUrl/$slug';
@@ -175,6 +180,9 @@ class PublicStore {
   final String template;
   final String? heroTitle;
 
+  /// La portada muestra fotos de los productos
+  final bool heroPhotos;
+
   const PublicStore({
     required this.slug,
     required this.whatsapp,
@@ -186,6 +194,7 @@ class PublicStore {
     this.color,
     this.template = StoreTemplate.classic,
     this.heroTitle,
+    this.heroPhotos = true,
   });
 
   factory PublicStore.fromJson(Map<String, dynamic> j) {
@@ -200,6 +209,7 @@ class PublicStore {
       currency: b['currency'] as String? ?? 'COP',
       template: StoreTemplate.of(j['template'] as String?),
       heroTitle: j['hero_title'] as String?,
+      heroPhotos: j['hero_photos'] != false,
       products: [
         for (final p in (j['products'] as List? ?? const [])) StoreProduct.fromJson(Map<String, dynamic>.from(p as Map)),
       ],
@@ -268,6 +278,7 @@ class OnlineStoreService {
     bool showStock = false,
     String template = StoreTemplate.classic,
     String? heroTitle,
+    bool heroPhotos = true,
   }) async {
     final client = _client;
     if (client == null || client.auth.currentSession == null) {
@@ -281,21 +292,23 @@ class OnlineStoreService {
       'p_welcome': welcome,
       'p_show_stock': showStock,
     };
-    try {
-      final data = await client.rpc('save_my_store', params: {...params, 'p_template': template, 'p_hero_title': heroTitle});
-      return OnlineStoreConfig.fromJson(Map<String, dynamic>.from(data as Map));
-    } on PostgrestException catch (e) {
-      // La nube todavía no tiene las plantillas (función de 8 datos): se guarda lo demás
-      if (e.code == 'PGRST202') {
-        try {
-          final data = await client.rpc('save_my_store', params: params);
-          return OnlineStoreConfig.fromJson(Map<String, dynamic>.from(data as Map));
-        } on PostgrestException catch (e2) {
-          throw OnlineStoreException(errorMessage(e2.message));
-        }
+    // De la versión más nueva a la más vieja: si la nube no tiene una función (PGRST202),
+    // se prueba la anterior y se guarda lo que se pueda
+    final tries = [
+      {...params, 'p_template': template, 'p_hero_title': heroTitle, 'p_hero_photos': heroPhotos},
+      {...params, 'p_template': template, 'p_hero_title': heroTitle},
+      params,
+    ];
+    for (var i = 0; i < tries.length; i++) {
+      try {
+        final data = await client.rpc('save_my_store', params: tries[i]);
+        return OnlineStoreConfig.fromJson(Map<String, dynamic>.from(data as Map));
+      } on PostgrestException catch (e) {
+        if (e.code == 'PGRST202' && i < tries.length - 1) continue;
+        throw OnlineStoreException(errorMessage(e.message));
       }
-      throw OnlineStoreException(errorMessage(e.message));
     }
+    throw const OnlineStoreException('No se pudo guardar la tienda.');
   }
 
   /// Tienda pública; null si no existe o no está disponible

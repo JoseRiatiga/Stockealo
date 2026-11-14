@@ -598,11 +598,23 @@ class ServicesRepository {
     return rows.isEmpty ? null : WorkSchedule.decode(rows.first['services_schedule'] as String?);
   }
 
-  Future<bool> multipleServices(String businessId) async =>
-      await _dbProvider.getSetting(_multiKey(businessId)) == '1';
+  /// «Habilitar múltiples servicios» (0.14.0: en el negocio y en la nube, para todo el
+  /// equipo). Lo que había quedado guardado solo en el aparato se pasa una vez.
+  Future<bool> multipleServices(String businessId) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query('businesses', columns: ['services_multi'], where: 'id = ?', whereArgs: [businessId], limit: 1);
+    if (rows.isNotEmpty && rows.first['services_multi'] == 1) return true;
+    if (await _dbProvider.getSetting(_multiKey(businessId)) == '1') {
+      await setMultipleServices(businessId, true);
+      return true;
+    }
+    return false;
+  }
 
-  Future<void> setMultipleServices(String businessId, bool on) =>
-      _dbProvider.setSetting(_multiKey(businessId), on ? '1' : null);
+  Future<void> setMultipleServices(String businessId, bool on) async {
+    await _dbProvider.setSetting(_multiKey(businessId), null);
+    await BusinessRepository.instance.updateBusiness(id: businessId, servicesMulti: on);
+  }
 
   Future<ServiceBoard> loadBoard(String businessId, {DateTime? now}) async {
     final results = await Future.wait([

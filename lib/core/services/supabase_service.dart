@@ -591,6 +591,7 @@ class SupabaseService {
                   ? null
                   : (b['service_messages'] is String ? b['service_messages'] : jsonEncode(b['service_messages'])),
               'services_schedule': b['services_schedule'],
+              'services_multi': b['services_multi'] == true ? 1 : 0,
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
               'deleted_at': b['deleted_at'],
               'created_at': b['created_at'] ?? DateTime.now().toIso8601String(),
@@ -1325,6 +1326,7 @@ class SupabaseService {
           if (b['service_messages'] != null)
             'service_messages': b['service_messages'] is String ? jsonDecode(b['service_messages'] as String) : b['service_messages'],
           if (b['services_schedule'] != null) 'services_schedule': b['services_schedule'],
+          if (b['services_multi'] != null) 'services_multi': b['services_multi'] == 1 || b['services_multi'] == true,
         },
         'is_deleted': (b['is_deleted'] as int?) ?? 0,
       };

@@ -161449,7 +161449,7 @@ s=1
 break}j=J.p(l,"build_number")
 if(A.f0(j))i=j
 else i=A.em(A.o(j==null?"":j),null)
-if(!(i!=null&&i>40)){q=null
+if(!(i!=null&&i>41)){q=null
 s=1
 break}k=A.P(J.p(l,"version"))
 if(k==null)k=""
@@ -164369,7 +164369,7 @@ Jb(){var s=0,r=A.l(t.H),q,p=this,o
 var $async$Jb=A.h(function(a,b){if(a===1)return A.i(b,r)
 for(;;)switch(s){case 0:if(p.r!=="OWNER"){o=p.c
 o.toString
-A.aV(o,"Solo el due\xf1o fundador puede eliminar o enviar a la papelera esta empresa.",null,B.p8)
+A.aV(o,"Solo el due\xf1o fundador puede eliminar o enviar a la papelera este negocio.",null,B.p8)
 s=1
 break}o=p.c
 o.toString
@@ -165009,7 +165009,7 @@ bc3(a){var s=0,r=A.l(t.H),q,p=this,o,n
 var $async$KA=A.h(function(b,c){if(b===1)return A.i(c,r)
 for(;;)switch(s){case 0:n=p.r.h(0,a.a)
 if((n==null?"CASHIER":n)==="CASHIER"){o=p.c
-if(o!=null)A.aV(o,"Solo el due\xf1o o administradores pueden cambiar los datos de la empresa.",null,B.p8)
+if(o!=null)A.aV(o,"Solo el due\xf1o o administradores pueden cambiar los datos del negocio.",null,B.p8)
 s=1
 break}o=p.c
 o.toString
@@ -165037,7 +165037,7 @@ s=6
 return A.c(n.yg(m),$async$CE)
 case 6:o=p.c
 if(o==null){s=1
-break}A.aV(o,'Empresa "'+a.c+'" movida a la papelera (conservada por 7 d\xedas)',null,B.ev)
+break}A.aV(o,'Negocio "'+a.c+'" movido a la papelera (se conserva 7 d\xedas)',null,B.ev)
 s=7
 return A.c(p.pz(),$async$CE)
 case 7:o=p.w
@@ -165119,10 +165119,10 @@ $S:41}
 A.be2.prototype={
 $2(a,b){var s,r,q,p,o,n=this,m=null,l=n.b,k=n.c.c,j=B.f.A(l.a.a)===B.f.A(k),i=n.a,h=i.c
 h.toString
-h=A.e('La empresa "'+k+'" se mover\xe1 a la papelera. Tendr\xe1s 7 d\xedas para restaurarla antes de su eliminaci\xf3n definitiva.',m,m,m,m,A.y(m,m,A.z(h).r,m,m,m,m,m,m,m,m,13,m,m,m,m,m,!0,m,m,m,m,m,m,m,m),m,m,m)
+h=A.e('El negocio "'+k+'" se mover\xe1 a la papelera. Tendr\xe1s 7 d\xedas para restaurarlo antes de su eliminaci\xf3n definitiva.',m,m,m,m,A.y(m,m,A.z(h).r,m,m,m,m,m,m,m,m,13,m,m,m,m,m,!0,m,m,m,m,m,m,m,m),m,m,m)
 s=i.c
 s.toString
-s=A.e("Para confirmar, escribe exactamente el nombre de la empresa:",m,m,m,m,A.y(m,m,A.z(s).f,m,m,m,m,m,m,m,m,12,m,m,B.z,m,m,!0,m,m,m,m,m,m,m,m),m,m,m)
+s=A.e("Para confirmar, escribe exactamente el nombre del negocio:",m,m,m,m,A.y(m,m,A.z(s).f,m,m,m,m,m,m,m,m,12,m,m,B.z,m,m,!0,m,m,m,m,m,m,m,m),m,m,m)
 r=i.c
 r.toString
 r=A.z(r)
@@ -165218,10 +165218,10 @@ $1(a){var s=this
 return new A.j5(new A.aBY(s.a,s.b,s.c,s.d,a),null)},
 $S:41}
 A.aBY.prototype={
-$2(a,b){var s=this,r=null,q=s.a,p=A.z(q),o=A.cm(A.af(r,r,B.y,r,r,new A.ac(A.z(q).e,r,r,A.a5(2),r,r,B.F),r,4,r,r,r,r,r,40),r,r),n=t.p,m=A.a([A.T(A.a([A.ag(B.fw,A.z(q).as,r,r),B.ao,A.e("Papelera de Empresas",r,r,r,r,A.y(r,r,A.z(q).f,r,r,r,r,r,r,r,r,20,r,r,B.z,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],n),B.t,B.p,B.r,0,r,r)],n),l=s.b,k=J.R(l)
+$2(a,b){var s=this,r=null,q=s.a,p=A.z(q),o=A.cm(A.af(r,r,B.y,r,r,new A.ac(A.z(q).e,r,r,A.a5(2),r,r,B.F),r,4,r,r,r,r,r,40),r,r),n=t.p,m=A.a([A.T(A.a([A.ag(B.fw,A.z(q).as,r,r),B.ao,A.e("Papelera de negocios",r,r,r,r,A.y(r,r,A.z(q).f,r,r,r,r,r,r,r,r,20,r,r,B.z,r,r,!0,r,r,r,r,r,r,r,r),r,r,r)],n),B.t,B.p,B.r,0,r,r)],n),l=s.b,k=J.R(l)
 if(k.gbn(l))m.push(A.l_(A.ag(B.r6,A.z(q).as,r,16),A.e("Vaciar",r,r,r,r,A.y(r,r,A.z(q).as,r,r,r,r,r,r,r,r,12,r,r,B.z,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),new A.aBU(q,s.c,s.d,a,b,l),r))
-o=A.a([o,B.ak,A.T(m,B.t,B.dD,B.r,0,r,r),B.cy,A.e("Las empresas se conservan aqu\xed durante 7 d\xedas antes de eliminarse de forma permanente.",r,r,r,r,A.y(r,r,A.z(q).r,r,r,r,r,r,r,r,r,12,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),B.ak],n)
-if(k.gW(l))o.push(new A.a0(B.kY,A.cm(A.e("No hay empresas en la papelera",r,r,r,r,A.y(r,r,A.z(q).r,r,r,r,r,r,r,r,r,14,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),r,r),r))
+o=A.a([o,B.ak,A.T(m,B.t,B.dD,B.r,0,r,r),B.cy,A.e("Los negocios se conservan aqu\xed durante 7 d\xedas antes de eliminarse de forma permanente.",r,r,r,r,A.y(r,r,A.z(q).r,r,r,r,r,r,r,r,r,12,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),B.ak],n)
+if(k.gW(l))o.push(new A.a0(B.kY,A.cm(A.e("No hay negocios en la papelera",r,r,r,r,A.y(r,r,A.z(q).r,r,r,r,r,r,r,r,r,14,r,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r,r),r,r),r))
 else o.push(new A.eb(1,B.bw,A.na(new A.aBV(l,q,a,b,s.d),k.gu(l),r,B.a8,new A.aBW(),!0),r))
 o.push(B.ak)
 o.push(A.bn(A.jT(B.E2,new A.aBX(s.e),r),r,1/0))
@@ -165272,8 +165272,8 @@ return new A.j5(new A.aBz(s.a,s.b,s.c,s.d,a,s.e,s.f,s.r,s.w),null)},
 $S:41}
 A.aBz.prototype={
 $2(a,b){var s,r,q=this,p=null,o=q.b,n=B.f.A(o.a.a).toUpperCase()==="VACIAR",m=n&&q.c.a.a.length>=6&&!q.a.c,l=A.z(a),k=A.a5(10),j=A.c8(A.z(a).ch,1),i=q.d,h=J.R(i),g=h.gu(i)
-h=h.gu(i)===1?"empresa":"empresas"
-k=A.af(p,A.e("Se destruir\xe1n definitivamente todas las empresas en la papelera ("+g+" "+h+") y todos sus datos en el tel\xe9fono y en la nube. Esta acci\xf3n NO se puede deshacer.",p,p,p,p,A.y(p,p,A.z(a).as,p,p,p,p,p,p,p,p,12,p,p,B.aE,p,p,!0,p,p,p,p,p,p,p,p),p,p,p),B.y,p,p,new A.ac(l.ch,p,j,k,p,p,B.F),p,p,p,p,B.cc,p,p,p)
+h=h.gu(i)===1?"negocio":"negocios"
+k=A.af(p,A.e("Se destruir\xe1n definitivamente todos los negocios de la papelera ("+g+" "+h+") y todos sus datos en el tel\xe9fono y en la nube. Esta acci\xf3n NO se puede deshacer.",p,p,p,p,A.y(p,p,A.z(a).as,p,p,p,p,p,p,p,p,12,p,p,B.aE,p,p,!0,p,p,p,p,p,p,p,p),p,p,p),B.y,p,p,new A.ac(l.ch,p,j,k,p,p,B.F),p,p,p,p,B.cc,p,p,p)
 j=A.e("1. Escribe la palabra VACIAR para confirmar:",p,p,p,p,A.y(p,p,A.z(a).f,p,p,p,p,p,p,p,p,12,p,p,B.z,p,p,!0,p,p,p,p,p,p,p,p),p,p,p)
 l=q.a
 o=A.bH(p,B.a0,!1,p,!0,B.U,p,A.bK(),o,p,p,p,p,p,2,A.dy(p,p,p,p,p,p,p,p,!0,p,p,p,p,p,o.a.a.length!==0&&!n?"Escribe exactamente VACIAR":p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,"VACIAR",p,p,p,p,p,p,p,p,p,!0,!0,!1,p,B.awp,p,p,p,p,p,p,p,p,p,p,p,p),B.P,!0,p,!0,p,!1,p,B.af,p,p,p,p,p,p,p,p,1,p,p,!1,"\u2022",p,new A.aBu(l,b),p,p,p,!1,p,p,!1,p,!0,p,B.ag,p,p,p,p,p,p,p,p,p,p,p,p,!0,B.a2,p,B.mu,p,p,p,p)
@@ -165359,7 +165359,7 @@ $S:41}
 A.aBO.prototype={
 $2(a,b){var s,r,q,p,o=this,n=null,m=o.b,l=o.c,k=l.c,j=B.f.A(m.a.a)===B.f.A(k),i=j&&o.d.a.a.length>=6&&!o.a.c,h=A.z(a),g=A.a5(10),f=A.c8(A.z(a).ch,1)
 g=A.af(n,A.e('Esta acci\xf3n es IRREVERSIBLE. Se destruir\xe1n para siempre los productos, ventas, inventario, clientes y miembros de "'+k+'" en el tel\xe9fono y en la nube.',n,n,n,n,A.y(n,n,A.z(a).as,n,n,n,n,n,n,n,n,12,n,n,B.aE,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),B.y,n,n,new A.ac(h.ch,n,f,g,n,n,B.F),n,n,n,n,B.cc,n,n,n)
-f=A.e("1. Escribe el nombre exacto de la empresa:",n,n,n,n,A.y(n,n,A.z(a).f,n,n,n,n,n,n,n,n,12,n,n,B.z,n,n,!0,n,n,n,n,n,n,n,n),n,n,n)
+f=A.e("1. Escribe el nombre exacto del negocio:",n,n,n,n,A.y(n,n,A.z(a).f,n,n,n,n,n,n,n,n,12,n,n,B.z,n,n,!0,n,n,n,n,n,n,n,n),n,n,n)
 h=A.z(a)
 s=A.a5(8)
 r=A.c8(A.z(a).e,1)
@@ -165425,7 +165425,7 @@ s=5
 return A.c(p.x.$0(),$async$$0)
 case 5:o=p.e
 if(o.e!=null)A.aj(o,!1).ad(null)
-A.a7f(n,B.jn,'Empresa "'+m.c+'" eliminada definitivamente.',null,B.bp)
+A.a7f(n,B.jn,'Negocio "'+m.c+'" eliminado definitivamente.',null,B.bp)
 case 1:return A.j(q,r)}})
 return A.k($async$$0,r)},
 $S:1}
@@ -169871,7 +169871,7 @@ if(B.f.A(d==null?"":d).length===0)l=null
 else{d.toString
 l=B.f.A(d)}k=t.z
 s=6
-return A.c(i.mb("submit_feedback",A.M(["p_kind",e,"p_message",m,"p_area",b,"p_business_id",c,"p_contact_phone",l,"p_app_version","0.13.1+40","p_platform","web"],t.N,k),k),$async$Pt)
+return A.c(i.mb("submit_feedback",A.M(["p_kind",e,"p_message",m,"p_area",b,"p_business_id",c,"p_contact_phone",l,"p_app_version","0.13.2+41","p_platform","web"],t.N,k),k),$async$Pt)
 case 6:q=1
 s=5
 break
@@ -170782,7 +170782,7 @@ A.atY.prototype={
 G(a){return A.iG(new A.bKy())}}
 A.bKy.prototype={
 $2(a,b){var s=null,r=Math.max(20,(b.b-720)/2)
-return A.ef(A.a([new A.a0Z(B.Jz,"T\xe9rminos y condiciones de uso","\xdaltima actualizaci\xf3n: Noviembre 2026",s),B.hf,new A.hB("1","Aceptaci\xf3n de los t\xe9rminos","Al crear una cuenta, acceder o utilizar la aplicaci\xf3n Stockealo, aceptas cumplir plenamente con estos T\xe9rminos y Condiciones. Si no est\xe1s de acuerdo con alguna disposici\xf3n, debes abstenerte de utilizar la plataforma.",s),new A.hB("2","Naturaleza del servicio",'Stockealo es una herramienta de productividad y gesti\xf3n comercial dise\xf1ada para registrar inventarios, catalogar productos por c\xf3digos de barras o SKU, registrar ventas, administrar deudas de clientes ("fiado"), crear cat\xe1logos y consultar a Stocky, el asistente del negocio. La app opera bajo una arquitectura Local-First: tus datos se guardan primero en tu dispositivo.',s),new A.hB("3","Exclusi\xf3n de facturaci\xf3n tributaria oficial","Stockealo es una herramienta tecnol\xf3gica de control interno, inventario y soporte operativo para comerciantes. No constituye ni reemplaza un sistema de facturaci\xf3n electr\xf3nica fiscal avalado por entidades tributarias oficiales (como DIAN, SAT u otros organismos gubernamentales). El usuario es el \xfanico responsable del cumplimiento de sus obligaciones contables, tributarias y fiscales.",s),new A.hB("4","Cuentas, negocios y equipo","Cada usuario es responsable de mantener la confidencialidad de sus credenciales. Stockealo permite gestionar varios negocios bajo una misma cuenta, con el inventario, las ventas y los clientes de cada negocio separados. El due\xf1o de un negocio decide a qui\xe9n invita a su equipo y qu\xe9 puede hacer cada miembro; la app guarda un historial de actividad del equipo para que el due\xf1o sepa qui\xe9n hizo cada movimiento.",s),new A.hB("5","Control de inventario y ventas","El usuario es el \xfanico responsable de la exactitud de los precios, costos y cantidades ingresadas. El sistema incluye validaciones para registrar existencias y generar \xf3rdenes de reabastecimiento, pero no reemplaza la auditor\xeda f\xedsica que el comerciante deba realizar peri\xf3dicamente.",s),new A.hB("6",'Cr\xe9ditos comerciales ("fiados"), cobros y datos de clientes','La funci\xf3n de venta a cr\xe9dito o "fiado" es exclusivamente una herramienta de registro interno. Stockealo no act\xfaa como entidad financiera, cobrador ni garante, y nunca env\xeda mensajes a tus clientes por su cuenta: los recordatorios programados solo te avisan a ti, y cada mensaje de WhatsApp o estado de cuenta lo env\xedas t\xfa.\nEl comerciante declara contar con la autorizaci\xf3n de sus clientes para registrar sus datos y enviarles recordatorios, y se compromete a cobrar de forma respetuosa, en horarios razonables y conforme a la ley, sin acoso ni presiones indebidas.',s),new A.hB("7","Stockealo Pro","Stockealo Pro es una suscripci\xf3n opcional que suma funciones extra (por ejemplo, cat\xe1logos personalizados, cobro de fiados con recordatorios y estado de cuenta, m\xe1s preguntas a Stocky y tienda en l\xednea). Todo lo que hoy es gratis sigue siendo gratis.\n\n\u2022 Pago y activaci\xf3n: puedes pagar en l\xednea con Wompi (Nequi, PSE, tarjeta o Bancolombia) y Pro se activa solo al aprobarse el pago, o por Nequi con comprobante y un c\xf3digo de activaci\xf3n. Stockealo no guarda los datos de tu tarjeta ni de tu cuenta: los maneja Wompi. Los planes semanales y mensuales no se renuevan solos: cada pago o c\xf3digo suma d\xedas.\n\u2022 Alcance: Pro Negocio aplica a un negocio y a su equipo; Pro Global, a los negocios del titular. Los planes son semanales, mensuales o anuales y duran 7, 30 o 365 d\xedas desde que se activan.\n\u2022 Precios: pueden cambiar para compras futuras; lo que ya pagaste se respeta.\n\u2022 Reembolsos y retracto: si tienes un problema con tu pago o quieres ejercer el derecho de retracto que te reconozca la ley, escr\xedbenos al correo de soporte y revisaremos tu caso.",s),new A.hB("8","Stocky y las respuestas autom\xe1ticas","Las respuestas de Stocky, incluidas las generadas con inteligencia artificial, son orientativas y pueden contener errores. No constituyen asesor\xeda contable, legal, tributaria ni financiera. Las preguntas a la IA tienen un l\xedmite diario que depende de tu plan.",s),new A.hB("9","Uso por mayores de edad","La plataforma est\xe1 dirigida a personas mayores de 18 a\xf1os con plena capacidad legal para el ejercicio de actividades comerciales.",s),new A.hB("10","Propiedad intelectual","Todos los derechos de software, dise\xf1o, logotipos y c\xf3digo fuente de Stockealo est\xe1n protegidos por leyes de propiedad intelectual. Los datos de tus productos, clientes e im\xe1genes registradas son y seguir\xe1n siendo de tu propiedad exclusiva.",s),new A.hB("11","Disponibilidad y responsabilidad",'Stockealo se ofrece "tal como est\xe1". Hacemos lo posible para que funcione sin interrupciones y para proteger tus datos, pero no garantizamos que el servicio est\xe9 libre de fallas. Te recomendamos mantener activo el respaldo. Stockealo no responde por p\xe9rdidas comerciales derivadas del uso de la app, de datos mal ingresados o de fallas del dispositivo o de la conexi\xf3n, salvo en los casos en que la ley no permita esta limitaci\xf3n.',s),new A.hB("12","Modificaciones","Nos reservamos el derecho de actualizar estos t\xe9rminos en cualquier momento. Te notificaremos dentro de la aplicaci\xf3n ante cualquier cambio sustancial.",s),new A.hB("13","Ley aplicable","Estos t\xe9rminos se rigen por las leyes de la Rep\xfablica de Colombia, sin perjuicio de los derechos que te reconozcan las leyes de protecci\xf3n al consumidor de tu pa\xeds.",s),B.a81],t.p),s,new A.a_(r,20,r,30),s,B.a8,!1)},
+return A.ef(A.a([new A.a0Z(B.Jz,"T\xe9rminos y condiciones de uso","\xdaltima actualizaci\xf3n: Noviembre 2026",s),B.hf,new A.hB("1","Aceptaci\xf3n de los t\xe9rminos","Al crear una cuenta, acceder o utilizar la aplicaci\xf3n Stockealo, aceptas cumplir plenamente con estos T\xe9rminos y Condiciones. Si no est\xe1s de acuerdo con alguna disposici\xf3n, debes abstenerte de utilizar la plataforma.",s),new A.hB("2","Naturaleza del servicio",'Stockealo es una herramienta de productividad y gesti\xf3n comercial dise\xf1ada para registrar inventarios, catalogar productos por c\xf3digos de barras o SKU, registrar ventas, administrar deudas de clientes ("fiado"), crear cat\xe1logos y consultar a Stocky, el asistente del negocio. La app opera bajo una arquitectura Local-First: tus datos se guardan primero en tu dispositivo.',s),new A.hB("3","Exclusi\xf3n de facturaci\xf3n tributaria oficial","Stockealo es una herramienta tecnol\xf3gica de control interno, inventario y soporte operativo para comerciantes. No constituye ni reemplaza un sistema de facturaci\xf3n electr\xf3nica fiscal avalado por entidades tributarias oficiales (como DIAN, SAT u otros organismos gubernamentales). El usuario es el \xfanico responsable del cumplimiento de sus obligaciones contables, tributarias y fiscales.",s),new A.hB("4","Cuentas, negocios y equipo","Cada usuario es responsable de mantener la confidencialidad de sus credenciales. Stockealo permite gestionar varios negocios bajo una misma cuenta, con el inventario, las ventas y los clientes de cada negocio separados. El due\xf1o de un negocio decide a qui\xe9n invita a su equipo y qu\xe9 puede hacer cada miembro; la app guarda un historial de actividad del equipo para que el due\xf1o sepa qui\xe9n hizo cada movimiento.",s),new A.hB("5","Control de inventario y ventas","El usuario es el \xfanico responsable de la exactitud de los precios, costos y cantidades ingresadas. El sistema incluye validaciones para registrar existencias y generar \xf3rdenes de reabastecimiento, pero no reemplaza la auditor\xeda f\xedsica que el comerciante deba realizar peri\xf3dicamente.",s),new A.hB("6",'Cr\xe9ditos comerciales ("fiados"), cobros y datos de clientes','La funci\xf3n de venta a cr\xe9dito o "fiado" es exclusivamente una herramienta de registro interno. Stockealo no act\xfaa como entidad financiera, cobrador ni garante, y nunca env\xeda mensajes a tus clientes por su cuenta: los recordatorios programados solo te avisan a ti, y cada mensaje de WhatsApp o estado de cuenta lo env\xedas t\xfa.\nEl comerciante declara contar con la autorizaci\xf3n de sus clientes para registrar sus datos y enviarles recordatorios, y se compromete a cobrar de forma respetuosa, en horarios razonables y conforme a la ley, sin acoso ni presiones indebidas.',s),new A.hB("7","Stockealo Pro","Stockealo Pro es una suscripci\xf3n opcional que suma funciones extra (por ejemplo, cat\xe1logos personalizados, cobro de fiados con recordatorios y estado de cuenta, m\xe1s preguntas a Stocky y tienda en l\xednea). Todo lo que hoy es gratis sigue siendo gratis.\n\n\u2022 Pago y activaci\xf3n: puedes pagar en l\xednea con Wompi (Nequi, PSE, tarjeta o Bancolombia) y Pro se activa solo al aprobarse el pago, o por Nequi con comprobante y un c\xf3digo de activaci\xf3n. Stockealo no guarda los datos de tu tarjeta ni de tu cuenta: los maneja Wompi. Los planes semanales y mensuales no se renuevan solos: cada pago o c\xf3digo suma d\xedas.\n\u2022 Alcance: Pro Negocio aplica a un negocio y a su equipo, y es semanal, mensual o anual (7, 30 o 365 d\xedas desde que se activa). Pro Servicios agrega a un negocio el m\xf3dulo de Servicios (tablero, empleados y comisiones) y es mensual (30 d\xedas).\n\u2022 Precios: pueden cambiar para compras futuras; lo que ya pagaste se respeta.\n\u2022 Reembolsos y retracto: si tienes un problema con tu pago o quieres ejercer el derecho de retracto que te reconozca la ley, escr\xedbenos al correo de soporte y revisaremos tu caso.",s),new A.hB("8","Stocky y las respuestas autom\xe1ticas","Las respuestas de Stocky, incluidas las generadas con inteligencia artificial, son orientativas y pueden contener errores. No constituyen asesor\xeda contable, legal, tributaria ni financiera. Las preguntas a la IA tienen un l\xedmite diario que depende de tu plan.",s),new A.hB("9","Uso por mayores de edad","La plataforma est\xe1 dirigida a personas mayores de 18 a\xf1os con plena capacidad legal para el ejercicio de actividades comerciales.",s),new A.hB("10","Propiedad intelectual","Todos los derechos de software, dise\xf1o, logotipos y c\xf3digo fuente de Stockealo est\xe1n protegidos por leyes de propiedad intelectual. Los datos de tus productos, clientes e im\xe1genes registradas son y seguir\xe1n siendo de tu propiedad exclusiva.",s),new A.hB("11","Disponibilidad y responsabilidad",'Stockealo se ofrece "tal como est\xe1". Hacemos lo posible para que funcione sin interrupciones y para proteger tus datos, pero no garantizamos que el servicio est\xe9 libre de fallas. Te recomendamos mantener activo el respaldo. Stockealo no responde por p\xe9rdidas comerciales derivadas del uso de la app, de datos mal ingresados o de fallas del dispositivo o de la conexi\xf3n, salvo en los casos en que la ley no permita esta limitaci\xf3n.',s),new A.hB("12","Modificaciones","Nos reservamos el derecho de actualizar estos t\xe9rminos en cualquier momento. Te notificaremos dentro de la aplicaci\xf3n ante cualquier cambio sustancial.",s),new A.hB("13","Ley aplicable","Estos t\xe9rminos se rigen por las leyes de la Rep\xfablica de Colombia, sin perjuicio de los derechos que te reconozcan las leyes de protecci\xf3n al consumidor de tu pa\xeds.",s),B.a81],t.p),s,new A.a_(r,20,r,30),s,B.a8,!1)},
 $S:170}
 A.aqt.prototype={
 G(a){return A.iG(new A.bvT())}}
@@ -176999,7 +176999,7 @@ A.bz3.prototype={
 $1(a){return new A.j5(new A.bz2(this.a,this.b,this.c,a),null)},
 $S:41}
 A.bz2.prototype={
-$2(a,b){var s,r=this,q=null,p=r.a,o=t.p,n=A.L(A.a([A.e('Se borrar\xe1n por completo tus empresas, cat\xe1logo de productos, registro de ventas, clientes e historial contable tanto de este dispositivo como de la nube.\n\nPara confirmar, escribe la palabra "ELIMINAR" a continuaci\xf3n:',q,q,q,q,A.y(q,q,A.z(a).r,q,q,q,q,q,q,q,q,13,q,q,q,q,1.4,!0,q,q,q,q,q,q,q,q),q,q,q),B.dd,A.bH(q,B.a0,!0,q,!0,B.U,q,A.bK(),r.c,q,q,q,q,q,2,B.ayK,B.P,!0,q,!0,q,!1,q,B.af,q,q,q,q,q,q,q,q,1,q,q,!1,"\u2022",q,new A.bz_(p,b),q,q,q,!1,q,q,!1,q,!0,q,B.ag,q,q,q,q,q,q,q,q,q,q,q,q,!0,B.a2,q,B.mu,q,q,q,q)],o),B.H,B.p,B.a5,0,B.u),m=A.pn(q,q,q,q,q,q,q,q,q,q,q,q,B.ek,q,new A.c5(A.a5(12),B.Z),new A.aE(A.z(a).e,1,B.S,-1),q,q,q,q),l=r.d
+$2(a,b){var s,r=this,q=null,p=r.a,o=t.p,n=A.L(A.a([A.e('Se borrar\xe1n por completo tus negocios, cat\xe1logo de productos, registro de ventas, clientes e historial contable tanto de este dispositivo como de la nube.\n\nPara confirmar, escribe la palabra "ELIMINAR" a continuaci\xf3n:',q,q,q,q,A.y(q,q,A.z(a).r,q,q,q,q,q,q,q,q,13,q,q,q,q,1.4,!0,q,q,q,q,q,q,q,q),q,q,q),B.dd,A.bH(q,B.a0,!0,q,!0,B.U,q,A.bK(),r.c,q,q,q,q,q,2,B.ayK,B.P,!0,q,!0,q,!1,q,B.af,q,q,q,q,q,q,q,q,1,q,q,!1,"\u2022",q,new A.bz_(p,b),q,q,q,!1,q,q,!1,q,!0,q,B.ag,q,q,q,q,q,q,q,q,q,q,q,q,!0,B.a2,q,B.mu,q,q,q,q)],o),B.H,B.p,B.a5,0,B.u),m=A.pn(q,q,q,q,q,q,q,q,q,q,q,q,B.ek,q,new A.c5(A.a5(12),B.Z),new A.aE(A.z(a).e,1,B.S,-1),q,q,q,q),l=r.d
 m=A.jT(A.e("Cancelar",q,q,q,q,A.y(q,q,A.z(a).r,q,q,q,q,q,q,q,q,q,q,q,B.Q,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),new A.bz0(l),m)
 s=p.a?A.z(a).as:A.z(a).w
 s=A.lg(q,q,s,q,q,q,0,q,q,q,q,q,B.Ij,q,new A.c5(A.a5(12),B.Z),q,q,q,q,q)
@@ -190120,8 +190120,8 @@ case 7:p=6
 a9=o.pop()
 h=A.U(a9)
 if(h instanceof A.lt){j=h
-if(B.f.n(j.a,"code_not_found")||B.f.n(j.a,"invalid_code"))throw A.d(A.bC("C\xf3digo no encontrado. Verifica con el due\xf1o o administrador de la empresa."))
-throw A.d(A.bC("No se pudo unir a la empresa. Int\xe9ntalo de nuevo."))}else throw a9
+if(B.f.n(j.a,"code_not_found")||B.f.n(j.a,"invalid_code"))throw A.d(A.bC("C\xf3digo no encontrado. Verifica con el due\xf1o o administrador del negocio."))
+throw A.d(A.bC("No se pudo unir al negocio. Int\xe9ntalo de nuevo."))}else throw a9
 s=9
 break
 case 6:s=2
@@ -190182,7 +190182,7 @@ switch(s){case"OWNER":return"Due\xf1o"
 case"ADMIN":return"Administrador"
 case"CASHIER":return"Cajero / Vendedor"
 default:return s}},
-gbw7(a){switch(this.f){case"OWNER":return"Control total de la empresa y gesti\xf3n del equipo."
+gbw7(a){switch(this.f){case"OWNER":return"Control total del negocio y gesti\xf3n del equipo."
 case"ADMIN":return"Puede gestionar productos, inventario y ventas. Puede ver costos."
 case"CASHIER":return"Solo registra ventas. Precios de compra y costos protegidos."
 default:return""}}}

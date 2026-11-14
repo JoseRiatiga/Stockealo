@@ -1,13 +1,15 @@
-/* Stockealo · sitio público (stockealo.online): mismo diseño V1 que la app
-   (fondo papel, tarjetas blancas con borde fino, verde Stockealo solo en lo importante) */
+/* Stockealo · sitio público (stockealo.online): el mismo diseño de la app (re-diseño 0.13,
+   lib/core/theme/app_tokens.dart): fondo gris claro, tarjetas blancas con borde fino,
+   verde Stockealo solo en lo importante */
 
 :root {
-  --paper: #F6F3EC;
+  --paper: #F6F7F9;
   --surface: #FFFFFF;
-  --surface-muted: #F1EDE4;
-  --line: #ECE7DC;
-  --ink: #1F1D18;
-  --ink-muted: #6E6A60;
+  --surface-muted: #EEF0F3;
+  --line: #E6E8EC;
+  --line-strong: #D5D9E0;
+  --ink: #14161A;
+  --ink-muted: #5B6170;
   --accent: #1E6B4E;
   --on-accent: #FFFFFF;
   --accent-soft: #E3F0E9;
@@ -17,15 +19,16 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #14130F;
-    --surface: #1E1C18;
-    --surface-muted: #272420;
-    --line: #2F2C26;
-    --ink: #F2EEE5;
-    --ink-muted: #B1AB9F;
+    --paper: #0E1013;
+    --surface: #16191E;
+    --surface-muted: #1E2228;
+    --line: #262A31;
+    --line-strong: #343943;
+    --ink: #F2F4F7;
+    --ink-muted: #A3AAB8;
     --accent: #5CC497;
     --on-accent: #10261C;
-    --accent-soft: #1C2E25;
+    --accent-soft: #17291F;
   }
 }
 
@@ -58,7 +61,10 @@ a { color: var(--accent); }
 
 /* Botones */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px;
-       border-radius: 999px; font-weight: 700; text-decoration: none; border: 1px solid transparent; }
+       border-radius: var(--radius-sm); font-weight: 700; text-decoration: none; border: 1px solid transparent;
+       transition: background .15s, border-color .15s; }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+.btn-ghost:hover { border-color: var(--line-strong); }
 .btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
 .btn-sm { min-height: 38px; padding: 0 16px; font-size: 14px; }
@@ -71,7 +77,8 @@ h2 { font-size: clamp(24px, 4vw, 32px); line-height: 1.2; letter-spacing: -0.01e
 h3 { font-size: 17px; margin: 0 0 6px; }
 .lead { font-size: 18px; color: var(--ink-muted); max-width: 640px; }
 
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
 .grid { display: grid; gap: 12px; }
 .grid-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .grid-4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
@@ -97,11 +104,11 @@ h3 { font-size: 17px; margin: 0 0 6px; }
          font-size: 12px; font-weight: 700; }
 .badge.gold { background: color-mix(in srgb, var(--gold) 18%, transparent); color: #8A5300; }
 @media (prefers-color-scheme: dark) { .badge.gold { color: var(--gold); } }
-.tabs { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px; gap: 4px;
+.tabs { display: inline-flex; background: var(--surface-muted); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px; gap: 4px;
         margin-bottom: 16px; }
 .tabs button { border: 0; background: transparent; color: var(--ink-muted); font: inherit; font-weight: 700; padding: 8px 16px;
-               border-radius: 999px; cursor: pointer; }
-.tabs button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
+               border-radius: 8px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(16, 24, 40, .08); }
 
 /* Tiendas */
 .store { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }

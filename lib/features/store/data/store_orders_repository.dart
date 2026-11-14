@@ -6,6 +6,16 @@ import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../sales/models/quotation.dart';
 
+/// Un pedido que acaba de llegar
+typedef NewStoreOrder = ({String id, String code, String? name, double total});
+
+/// Quién avisa de los pedidos (la campana y el celular). Lo conecta la navegación
+/// de la app; así este repositorio no depende de las pantallas ni de los avisos.
+abstract final class OrderAlerts {
+  static void Function(NewStoreOrder order)? onNewOrder;
+  static void Function(({String id, String code, String? name}) order)? onReminder;
+}
+
 /// Pedidos de la tienda en línea (0.13.4): el comprador los crea en la nube con su
 /// código (T-0001) y aquí se bajan como cotizaciones «Tienda» para pasarlos a venta.
 /// Vencen a los 7 días sin borrarse.
@@ -15,14 +25,89 @@ class StoreOrdersRepository {
 
   static const validDays = 7;
 
-  /// Trae los pedidos nuevos de la nube. Devuelve cuántos llegaron. Sin conexión no hace nada.
+  /// Pedidos sin ver: el número de Ventas y de Cotizaciones. Se pone en 0 al abrir Cotizaciones.
+  final ValueNotifier<int> unseen = ValueNotifier(0);
+
+  /// Si un pedido lleva este tiempo sin abrir, se recuerda una vez
+  static const remindAfter = Duration(hours: 2);
+
+  static String _seenKey(String businessId) => 'orders_seen_at_$businessId';
+  static const _remindedKey = 'orders_reminded';
+
+  /// Recalcula cuántos pedidos llegaron después de la última vez que se abrió Cotizaciones
+  Future<int> refreshUnseen(String businessId) async {
+    final db = await AppDatabase.instance.database;
+    final seen = await AppDatabase.instance.getSetting(_seenKey(businessId)) ?? '';
+    final now = DateTime.now().toIso8601String();
+    final n = Sqflite.firstIntValue(await db.rawQuery(
+          "SELECT COUNT(*) FROM quotations WHERE business_id = ? AND source = ? AND status = 'PENDIENTE' "
+          'AND created_at > ? AND (valid_until IS NULL OR valid_until > ?)',
+          [businessId, Quotation.sourceStore, seen, now],
+        )) ??
+        0;
+    unseen.value = n;
+    return n;
+  }
+
+  /// Se abrió Cotizaciones: el número se quita (los pedidos siguen «Por confirmar»)
+  Future<void> markAllSeen(String businessId) async {
+    await AppDatabase.instance.setSetting(_seenKey(businessId), DateTime.now().toIso8601String());
+    unseen.value = 0;
+  }
+
+  /// Se abrió un pedido: se quita su marca «Nuevo»
+  Future<void> markOpened(String quotationId) async {
+    final db = await AppDatabase.instance.database;
+    await db.update('quotations', {'opened_at': DateTime.now().toIso8601String()},
+        where: 'id = ? AND opened_at IS NULL', whereArgs: [quotationId]);
+  }
+
+  /// Pedidos que llevan más de [remindAfter] sin abrir y todavía no se recordaron.
+  /// Se marcan como recordados (una sola vez cada uno).
+  Future<List<({String id, String code, String? name})>> dueReminders(String businessId, {DateTime? now}) async {
+    final db = await AppDatabase.instance.database;
+    final at = now ?? DateTime.now();
+    final rows = await db.rawQuery(
+      "SELECT id, quotation_number, customer_name FROM quotations WHERE business_id = ? AND source = ? AND status = 'PENDIENTE' "
+      'AND opened_at IS NULL AND created_at <= ? AND (valid_until IS NULL OR valid_until > ?)',
+      [businessId, Quotation.sourceStore, at.subtract(remindAfter).toIso8601String(), at.toIso8601String()],
+    );
+    final reminded = {...?(await AppDatabase.instance.getSetting(_remindedKey))?.split(',')};
+    final due = [
+      for (final r in rows)
+        if (!reminded.contains(r['id']))
+          (id: r['id'] as String, code: r['quotation_number'] as String, name: r['customer_name'] as String?),
+    ];
+    if (due.isNotEmpty) {
+      reminded.addAll(due.map((d) => d.id));
+      // Solo se guardan los últimos 200
+      final keep = reminded.where((e) => e.isNotEmpty).toList();
+      await AppDatabase.instance.setSetting(_remindedKey, keep.skip(keep.length > 200 ? keep.length - 200 : 0).join(','));
+    }
+    return due;
+  }
+
+  /// Trae los pedidos nuevos de la nube y avisa: cada pedido nuevo, y una vez los que
+  /// llevan 2 horas sin abrir. Devuelve cuántos llegaron. Sin conexión no hace nada.
   Future<int> pull(String businessId) async {
+    final arrived = await _download(businessId);
+    for (final o in arrived) {
+      OrderAlerts.onNewOrder?.call(o);
+    }
+    for (final r in await dueReminders(businessId)) {
+      OrderAlerts.onReminder?.call(r);
+    }
+    await refreshUnseen(businessId);
+    return arrived.length;
+  }
+
+  Future<List<NewStoreOrder>> _download(String businessId) async {
     final client = SupabaseService.instance.client;
-    if (client == null || client.auth.currentSession == null) return 0;
+    if (client == null || client.auth.currentSession == null) return const [];
     try {
       final rows = await client.from('store_orders').select().eq('business_id', businessId).eq('status', 'PENDIENTE');
       final db = await AppDatabase.instance.database;
-      var added = 0;
+      final added = <NewStoreOrder>[];
       for (final raw in rows) {
         final o = Map<String, dynamic>.from(raw as Map);
         final id = o['id'] as String;
@@ -65,12 +150,17 @@ class StoreOrdersRepository {
             });
           }
         });
-        added++;
+        added.add((
+          id: id,
+          code: o['code'] as String,
+          name: o['customer_name'] as String?,
+          total: (o['total'] as num?)?.toDouble() ?? 0,
+        ));
       }
       return added;
     } catch (e) {
       debugPrint('Pedidos de la tienda: $e');
-      return 0;
+      return const [];
     }
   }
 

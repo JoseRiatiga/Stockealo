@@ -21,6 +21,9 @@ import 'package:stockealo/features/sales/data/sales_repository.dart';
 import 'package:stockealo/features/sales/data/sell_cart.dart';
 import 'package:stockealo/features/sales/models/cart_item.dart';
 import 'package:stockealo/features/sales/models/payment_method.dart';
+import 'package:stockealo/features/store/data/store_orders_repository.dart';
+import 'package:stockealo/features/sales/models/quotation.dart';
+import 'package:stockealo/core/services/phone_alerts_service.dart';
 import 'package:stockealo/features/sales/models/sale.dart';
 import 'package:stockealo/features/sales/data/promotions_repository.dart';
 import 'package:stockealo/features/sales/models/promotion.dart';
@@ -172,6 +175,47 @@ void main() {
     // Una venta normal de mostrador no queda por entregar
     final normal = await sales.recordMultiProductSale(businessId: businessId, items: await items({'gaseosa': 1}), paymentMethod: PaymentMethod.cash);
     expect(normal.single.pendingDelivery, isFalse);
+  });
+
+  test('pedidos de la tienda: número sin ver, «Nuevo» y un solo recordatorio a las 2 horas', () async {
+    final db = await appDb.database;
+    final orders = StoreOrdersRepository.instance;
+    final now = DateTime.now();
+    Future<void> order(String id, String code, DateTime at) => db.insert('quotations', {
+          'id': id, 'business_id': businessId, 'quotation_number': code, 'customer_name': 'Ana',
+          'total_amount': 45000.0, 'status': 'PENDIENTE', 'created_at': at.toIso8601String(),
+          'valid_until': at.add(const Duration(days: 7)).toIso8601String(), 'source': Quotation.sourceStore,
+        });
+    await order('o1', 'T-0001', now.subtract(const Duration(hours: 3)));
+    await order('o2', 'T-0002', now.subtract(const Duration(minutes: 5)));
+    expect(await orders.refreshUnseen(businessId), 2);
+    expect(orders.unseen.value, 2);
+
+    // Al abrir Cotizaciones el número se quita, pero siguen «Nuevo» y por confirmar
+    await orders.markAllSeen(businessId);
+    expect(await orders.refreshUnseen(businessId), 0);
+    var list = await sales.getQuotations(businessId: businessId);
+    expect(list.where((q) => q.isNew), hasLength(2));
+    expect(await orders.pendingCount(businessId), 2);
+
+    // El de hace 3 horas se recuerda una sola vez; el de 5 minutos todavía no
+    final due = await orders.dueReminders(businessId);
+    expect(due.map((d) => d.code), ['T-0001']);
+    expect(await orders.dueReminders(businessId), isEmpty);
+
+    // Abrirlo le quita «Nuevo»
+    await orders.markOpened('o2');
+    list = await sales.getQuotations(businessId: businessId);
+    expect(list.firstWhere((q) => q.id == 'o2').isNew, isFalse);
+  });
+
+  test('los avisos del celular vienen encendidos salvo que se apaguen', () async {
+    final alerts = PhoneAlertsService.instance;
+    expect(await alerts.ordersEnabled(), isTrue);
+    expect(await alerts.stockAlertsEnabled(), isTrue);
+    expect(await alerts.summaryEnabled(), isTrue);
+    await appDb.setSetting(PhoneAlertsService.ordersKey, '0');
+    expect(await alerts.ordersEnabled(), isFalse);
   });
 
   test('pago mixto: cada medio suma lo suyo y la caja solo cuenta el efectivo', () async {

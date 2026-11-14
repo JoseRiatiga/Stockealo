@@ -26,6 +26,7 @@ import '../widgets/digital_ticket_modal.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/services/sync_queue.dart';
 import '../widgets/deliveries.dart';
+import '../../../store/data/store_orders_repository.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -48,6 +49,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
 
   /// Ventas hechas sin conexión que todavía no suben a la nube
   Set<String> _pendingIds = const {};
+
+  void _onUnseen() {
+    if (mounted) setState(() {});
+  }
 
   Future<void> _refreshPending() async {
     final ids = await SyncQueue.instance.pendingIds('upsert_sale');
@@ -88,6 +93,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     DataEvents.instance.salesVersion.addListener(_onRemoteSales);
     // Cuando sube lo hecho sin conexión, se quita «Pendiente de subir»
     SyncQueue.instance.status.addListener(_refreshPending);
+    // Pedidos de la tienda sin ver: el número de Cotizaciones
+    StoreOrdersRepository.instance.unseen.addListener(_onUnseen);
     _loadSales();
     _syncSilently();
   }
@@ -137,6 +144,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     NotificationService.instance.remoteSalesVersion.removeListener(_onRemoteSales);
     DataEvents.instance.salesVersion.removeListener(_onRemoteSales);
     SyncQueue.instance.status.removeListener(_refreshPending);
+    StoreOrdersRepository.instance.unseen.removeListener(_onUnseen);
     _scrollController.dispose();
     super.dispose();
   }
@@ -341,6 +349,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                           label: 'Cotizaciones',
                           caption: 'Pedidos y proformas',
                           onTap: _openQuotations,
+                          badge: StoreOrdersRepository.instance.unseen.value,
                         ),
                         // Lo cobrado que falta entregar (0.13.4)
                         QuickAccessItem(

@@ -20,6 +20,9 @@ class AppHeaderBar extends StatelessWidget {
   final bool compact;
   final Business? business;
   final VoidCallback? onMenuTap;
+
+  /// Número sobre ☰ en el celular (pedidos de la tienda sin ver), para que se abra el menú
+  final int menuBadge;
   final VoidCallback? onSearchTap;
   final VoidCallback? onNotificationsTap;
   final VoidCallback? onNewSale;
@@ -33,6 +36,7 @@ class AppHeaderBar extends StatelessWidget {
     this.compact = false,
     this.business,
     this.onMenuTap,
+    this.menuBadge = 0,
     this.onSearchTap,
     this.onNotificationsTap,
     this.onNewSale,
@@ -79,7 +83,11 @@ class AppHeaderBar extends StatelessWidget {
                       tooltip: 'Abrir el menú',
                       onPressed: onMenuTap,
                       style: IconButton.styleFrom(side: BorderSide(color: c.line)),
-                      icon: Icon(Icons.menu_outlined, size: 20, color: c.ink),
+                      icon: Badge(
+                        isLabelVisible: menuBadge > 0,
+                        label: Text(menuBadge > 99 ? '99+' : '$menuBadge'),
+                        child: Icon(Icons.menu_outlined, size: 20, color: c.ink),
+                      ),
                     ),
                     const SizedBox(width: AppSpace.sm + 2),
                     Expanded(

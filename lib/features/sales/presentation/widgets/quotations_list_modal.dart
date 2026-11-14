@@ -57,6 +57,8 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
     try {
       // Los pedidos nuevos de la tienda en línea llegan como cotizaciones «Tienda»
       await StoreOrdersRepository.instance.pull(widget.businessId);
+      // Se abrió Cotizaciones: el número de Ventas se quita (siguen «Por confirmar»)
+      await StoreOrdersRepository.instance.markAllSeen(widget.businessId);
       final list = await _salesRepo.getQuotations(businessId: widget.businessId);
       if (mounted) {
         setState(() {
@@ -71,6 +73,8 @@ class _QuotationsListModalState extends State<QuotationsListModal> {
 
   /// Abre la cotización con el logo del negocio para compartirla
   void _shareQuotation(Quotation q) {
+    // Abrir el pedido le quita la marca «Nuevo»
+    if (q.isNew) StoreOrdersRepository.instance.markOpened(q.id).then((_) => _loadQuotations());
     final business = ActiveBusinessScope.read(context);
     TicketViewer.show(
       context,
@@ -347,6 +351,10 @@ actions: [
                                         if (q.source != Quotation.sourceLocal) ...[
                                           const SizedBox(width: 6),
                                           StatusPill(q.fromStore ? 'Tienda' : 'WhatsApp', tone: AppTone.info, compact: true),
+                                        ],
+                                        if (q.isNew) ...[
+                                          const SizedBox(width: 6),
+                                          const StatusPill('Nuevo', tone: AppTone.accent, compact: true),
                                         ],
                                       ],
                                     ),

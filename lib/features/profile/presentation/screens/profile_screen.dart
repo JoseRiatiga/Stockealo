@@ -81,6 +81,10 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
   // Avisos en el celular
   bool _stockAlerts = false;
   bool _summaryAlerts = false;
+  bool _orderAlerts = true;
+
+  /// Android dio permiso para mostrar avisos
+  bool _alertsAllowed = true;
   int _summaryHour = PhoneAlertsService.defaultSummaryHour;
 
   @override
@@ -104,8 +108,12 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       final stock = await alerts.stockAlertsEnabled();
       final summary = await alerts.summaryEnabled();
       final hour = await alerts.summaryHour();
+      final orders = await alerts.ordersEnabled();
+      final allowed = await alerts.hasPermission();
       if (mounted) {
         setState(() {
+          _orderAlerts = orders;
+          _alertsAllowed = allowed;
           _stockAlerts = stock;
           _summaryAlerts = summary;
           _summaryHour = hour;
@@ -149,6 +157,34 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       final c = context.colors;
       return [
         SettingsGroup(label: 'En la barra del celular', children: [
+          // Sin permiso del sistema no sale ningún aviso (0.13.5)
+          if (!_alertsAllowed)
+            SettingsRow(
+              icon: Icons.notifications_off_outlined,
+              title: 'Activar avisos del celular',
+              subtitle: 'Android todavía no deja que Stockealo te avise. Toca para dar el permiso.',
+              onTap: () async {
+                final ok = await PhoneAlertsService.instance.ensurePermission();
+                if (!mounted) return;
+                if (!ok) {
+                  AppToast.showWarning(context,
+                      'Actívalo en Ajustes del celular › Apps › Stockealo › Notificaciones.');
+                }
+                await _loadAlerts();
+                _refresh.value++;
+              },
+            ),
+          SettingsRow.toggle(
+            icon: Icons.storefront_outlined,
+            title: 'Pedidos de la tienda',
+            subtitle: 'Con sonido, cuando llega un pedido de tu tienda en línea, y si lleva 2 horas sin abrir',
+            value: _orderAlerts,
+            onChanged: (v) async {
+              await PhoneAlertsService.instance.setOrders(v);
+              if (mounted) setState(() => _orderAlerts = v);
+              _refresh.value++;
+            },
+          ),
           SettingsRow.toggle(
             icon: Icons.inventory_2_outlined,
             title: 'Stock bajo',
@@ -831,6 +867,7 @@ actions: [
                           icon: Icons.notifications_none_outlined,
                           title: 'Avisos',
                           subtitle: [
+                            if (_orderAlerts) 'Pedidos',
                             if (_stockAlerts) 'Stock bajo',
                             if (_summaryAlerts) 'Resumen a las ${_hourLabel(_summaryHour)}',
                           ].join(' · ').ifEmpty('Apagados'),

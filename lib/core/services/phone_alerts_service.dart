@@ -25,8 +25,10 @@ import 'data_events.dart';
 /// • cobro de fiados (Pro): "Hoy toca cobrarle a X", con un botón que abre WhatsApp
 ///   con el mensaje listo (el dueño lo envía; nada sale solo)
 ///
-/// Los dos vienen apagados; al activarlos Android 13+ pide permiso. Todo se calcula
-/// con los datos del celular, sin servidor.
+/// • pedido nuevo de la tienda en línea (0.13.5), con sonido, y su recordatorio
+///
+/// Desde la 0.13.5 vienen ENCENDIDOS (decisión del dueño): el permiso se pide al abrir
+/// la app la primera vez. Todo se calcula con los datos del celular, sin servidor.
 class PhoneAlertsService {
   PhoneAlertsService._();
   static final PhoneAlertsService instance = PhoneAlertsService._();
@@ -34,6 +36,10 @@ class PhoneAlertsService {
   static const stockKey = 'alerts_stock';
   static const summaryKey = 'alerts_summary';
   static const summaryHourKey = 'alerts_summary_hour';
+  static const ordersKey = 'alerts_store_orders';
+
+  /// Ya se mostró la pantalla «Activa los avisos» al abrir la app
+  static const promptKey = 'alerts_prompt_shown';
   static const _notifiedKey = 'alerts_stock_notified';
   static const defaultSummaryHour = 20;
 
@@ -51,6 +57,15 @@ class PhoneAlertsService {
     channelDescription: 'Cómo te fue en el día, a la hora que elijas',
   );
 
+  static const _ordersChannel = AndroidNotificationDetails(
+    'store_orders',
+    'Pedidos de la tienda',
+    channelDescription: 'Cuando llega un pedido de tu tienda en línea',
+    importance: Importance.max,
+    priority: Priority.high,
+    playSound: true,
+    enableVibration: true,
+  );
   static const _openWhatsAppAction = 'open_whatsapp';
   static const _debtChannel = AndroidNotificationDetails(
     'debt_reminders',
@@ -101,10 +116,68 @@ class PhoneAlertsService {
   // ---------------------------------------------------------------------------
   // Preferencias (por cuenta)
 
-  Future<bool> _flag(String key) async => await AppDatabase.instance.getSetting(key) == '1';
+  /// Encendido salvo que la persona lo haya apagado (0.13.5: todo viene encendido)
+  Future<bool> _flag(String key) async => await AppDatabase.instance.getSetting(key) != '0';
 
   Future<bool> stockAlertsEnabled() => _flag(stockKey);
   Future<bool> summaryEnabled() => _flag(summaryKey);
+  Future<bool> ordersEnabled() => _flag(ordersKey);
+
+  Future<void> setOrders(bool value) async {
+    if (value) await ensurePermission();
+    await AppDatabase.instance.setSetting(ordersKey, value ? '1' : '0');
+  }
+
+  /// Hay permiso del sistema para mostrar avisos
+  Future<bool> hasPermission() async {
+    await init();
+    return _ready && await _android?.areNotificationsEnabled() == true;
+  }
+
+  /// Ya se le preguntó a esta persona (al abrir la app la primera vez)
+  Future<bool> promptShown() async => await AppDatabase.instance.getSetting(promptKey) == '1';
+  Future<void> setPromptShown() => AppDatabase.instance.setSetting(promptKey, '1');
+
+  /// Con los avisos encendidos por defecto, lo que ya estaba bajo de stock no se avisa
+  /// de golpe la primera vez: solo lo que baje de aquí en adelante
+  Future<void> seedDefaults() async {
+    if (await AppDatabase.instance.getSetting(_notifiedKey) == null) {
+      await _saveNotified(await _lowStockIds());
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pedidos de la tienda (0.13.5)
+
+  /// «Nuevo pedido T-0003 de Ana · $45.000»
+  Future<void> showStoreOrder({required String id, required String code, String? name, required String total}) async {
+    if (!_ready || !await ordersEnabled()) return;
+    try {
+      await _plugin.show(
+        id.hashCode & 0x7fffffff,
+        'Nuevo pedido $code${name == null || name.isEmpty ? '' : ' de $name'}',
+        '$total · Ábrelo en Ventas › Cotizaciones',
+        const NotificationDetails(android: _ordersChannel),
+      );
+    } catch (e) {
+      debugPrint('Aviso de pedido: $e');
+    }
+  }
+
+  /// «Ana sigue esperando tu respuesta (T-0003)»
+  Future<void> showOrderReminder({required String id, required String code, String? name}) async {
+    if (!_ready || !await ordersEnabled()) return;
+    try {
+      await _plugin.show(
+        (id.hashCode ^ 0x5a5a) & 0x7fffffff,
+        '${name == null || name.isEmpty ? 'Un cliente' : name} sigue esperando tu respuesta',
+        'Pedido $code de tu tienda en línea, sin abrir hace más de 2 horas.',
+        const NotificationDetails(android: _ordersChannel),
+      );
+    } catch (e) {
+      debugPrint('Recordatorio de pedido: $e');
+    }
+  }
 
   Future<int> summaryHour() async =>
       int.tryParse(await AppDatabase.instance.getSetting(summaryHourKey) ?? '') ?? defaultSummaryHour;

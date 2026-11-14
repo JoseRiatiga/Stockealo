@@ -14,6 +14,7 @@ import 'package:stockealo/features/services/data/service_board.dart';
 import 'package:stockealo/features/services/data/services_repository.dart';
 import 'package:stockealo/features/services/models/service_models.dart';
 import 'package:stockealo/features/services/data/appointments_repository.dart';
+import 'package:stockealo/features/services/data/commissions_repository.dart';
 import 'package:stockealo/features/services/models/appointment.dart';
 import 'package:stockealo/features/services/models/order_extra.dart';
 import 'package:stockealo/features/services/models/work_schedule.dart';
@@ -419,6 +420,24 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 300));
   });
 
+  test('alquiler de silla: se queda con todo y al pagarle se descuenta por semana (0.14.0)', () async {
+    final (juan, _, lavado, _) = await setUpTeam();
+    await repo.saveStaff(juan.copyWith().copyWithRent(50000, 'SEMANA'));
+    var o = await repo.createOrder(businessId: businessId, vehicleKind: 'MOTO', lines: [lineOf(lavado, 'MOTO')], now: now);
+    final board = await repo.loadBoard(businessId, now: now);
+    o = await repo.startLine(o, 0, [juan.id], board: board, now: now);
+    o = await repo.finishLine(o, 0, now: now);
+    final sales = await SalesRepository.instance.recordServiceSale(order: o, paymentMethod: 'EFECTIVO', now: now);
+    await repo.markPaid(o, saleIds: [for (final s in sales) s.id], paymentMethod: 'EFECTIVO', total: 10000, now: now);
+    final comm = CommissionsRepository.instance;
+    final pending = (await comm.pending(businessId)).firstWhere((e) => e.staffId == juan.id);
+    expect(pending.commissions, 10000, reason: 'el 100 % del lavado');
+    final staff = (await repo.getStaff(businessId)).firstWhere((s) => s.id == juan.id);
+    expect(CommissionsRepository.chairRentFor(staff, pending).periods, 1);
+    final net = await comm.withChairRent(businessId, pending, staff);
+    expect(net.total, 10000 - 50000, reason: 'esa semana trabajó poco: queda debiendo el resto del alquiler');
+  });
+
   test('historial en vivo por placa, nombre o teléfono', () async {
     final (_, _, lavado, _) = await setUpTeam();
     await repo.createOrder(
@@ -448,4 +467,12 @@ void main() {
     expect(WorkSchedule.decode(WorkSchedule.typical.encode())?.days, WorkSchedule.typical.days);
     expect(WorkSchedule.decode('no es json'), isNull);
   });
+}
+
+extension on StaffMember {
+  StaffMember copyWithRent(double rent, String period) => StaffMember(
+        id: id, businessId: businessId, name: name, phone: phone, document: document, commissionPct: commissionPct,
+        isActive: isActive, memberEmail: memberEmail, schedule: schedule, chairRent: rent, rentPeriod: period,
+        createdAt: createdAt, updatedAt: updatedAt,
+      );
 }

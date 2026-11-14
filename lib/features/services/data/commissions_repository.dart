@@ -14,6 +14,7 @@ import '../../customers/data/debt_reminder.dart';
 import '../../team/data/activity_repository.dart';
 import '../models/commission_models.dart';
 import '../models/service_models.dart';
+import 'services_repository.dart';
 
 /// Un servicio cobrado: su venta, lo cobrado después del descuento y la línea del trabajo
 typedef ChargedLine = ({String saleId, double total, WorkOrderLine line});
@@ -69,8 +70,14 @@ class CommissionsRepository {
   }) async {
     final at = now ?? DateTime.now();
     final created = <Commission>[];
+    // Quien alquila la silla se queda con todo lo de sus servicios (0.14.0)
+    final renters = {
+      for (final s in await ServicesRepository.instance.getStaff(order.businessId, includeInactive: true))
+        if (s.rentsChair) s.id,
+    };
     for (final ch in charged) {
       for (final part in split(ch.total, ch.line.commissionPct, ch.line.staffIds)) {
+        final rents = renters.contains(part.staffId);
         created.add(Commission(
           id: const Uuid().v4(),
           businessId: order.businessId,
@@ -79,8 +86,8 @@ class CommissionsRepository {
           saleId: ch.saleId,
           label: ch.line.name,
           base: part.base,
-          pct: ch.line.commissionPct,
-          amount: part.amount,
+          pct: rents ? 100 : ch.line.commissionPct,
+          amount: rents ? part.base : part.amount,
           date: at,
           updatedAt: at,
         ));
@@ -195,6 +202,43 @@ class CommissionsRepository {
   }
 
   /// Paga lo pendiente de una persona: crea la liquidación y marca sus comisiones
+  /// Alquiler de silla: cuántos periodos (días, semanas o meses) trabajó en lo que se
+  /// le va a pagar, y el valor a descontar
+  static ({int periods, double amount}) chairRentFor(StaffMember staff, StaffEarnings earnings) {
+    if (!staff.rentsChair) return (periods: 0, amount: 0);
+    String keyOf(DateTime d) => switch (staff.rentPeriod) {
+          'DIA' => '${d.year}-${d.month}-${d.day}',
+          'MES' => '${d.year}-${d.month}',
+          // Semana: el lunes de esa semana
+          _ => () {
+              final monday = DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
+              return '${monday.year}-${monday.month}-${monday.day}';
+            }(),
+        };
+    final periods = {for (final c in earnings.items.where((c) => c.kind == Commission.kindService)) keyOf(c.date)}.length;
+    return (periods: periods, amount: _round(periods * staff.chairRent!));
+  }
+
+  /// Descuenta el alquiler de la silla antes de pagar: queda como un ajuste negativo
+  /// («Alquiler de silla · 2 semanas») dentro de lo que se paga
+  Future<StaffEarnings> withChairRent(String businessId, StaffEarnings earnings, StaffMember staff, {DateTime? now}) async {
+    final rent = chairRentFor(staff, earnings);
+    if (rent.amount <= 0) return earnings;
+    final at = now ?? DateTime.now();
+    final adj = Commission(
+      id: const Uuid().v4(),
+      businessId: businessId,
+      staffId: staff.id,
+      kind: Commission.kindAdjustment,
+      label: 'Alquiler de silla · ${rent.periods} ${staff.rentPeriodLabel}${rent.periods == 1 ? '' : (staff.rentPeriod == 'MES' ? 'es' : 's')}',
+      amount: -rent.amount,
+      date: at,
+      updatedAt: at,
+    );
+    await _insert(adj);
+    return StaffEarnings(earnings.staffId, [...earnings.items, adj]);
+  }
+
   Future<StaffPayout> pay(String businessId, StaffEarnings earnings, {String? staffName, DateTime? now}) async {
     if (earnings.items.isEmpty) throw StateError('No hay nada pendiente por pagar.');
     final at = now ?? DateTime.now();

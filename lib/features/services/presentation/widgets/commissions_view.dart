@@ -81,13 +81,18 @@ class _CommissionsViewState extends State<CommissionsView> {
 
   Future<void> _pay(StaffEarnings e) async {
     final name = _name(e.staffId);
+    // Alquiler de silla (0.14.0): se descuenta de lo que le toca
+    final renter = _staff[e.staffId];
+    final rent = renter == null ? (periods: 0, amount: 0.0) : CommissionsRepository.chairRentFor(renter, e);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AppDialog(
 title: '¿Pagar ${CurrencyFormatter.format(e.total)} a $name?',
 content: Text(
           '${e.services} ${e.services == 1 ? 'servicio' : 'servicios'} · comisiones ${CurrencyFormatter.format(e.commissions)}'
-          '${e.tips != 0 ? ' · propinas ${CurrencyFormatter.format(e.tips)}' : ''}.\n\n'
+          '${e.tips != 0 ? ' · propinas ${CurrencyFormatter.format(e.tips)}' : ''}.\n'
+          '${rent.amount > 0 ? 'Alquiler de silla (${rent.periods} ${renter!.rentPeriodLabel}): −${CurrencyFormatter.format(rent.amount)}. '
+              'Le pagas ${CurrencyFormatter.format(e.total - rent.amount)}.\n' : ''}\n'
           'Queda como pagado y ya no aparece pendiente.',
         ),
 actions: [
@@ -98,6 +103,7 @@ actions: [
     );
     if (ok != true) return;
     try {
+      if (rent.amount > 0) e = await _repo.withChairRent(widget.business.id, e, renter!);
       await _repo.pay(widget.business.id, e, staffName: name);
       if (!mounted) return;
       final staff = _staff[e.staffId];

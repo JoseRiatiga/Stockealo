@@ -1199,9 +1199,15 @@ class SupabaseService {
         try {
           await db.from('staff').upsert(staffRow, onConflict: 'id');
         } catch (e) {
-          // La nube todavía no tiene la columna del horario: se guarda lo demás
-          if (!e.toString().contains('schedule') && !e.toString().contains('42703')) rethrow;
-          staffRow.remove('schedule');
+          // La nube todavía no tiene las columnas nuevas: se guarda lo demás
+          if (!e.toString().contains('schedule') && !e.toString().contains('chair_rent') &&
+              !e.toString().contains('rent_period') && !e.toString().contains('42703')) {
+            rethrow;
+          }
+          staffRow
+            ..remove('schedule')
+            ..remove('chair_rent')
+            ..remove('rent_period');
           await db.from('staff').upsert(staffRow, onConflict: 'id');
         }
       case 'upsert_work_order':

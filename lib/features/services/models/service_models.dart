@@ -145,6 +145,17 @@ class StaffMember {
 
   /// Horario propio (JSON de [WorkSchedule]); null = usa el del negocio
   final String? schedule;
+
+  /// Alquiler de silla (0.14.0): paga este valor por [rentPeriod] y se queda con todo
+  /// lo de sus servicios. null o 0 = gana por comisión.
+  final double? chairRent;
+
+  /// 'DIA', 'SEMANA' o 'MES'
+  final String? rentPeriod;
+
+  bool get rentsChair => (chairRent ?? 0) > 0;
+
+  String get rentPeriodLabel => switch (rentPeriod) { 'DIA' => 'día', 'MES' => 'mes', _ => 'semana' };
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -158,6 +169,8 @@ class StaffMember {
     this.isActive = true,
     this.memberEmail,
     this.schedule,
+    this.chairRent,
+    this.rentPeriod,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -189,6 +202,8 @@ class StaffMember {
         isActive: isActive ?? this.isActive,
         memberEmail: memberEmail,
         schedule: clearSchedule ? null : (schedule ?? this.schedule),
+        chairRent: chairRent,
+        rentPeriod: rentPeriod,
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -203,6 +218,8 @@ class StaffMember {
         'is_active': isActive ? 1 : 0,
         'member_email': memberEmail,
         'schedule': schedule,
+        'chair_rent': chairRent,
+        'rent_period': rentPeriod,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };
@@ -217,6 +234,8 @@ class StaffMember {
         isActive: m['is_active'] == true || m['is_active'] == 1,
         memberEmail: m['member_email'] as String?,
         schedule: m['schedule'] as String?,
+        chairRent: (m['chair_rent'] as num?)?.toDouble(),
+        rentPeriod: m['rent_period'] as String?,
         createdAt: DateTime.tryParse(m['created_at'] as String? ?? '') ?? DateTime.now(),
         updatedAt: DateTime.tryParse(m['updated_at'] as String? ?? '') ?? DateTime.now(),
       );

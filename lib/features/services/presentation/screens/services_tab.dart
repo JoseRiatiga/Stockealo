@@ -16,6 +16,7 @@ import '../widgets/messages_view.dart';
 import '../../../../core/design/filter_tabs.dart';
 import '../../../../core/design/status_pill.dart';
 import '../widgets/agenda_view.dart';
+import '../../../pro/data/pro_service.dart';
 
 /// Secciones de la pestaña Servicios
 enum ServicesSection {
@@ -93,10 +94,15 @@ class _ServicesTabState extends State<ServicesTab> {
       return TemplatePicker(business: b, canConfigure: _canConfigure);
     }
     final template = ServiceTemplate.of(b.serviceType);
+    // Gratis (0.14.0): catálogo, tablero, agenda, empleados (hasta 3) y cobro.
+    // Comisiones y mensajes son de Pro Servicios.
+    final pro = ProService.instance.status.value.services;
     final sections = [
       for (final s in ServicesSection.values)
         // Comisiones y catálogo: solo dueño o administrador
-        if (!const {ServicesSection.catalog, ServicesSection.commissions, ServicesSection.messages}.contains(s) || _canConfigure) s,
+        if ((!const {ServicesSection.catalog, ServicesSection.commissions, ServicesSection.messages}.contains(s) || _canConfigure) &&
+            (pro || !const {ServicesSection.commissions, ServicesSection.messages}.contains(s)))
+          s,
     ];
 
     return Scaffold(

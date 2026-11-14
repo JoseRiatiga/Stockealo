@@ -13,6 +13,7 @@ import '../../models/commission_models.dart';
 import '../../models/work_schedule.dart';
 import 'schedule_editor.dart';
 import 'staff_section.dart';
+import '../../../pro/data/pro_service.dart';
 
 /// Servicios › Empleados (antes «Asistencia», 0.13.1): quién vino, qué está haciendo
 /// y lo que lleva hoy cada uno. Se agregan personas aquí mismo (la misma hoja de
@@ -139,7 +140,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                           ),
                       ],
                     ),
-                    if (widget.canEdit) ...[
+                    if (widget.canEdit && ProService.instance.status.value.services) ...[
                       const SizedBox(height: AppSpace.md),
                       _card(
                         child: SwitchListTile(
@@ -156,7 +157,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                         ),
                       ),
                     ],
-                    if (widget.canEdit || board.globalSchedule != null) ...[
+                    if (ProService.instance.status.value.services && (widget.canEdit || board.globalSchedule != null)) ...[
                       const SizedBox(height: AppSpace.sm),
                       _card(
                         child: ListTile(

@@ -41,6 +41,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../store/data/store_orders_repository.dart';
 import 'package:intl/intl.dart';
 import '../../../services/data/appointments_repository.dart';
+import '../../../services/models/service_template.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -347,7 +348,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     });
   }
 
-  bool get _showServices => ProService.instance.status.value.services;
+  /// Servicios se ve con Pro Servicios y, desde la 0.14.0, gratis (hasta 3 empleados)
+  /// en los negocios de servicios: los que eligieron un tipo de servicio al crearse o
+  /// ya lo usan
+  bool get _showServices {
+    final b = _activeBusiness;
+    return ProService.instance.status.value.services ||
+        (b != null && (b.servicesEnabled || ServiceTemplate.suggestedFor(b.icon) != null));
+  }
 
   /// Ajustes › Equipo, donde se agregan las personas que hacen los servicios
   Future<void> _openTeam() async {

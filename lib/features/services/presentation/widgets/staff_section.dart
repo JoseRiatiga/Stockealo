@@ -9,6 +9,7 @@ import '../../models/service_models.dart';
 import '../../models/work_schedule.dart';
 import 'schedule_editor.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../pro/data/pro_service.dart';
 
 /// Ajustes › Equipo › Personas que hacen los servicios (Pro Servicios).
 /// No necesitan cuenta en la app. La comisión es la de cada servicio.
@@ -133,7 +134,22 @@ class StaffEditor extends StatefulWidget {
   const StaffEditor({super.key, required this.business, this.person});
 
   /// true si se guardó
+  /// Empleados sin Pro Servicios (0.14.0)
+  static const freeLimit = 3;
+
   static Future<bool> show(BuildContext context, {required Business business, StaffMember? person}) async {
+    // Plan gratis: hasta 3 empleados activos
+    if (person == null && !ProService.instance.status.value.services) {
+      final active = (await ServicesRepository.instance.getStaff(business.id)).where((s) => s.isActive).length;
+      if (active >= freeLimit) {
+        if (context.mounted) {
+          AppToast.showWarning(context,
+              'Con el plan gratis puedes tener hasta $freeLimit empleados. Con Pro Servicios, sin límite y con comisiones.');
+        }
+        return false;
+      }
+    }
+    if (!context.mounted) return false;
     final saved = await AppSheet.show<bool>(
       context: context,
       title: person == null ? 'Agregar empleado' : 'Editar empleado',
@@ -227,7 +243,8 @@ class _StaffEditorState extends State<StaffEditor> {
             controller: _document,
             decoration: const InputDecoration(labelText: 'Documento (opcional)'),
           ),
-          ListTile(
+          // Horario propio: Pro Servicios
+          if (ProService.instance.status.value.services) ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.schedule_outlined),
             title: const Text('Horario'),

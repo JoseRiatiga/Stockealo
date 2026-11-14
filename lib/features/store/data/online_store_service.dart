@@ -23,6 +23,9 @@ class OnlineStoreConfig {
   /// Título grande de la portada (plantilla Moda): «Chaquetas y abrigos para el frío»
   final String? heroTitle;
 
+  /// La portada muestra fotos de los productos (plantilla Moda)
+  final bool heroPhotos;
+
   const OnlineStoreConfig({
     required this.slug,
     required this.enabled,
@@ -31,6 +34,7 @@ class OnlineStoreConfig {
     this.showStock = false,
     this.template = StoreTemplate.classic,
     this.heroTitle,
+    this.heroPhotos = true,
   });
 
   factory OnlineStoreConfig.fromJson(Map<String, dynamic> j) => OnlineStoreConfig(
@@ -41,6 +45,7 @@ class OnlineStoreConfig {
         showStock: j['show_stock'] == true,
         template: StoreTemplate.of(j['template'] as String?),
         heroTitle: j['hero_title'] as String?,
+        heroPhotos: j['hero_photos'] != false,
       );
 
   String get url => '$storeBaseUrl/$slug';
@@ -105,6 +110,41 @@ class StoreVariant {
       );
 }
 
+/// Promoción vigente de un producto en la tienda (0.13.4)
+class StorePromo {
+  final String name;
+  final bool isPercent;
+  final double percentOff;
+  final int buyQty;
+  final int payQty;
+  final DateTime? endsAt;
+
+  const StorePromo({
+    required this.name,
+    required this.isPercent,
+    this.percentOff = 0,
+    this.buyQty = 2,
+    this.payQty = 1,
+    this.endsAt,
+  });
+
+  /// En la cinta: «−20 %» o «2×1»
+  String get badge => isPercent ? '−${percentOff.round()} %' : '$buyQty×$payQty';
+
+  static StorePromo? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final j = Map<String, dynamic>.from(raw);
+    return StorePromo(
+      name: j['name'] as String? ?? 'Promoción',
+      isPercent: j['kind'] == 'PERCENT',
+      percentOff: (j['percent_off'] as num?)?.toDouble() ?? 0,
+      buyQty: (j['buy_qty'] as num?)?.toInt() ?? 2,
+      payQty: (j['pay_qty'] as num?)?.toInt() ?? 1,
+      endsAt: DateTime.tryParse('${j['ends_at'] ?? ''}')?.toLocal(),
+    );
+  }
+}
+
 /// Un producto de la tienda pública
 class StoreProduct {
   final String id;
@@ -125,6 +165,9 @@ class StoreProduct {
   /// Quedan 3 o menos (producto sin tallas ni colores)
   final bool few;
 
+  /// Promoción vigente (con % el [price] ya viene rebajado y [oldPrice] es el de antes)
+  final StorePromo? promo;
+
   const StoreProduct({
     required this.id,
     required this.name,
@@ -135,6 +178,7 @@ class StoreProduct {
     this.oldPrice,
     this.variants = const [],
     this.few = false,
+    this.promo,
   });
 
   /// Tallas y colores que todavía se pueden pedir
@@ -147,19 +191,28 @@ class StoreProduct {
   List<String> get sizes => [for (final s in available.map((v) => v.size).whereType<String>().toSet()) s];
   List<String> get colorHexes => [for (final h in available.map((v) => v.hex).whereType<String>().toSet()) h];
 
-  factory StoreProduct.fromJson(Map<String, dynamic> j) => StoreProduct(
+  factory StoreProduct.fromJson(Map<String, dynamic> j) {
+    final promo = StorePromo.fromJson(j['promo']);
+    final base = (j['price'] as num?)?.toDouble() ?? 0;
+    final before = (j['old_price'] as num?)?.toDouble();
+    // Con % de descuento: se cobra rebajado y se tacha el precio normal
+    final pct = promo != null && promo.isPercent && promo.percentOff > 0;
+    final price = pct ? (base * (100 - promo.percentOff) / 100).roundToDouble() : base;
+    return StoreProduct(
         id: j['id'] as String,
         name: j['name'] as String? ?? '',
         category: (j['category'] as String? ?? '').trim(),
-        price: (j['price'] as num?)?.toDouble() ?? 0,
+        price: price,
         imageUrl: j['image_url'] as String?,
         stock: (j['stock'] as num?)?.toInt(),
-        oldPrice: (j['old_price'] as num?)?.toDouble(),
+        oldPrice: pct ? ((before ?? 0) > base ? before : base) : before,
         few: j['few'] == true,
+        promo: promo,
         variants: [
           for (final v in (j['variants'] as List? ?? const [])) StoreVariant.fromJson(Map<String, dynamic>.from(v as Map)),
         ],
       );
+  }
 }
 
 /// Lo que ve el comprador en stockealo.online/tienda/<slug>
@@ -175,6 +228,9 @@ class PublicStore {
   final String template;
   final String? heroTitle;
 
+  /// La portada muestra fotos de los productos
+  final bool heroPhotos;
+
   const PublicStore({
     required this.slug,
     required this.whatsapp,
@@ -186,6 +242,7 @@ class PublicStore {
     this.color,
     this.template = StoreTemplate.classic,
     this.heroTitle,
+    this.heroPhotos = true,
   });
 
   factory PublicStore.fromJson(Map<String, dynamic> j) {
@@ -200,6 +257,7 @@ class PublicStore {
       currency: b['currency'] as String? ?? 'COP',
       template: StoreTemplate.of(j['template'] as String?),
       heroTitle: j['hero_title'] as String?,
+      heroPhotos: j['hero_photos'] != false,
       products: [
         for (final p in (j['products'] as List? ?? const [])) StoreProduct.fromJson(Map<String, dynamic>.from(p as Map)),
       ],
@@ -225,7 +283,14 @@ class CartLine {
   static String keyOf(StoreProduct p, StoreVariant? v) => v == null ? p.id : '${p.id}:${v.id}';
   String get name => variant == null ? product.name : '${product.name} (${variant!.label})';
   double get unitPrice => product.price + (variant?.extra ?? 0);
-  double get subtotal => unitPrice * quantity;
+
+  /// Con «lleva X, paga Y» se descuentan las unidades de regalo (0.13.4)
+  double get subtotal {
+    final promo = product.promo;
+    if (promo == null || promo.isPercent || promo.buyQty <= promo.payQty) return unitPrice * quantity;
+    final free = (quantity ~/ promo.buyQty) * (promo.buyQty - promo.payQty);
+    return unitPrice * (quantity - free);
+  }
   int? get stock => variant?.stock ?? product.stock;
 }
 
@@ -268,6 +333,7 @@ class OnlineStoreService {
     bool showStock = false,
     String template = StoreTemplate.classic,
     String? heroTitle,
+    bool heroPhotos = true,
   }) async {
     final client = _client;
     if (client == null || client.auth.currentSession == null) {
@@ -281,21 +347,23 @@ class OnlineStoreService {
       'p_welcome': welcome,
       'p_show_stock': showStock,
     };
-    try {
-      final data = await client.rpc('save_my_store', params: {...params, 'p_template': template, 'p_hero_title': heroTitle});
-      return OnlineStoreConfig.fromJson(Map<String, dynamic>.from(data as Map));
-    } on PostgrestException catch (e) {
-      // La nube todavía no tiene las plantillas (función de 8 datos): se guarda lo demás
-      if (e.code == 'PGRST202') {
-        try {
-          final data = await client.rpc('save_my_store', params: params);
-          return OnlineStoreConfig.fromJson(Map<String, dynamic>.from(data as Map));
-        } on PostgrestException catch (e2) {
-          throw OnlineStoreException(errorMessage(e2.message));
-        }
+    // De la versión más nueva a la más vieja: si la nube no tiene una función (PGRST202),
+    // se prueba la anterior y se guarda lo que se pueda
+    final tries = [
+      {...params, 'p_template': template, 'p_hero_title': heroTitle, 'p_hero_photos': heroPhotos},
+      {...params, 'p_template': template, 'p_hero_title': heroTitle},
+      params,
+    ];
+    for (var i = 0; i < tries.length; i++) {
+      try {
+        final data = await client.rpc('save_my_store', params: tries[i]);
+        return OnlineStoreConfig.fromJson(Map<String, dynamic>.from(data as Map));
+      } on PostgrestException catch (e) {
+        if (e.code == 'PGRST202' && i < tries.length - 1) continue;
+        throw OnlineStoreException(errorMessage(e.message));
       }
-      throw OnlineStoreException(errorMessage(e.message));
     }
+    throw const OnlineStoreException('No se pudo guardar la tienda.');
   }
 
   /// Tienda pública; null si no existe o no está disponible
@@ -328,24 +396,69 @@ class OnlineStoreService {
       !const ['app', 'admin', 'tienda', 'api', 'www', 'stockealo', 'soporte', 'ayuda'].contains(slug);
 
   /// Mensaje de WhatsApp con el pedido
+  /// Guarda el pedido en la nube con su código por negocio (T-0001). Devuelve el código,
+  /// o null si no se pudo (sin conexión o la nube aún no tiene pedidos): el pedido sigue
+  /// por WhatsApp como antes. (0.13.4)
+  Future<String?> createOrder({
+    required String slug,
+    required String customerName,
+    String? customerPhone,
+    String? note,
+    required List<CartLine> lines,
+  }) async {
+    final client = _client;
+    if (client == null) return null;
+    try {
+      final data = await client.rpc('create_store_order', params: {
+        'p_slug': slug,
+        'p_customer_name': customerName.trim(),
+        'p_customer_phone': customerPhone?.trim(),
+        'p_note': note?.trim(),
+        'p_lines': [
+          for (final l in lines)
+            {
+              'product_id': l.product.id,
+              'variant_id': l.variant?.id,
+              'variant_name': l.variant?.label,
+              'name': l.name,
+              'quantity': l.quantity,
+              'unit_price': l.unitPrice,
+              'subtotal': l.subtotal,
+            },
+        ],
+        'p_total': lines.fold<double>(0, (s, l) => s + l.subtotal),
+      });
+      return (data as Map)['code'] as String?;
+    } catch (e) {
+      debugPrint('No se pudo guardar el pedido: $e');
+      return null;
+    }
+  }
+
   static String orderMessage({
     required String businessName,
     required List<CartLine> lines,
     required String currency,
     String? customerName,
     String? note,
+
+    /// Código del pedido (T-0001), para buscarlo en Ventas › Cotizaciones
+    String? code,
+    String? phone,
   }) {
     String money(num v) => CurrencyFormatter.formatIn(v, currency);
     final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
     final name = customerName?.trim() ?? '';
     final extra = note?.trim() ?? '';
+    final cel = phone?.trim() ?? '';
     return [
-      'Hola $businessName, quiero hacer este pedido:',
+      code == null ? 'Hola $businessName, quiero hacer este pedido:' : 'Hola $businessName, quiero hacer el pedido $code:',
       '',
       for (final l in lines) '• ${l.quantity} × ${l.name} — ${money(l.subtotal)}',
       '',
       'Total: ${money(total)}',
       if (name.isNotEmpty) 'A nombre de: $name',
+      if (cel.isNotEmpty) 'Celular: $cel',
       if (extra.isNotEmpty) 'Nota: $extra',
       '',
       'Pedido hecho desde la tienda en línea (Stockealo).',

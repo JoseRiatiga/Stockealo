@@ -285,7 +285,7 @@ class ProductRepository {
       );
 
       // Eliminar también de Supabase en tiempo real
-      await SupabaseService.instance.deleteProductFromCloud(id);
+      await SupabaseService.instance.deleteProductFromCloud(id, businessId: businessId);
       ActivityRepository.instance.log(
         businessId: businessId,
         action: ActivityAction.productDelete,

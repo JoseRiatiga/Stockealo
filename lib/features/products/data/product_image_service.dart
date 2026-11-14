@@ -67,6 +67,8 @@ class ProductImageService {
       debugPrint('Subir foto: $e');
       throw const ProductImageException('No se pudo subir la foto. Revisa tu conexión e inténtalo de nuevo.');
     }
+    // La foto anterior en otro formato (.jpg → .png) ya no se usa
+    await SupabaseService.instance.removeStorageFiles(_bucket, businessId, prefix: productId, keep: '$productId.$ext');
     final url = client.storage.from(_bucket).getPublicUrl(path);
     return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
   }
@@ -90,6 +92,11 @@ class ProductImageService {
       final data = Map<String, dynamic>.from(res.data as Map);
       final imageUrl = data['url'] as String?;
       if (imageUrl == null) throw const ProductImageException('No pudimos traer la foto de esa página.');
+      // La foto anterior en otro formato ya no se usa
+      final name = Uri.tryParse(imageUrl)?.pathSegments.lastOrNull;
+      if (name != null) {
+        await SupabaseService.instance.removeStorageFiles(_bucket, businessId, prefix: productId, keep: name);
+      }
       return imageUrl;
     } on FunctionException catch (e) {
       final details = e.details is Map ? e.details as Map : const {};

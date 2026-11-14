@@ -85,16 +85,46 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     return Scaffold(
       backgroundColor: c.paper,
       appBar: widget.embedded ? null : AppBar(title: const Text('Proveedores'), actions: _actions(context)),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _new,
-        icon: const Icon(Icons.add_outlined),
-        label: const Text('Nuevo proveedor'),
-      ),
+      // Dentro de Clientes y proveedores la acción va arriba (re-diseño 0.13.4, sin botón flotante)
+      floatingActionButton: widget.embedded
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _new,
+              icon: const Icon(Icons.add_outlined),
+              label: const Text('Nuevo proveedor'),
+            ),
       body: ContentWidth(
         child: widget.embedded ? Column(children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, 0),
-            child: Row(mainAxisAlignment: MainAxisAlignment.end, children: _actions(context)),
+            padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, 0),
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpace.md,
+              runSpacing: AppSpace.sm,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Proveedores', style: AppText.title(context)),
+                    Text('A quién le compras, pedidos y entradas de mercancía', style: AppText.small(context)),
+                  ],
+                ),
+                Wrap(
+                  spacing: AppSpace.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ..._actions(context),
+                    FilledButton.icon(
+                      onPressed: _new,
+                      icon: const Icon(Icons.add_outlined, size: 18),
+                      label: const Text('Nuevo proveedor'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           Expanded(child: _content(list)),
         ]) : _content(list),

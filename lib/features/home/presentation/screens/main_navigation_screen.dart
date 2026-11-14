@@ -34,6 +34,7 @@ import '../widgets/where_things_moved_sheet.dart';
 import '../widgets/global_search_dialog.dart';
 import '../widgets/notifications_modal.dart';
 import '../../../dashboard/presentation/widgets/stocky_floating_button.dart';
+import '../../../../core/widgets/sync_banner.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -353,14 +354,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
             final body = Stack(
               children: [
                 stack,
+                // Aviso de la nube: sin conexión o cambios con error (abajo al centro-izquierda)
+                Positioned(
+                  left: isWide ? AppSpace.xl : AppSpace.md,
+                  right: isWide ? 260 : 96,
+                  bottom: (isWide ? AppSpace.xl : AppSpace.lg) + MediaQuery.of(context).padding.bottom,
+                  child: const Align(alignment: Alignment.bottomLeft, child: SyncBanner()),
+                ),
                 // Stocky abajo a la derecha (no en Ajustes ni Reportes)
                 if (showStocky)
                   Positioned(
                     right: isWide ? AppSpace.xl : AppSpace.lg,
-                    // Productos y Clientes y proveedores tienen su botón abajo a la derecha: Stocky va encima
-                    bottom: (isWide ? AppSpace.xl : AppSpace.lg) +
-                        MediaQuery.of(context).padding.bottom +
-                        (_currentIndex == AppPlace.productos || _currentIndex == AppPlace.personas ? 72 : 0),
+                    bottom: (isWide ? AppSpace.xl : AppSpace.lg) + MediaQuery.of(context).padding.bottom,
                     child: StockyFloatingButton(businessId: _activeBusiness?.id, onNavigateToTab: _navigateToTab),
                   ),
               ],

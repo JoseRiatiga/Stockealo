@@ -19,6 +19,7 @@ import '../../../reports/models/catalog_style.dart';
 import '../../models/product.dart';
 import '../../../business/presentation/business_identity.dart';
 import 'story_catalog_modal.dart';
+import '../../../sales/data/promotions_repository.dart';
 
 /// Arma el catálogo del negocio: qué productos, cómo se ve y qué datos de
 /// contacto lleva. El estilo se recuerda por negocio y sirve para el PDF y las
@@ -80,10 +81,19 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
     ProService.instance.refresh(widget.business.id);
     // refresh limpia al instante el estado si era de otro negocio
     _pro = ProService.instance.status.value.active;
+    _loadPromotions();
+  }
+
+  /// Con Pro, los catálogos muestran las promociones vigentes con su cinta (0.13.4)
+  Future<void> _loadPromotions() async {
+    final live = await PromotionsRepository.instance.live(widget.business.id);
+    _pdfService.promotions = _pro ? live : const [];
+    if (mounted) setState(() {});
   }
 
   void _onProChanged() {
     if (mounted) setState(() => _pro = ProService.instance.status.value.active);
+    _loadPromotions();
   }
 
   /// Las opciones Pro se pueden probar en la vista previa; Pro se pide al

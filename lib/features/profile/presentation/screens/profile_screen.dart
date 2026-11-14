@@ -40,6 +40,7 @@ import '../../../pro/presentation/screens/pro_screen.dart';
 import '../../../../core/services/phone_alerts_service.dart';
 import '../../../backup/data/backup_service.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/services/sync_queue.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -1182,14 +1183,27 @@ actions: [
               onChanged: _toggleCloudSync,
             ),
           if (_isCloudSyncEnabled)
-            SettingsRow(
-              icon: Icons.sync_outlined,
-              title: _isManualSyncing ? 'Sincronizando…' : 'Sincronizar ahora',
-              subtitle: 'Sube y baja los últimos cambios',
-              onTap: _isManualSyncing ? null : _runManualSync,
-              trailing: _isManualSyncing
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : null,
+            // Dice qué falta por subir; «Sincronizar ahora» reintenta también lo que quedó con error
+            ValueListenableBuilder<SyncStatus>(
+              valueListenable: SyncQueue.instance.status,
+              builder: (context, sync, _) => SettingsRow(
+                icon: Icons.sync_outlined,
+                title: _isManualSyncing ? 'Sincronizando…' : 'Sincronizar ahora',
+                subtitle: sync.failed > 0
+                    ? '${sync.failed} ${sync.failed == 1 ? 'cambio no se pudo' : 'cambios no se pudieron'} subir. Toca para reintentar'
+                    : sync.pending > 0
+                        ? '${sync.pending} ${sync.pending == 1 ? 'cambio espera' : 'cambios esperan'} subir${sync.offline ? ' (sin conexión)' : ''}'
+                        : 'Todo está guardado en la nube',
+                onTap: _isManualSyncing
+                    ? null
+                    : () async {
+                        await SyncQueue.instance.retryFailed();
+                        await _runManualSync();
+                      },
+                trailing: _isManualSyncing
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : null,
+              ),
             ),
         ]),
         if (AutoBackupService.instance.isSupported)

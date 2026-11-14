@@ -38,7 +38,12 @@ const _moda = PublicStore(
       name: 'Abrigo largo camel',
       category: 'Chaquetas y abrigos',
       price: 189000,
-      variants: [StoreVariant(id: 'a-s', size: 'S'), StoreVariant(id: 'a-m', size: 'M')],
+      variants: [
+        StoreVariant(id: 'a-s-c', size: 'S', color: 'Camel', hex: '#C19A6B'),
+        StoreVariant(id: 'a-s-n', size: 'S', color: 'Negro', hex: '#111111', few: true),
+        StoreVariant(id: 'a-m-c', size: 'M', color: 'Camel', hex: '#C19A6B', soldOut: true),
+        StoreVariant(id: 'a-l-c', size: 'L', color: 'Camel', hex: '#C19A6B'),
+      ],
     ),
     StoreProduct(
       id: 'b',
@@ -155,8 +160,8 @@ void main() {
     expect(find.textContaining('159.000'), findsOneWidget, reason: 'el precio de antes, tachado');
     await _save(tester, key, 'tienda_moda');
 
-    // Filtro por talla M: solo el abrigo
-    await tester.tap(find.widgetWithText(ChoiceChip, 'M'));
+    // Filtro por talla S: solo el abrigo (las tallas agotadas no salen en el filtro)
+    await tester.tap(find.widgetWithText(ChoiceChip, 'S'));
     await tester.pumpAndSettle();
     expect(find.text('Abrigo largo camel'), findsOneWidget);
     expect(find.text('Buzo con capota'), findsNothing);
@@ -164,7 +169,16 @@ void main() {
     // Agregar pide la talla
     await tester.tap(find.byTooltip('Elegir talla o color').first);
     await tester.pumpAndSettle();
+    // Primero la talla, debajo los colores de esa talla; la M está agotada
+    expect(find.byTooltip('Agotada'), findsOneWidget);
+    expect(find.text('Elige una talla'), findsOneWidget);
     await tester.tap(find.text('S').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Color en talla S'), findsOneWidget);
+    await tester.tap(find.text('Negro'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quedan pocas, pide pronto'), findsWidgets);
+    await tester.tap(find.textContaining('Agregar al pedido ·'));
     await tester.pumpAndSettle();
     expect(find.text('1 en tu pedido'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -181,6 +195,11 @@ void main() {
     await tester.tap(find.byTooltip('Elegir talla o color').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('S').last);
+    await tester.pumpAndSettle();
+    await _save(tester, key, 'tienda_talla_celular');
+    await tester.tap(find.text('Camel').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Agregar al pedido ·'));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Ver pedido'));
     await tester.pumpAndSettle();

@@ -61,6 +61,18 @@ class Quotation {
   final String? sellerName;
   final List<QuotationItem> items;
 
+  /// De dónde vino el pedido (0.13.4): [sourceLocal], [sourceWhatsApp] o [sourceStore]
+  final String source;
+
+  static const sourceLocal = 'LOCAL';
+  static const sourceWhatsApp = 'WHATSAPP';
+  static const sourceStore = 'TIENDA';
+
+  bool get fromStore => source == sourceStore;
+
+  /// Ya pasó la fecha y nadie la confirmó (los pedidos de la tienda vencen a los 7 días)
+  bool get isExpired => status == 'PENDIENTE' && validUntil != null && DateTime.now().isAfter(validUntil!);
+
   Quotation({
     required this.id,
     required this.businessId,
@@ -75,6 +87,7 @@ class Quotation {
     required this.createdAt,
     this.sellerName,
     this.items = const [],
+    this.source = sourceLocal,
   });
 
   Map<String, dynamic> toMap() => {
@@ -90,6 +103,7 @@ class Quotation {
     'valid_until': validUntil?.toIso8601String(),
     'created_at': createdAt.toIso8601String(),
     'seller_name': sellerName,
+    'source': source,
   };
 
   factory Quotation.fromMap(Map<String, dynamic> map, [List<QuotationItem> items = const []]) => Quotation(
@@ -106,5 +120,6 @@ class Quotation {
     createdAt: DateTime.parse(map['created_at'] as String),
     sellerName: map['seller_name'] as String?,
     items: items,
+    source: map['source'] as String? ?? sourceLocal,
   );
 }

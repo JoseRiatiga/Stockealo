@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/design/app_dialog.dart';
 import '../core/theme/app_tokens.dart';
+import '../core/widgets/app_toast.dart';
 import '../core/utils/currency_formatter.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import 'admin_user_detail.dart';
@@ -211,10 +213,68 @@ class AdminHealthSection extends StatelessWidget {
           bar('Archivos (fotos y logos)', h.storageBytes, h.storageLimitBytes, h.storageUse,
               ' · ${h.storageObjects} ${h.storageObjects == 1 ? 'archivo' : 'archivos'}'),
           Text('Límites del plan gratis de Supabase.', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
+          const SizedBox(height: AppSpace.sm),
+          const _OrphanCleanup(),
         ],
       ),
     );
   }
+}
+
+/// Limpieza única de archivos que ya no usa nadie (0.13.4): primero cuenta y muestra
+/// cuánto espacio libera; solo borra después de confirmar.
+class _OrphanCleanup extends StatefulWidget {
+  const _OrphanCleanup();
+
+  @override
+  State<_OrphanCleanup> createState() => _OrphanCleanupState();
+}
+
+class _OrphanCleanupState extends State<_OrphanCleanup> {
+  bool _busy = false;
+
+  static String _size(num bytes) =>
+      bytes >= 1048576 ? '${(bytes / 1048576).toStringAsFixed(1)} MB' : '${(bytes / 1024).ceil()} KB';
+
+  Future<void> _run() async {
+    setState(() => _busy = true);
+    try {
+      final found = await ProAdminService.instance.orphanFiles();
+      if (!mounted) return;
+      final count = (found['count'] as num?)?.toInt() ?? 0;
+      if (count == 0) {
+        AppToast.show(context, message: 'No hay archivos sin uso.', type: ToastType.success);
+        return;
+      }
+      final ok = await AppDialog.confirm(
+        context: context,
+        title: 'Borrar $count ${count == 1 ? 'archivo sin uso' : 'archivos sin uso'}',
+        message: 'Son fotos de productos que ya no existen y facturas sin compra, con más de un día. '
+            'Liberan ${_size(found['bytes'] as num? ?? 0)}. Los negocios en la papelera no se tocan. '
+            'No se puede deshacer.',
+        confirmText: 'Borrar',
+        destructive: true,
+      );
+      if (!ok || !mounted) return;
+      final done = await ProAdminService.instance.orphanFiles(delete: true);
+      if (!mounted) return;
+      AppToast.show(context, message: 'Se borraron ${done['deleted']} archivos.', type: ToastType.success);
+    } on ProAdminException catch (e) {
+      if (mounted) AppToast.showError(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          onPressed: _busy ? null : _run,
+          icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+          label: Text(_busy ? 'Revisando…' : 'Buscar archivos sin uso'),
+        ),
+      );
 }
 
 class _Row {

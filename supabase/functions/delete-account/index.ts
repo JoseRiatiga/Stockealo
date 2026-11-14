@@ -79,14 +79,18 @@ Deno.serve(async (req) => {
   return json({ deleted: true });
 });
 
+// Todos los archivos del negocio: fotos y logo (product-images) y facturas de compra
+// (purchase-invoices). Según los términos, al borrar la cuenta no se queda nada.
 // deno-lint-ignore no-explicit-any
 async function removeBusinessImages(admin: any, businessId: string): Promise<void> {
-  for (;;) {
-    const { data: files, error } = await admin.storage.from(BUCKET).list(businessId, { limit: 1000 });
-    if (error || !files?.length) return;
-    // deno-lint-ignore no-explicit-any
-    const paths = files.map((f: any) => `${businessId}/${f.name}`);
-    const { error: removeError } = await admin.storage.from(BUCKET).remove(paths);
-    if (removeError || files.length < 1000) return;
+  for (const bucket of [BUCKET, "purchase-invoices"]) {
+    for (;;) {
+      const { data: files, error } = await admin.storage.from(bucket).list(businessId, { limit: 1000 });
+      if (error || !files?.length) break;
+      // deno-lint-ignore no-explicit-any
+      const paths = files.map((f: any) => `${businessId}/${f.name}`);
+      const { error: removeError } = await admin.storage.from(bucket).remove(paths);
+      if (removeError || files.length < 1000) break;
+    }
   }
 }

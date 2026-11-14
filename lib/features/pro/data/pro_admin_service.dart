@@ -431,6 +431,20 @@ class ProAdminService {
     }
   }
 
+  /// Archivos que ya no usa nadie (fotos de productos borrados, facturas sin compra).
+  /// Con [delete] en false solo cuenta; en true los borra. Devuelve count/deleted y bytes.
+  Future<Map<String, dynamic>> orphanFiles({bool delete = false}) async {
+    final client = _client;
+    if (client == null) throw const ProAdminException('Necesitas conexión a internet.');
+    try {
+      final res = await client.functions.invoke('storage-cleanup', body: {'action': delete ? 'delete' : 'count'});
+      return Map<String, dynamic>.from(res.data as Map);
+    } on FunctionException catch (e) {
+      debugPrint('Limpieza de archivos: ${e.details}');
+      throw const ProAdminException('No se pudo revisar los archivos. Inténtalo de nuevo.');
+    }
+  }
+
   List<Map<String, dynamic>> _rows(dynamic data) => [for (final r in data as List) Map<String, dynamic>.from(r as Map)];
 
   // --- Resumen, usuarios, negocios y tiendas ---------------------------------

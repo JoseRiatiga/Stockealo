@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../products/models/product.dart';
 import '../../products/models/product_variant.dart';
 import '../models/cart_item.dart';
+import '../models/promotion.dart';
 
 /// Una venta que se dejó «para después» (el cliente fue por algo y se atiende a otro)
 class HeldSale {
@@ -13,7 +14,7 @@ class HeldSale {
 
   HeldSale({required this.lines, required this.discount, required this.customer, required this.at});
 
-  double get total => (lines.fold<double>(0, (s, l) => s + l.subtotal) - discount).clamp(0, double.infinity);
+  double get total => (lines.fold<double>(0, (s, l) => s + l.netSubtotal) - discount).clamp(0, double.infinity);
   int get units => lines.fold<int>(0, (s, l) => s + l.quantity);
 }
 
@@ -29,16 +30,36 @@ class SellCart extends ChangeNotifier {
 
   /// Descuento a toda la venta, en dinero
   double discount = 0;
+
+  /// Promociones vigentes del negocio: se aplican solas a cada línea (0.13.4)
+  List<Promotion> promotions = const [];
+
+  void setPromotions(List<Promotion> list) {
+    promotions = list;
+    _applyPromotions();
+    notifyListeners();
+  }
+
+  void _applyPromotions() {
+    final now = DateTime.now();
+    for (final l in lines) {
+      l.promotion = Promotion.best(promotions,
+          productId: l.product.id, category: l.product.category, unitPrice: l.unitPrice, quantity: l.quantity, at: now);
+    }
+  }
+
+  /// Lo que descuentan las promociones en toda la cuenta
+  double get promoDiscount => lines.fold<double>(0, (s, l) => s + l.promoDiscount);
   String customer = '';
 
   bool get isEmpty => lines.isEmpty;
   int get units => lines.fold<int>(0, (s, l) => s + l.quantity);
   double get subtotal => lines.fold<double>(0, (s, l) => s + l.subtotal);
-  double get total => (subtotal - discount).clamp(0, double.infinity);
+  double get total => (subtotal - promoDiscount - discount).clamp(0, double.infinity);
   double get cost => lines.fold<double>(0, (s, l) => s + l.totalCost);
 
   /// El descuento más alto sin vender por debajo del costo
-  double get maxSafeDiscount => (subtotal - cost).clamp(0, double.infinity);
+  double get maxSafeDiscount => (subtotal - promoDiscount - cost).clamp(0, double.infinity);
 
   /// Con ese descuento la venta deja pérdida
   bool get hasLoss => lines.isNotEmpty && total < cost - 0.5;
@@ -78,7 +99,7 @@ class SellCart extends ChangeNotifier {
   }
 
   void setDiscount(double value) {
-    discount = value.clamp(0, subtotal).toDouble();
+    discount = value.clamp(0, subtotal - promoDiscount).toDouble();
     notifyListeners();
   }
 
@@ -87,9 +108,11 @@ class SellCart extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// El descuento nunca supera lo que se está vendiendo
+  /// El descuento nunca supera lo que se está vendiendo (y las promociones se recalculan)
   void _fitDiscount() {
-    if (discount > subtotal) discount = subtotal;
+    _applyPromotions();
+    final max = subtotal - promoDiscount;
+    if (discount > max) discount = max < 0 ? 0 : max;
   }
 
   void clear() {
@@ -119,6 +142,7 @@ class SellCart extends ChangeNotifier {
     lines
       ..clear()
       ..addAll(h.lines);
+    _applyPromotions();
     discount = h.discount;
     customer = h.customer;
     notifyListeners();

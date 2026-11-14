@@ -13,6 +13,7 @@ import '../widgets/catalog_view.dart';
 import '../widgets/commissions_view.dart';
 import '../widgets/history_view.dart';
 import '../widgets/messages_view.dart';
+import '../../../../core/design/filter_tabs.dart';
 
 /// Secciones de la pestaña Servicios
 enum ServicesSection {
@@ -104,24 +105,12 @@ class _ServicesTabState extends State<ServicesTab> {
               padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, AppSpace.sm),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Wrap(
-                  spacing: AppSpace.sm,
-                  runSpacing: AppSpace.sm,
-                  children: [
-                    for (final s in sections)
-                      ChoiceChip(
-                        avatar: Icon(s.icon, size: 18, color: _section == s ? c.onAccent : c.inkMuted),
-                        label: Text(s.label),
-                        selected: _section == s,
-                        showCheckmark: false,
-                        selectedColor: c.accent,
-                        labelStyle: TextStyle(
-                          color: _section == s ? c.onAccent : c.ink,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        onSelected: (_) => setState(() => _section = s),
-                      ),
-                  ],
+                // Las secciones con las mismas pestañas del resto de la app (re-diseño 0.13.4)
+                child: FilterTabs<ServicesSection>(
+                  options: {for (final s in sections) s: s.label},
+                  value: _section,
+                  onChanged: (s) => setState(() => _section = s),
+                  wrap: true,
                 ),
               ),
             ),

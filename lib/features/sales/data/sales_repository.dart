@@ -187,6 +187,10 @@ class SalesRepository {
 
     /// Solo con pago mixto: cuánto entró por cada medio (debe sumar el total)
     Map<String, double>? paymentSplit,
+
+    /// «Por entregar» (pedidos): [Sale.toDeliver] y cómo se entrega (recoge o dirección)
+    String? deliveryStatus,
+    String? deliveryNote,
   }) async {
     if (items.isEmpty) {
       throw Exception('El carrito está vacío. Agrega al menos un producto.');
@@ -209,7 +213,9 @@ class SalesRepository {
       }
     }
 
-    final double totalSubtotal = items.fold(0.0, (sum, i) => sum + i.subtotal);
+    // Con promoción: cada línea ya trae su descuento; el descuento a toda la venta se
+    // reparte sobre lo que queda (0.13.4)
+    final double totalSubtotal = items.fold(0.0, (sum, i) => sum + i.netSubtotal);
     final double finalDiscount = discountAmount > 0
         ? discountAmount
         : (discountPercent > 0 ? (totalSubtotal * (discountPercent / 100.0)) : 0.0);
@@ -282,9 +288,10 @@ class SalesRepository {
         final saleId = const Uuid().v4();
 
         // Proporción del descuento asignado a este ítem
-        final double itemProportion = totalSubtotal > 0 ? (item.subtotal / totalSubtotal) : (1.0 / items.length);
+        final double itemProportion = totalSubtotal > 0 ? (item.netSubtotal / totalSubtotal) : (1.0 / items.length);
         final double itemDiscount = finalDiscount * itemProportion;
-        final double itemTotal = (item.subtotal - itemDiscount).clamp(0.0, double.infinity);
+        final double itemTotal = (item.netSubtotal - itemDiscount).clamp(0.0, double.infinity);
+        final promo = item.promoDiscount > 0 ? item.promotion : null;
         final double itemProfit = itemTotal - item.totalCost;
         // Cada línea guarda su parte de cada medio, para que la caja sepa cuánto fue en efectivo
         final String? itemSplit = mixed && finalTotal > 0
@@ -345,10 +352,15 @@ class SalesRepository {
           'payment_status': paymentMethod == 'FIADO' ? 'PENDIENTE' : 'PAGADO',
           'notes': notes,
           'invoice_number': invoiceNumber,
-          'discount_amount': itemDiscount,
+          'discount_amount': itemDiscount + (promo == null ? 0 : item.promoDiscount),
           'variant_id': item.variant?.id,
           'variant_name': item.variant?.label,
           'payment_split': itemSplit,
+          'promotion_id': promo?.id,
+          'promotion_name': promo?.name,
+          'promotion_discount': promo == null ? 0.0 : item.promoDiscount,
+          'delivery_status': deliveryStatus,
+          'delivery_note': deliveryNote,
           'created_at': now.toIso8601String(),
           'is_synced': 0,
         });
@@ -383,6 +395,11 @@ class SalesRepository {
           variantName: item.variant?.label,
           invoiceNumber: invoiceNumber,
           paymentSplit: itemSplit,
+          promotionId: promo?.id,
+          promotionName: promo?.name,
+          promotionDiscount: promo == null ? 0 : item.promoDiscount,
+          deliveryStatus: deliveryStatus,
+          deliveryNote: deliveryNote,
         );
 
         createdSales.add(sale);
@@ -580,6 +597,9 @@ class SalesRepository {
     double discountAmount = 0.0,
     int validDays = 7,
     String? notes,
+
+    /// De dónde vino: en el local o por WhatsApp (los de la tienda llegan solos)
+    String source = Quotation.sourceLocal,
   }) async {
     if (items.isEmpty) {
       throw Exception('Agrega al menos un producto para generar una cotización.');
@@ -613,6 +633,7 @@ class SalesRepository {
         'notes': notes,
         'status': 'PENDIENTE',
         'valid_until': validUntil.toIso8601String(),
+        'source': source,
         'created_at': now.toIso8601String(),
         'seller_name': seller,
       });
@@ -679,15 +700,52 @@ class SalesRepository {
     ];
   }
 
+  /// Ventas por entregar, agrupadas por número de venta (las más viejas primero)
+  Future<List<List<Sale>>> pendingDeliveries(String businessId) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query('sales',
+        where: 'business_id = ? AND delivery_status = ? AND voided_at IS NULL',
+        whereArgs: [businessId, Sale.toDeliver],
+        orderBy: 'date ASC');
+    final groups = <String, List<Sale>>{};
+    for (final r in rows) {
+      final s = saleFromRow(r);
+      groups.putIfAbsent(s.invoiceNumber ?? s.id, () => []).add(s);
+    }
+    return groups.values.toList();
+  }
+
+  /// «Entregado»: guarda la fecha y lo sube a la nube
+  Future<void> markDelivered(List<Sale> lines) async {
+    final db = await _dbProvider.database;
+    final now = DateTime.now().toIso8601String();
+    for (final s in lines) {
+      await db.update('sales', {'delivery_status': Sale.delivered, 'delivered_at': now}, where: 'id = ?', whereArgs: [s.id]);
+      final row = await db.query('sales', where: 'id = ?', whereArgs: [s.id], limit: 1);
+      if (row.isNotEmpty) SupabaseService.instance.insertSaleToCloud(row.first);
+    }
+    DataEvents.instance.salesChanged();
+  }
+
   /// Elimina una cotización
   Future<void> deleteQuotation(String quotationId) async {
     final db = await _dbProvider.database;
+    await _tellStoreOrder(db, quotationId, 'RECHAZADO');
     await db.delete('quotations', where: 'id = ?', whereArgs: [quotationId]);
+  }
+
+  /// Si era un pedido de la tienda, la nube sabe que se confirmó o se rechazó
+  Future<void> _tellStoreOrder(Database db, String quotationId, String status) async {
+    final row = await db.query('quotations', columns: ['source'], where: 'id = ?', whereArgs: [quotationId], limit: 1);
+    if (row.isNotEmpty && row.first['source'] == Quotation.sourceStore) {
+      await SupabaseService.instance.updateStoreOrderInCloud(quotationId, status);
+    }
   }
 
   /// Marca una cotización como FACTURADA
   Future<void> markQuotationAsBilled(String quotationId) async {
     final db = await _dbProvider.database;
+    await _tellStoreOrder(db, quotationId, 'CONFIRMADO');
     await db.update(
       'quotations',
       {'status': 'FACTURADA'},
@@ -771,6 +829,13 @@ class SalesRepository {
       voidReason: map['void_reason'] as String?,
       voidedBy: map['voided_by'] as String?,
       paymentSplit: map['payment_split'] as String?,
+      // 0.13.4: promoción y «Por entregar»
+      promotionId: map['promotion_id'] as String?,
+      promotionName: map['promotion_name'] as String?,
+      promotionDiscount: (map['promotion_discount'] as num?)?.toDouble() ?? 0,
+      deliveryStatus: map['delivery_status'] as String?,
+      deliveryNote: map['delivery_note'] as String?,
+      deliveredAt: DateTime.tryParse('${map['delivered_at'] ?? ''}'),
     );
   }
 

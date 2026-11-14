@@ -2,6 +2,8 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../cash/data/cash_register_repository.dart';
+import '../../sales/data/sales_repository.dart';
+import '../../store/data/store_orders_repository.dart';
 
 /// Rango del gráfico de ventas del Inicio
 enum HomeRange { days14, month, year }
@@ -19,7 +21,7 @@ class HomeBar {
 }
 
 /// Qué pide atención en el Inicio, de lo más urgente a lo menos
-enum AttentionKind { outOfStock, cashLeftOpen, overdueDebt, lowStock }
+enum AttentionKind { outOfStock, cashLeftOpen, overdueDebt, lowStock, storeOrders, toDeliver }
 
 /// Un aviso de «Necesita atención». Trae lo necesario para explicar por qué pasó
 /// y para resolverlo desde su panel, sin volver a consultar.
@@ -46,6 +48,9 @@ class AttentionItem {
   // Caja
   final DateTime? since;
 
+  /// Pedidos de la tienda por confirmar o ventas por entregar (0.13.4)
+  final int count;
+
   const AttentionItem({
     required this.kind,
     required this.refId,
@@ -60,6 +65,7 @@ class AttentionItem {
     this.days = 0,
     this.neverPaid = false,
     this.since,
+    this.count = 0,
   });
 }
 
@@ -230,6 +236,20 @@ class HomeRepository {
       }
     } catch (_) {}
 
+    // Pedidos de la tienda por confirmar y lo cobrado que falta entregar (0.13.4)
+    final orders = <AttentionItem>[];
+    try {
+      await StoreOrdersRepository.instance.pull(businessId);
+      final pendingOrders = await StoreOrdersRepository.instance.pendingCount(businessId);
+      if (pendingOrders > 0) {
+        orders.add(AttentionItem(kind: AttentionKind.storeOrders, refId: 'store', name: 'Pedidos', count: pendingOrders));
+      }
+      final deliveries = await SalesRepository.instance.pendingDeliveries(businessId);
+      if (deliveries.isNotEmpty) {
+        orders.add(AttentionItem(kind: AttentionKind.toDeliver, refId: 'deliver', name: 'Entregas', count: deliveries.length));
+      }
+    } catch (_) {}
+
     // Lo más vendido en los últimos 7 días
     final top = await db.rawQuery(
       'SELECT product_name AS name, SUM(quantity) AS u FROM sales_ok WHERE business_id = ? AND date >= ? GROUP BY product_name ORDER BY u DESC LIMIT 5',
@@ -250,7 +270,7 @@ class HomeRepository {
       outOfStockCount: out.length,
       bars: await bars(businessId, range, now: at),
       topWeek: [for (final r in top) (name: '${r['name']}', units: (r['u'] as num?)?.toInt() ?? 0)],
-      attention: [...out, ...cash, ...overdue, ...low],
+      attention: [...out, ...cash, ...orders, ...overdue, ...low],
     );
   }
 

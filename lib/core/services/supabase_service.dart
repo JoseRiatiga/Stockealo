@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -820,6 +821,7 @@ class SupabaseService {
           for (final r in await db.query('sales', columns: [
             'id', 'variant_id', 'variant_name', 'seller_name', 'invoice_number', 'product_photo_path', 'discount_amount',
             'service_id', 'work_order_id', 'staff_ids', 'voided_at', 'void_reason', 'voided_by', 'payment_split',
+            'promotion_id', 'promotion_name', 'promotion_discount', 'delivery_status', 'delivery_note', 'delivered_at',
           ]))
             r['id'] as String: r,
         };
@@ -915,6 +917,12 @@ class SupabaseService {
               'void_reason': s['void_reason'] ?? local?['void_reason'],
               'voided_by': s['voided_by'] ?? local?['voided_by'],
               'payment_split': s['payment_split'] ?? local?['payment_split'],
+              'promotion_id': s['promotion_id'] ?? local?['promotion_id'],
+              'promotion_name': s['promotion_name'] ?? local?['promotion_name'],
+              'promotion_discount': s['promotion_discount'] ?? local?['promotion_discount'] ?? 0.0,
+              'delivery_status': s['delivery_status'] ?? local?['delivery_status'],
+              'delivery_note': s['delivery_note'] ?? local?['delivery_note'],
+              'delivered_at': s['delivered_at'] ?? local?['delivered_at'],
               'seller_name': local?['seller_name'],
               'invoice_number': local?['invoice_number'],
               'product_photo_path': local?['product_photo_path'],
@@ -964,6 +972,7 @@ class SupabaseService {
         ('staff_payouts', <String>[]),
         ('cash_sessions', <String>[]),
         ('cash_movements', <String>[]),
+        ('promotions', ['is_active']),
       ]) {
         try {
           final List<dynamic> rows = await client!.from(table).select();
@@ -1083,11 +1092,29 @@ class SupabaseService {
       // Sin sesión, RLS rechazaría todo: se espera al próximo inicio de sesión
       if (client?.auth.currentSession == null) return await SyncQueue.instance.pendingCount();
       await ensureFreshSession();
-      return await SyncQueue.instance.flush(_send);
+      final left = await SyncQueue.instance.flush(_send);
+      _scheduleRetry(left > 0);
+      return left;
     } catch (e) {
       debugPrint('Error enviando cambios pendientes: $e');
+      if (SyncQueue.isNetworkError(e)) await SyncQueue.instance.refreshStatus(offline: true);
+      _scheduleRetry(true);
       return -1;
     }
+  }
+
+  /// Mientras quede algo sin subir, se reintenta solo cada 30 s: así lo hecho sin
+  /// conexión sube cuando vuelve, sin tocar nada (0.13.4)
+  Timer? _retryTimer;
+  static const retryEvery = Duration(seconds: 30);
+
+  void _scheduleRetry(bool pending) {
+    if (!pending) {
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      return;
+    }
+    _retryTimer ??= Timer.periodic(retryEvery, (_) => flushPendingSync());
   }
 
   static const String _editedAtKey = '_edited_at';
@@ -1116,6 +1143,8 @@ class SupabaseService {
         await _sendProduct(db, p);
       case 'delete_product':
         await db.from('products').delete().eq('id', p['id'] as String);
+        final bizId = p['business_id'] as String?;
+        if (bizId != null) await removeStorageFiles('product-images', bizId, prefix: p['id'] as String);
       case 'update_stock':
         // Ajuste manual o importación: el usuario fija el valor exacto
         await db.from('products').update({'current_stock': p['stock']}).eq('id', p['id'] as String);
@@ -1153,6 +1182,12 @@ class SupabaseService {
         await db.from('cash_sessions').upsert(cashSessionCloudRow(p), onConflict: 'id');
       case 'upsert_cash_movement':
         await db.from('cash_movements').upsert(boolRow(p, const []), onConflict: 'id');
+      case 'update_store_order':
+        await db.from('store_orders').update({'status': p['status']}).eq('id', p['id'] as String);
+      case 'upsert_promotion':
+        await db.from('promotions').upsert(boolRow(p, const ['is_active']), onConflict: 'id');
+      case 'delete_promotion':
+        await db.from('promotions').delete().eq('id', p['id'] as String);
       case 'upsert_staff':
         final staffRow = boolRow(p, const ['is_active']);
         try {
@@ -1389,11 +1424,16 @@ class SupabaseService {
         ..._saleV13Fields(s),
       };
 
-  static const _saleV13Columns = ['voided_at', 'void_reason', 'voided_by', 'payment_split'];
+  static const _saleV13Columns = [
+    'voided_at', 'void_reason', 'voided_by', 'payment_split', 'promotion_id', 'promotion_name',
+    'delivery_status', 'delivery_note', 'delivered_at',
+  ];
 
   static Map<String, dynamic> _saleV13Fields(Map<String, dynamic> s) => {
         for (final c in _saleV13Columns)
           if ((s[c] as String?)?.isNotEmpty == true) c: s[c],
+        // Promoción (0.13.4): cuánto se descontó en la línea
+        if (((s['promotion_discount'] as num?) ?? 0) > 0) 'promotion_discount': s['promotion_discount'],
       };
 
   Future<void> _sendSale(SupabaseClient db, Map<String, dynamic> s) async {
@@ -1447,7 +1487,45 @@ class SupabaseService {
   }
 
   /// Elimina un producto de Supabase
-  Future<void> deleteProductFromCloud(String productId) => _write('delete_product', {'id': productId});
+  /// Borra el producto de la nube y también su foto (decisión del dueño, 14 nov 2026:
+  /// no se guarda la foto de un producto eliminado)
+  Future<void> deleteProductFromCloud(String productId, {String? businessId}) =>
+      _write('delete_product', {'id': productId, if (businessId != null) 'business_id': businessId});
+
+  /// Carpetas de la nube con archivos de un negocio (todas van como `<negocio>/<archivo>`)
+  static const storageBuckets = ['product-images', 'purchase-invoices'];
+
+  /// Borra archivos de la carpeta [folder] de [bucket]: los que se llaman `<prefix>.<algo>`
+  /// (una foto en cualquier formato) o, sin [prefix], todos. [keep] se deja.
+  /// Recorre por páginas, sin límite de cantidad. Nunca lanza error: un archivo que no se
+  /// pudo borrar no debe trabar lo demás. Devuelve cuántos borró.
+  Future<int> removeStorageFiles(String bucket, String folder, {String? prefix, String? keep}) async {
+    try {
+      if (!_isInitialized) await initialize();
+      final store = client?.storage.from(bucket);
+      if (store == null) return 0;
+      final paths = <String>[];
+      for (var offset = 0;; offset += 1000) {
+        final page = await store.list(
+          path: folder,
+          searchOptions: SearchOptions(limit: 1000, offset: offset, search: prefix),
+        );
+        for (final f in page) {
+          if (f.name == keep) continue;
+          if (prefix != null && !f.name.startsWith('$prefix.')) continue;
+          paths.add('$folder/${f.name}');
+        }
+        if (page.length < 1000) break;
+      }
+      for (var i = 0; i < paths.length; i += 1000) {
+        await store.remove(paths.sublist(i, i + 1000 > paths.length ? paths.length : i + 1000));
+      }
+      return paths.length;
+    } catch (e) {
+      debugPrint('No se pudieron borrar archivos de $bucket/$folder: $e');
+      return 0;
+    }
+  }
 
   /// Crea o actualiza un producto en Supabase (incluida su foto)
   Future<void> upsertProductToCloud(Map<String, dynamic> p) => _write('upsert_product', p);
@@ -1589,6 +1667,13 @@ class SupabaseService {
   /// Servicio del catálogo, empleado u orden del tablero
   Future<void> upsertServiceToCloud(Map<String, dynamic> row) => _write('upsert_service', row);
   Future<void> upsertStaffToCloud(Map<String, dynamic> row) => _write('upsert_staff', row);
+
+  /// Pedido de la tienda confirmado (pasó a venta) o rechazado (0.13.4)
+  Future<void> updateStoreOrderInCloud(String id, String status) => _write('update_store_order', {'id': id, 'status': status});
+
+  /// Promociones (0.13.4)
+  Future<void> upsertPromotionToCloud(Map<String, dynamic> row) => _write('upsert_promotion', row);
+  Future<void> deletePromotionFromCloud(String id) => _write('delete_promotion', {'id': id});
   Future<void> upsertWorkOrderToCloud(Map<String, dynamic> row) => _write('upsert_work_order', row);
   Future<void> upsertAttendanceToCloud(Map<String, dynamic> row) => _write('upsert_attendance', row);
   Future<void> upsertCommissionToCloud(Map<String, dynamic> row) => _write('upsert_commission', row);
@@ -1784,6 +1869,7 @@ class SupabaseService {
         ),
       );
 
+      await removeStorageFiles('product-images', businessId, prefix: productId, keep: '$productId.$extension');
       final publicUrl = client!.storage.from('product-images').getPublicUrl(storagePath);
       final urlWithTimestamp = '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
       return urlWithTimestamp;
@@ -1800,15 +1886,10 @@ class SupabaseService {
       if (!_isInitialized) await initialize();
       if (client == null) return;
 
-      // 1. Fotos primero: al borrar el negocio se pierde el permiso sobre su carpeta
-      try {
-        final files = await client!.storage.from('product-images').list(path: businessId);
-        if (files.isNotEmpty) {
-          final filePaths = files.map((f) => '$businessId/${f.name}').toList();
-          await client!.storage.from('product-images').remove(filePaths);
-        }
-      } catch (storageErr) {
-        debugPrint('Nota al eliminar fotos de Storage en Supabase: $storageErr');
+      // 1. Archivos primero (fotos, logo y facturas de compra), todos: al borrar el negocio
+      //    se pierde el permiso sobre sus carpetas. Según los términos no se queda nada.
+      for (final bucket in storageBuckets) {
+        await removeStorageFiles(bucket, businessId);
       }
 
       // 2. Borrar el negocio: ventas, clientes, productos, categorías y miembros caen

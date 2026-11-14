@@ -1,5 +1,6 @@
 import '../../products/models/product.dart';
 import '../../products/models/product_variant.dart';
+import 'promotion.dart';
 
 class CartItem {
   final Product product;
@@ -7,6 +8,9 @@ class CartItem {
   int quantity;
   double customUnitPrice;
   double? discountPercent;
+
+  /// La promoción que aplica a esta línea (la pone [SellCart] según las vigentes)
+  Promotion? promotion;
 
   CartItem({
     required this.product,
@@ -28,4 +32,10 @@ class CartItem {
   double get totalCost => quantity * unitCost;
   double get netProfit => subtotal - totalCost;
   double get itemSavings => originalSubtotal - subtotal;
+
+  /// Lo que descuenta la promoción en esta línea
+  double get promoDiscount => promotion?.discountFor(unitPrice, quantity) ?? 0;
+
+  /// Lo que se cobra por la línea con la promoción
+  double get netSubtotal => (subtotal - promoDiscount).clamp(0, double.infinity).toDouble();
 }

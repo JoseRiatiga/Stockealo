@@ -1,7 +1,6 @@
 import '../../../reports/presentation/screens/guided_import_screen.dart';
 import '../../../suppliers/presentation/widgets/visit_today_banner.dart';
 import '../../../../core/database/app_database.dart';
-import '../../../../core/design/app_card.dart';
 import '../../../../core/design/app_pagination.dart';
 import '../../../../core/design/primary_action_button.dart';
 import '../../../../core/design/quick_access_row.dart';
@@ -32,6 +31,8 @@ import '../../../../core/services/notification_service.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/stocky_empty_state.dart';
 import '../../../../core/codes/code_reader.dart';
+import '../../../../core/design/stat_card.dart';
+import '../../../sales/presentation/screens/promotions_screen.dart';
 
 /// Productos (el catálogo) y, en [ProductsListMode.stock], el lugar Stock: la
 /// misma lista arrancando en «por reponer», con el aviso del proveedor que pasa
@@ -427,6 +428,13 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                           caption: 'PDF e historias',
                           onTap: _openCatalogModal,
                         ),
+                        if (canEditProducts && _activeBusiness != null)
+                          QuickAccessItem(
+                            icon: Icons.local_offer_outlined,
+                            label: 'Promociones',
+                            caption: '% y 2×1 con fechas',
+                            onTap: () => PromotionsScreen.open(context, business: _activeBusiness!),
+                          ),
                         if (canEditProducts)
                           QuickAccessItem(
                             icon: Icons.upload_file_outlined,
@@ -689,36 +697,40 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     final lowStock = _stats['lowStock'] ?? 0;
     final totalValue = _stats['totalValue'] ?? 0.0;
 
-    Widget stat(String label, String value, Color color) => Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: AppText.amount(context, size: 22, color: color)),
-              Text(label, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
-            ],
-          ),
-        );
+    // Re-diseño 0.13.4 (segunda pasada): las cifras en tarjetas, como en Inicio y Clientes
+    final openStock = (lowStock > 0 || outOfStock > 0) ? (widget.onOpenStock ?? _showToRestock) : null;
+    final cards = <Widget>[
+      StatCard(title: 'Productos', value: '$total', detail: _stockMode ? 'En tu inventario' : 'En tu catálogo', compact: true),
+      StatCard(
+        title: 'Stock bajo',
+        value: '$lowStock',
+        detail: lowStock > 0 ? 'Quedan pocas unidades' : 'Todo bien',
+        onTap: lowStock > 0 ? openStock : null,
+        compact: true,
+      ),
+      StatCard(
+        title: 'Agotados',
+        value: '$outOfStock',
+        detail: outOfStock > 0 ? 'Sin unidades' : 'Ninguno',
+        onTap: outOfStock > 0 ? openStock : null,
+        compact: true,
+      ),
+      if (canViewCosts && totalValue > 0)
+        StatCard(title: 'Valor del inventario', value: CurrencyFormatter.format(totalValue), detail: 'A precio de costo', compact: true),
+    ];
 
-    return AppCard(
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              stat('Productos', '$total', c.ink),
-              stat('Stock bajo', '$lowStock', lowStock > 0 ? c.warning : c.ink),
-              stat('Agotados', '$outOfStock', outOfStock > 0 ? c.danger : c.ink),
-            ],
-          ),
-          if (canViewCosts && totalValue > 0) ...[
-            Divider(height: AppSpace.xl, color: c.line),
-            Row(
-              children: [
-                Expanded(child: Text('Valor del inventario', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted))),
-                Text(CurrencyFormatter.format(totalValue), style: AppText.amount(context, size: 15)),
-              ],
-            ),
-          ],
+          LayoutBuilder(builder: (context, box) {
+            final perRow = box.maxWidth >= 760 ? cards.length : 2;
+            final w = (box.maxWidth - AppSpace.sm * (perRow - 1)) / perRow;
+            return Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: [for (final card in cards) SizedBox(width: w, child: card)],
+            );
+          }),
           if ((lowStock > 0 || outOfStock > 0) && !_stockMode) ...[
             const SizedBox(height: AppSpace.md),
             Material(
@@ -748,7 +760,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
             ),
           ],
         ],
-      ),
     );
   }
 

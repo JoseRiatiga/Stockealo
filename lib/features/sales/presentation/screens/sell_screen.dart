@@ -26,6 +26,8 @@ import '../../models/sale.dart';
 import '../widgets/digital_ticket_modal.dart';
 import '../widgets/variant_picker.dart';
 import '../../../../core/codes/code_reader.dart';
+import '../../data/promotions_repository.dart';
+import '../widgets/deliveries.dart';
 
 /// Vender: el punto de venta. Buscar o escanear (también con lector USB: el código
 /// entra solo al carrito), tocar productos, cobrar con F9 y seguir con la
@@ -183,6 +185,8 @@ class _SellScreenState extends State<SellScreen> {
     final products = await ProductRepository.instance.searchProducts('', businessId: widget.business.id);
     final customers = await CustomerRepository.instance.getCustomers(widget.business.id);
     final closed = await isCashClosedFor(widget.business);
+    // Las promociones vigentes se aplican solas a la cuenta (0.13.4)
+    _cart.setPromotions(await PromotionsRepository.instance.live(widget.business.id));
     if (!mounted) return;
     setState(() {
       _products = products.where((p) => p.isActive).toList();
@@ -353,12 +357,16 @@ class _SellScreenState extends State<SellScreen> {
       AppToast.showError(context, 'No se puede cotizar por debajo del costo.');
       return;
     }
+    // ¿El cliente está aquí o lo pidió por WhatsApp? (0.13.4)
+    final source = await askQuotationSource(context);
+    if (source == null || !mounted) return;
     try {
       final q = await SalesRepository.instance.recordQuotation(
         businessId: widget.business.id,
         items: List.of(_cart.lines),
         customerName: _customer.text.trim().isEmpty ? null : _customer.text.trim(),
         discountAmount: _cart.discount,
+        source: source,
       );
       _cart.clear();
       if (mounted) AppToast.showSuccess(context, 'Cotización ${q.quotationNumber} guardada en Ventas › Cotizaciones');
@@ -864,6 +872,13 @@ class _SellScreenState extends State<SellScreen> {
               children: [
                 Text(l.displayName, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600)),
                 Text('${CurrencyFormatter.format(l.unitPrice)} c/u', style: AppText.caption(context)),
+                if (l.promotion != null)
+                  Text(
+                    l.promoDiscount > 0
+                        ? '${l.promotion!.name} (${l.promotion!.badge}) −${CurrencyFormatter.format(l.promoDiscount)}'
+                        : '${l.promotion!.name}: lleva ${l.promotion!.buyQty} y paga ${l.promotion!.payQty}',
+                    style: AppText.caption(context, weight: FontWeight.w700, color: c.accent),
+                  ),
               ],
             ),
           ),
@@ -886,7 +901,7 @@ class _SellScreenState extends State<SellScreen> {
           const SizedBox(width: AppSpace.sm),
           SizedBox(
             width: 84,
-            child: Text(CurrencyFormatter.format(l.subtotal),
+            child: Text(CurrencyFormatter.format(l.netSubtotal),
                 textAlign: TextAlign.right, style: AppText.amount(context, size: AppText.sizeBody)),
           ),
         ],
@@ -916,6 +931,7 @@ class _SellScreenState extends State<SellScreen> {
         _customerField(),
         const SizedBox(height: AppSpace.md),
         _totalRow('Subtotal', CurrencyFormatter.format(_cart.subtotal)),
+        if (_cart.promoDiscount > 0) _totalRow('Promociones', '− ${CurrencyFormatter.format(_cart.promoDiscount)}'),
         InkWell(
           onTap: _editDiscount,
           borderRadius: BorderRadius.circular(AppRadius.small),

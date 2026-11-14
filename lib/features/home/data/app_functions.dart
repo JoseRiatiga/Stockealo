@@ -55,6 +55,8 @@ const kAppFunctions = <AppFunction>[
       keywords: ['stock', 'reponer', 'agotado', 'falta', 'minimo', 'pedir', 'faltante']),
   AppFunction(id: 'catalog', title: 'Catálogo', where: 'Productos › Catálogo', tab: 1, icon: Icons.menu_book_outlined,
       keywords: ['catalogo', 'pdf', 'historia', 'compartir']),
+  AppFunction(id: 'promotions', title: 'Promociones', where: 'Productos › Promociones', tab: 1, icon: Icons.local_offer_outlined,
+      keywords: ['promocion', 'descuento', 'oferta', '2x1', '3x2', 'rebaja', 'black friday'], managersOnly: true),
   AppFunction(id: 'online_store', title: 'Tienda en línea', where: 'Tienda en línea', tab: 10, icon: Icons.storefront_outlined,
       keywords: ['tienda', 'online', 'web', 'carrito', 'pedido en linea'], managersOnly: true),
   AppFunction(id: 'profits', title: 'Ganancias', where: 'Reportes › Ganancias', tab: 4, icon: Icons.insights_outlined,

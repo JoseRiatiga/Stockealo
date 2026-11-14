@@ -23,7 +23,10 @@ class SaleCard extends StatelessWidget {
   /// Anular la venta; null oculta el botón (cajeros, o ya anulada)
   final VoidCallback? onCancel;
 
-  const SaleCard({super.key, required this.sale, required this.showProfit, this.onCancel});
+  /// Todavía no sube a la nube (se hizo sin conexión): «Pendiente de subir»
+  final bool pendingUpload;
+
+  const SaleCard({super.key, required this.sale, required this.showProfit, this.onCancel, this.pendingUpload = false});
 
   String get _title {
     final variant = sale.variantName;
@@ -167,6 +170,14 @@ class SaleCard extends StatelessWidget {
                       if (voided) ...[
                         const SizedBox(height: 2),
                         const StatusPill('Anulada', tone: AppTone.danger, compact: true),
+                      ],
+                      if (sale.pendingDelivery) ...[
+                        const SizedBox(height: 2),
+                        const StatusPill('Por entregar', tone: AppTone.warning, compact: true),
+                      ],
+                      if (pendingUpload) ...[
+                        const SizedBox(height: 2),
+                        const StatusPill('Pendiente de subir', tone: AppTone.warning, compact: true),
                       ],
                     ],
                   ),

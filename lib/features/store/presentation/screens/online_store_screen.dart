@@ -48,6 +48,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
   OnlineStoreConfig? _saved;
   bool _enabled = true;
   bool _showStock = false;
+  bool _heroPhotos = true;
   bool _pro = false;
   bool _cloudSync = true;
   bool _loading = true;
@@ -94,6 +95,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         _welcomeController.text = saved?.welcome ?? '';
         _enabled = saved?.enabled ?? true;
         _showStock = saved?.showStock ?? false;
+        _heroPhotos = saved?.heroPhotos ?? true;
         _template = saved?.template ?? StoreTemplate.classic;
         _heroController.text = saved?.heroTitle ?? '';
       });
@@ -149,6 +151,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         whatsapp: phone,
         welcome: _welcomeController.text,
         showStock: _showStock,
+        heroPhotos: _heroPhotos,
         template: _template,
         heroTitle: _heroController.text.trim().isEmpty ? null : _heroController.text.trim(),
       );
@@ -421,9 +424,21 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                 hintText: 'Ej.: Domicilios gratis en el barrio',
               ),
             ),
+            if (_template == StoreTemplate.fashion)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Mostrar fotos en la portada', style: AppText.body(context)),
+                subtitle: Text('Fotos pequeñas de tus productos junto al título', style: AppText.small(context)),
+                value: _heroPhotos,
+                onChanged: (v) => setState(() => _heroPhotos = v),
+              ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text('Mostrar unidades disponibles', style: AppText.body(context)),
+              subtitle: Text(
+                'Si lo apagas, la tienda solo avisa «Quedan pocas, pide pronto» cuando quedan 3 o menos.',
+                style: AppText.small(context),
+              ),
               value: _showStock,
               onChanged: (v) => setState(() => _showStock = v),
             ),

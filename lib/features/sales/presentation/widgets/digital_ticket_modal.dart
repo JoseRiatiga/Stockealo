@@ -85,7 +85,15 @@ class DigitalTicketModal {
       date: first.date,
       lines: [
         for (final s in items)
-          SaleDocumentLine(quantity: s.quantity, name: s.productName, unitPrice: s.unitPrice, total: s.totalAmount),
+          SaleDocumentLine(
+            quantity: s.quantity,
+            // Con promoción (0.13.4): «Camiseta · Promo Fin de mes −$5.000»
+            name: s.promotionName == null || s.promotionDiscount <= 0
+                ? s.productName
+                : '${s.productName} · Promo ${s.promotionName} −${CurrencyFormatter.format(s.promotionDiscount)}',
+            unitPrice: s.unitPrice,
+            total: s.totalAmount,
+          ),
       ],
       discount: discount,
       total: items.fold(0.0, (sum, s) => sum + s.totalAmount),

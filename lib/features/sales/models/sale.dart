@@ -36,6 +36,23 @@ class Sale {
   /// Pago mixto: cuánto entró por cada medio en esta línea (JSON)
   final String? paymentSplit;
 
+  /// Promoción que se aplicó a la línea (0.13.4) y cuánto descontó
+  final String? promotionId;
+  final String? promotionName;
+  final double promotionDiscount;
+
+  /// «Por entregar» (0.13.4): null = se lo llevó; 'PENDIENTE' o 'ENTREGADO'
+  final String? deliveryStatus;
+
+  /// Cómo se entrega: «Lo recoge después» o la dirección del envío
+  final String? deliveryNote;
+  final DateTime? deliveredAt;
+
+  static const toDeliver = 'PENDIENTE';
+  static const delivered = 'ENTREGADO';
+
+  bool get pendingDelivery => deliveryStatus == toDeliver && !isVoided;
+
   bool get isService => serviceId != null || productId.isEmpty;
   bool get isVoided => voidedAt != null;
 
@@ -65,6 +82,12 @@ class Sale {
     this.voidReason,
     this.voidedBy,
     this.paymentSplit,
+    this.promotionId,
+    this.promotionName,
+    this.promotionDiscount = 0,
+    this.deliveryStatus,
+    this.deliveryNote,
+    this.deliveredAt,
   });
 
   Map<String, dynamic> toMap() {
@@ -94,6 +117,12 @@ class Sale {
       'void_reason': voidReason,
       'voided_by': voidedBy,
       'payment_split': paymentSplit,
+      'promotion_id': promotionId,
+      'promotion_name': promotionName,
+      'promotion_discount': promotionDiscount,
+      'delivery_status': deliveryStatus,
+      'delivery_note': deliveryNote,
+      'delivered_at': deliveredAt?.toIso8601String(),
     };
   }
 
@@ -124,6 +153,12 @@ class Sale {
       voidReason: map['void_reason'] as String?,
       voidedBy: map['voided_by'] as String?,
       paymentSplit: map['payment_split'] as String?,
+      promotionId: map['promotion_id'] as String?,
+      promotionName: map['promotion_name'] as String?,
+      promotionDiscount: (map['promotion_discount'] as num?)?.toDouble() ?? 0,
+      deliveryStatus: map['delivery_status'] as String?,
+      deliveryNote: map['delivery_note'] as String?,
+      deliveredAt: DateTime.tryParse('${map['delivered_at'] ?? ''}'),
     );
   }
 }

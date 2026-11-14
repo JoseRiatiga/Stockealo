@@ -18,6 +18,9 @@ import '../../../pro/presentation/widgets/pro_upsell_sheet.dart';
 import '../../data/account_statement.dart';
 import '../../data/debt_reminder_schedule.dart';
 import '../widgets/debt_reminder_schedule_sheet.dart';
+import '../../../../core/design/stat_card.dart';
+import '../../../../core/design/filter_tabs.dart';
+import '../../../../core/design/status_pill.dart';
 
 class CustomersScreen extends StatefulWidget {
   final String businessId;
@@ -240,106 +243,113 @@ class _CustomersScreenState extends State<CustomersScreen> {
   Widget build(BuildContext context) {
     final filtered = _filteredCustomers;
 
+    final c = context.colors;
+    final wide = MediaQuery.sizeOf(context).width >= 640;
+    final kpis = [
+      StatCard(
+        title: 'Fiados por cobrar',
+        value: CurrencyFormatter.formatCOP(_totalDebt),
+        detail: _totalDebt > 0 ? 'Lo que te deben tus clientes' : 'Nadie te debe',
+        compact: !wide,
+      ),
+      StatCard(
+        title: 'Clientes que deben',
+        value: '$_debtorsCount',
+        detail: _debtorsCount == 0 ? 'Todos al día' : 'Toca «Con deuda» para verlos',
+        onTap: _debtorsCount == 0 ? null : () => setState(() => _filter = 'DEUDA'),
+        compact: !wide,
+      ),
+      StatCard(
+        title: 'Clientes',
+        value: '${_customers.length}',
+        detail: '${_customers.length - _debtorsCount} al día',
+        compact: !wide,
+      ),
+    ];
+
+    // Re-diseño 0.13.4 (segunda pasada): encabezado con la acción, cifras en tarjetas,
+    // buscador y pestañas; sin botón flotante (ya no se cruza con Stocky)
     return Scaffold(
-      backgroundColor: context.colors.surfaceMuted,
+      backgroundColor: c.paper,
       appBar: widget.embedded ? null : AppBar(title: const Text('Clientes y fiados')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
           child: Column(
             children: [
-          // Banner de resumen de cartera/deuda
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: context.colors.warningSoft,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: context.colors.warningSoft),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: context.colors.warning.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.receipt_long_outlined, color: context.colors.warning, size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Fiados por cobrar',
-                          style: TextStyle(
-                            fontSize: AppText.sizeCaption,
-                            color: context.colors.warning,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          CurrencyFormatter.formatCOP(_totalDebt),
-                          style: TextStyle(
-                            fontSize: AppText.sizeHeading,
-                            fontWeight: FontWeight.bold,
-                            color: context.colors.warning,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _debtorsCount == 1 ? '1 cliente debe' : '$_debtorsCount clientes deben',
-                      style: TextStyle(
-                        fontSize: AppText.sizeCaption,
-                        fontWeight: FontWeight.bold,
-                        color: context.colors.warning,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Buscador y Filtros
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, AppSpace.sm),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Buscar por nombre o teléfono',
-                    prefixIcon: Icon(Icons.search_outlined, color: context.colors.inkMuted),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(icon: const Icon(Icons.clear_outlined, size: 18), onPressed: () => setState(() => _searchController.clear()))
-                        : null,
-                    filled: true,
-                    fillColor: context.colors.surfaceMuted,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  ),
-                ),
-                const SizedBox(height: 8),
                 Row(
                   children: [
-                    _buildFilterChip('TODOS', 'Todos (${_customers.length})'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('DEUDA', 'Con deuda ($_debtorsCount)'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('AL_DIA', 'Al día (${_customers.length - _debtorsCount})'),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Clientes y fiados', style: AppText.title(context)),
+                          Text('Quién te debe, cuánto y desde cuándo', style: AppText.small(context)),
+                        ],
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: _openCreateCustomerDialog,
+                      icon: const Icon(Icons.person_add_outlined, size: 18),
+                      label: Text(wide ? 'Nuevo cliente' : 'Nuevo'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpace.md),
+                if (wide)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < kpis.length; i++) ...[
+                        if (i > 0) const SizedBox(width: AppSpace.md),
+                        Expanded(child: kpis[i]),
+                      ],
+                    ],
+                  )
+                else ...[
+                  kpis[0],
+                  const SizedBox(height: AppSpace.sm),
+                  Row(children: [Expanded(child: kpis[1]), const SizedBox(width: AppSpace.sm), Expanded(child: kpis[2])]),
+                ],
+                const SizedBox(height: AppSpace.md),
+                Flex(
+                  direction: wide ? Axis.horizontal : Axis.vertical,
+                  crossAxisAlignment: wide ? CrossAxisAlignment.center : CrossAxisAlignment.stretch,
+                  children: [
+                    Flexible(
+                      flex: wide ? 1 : 0,
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          hintText: 'Buscar por nombre o teléfono',
+                          prefixIcon: Icon(Icons.search_outlined, color: c.inkMuted),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  tooltip: 'Borrar búsqueda',
+                                  icon: const Icon(Icons.clear_outlined, size: 18),
+                                  onPressed: () => setState(() => _searchController.clear()),
+                                )
+                              : null,
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: wide ? AppSpace.md : 0, height: wide ? 0 : AppSpace.sm),
+                    FilterTabs<String>(
+                      options: {
+                        'TODOS': 'Todos (${_customers.length})',
+                        'DEUDA': 'Con deuda ($_debtorsCount)',
+                        'AL_DIA': 'Al día (${_customers.length - _debtorsCount})',
+                      },
+                      value: _filter,
+                      onChanged: (v) => setState(() => _filter = v),
+                    ),
                   ],
                 ),
               ],
@@ -369,10 +379,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       )
                     : ListView.builder(
                         padding: EdgeInsets.fromLTRB(
-                          16,
-                          12,
-                          16,
-                          MediaQuery.of(context).padding.bottom + 80,
+                          AppSpace.lg,
+                          AppSpace.sm,
+                          AppSpace.lg,
+                          MediaQuery.of(context).padding.bottom + 96,
                         ),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
@@ -385,43 +395,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
       ),
       ),
       ),
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-        child: FloatingActionButton.extended(
-          onPressed: _openCreateCustomerDialog,
-          backgroundColor: context.colors.accent,
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.person_add_outlined),
-          label: const Text('Nuevo cliente'),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String key, String label) {
-    final selected = _filter == key;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      selectedColor: context.colors.successSoft,
-      backgroundColor: context.colors.surfaceMuted,
-      labelStyle: TextStyle(
-        fontSize: AppText.sizeCaption,
-        fontWeight: FontWeight.bold,
-        color: selected
-            ? (context.colors.accent)
-            : (context.colors.inkMuted),
-      ),
-      onSelected: (_) => setState(() => _filter = key),
     );
   }
 
   Widget _buildCustomerCard(Customer customer) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: AppSpace.sm),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         side: BorderSide(
           color: customer.hasDebt
               ? (context.colors.warningSoft)
@@ -457,11 +439,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     children: [
                       Text(
                         customer.name,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: AppText.sizeBodyLarge,
-                          color: context.colors.ink,
-                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.bodyLarge(context, weight: FontWeight.w700),
                       ),
                       if (_reminders[customer.id] != null)
                         Padding(
@@ -489,11 +469,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               color: context.colors.inkMuted,
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              customer.phone!,
-                              style: TextStyle(
-                                fontSize: AppText.sizeCaption,
-                                color: context.colors.inkMuted,
+                            Flexible(
+                              child: Text(
+                                customer.phone!,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.caption(context),
                               ),
                             ),
                           ],
@@ -501,51 +481,27 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     ],
                   ),
                 ),
-                // Badge de saldo
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: customer.hasDebt
-                        ? (context.colors.warningSoft)
-                        : (context.colors.successSoft),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: customer.hasDebt
-                          ? (context.colors.warningSoft)
-                          : (context.colors.successSoft),
+                // Saldo: lo que debe en grande y su estado
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      CurrencyFormatter.formatCOP(customer.debtBalance),
+                      style: AppText.amount(context, size: AppText.sizeBodyLarge, color: customer.hasDebt ? context.colors.warning : context.colors.ink),
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        customer.hasDebt ? 'Deuda' : 'Al día',
-                        style: TextStyle(
-                          fontSize: AppText.sizeCaption,
-                          fontWeight: FontWeight.bold,
-                          color: customer.hasDebt
-                              ? (context.colors.warning)
-                              : context.colors.accent,
-                        ),
-                      ),
-                      Text(
-                        CurrencyFormatter.formatCOP(customer.debtBalance),
-                        style: TextStyle(
-                          fontSize: AppText.sizeSmall,
-                          fontWeight: FontWeight.bold,
-                          color: customer.hasDebt
-                              ? (context.colors.warning)
-                              : context.colors.accent,
-                        ),
-                      ),
-                    ],
-                  ),
+                    const SizedBox(height: 2),
+                    StatusPill(customer.hasDebt ? 'Debe' : 'Al día', tone: customer.hasDebt ? AppTone.warning : AppTone.success, compact: true),
+                  ],
                 ),
               ],
             ),
             Divider(height: 20, color: context.colors.line),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            // Acciones: se acomodan en varias líneas si no caben (celular)
+            SizedBox(width: double.infinity, child: Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpace.xs,
+              runSpacing: AppSpace.xs,
               children: [
                 if (customer.hasDebt) ...[
                   IconButton(
@@ -553,7 +509,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     tooltip: 'Recordar pago por WhatsApp',
                     onPressed: () => _sendFriendlyReminderWhatsApp(customer),
                   ),
-                  ElevatedButton.icon(
+                  FilledButton.icon(
                     onPressed: () {
                       RecordPaymentModal.show(
                         context,
@@ -562,15 +518,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       );
                     },
                     icon: const Icon(Icons.attach_money_outlined, size: 16),
-                    label: const Text('Abonar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeSmall)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: context.colors.accent,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    ),
+                    label: const Text('Abonar'),
                   ),
-                  const SizedBox(width: 8),
                 ],
                 _sharingId == customer.id
                     ? const Padding(
@@ -593,16 +542,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 OutlinedButton.icon(
                   onPressed: () => _showCustomerPaymentsHistory(customer),
                   icon: const Icon(Icons.history_outlined, size: 16),
-                  label: const Text('Historial', style: TextStyle(fontSize: AppText.sizeCaption)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: context.colors.ink,
-                    side: BorderSide(color: context.colors.lineStrong),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  ),
+                  label: const Text('Historial'),
                 ),
               ],
-            ),
+            )),
           ],
         ),
       ),

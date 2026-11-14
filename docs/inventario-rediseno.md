@@ -506,7 +506,7 @@ El dueño pidió publicar lo hecho para una presentación y anotar lo que falta.
    - ~~textos: «empresa» → «negocio»;~~ **hecho el 14 nov (feat/0.13.2):** papelera, eliminar negocio, perfil, equipo y roles. Quedan solo comentarios del código y la palabra clave «empresa» del tipo Oficina (sirve para buscar);
    - ~~los textos legales todavía mencionan «Pro Global»~~ **hecho:** términos de la web y de la app, portada, crear códigos del panel y mensaje de error. Se dejan las etiquetas que muestran suscripciones viejas guardadas como «global»;
    - revisión en la web y el APK.
-4. **Pendientes pequeños anotados en cada bloque:**
+4. **Pendientes pequeños anotados en cada bloque** (14 nov: TODOS repartidos en `docs/plan-fases.md`, en «Pendientes que se suman» de las 0.14.0, 0.15.0 y 0.16.0):
    - descuento por línea en Vender;
    - las ventas en espera se pierden al cerrar la app;
    - arrastrar o pegar una foto en el lector de códigos;

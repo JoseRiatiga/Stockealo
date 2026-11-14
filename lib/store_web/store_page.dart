@@ -14,6 +14,8 @@ import '../core/utils/currency_formatter.dart';
 import '../core/widgets/maintenance_gate.dart';
 import '../features/sales/presentation/widgets/sale_document.dart';
 import '../features/store/data/online_store_service.dart';
+import '../features/store/data/booking_service.dart';
+import 'booking_panel.dart';
 
 /// Nombre de la tienda en la dirección: /tienda/<slug> o /tienda/?t=<slug>
 /// (el 404 del sitio convierte la primera en la segunda)
@@ -96,6 +98,47 @@ class _StorePageState extends State<StorePage> {
   /// El contexto de la plantilla (con su tema): lo que se abre encima toma sus colores
   BuildContext? _themed;
 
+  /// Reservas en línea (0.14.0); null si el negocio no las recibe
+  PublicBooking? _booking;
+
+  Future<void> _loadBooking(String slug) async {
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month, now.day);
+    final booking = await BookingService.instance.get(slug, from: from, to: from.add(const Duration(days: 15)));
+    if (mounted) setState(() => _booking = booking);
+  }
+
+  Future<void> _openBooking(PublicStore store) async {
+    final booking = _booking;
+    if (booking == null) return;
+    await AppSidePanel.show<void>(
+      context: _themed ?? context,
+      title: 'Reservar una cita',
+      subtitle: store.businessName,
+      builder: (_) => BookingPanel(store: store, booking: booking),
+    );
+    _loadBooking(store.slug);
+  }
+
+  /// «Reservar cita» (solo si el negocio recibe reservas)
+  Widget _bookButton(PublicStore store, {bool compact = false}) {
+    if (_booking == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(right: AppSpace.sm),
+      child: compact
+          ? IconButton.filledTonal(
+              tooltip: 'Reservar cita',
+              onPressed: () => _openBooking(store),
+              icon: const Icon(Icons.event_available_outlined),
+            )
+          : FilledButton.icon(
+              onPressed: () => _openBooking(store),
+              icon: const Icon(Icons.event_available_outlined, size: 18),
+              label: const Text('Reservar cita'),
+            ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -116,6 +159,7 @@ class _StorePageState extends State<StorePage> {
       final maintenanceFuture = (widget.maintenanceLoader ?? StorePage._serverMaintenance)();
       final store = await (widget.loader ?? OnlineStoreService.instance.getPublic)(slug);
       final maintenance = await maintenanceFuture;
+      if (store != null && widget.loader == null) _loadBooking(slug);
       if (mounted) {
         setState(() {
           _store = store;
@@ -264,6 +308,14 @@ class _StorePageState extends State<StorePage> {
                 ],
               ),
             ),
+            // Reservas en línea (Pro Servicios)
+            if (_booking != null)
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: c.onAccent, foregroundColor: c.accent),
+                onPressed: () => _openBooking(store),
+                icon: const Icon(Icons.event_available_outlined, size: 18),
+                label: const Text('Reservar cita'),
+              ),
           ],
         ),
       );
@@ -326,6 +378,7 @@ class _StorePageState extends State<StorePage> {
                   children: [
                     if (wide) SizedBox(width: 200, child: _searchField(pill: true)),
                     const SizedBox(width: AppSpace.sm),
+                    _bookButton(store, compact: !wide),
                     _cartButton(context, store),
                   ],
                 ),

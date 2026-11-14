@@ -15,6 +15,36 @@ class AppointmentsRepository {
 
   final _db = AppDatabase.instance;
 
+  /// Quién avisa de una reserva nueva (la conecta la navegación de la app)
+  static void Function(Appointment booking)? onNewBooking;
+
+  /// Baja las reservas en línea nuevas y avisa de cada una. Sin conexión no hace nada.
+  Future<int> pullOnline(String businessId) async {
+    final client = SupabaseService.instance.client;
+    if (client == null || client.auth.currentSession == null) return 0;
+    try {
+      final rows = await client
+          .from('appointments')
+          .select()
+          .eq('business_id', businessId)
+          .eq('source', Appointment.sourceOnline)
+          .eq('status', Appointment.pending);
+      final db = await _db.database;
+      var added = 0;
+      for (final raw in rows) {
+        final a = Appointment.fromMap(Map<String, dynamic>.from(raw as Map));
+        final exists = await db.query('appointments', columns: ['id'], where: 'id = ?', whereArgs: [a.id], limit: 1);
+        if (exists.isNotEmpty) continue;
+        await db.insert('appointments', a.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
+        onNewBooking?.call(a);
+        added++;
+      }
+      return added;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   Appointment newAppointment(String businessId, {required DateTime startsAt}) {
     final now = DateTime.now();
     return Appointment(

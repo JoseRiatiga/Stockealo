@@ -164,6 +164,21 @@ class PhoneAlertsService {
     }
   }
 
+  /// «Nueva reserva de Ana · sáb 15, 3:00 p. m.» (0.14.0)
+  Future<void> showBooking({required String id, required String name, required String when, String? services}) async {
+    if (!_ready || !await ordersEnabled()) return;
+    try {
+      await _plugin.show(
+        (id.hashCode ^ 0x2b2b) & 0x7fffffff,
+        'Nueva reserva de $name',
+        '$when${services == null || services.isEmpty ? '' : ' · $services'}. Confírmala en Servicios › Agenda.',
+        const NotificationDetails(android: _ordersChannel),
+      );
+    } catch (e) {
+      debugPrint('Aviso de reserva: $e');
+    }
+  }
+
   /// «Ana sigue esperando tu respuesta (T-0003)»
   Future<void> showOrderReminder({required String id, required String code, String? name}) async {
     if (!_ready || !await ordersEnabled()) return;

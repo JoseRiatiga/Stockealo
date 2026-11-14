@@ -72,22 +72,22 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 3. HECHO (14 nov). **Precio por variante para todos:** corto/largo, moto/carro, pequeño/grande.
 4. HECHO (14 nov). **Historial del cliente por teléfono:** qué se hizo, con quién y cada cuánto viene.
 5. HECHO (14 nov), al cobrar. **Productos vendidos dentro del servicio:** pomada, shampoo. Salen del inventario.
-6. **Alquiler de silla:** opción por persona, además de la comisión (Pro Servicios).
-7. **Abono y pago mixto:** por ejemplo, efectivo + Nequi. Cuadra con la caja y los reportes.
-8. **Anular sin borrar:** la venta queda «Anulada» en el historial y en los reportes, con el stock repuesto. Hoy «anular el cobro» de Servicios la borra.
-9. **Servicios gratis hasta 3 personas:** catálogo, tablero, agenda y cobro. Pro Servicios: sin límite.
+6. HECHO (14 nov). **Alquiler de silla:** opción por persona, además de la comisión (Pro Servicios).
+7. HECHO (14 nov). **Abono y pago mixto:** por ejemplo, efectivo + Nequi. Cuadra con la caja y los reportes.
+8. HECHO (14 nov). **Anular sin borrar:** la venta queda «Anulada» en el historial y en los reportes, con el stock repuesto. Hoy «anular el cobro» de Servicios la borra.
+9. HECHO (14 nov). **Servicios gratis hasta 3 personas:** catálogo, tablero, agenda y cobro. Pro Servicios: sin límite.
 
 ### Bloque B · Taller, servicio técnico y lavandería
 
-10. **Estados según el tipo de negocio**, por ejemplo «Esperando aprobación», «Esperando repuesto» o «Lista para recoger». También fecha de entrega y cantidad con decimales (por kilo).
-11. **Presupuesto:** por WhatsApp si el cliente no está, o aprobado en el local. Queda quién lo aprobó y cuándo.
-12. **Recepción con fotos**, accesorios recibidos y garantía.
+10. HECHO (14 nov). **Estados según el tipo de negocio**, por ejemplo «Esperando aprobación», «Esperando repuesto» o «Lista para recoger». También fecha de entrega y cantidad con decimales (por kilo).
+11. HECHO (14 nov). **Presupuesto:** por WhatsApp si el cliente no está, o aprobado en el local. Queda quién lo aprobó y cuándo.
+12. HECHO (14 nov). **Recepción con fotos**, accesorios recibidos y garantía.
 13. HECHO (14 nov), al cobrar. **Repuestos que salen del inventario** y se cobran en la orden.
 
 ### Para todos los tipos
 
-14. **Revisar cada plantilla:** nombres, servicios de ejemplo, mensajes de WhatsApp y precios de referencia.
-15. **Una prueba completa por tipo de negocio**, en el celular (360 px) y en el computador (1200 px), en claro y en oscuro.
+14. HECHO (14 nov). **Revisar cada plantilla:** nombres, servicios de ejemplo, mensajes de WhatsApp y precios de referencia.
+15. HECHO (14 nov). **Una prueba completa por tipo de negocio**, en el celular (360 px) y en el computador (1200 px), en claro y en oscuro.
 
 **Supabase:** sí (citas, reservas, pagos, ventas anuladas, órdenes). Cada migración, con permiso.
 

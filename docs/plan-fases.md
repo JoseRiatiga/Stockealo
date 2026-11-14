@@ -69,9 +69,9 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
    - la nube nunca deja dos citas a la vez;
    - confirmación automática y el cliente puede cancelar hasta cierto tiempo antes;
    - el dueño ve quién creó o cambió cada cita y cuándo.
-3. **Precio por variante para todos:** corto/largo, moto/carro, pequeño/grande.
+3. HECHO (14 nov). **Precio por variante para todos:** corto/largo, moto/carro, pequeño/grande.
 4. HECHO (14 nov). **Historial del cliente por teléfono:** qué se hizo, con quién y cada cuánto viene.
-5. **Productos vendidos dentro del servicio:** pomada, shampoo. Salen del inventario.
+5. HECHO (14 nov), al cobrar. **Productos vendidos dentro del servicio:** pomada, shampoo. Salen del inventario.
 6. **Alquiler de silla:** opción por persona, además de la comisión (Pro Servicios).
 7. **Abono y pago mixto:** por ejemplo, efectivo + Nequi. Cuadra con la caja y los reportes.
 8. **Anular sin borrar:** la venta queda «Anulada» en el historial y en los reportes, con el stock repuesto. Hoy «anular el cobro» de Servicios la borra.
@@ -82,7 +82,7 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 10. **Estados según el tipo de negocio**, por ejemplo «Esperando aprobación», «Esperando repuesto» o «Lista para recoger». También fecha de entrega y cantidad con decimales (por kilo).
 11. **Presupuesto:** por WhatsApp si el cliente no está, o aprobado en el local. Queda quién lo aprobó y cuándo.
 12. **Recepción con fotos**, accesorios recibidos y garantía.
-13. **Repuestos que salen del inventario** y se cobran en la orden.
+13. HECHO (14 nov), al cobrar. **Repuestos que salen del inventario** y se cobran en la orden.
 
 ### Para todos los tipos
 

@@ -97,8 +97,11 @@ class ServiceTemplate {
   /// Recepción con fotos, accesorios y garantía
   bool get usesReception => code == 'TALLER' || code == 'TECNICO';
 
-  /// Se cobra por kilo (el precio del servicio es por kilo)
+  /// Se cobra por cantidad (lavandería): el precio del servicio es por kilo o por prenda
   bool get byWeight => code == 'LAVANDERIA';
+
+  /// Unidad de un servicio por cantidad: «prendas» si es por prenda; si no, «kg»
+  String unitFor(String serviceName) => serviceName.toLowerCase().contains('prenda') ? 'prendas' : 'kg';
 
   /// Hay que elegir la variante antes de recibir (solo con vehículos)
   bool get kindsRequired => usesVehicleKinds && kindsAreVehicles;

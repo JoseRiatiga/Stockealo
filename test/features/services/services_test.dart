@@ -186,6 +186,54 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  // 0.14.0: cada tipo de negocio se ve bien en celular y computador, claro y oscuro
+  for (final t in ServiceTemplate.all) {
+    for (final width in [360.0, 1200.0]) {
+      for (final brightness in Brightness.values) {
+        testWidgets('plantilla ${t.code} a ${width.toInt()} px en ${brightness.name}', (tester) async {
+          tester.view.physicalSize = Size(width, 1800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final b = Business.fromMap({...business.toMap(), 'service_type': t.code});
+          late String title;
+          await tester.runAsync(() async {
+            final db = await appDb.database;
+            await db.update('businesses', {'service_type': t.code}, where: 'id = ?', whereArgs: [businessId]);
+            await repo.seedTemplate(businessId, t);
+            // «Otro» no trae ejemplos: se crea uno
+            if (t.examples.isEmpty) await repo.saveService(repo.newService(businessId, name: 'Servicio general', price: 10000));
+            final first = (await repo.getServices(businessId)).first;
+            final order = await repo.createOrder(
+              businessId: businessId,
+              plate: t.kindsRequired ? 'XYZ12A' : null,
+              vehicleKind: t.usesVehicleKinds ? t.vehicleKinds.first.code : null,
+              customerName: 'Cliente Prueba',
+              lines: [WorkOrderLine(serviceId: first.id, name: first.name, price: first.price)],
+            );
+            title = order.title;
+          });
+          await tester.pumpWidget(MaterialApp(
+            theme: AppTheme.build(brightness),
+            home: ServicesTab(business: b, userRole: 'OWNER'),
+          ));
+          await settle(tester, find.text(title));
+          expect(find.text(title), findsWidgets);
+          expect(tester.takeException(), isNull, reason: 'tablero de ${t.code}');
+
+          await tester.tap(find.text('Recibir').first);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: 'recibir de ${t.code}');
+          await tester.tapAt(const Offset(5, 5));
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.text('Catálogo y precios'));
+          await settle(tester, find.text((await tester.runAsync(() => repo.getServices(businessId)))!.first.name));
+          expect(tester.takeException(), isNull, reason: 'catálogo de ${t.code}');
+        });
+      }
+    }
+  }
+
   for (final width in [360.0, 1200.0]) {
     testWidgets('pestaña Servicios: tablero, recibir, asistencia, historial y catálogo a ${width.toInt()} px', (tester) async {
       tester.view.physicalSize = Size(width, 1800);

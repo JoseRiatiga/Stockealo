@@ -155,7 +155,7 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
       return;
     }
     if (_t.byWeight && chosen.any((s) => _kgOf(s.id) <= 0)) {
-      AppToast.showWarning(context, 'Escribe los kilos de cada servicio.');
+      AppToast.showWarning(context, 'Escribe la cantidad (kilos o prendas) de cada servicio.');
       return;
     }
     setState(() => _saving = true);
@@ -175,7 +175,7 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
               price: _lineTotal(s),
               commissionPct: s.commissionPct,
               quantity: _t.byWeight ? _kgOf(s.id) : 1,
-              unit: _t.byWeight ? 'kg' : null,
+              unit: _t.byWeight ? _t.unitFor(s.name) : null,
             ),
         ],
       );
@@ -283,7 +283,8 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
                 children: [
                   for (final s in _offered)
                     FilterChip(
-                      label: Text('${s.name} · ${CurrencyFormatter.format(_price(s))}${_t.byWeight ? ' el kilo' : ''}'),
+                      label: Text('${s.name} · ${CurrencyFormatter.format(_price(s))}'
+                          '${_t.byWeight ? (_t.unitFor(s.name) == 'kg' ? ' el kilo' : ' la prenda') : ''}'),
                       selected: _selected.contains(s.id),
                       onSelected: (v) => setState(() => v ? _selected.add(s.id) : _selected.remove(s.id)),
                     ),
@@ -298,7 +299,11 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
                     controller: _kgField(s.id),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(labelText: 'Kilos de ${s.name}', suffixText: 'kg', isDense: true),
+                    decoration: InputDecoration(
+                      labelText: '${_t.unitFor(s.name) == 'kg' ? 'Kilos' : 'Prendas'} de ${s.name}',
+                      suffixText: _t.unitFor(s.name),
+                      isDense: true,
+                    ),
                   ),
                 ),
             if (_t.usesDueDate) ...[

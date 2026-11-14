@@ -201,8 +201,11 @@ class _ServiceEditorSheetState extends State<ServiceEditorSheet> {
         if ((double.tryParse(e.value.text.trim()) ?? 0) > 0) e.key: double.parse(e.value.text.trim()),
     };
     final single = double.tryParse(_price.text.trim()) ?? 0;
-    if (_t.usesVehicleKinds ? prices.isEmpty : single <= 0) {
-      AppToast.showWarning(context, _t.usesVehicleKinds ? 'Pon el precio de al menos un tipo de vehículo.' : 'Escribe el precio.');
+    // Con vehículos el precio va por tipo; en las demás variantes (largo del cabello)
+    // hay un precio general y, si se quiere, uno distinto por variante
+    final byKindOnly = _t.kindsRequired;
+    if (byKindOnly ? prices.isEmpty : (single <= 0 && prices.isEmpty)) {
+      AppToast.showWarning(context, byKindOnly ? 'Pon el precio de al menos un tipo de vehículo.' : 'Escribe el precio.');
       return;
     }
     // Todo servicio debe tener quién lo hace (si ya hay personas en el equipo)
@@ -216,7 +219,7 @@ class _ServiceEditorSheetState extends State<ServiceEditorSheet> {
     setState(() => _saving = true);
     await repo.saveService(base.copyWith(
       name: name,
-      price: _t.usesVehicleKinds ? prices.values.reduce((a, b) => a < b ? a : b) : single,
+      price: single > 0 ? single : prices.values.reduce((a, b) => a < b ? a : b),
       prices: _t.usesVehicleKinds ? prices : const {},
       durationMin: int.tryParse(_minutes.text.trim()),
       commissionPct: pct,
@@ -246,9 +249,20 @@ class _ServiceEditorSheetState extends State<ServiceEditorSheet> {
               decoration: const InputDecoration(labelText: 'Nombre'),
             ),
             const SizedBox(height: AppSpace.md),
+            if (_t.usesVehicleKinds && !_t.kindsRequired) ...[
+              TextField(
+                controller: _price,
+                keyboardType: TextInputType.number,
+                inputFormatters: digits,
+                decoration: const InputDecoration(labelText: 'Precio', prefixText: '\$ '),
+              ),
+              const SizedBox(height: AppSpace.sm),
+            ],
             if (_t.usesVehicleKinds) ...[
-              Text('Precio por tipo de vehículo', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
-              Text('Deja vacío el tipo al que no se le ofrece.', style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
+              Text(_t.kindsRequired ? 'Precio por ${_t.kindsTitle.toLowerCase()}' : 'Precio distinto según ${_t.kindsTitle.toLowerCase()} (opcional)',
+                  style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
+              Text(_t.kindsRequired ? 'Deja vacío el tipo al que no se le ofrece.' : 'Vacío = cobra el precio de arriba.',
+                  style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint)),
               const SizedBox(height: AppSpace.xs),
               Row(
                 children: [

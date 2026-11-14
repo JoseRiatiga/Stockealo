@@ -133,6 +133,21 @@ void main() {
       expect(s.offeredFor('CARRO'), isFalse);
     });
 
+    test('barbería: precio según el largo del cabello, opcional al recibir (0.14.0)', () {
+      final t = ServiceTemplate.barberia;
+      expect(t.usesVehicleKinds, isTrue);
+      expect(t.kindsRequired, isFalse);
+      expect(t.kindsTitle, 'Largo del cabello');
+      final corte = ShopService(
+        id: 'c', businessId: businessId, name: 'Corte', price: 15000, prices: const {'LARGO': 20000},
+        createdAt: now, updatedAt: now,
+      );
+      expect(corte.priceFor('LARGO'), 20000);
+      expect(corte.priceFor('CORTO') ?? corte.price, 15000, reason: 'sin precio propio cobra el general');
+      expect(corte.priceFor(null) ?? corte.price, 15000);
+      expect(ServiceTemplate.lavadero.kindsRequired, isTrue);
+    });
+
     test('un servicio sin precios por vehículo cobra lo mismo para todos', () {
       final s = repo.newService(businessId, name: 'Corte', price: 15000);
       expect(s.priceFor(null), 15000);

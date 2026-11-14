@@ -84,7 +84,7 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
 
   List<ShopService> get _offered => [
         for (final s in _services)
-          if (!_t.usesVehicleKinds || s.offeredFor(_kind)) s,
+          if (!_t.kindsRequired || s.offeredFor(_kind)) s,
       ];
 
   double _price(ShopService s) => s.priceFor(_t.usesVehicleKinds ? _kind : null) ?? s.price;
@@ -92,7 +92,7 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
   double get _total => _offered.where((s) => _selected.contains(s.id)).fold(0.0, (sum, s) => sum + _price(s));
 
   Future<void> _save() async {
-    if (_t.usesVehicleKinds && _kind == null) {
+    if (_t.kindsRequired && _kind == null) {
       AppToast.showWarning(context, 'Elige el tipo de vehículo: de eso dependen los precios.');
       return;
     }
@@ -159,7 +159,8 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
               ),
             if (_t.usesVehicleKinds) ...[
               const SizedBox(height: AppSpace.md),
-              Text('Tipo de vehículo', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
+              Text(_t.kindsAreVehicles ? _t.kindsTitle : '${_t.kindsTitle} (opcional)',
+                  style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
               const SizedBox(height: AppSpace.xs),
               Wrap(
                 spacing: AppSpace.sm,
@@ -168,8 +169,10 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
                     ChoiceChip(
                       label: Text(k.label),
                       selected: _kind == k.code,
+                      // Sin vehículos (barbería) se puede quitar la variante tocándola otra vez
                       onSelected: (_) => setState(() {
-                        _kind = k.code;
+                        _kind = !_t.kindsAreVehicles && _kind == k.code ? null : k.code;
+                        if (_kind == null) return;
                         // Lo que no se ofrece para ese tipo se quita
                         _selected.removeWhere((id) => !_services.any((s) => s.id == id && s.offeredFor(k.code)));
                       }),
@@ -195,7 +198,7 @@ class _ReceiveSheetState extends State<ReceiveSheet> {
             const SizedBox(height: AppSpace.md),
             Text('Servicios', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w600, color: c.inkMuted)),
             const SizedBox(height: AppSpace.xs),
-            if (_t.usesVehicleKinds && _kind == null)
+            if (_t.kindsRequired && _kind == null)
               Text('Elige el tipo de vehículo para ver los servicios y sus precios.', style: TextStyle(color: c.inkMuted))
             else if (_offered.isEmpty)
               Text('No hay servicios activos. Agrégalos en Catálogo y precios.', style: TextStyle(color: c.inkMuted))

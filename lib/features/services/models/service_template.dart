@@ -50,8 +50,17 @@ class ServiceTemplate {
   /// "En proceso" con el nombre del negocio ("Lavando", "Atendiendo")
   final String inProgress;
 
-  /// Tipos de vehículo (solo el lavadero); vacío = un solo precio
+  /// Variantes con su propio precio (0.14.0, para todos): tipo de vehículo en el
+  /// lavadero y el taller, largo del cabello en la barbería. Vacío = un solo precio.
   final List<VehicleKind> vehicleKinds;
+
+  /// Cómo se llaman las variantes en pantalla («Tipo de vehículo», «Largo del cabello»)
+  final String kindsTitle;
+
+  /// Las variantes son vehículos: hay que elegirla al recibir y el mensaje dice «tu
+  /// moto». Si no (barbería), es opcional y un servicio sin precios por variante
+  /// cobra lo mismo para todos.
+  final bool kindsAreVehicles;
 
   final List<TemplateExample> examples;
 
@@ -64,8 +73,13 @@ class ServiceTemplate {
     required this.identifier,
     required this.inProgress,
     this.vehicleKinds = const [],
+    this.kindsTitle = 'Tipo de vehículo',
+    this.kindsAreVehicles = true,
     this.examples = const [],
   });
+
+  /// Hay que elegir la variante antes de recibir (solo con vehículos)
+  bool get kindsRequired => usesVehicleKinds && kindsAreVehicles;
 
   bool get usesIdentifier => identifier != IdentifierKind.none;
   bool get usesVehicleKinds => vehicleKinds.isNotEmpty;
@@ -119,6 +133,10 @@ class ServiceTemplate {
     unitPlural: 'Clientes',
     identifier: IdentifierKind.none,
     inProgress: 'Atendiendo',
+    // Precio según el largo del cabello (opcional al recibir)
+    vehicleKinds: [VehicleKind('CORTO', 'Corto'), VehicleKind('MEDIO', 'Medio'), VehicleKind('LARGO', 'Largo')],
+    kindsTitle: 'Largo del cabello',
+    kindsAreVehicles: false,
     examples: [
       TemplateExample('Corte', 30, 50, price: 15000),
       TemplateExample('Corte y barba', 45, 50, price: 22000),
@@ -148,6 +166,8 @@ class ServiceTemplate {
     unitPlural: 'Vehículos',
     identifier: IdentifierKind.plate,
     inProgress: 'En reparación',
+    // Precio según el vehículo, como el lavadero (0.14.0)
+    vehicleKinds: [VehicleKind('MOTO', 'Moto'), VehicleKind('CARRO', 'Carro'), VehicleKind('CAMIONETA', 'Camioneta')],
     examples: [
       TemplateExample('Cambio de aceite', 30, 30, price: 15000),
       TemplateExample('Revisión general', 60, 30, price: 30000),

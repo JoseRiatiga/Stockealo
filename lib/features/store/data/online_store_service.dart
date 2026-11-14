@@ -69,7 +69,22 @@ class StoreVariant {
   final double extra;
   final int? stock;
 
-  const StoreVariant({required this.id, this.size, this.color, this.hex, this.extra = 0, this.stock});
+  /// Agotada: se ve tachada y no se puede elegir
+  final bool soldOut;
+
+  /// Quedan 3 o menos: «Quedan pocas, pide pronto»
+  final bool few;
+
+  const StoreVariant({
+    required this.id,
+    this.size,
+    this.color,
+    this.hex,
+    this.extra = 0,
+    this.stock,
+    this.soldOut = false,
+    this.few = false,
+  });
 
   String get label => [if (size != null) size!, if (color != null) color!].join(' · ');
 
@@ -85,6 +100,8 @@ class StoreVariant {
         hex: _clean(j['hex']),
         extra: (j['extra'] as num?)?.toDouble() ?? 0,
         stock: (j['stock'] as num?)?.toInt(),
+        soldOut: j['sold_out'] == true,
+        few: j['few'] == true,
       );
 }
 
@@ -102,8 +119,11 @@ class StoreProduct {
   /// Precio de antes (se ve tachado con «Oferta»); null si no está en oferta
   final double? oldPrice;
 
-  /// Tallas y colores con existencias (vacío si el producto no tiene)
+  /// Tallas y colores (vacío si el producto no tiene); las agotadas vienen con [StoreVariant.soldOut]
   final List<StoreVariant> variants;
+
+  /// Quedan 3 o menos (producto sin tallas ni colores)
+  final bool few;
 
   const StoreProduct({
     required this.id,
@@ -114,11 +134,18 @@ class StoreProduct {
     this.stock,
     this.oldPrice,
     this.variants = const [],
+    this.few = false,
   });
 
+  /// Tallas y colores que todavía se pueden pedir
+  List<StoreVariant> get available => variants.where((v) => !v.soldOut).toList();
+
+  /// «Quedan pocas, pide pronto»: el producto o alguna de sus tallas
+  bool get runningLow => variants.isEmpty ? few : available.any((v) => v.few);
+
   bool get onOffer => (oldPrice ?? 0) > price;
-  List<String> get sizes => [for (final s in variants.map((v) => v.size).whereType<String>().toSet()) s];
-  List<String> get colorHexes => [for (final h in variants.map((v) => v.hex).whereType<String>().toSet()) h];
+  List<String> get sizes => [for (final s in available.map((v) => v.size).whereType<String>().toSet()) s];
+  List<String> get colorHexes => [for (final h in available.map((v) => v.hex).whereType<String>().toSet()) h];
 
   factory StoreProduct.fromJson(Map<String, dynamic> j) => StoreProduct(
         id: j['id'] as String,
@@ -128,6 +155,7 @@ class StoreProduct {
         imageUrl: j['image_url'] as String?,
         stock: (j['stock'] as num?)?.toInt(),
         oldPrice: (j['old_price'] as num?)?.toDouble(),
+        few: j['few'] == true,
         variants: [
           for (final v in (j['variants'] as List? ?? const [])) StoreVariant.fromJson(Map<String, dynamic>.from(v as Map)),
         ],

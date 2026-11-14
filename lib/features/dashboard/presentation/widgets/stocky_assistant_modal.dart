@@ -24,6 +24,9 @@ class StockyAssistantModal extends StatefulWidget {
     this.initialPrompt,
   });
 
+  /// Desde este ancho el chat sale en la esquina, encima del botón de Stocky
+  static const dockedFrom = 850.0;
+
   static Future<void> show(
     BuildContext context, {
     String? businessId,
@@ -35,7 +38,7 @@ class StockyAssistantModal extends StatefulWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Cerrar asistente',
-      barrierColor: Colors.black.withValues(alpha: 0.40),
+      barrierColor: Colors.black.withValues(alpha: MediaQuery.sizeOf(context).width >= dockedFrom ? 0.12 : 0.40),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim, secondaryAnim) {
         return StockyAssistantModal(
@@ -52,7 +55,7 @@ class StockyAssistantModal extends StatefulWidget {
         );
         return Transform.scale(
           scale: Tween<double>(begin: 0.78, end: 1.0).evaluate(curve),
-          alignment: const Alignment(0.85, 0.90), // Nace orgánicamente desde la esquina de Stocky
+          alignment: const Alignment(0.95, 0.95), // Nace desde la esquina de Stocky
           child: FadeTransition(
             opacity: curve,
             child: child,
@@ -385,21 +388,23 @@ class _StockyAssistantModalState extends State<StockyAssistantModal> with Single
     // Altura óptima (60% de la pantalla) para no tapar todo el fondo
     final modalHeight = (mediaQuery.size.height * 0.60).clamp(400.0, 580.0);
     final radius = BorderRadius.circular(AppRadius.sheet);
+    // En el computador el chat sale en la esquina, justo encima del botón de Stocky
+    final docked = mediaQuery.size.width >= StockyAssistantModal.dockedFrom;
 
     return SafeArea(
       child: Align(
-        alignment: Alignment.bottomCenter,
+        alignment: docked ? Alignment.bottomRight : Alignment.bottomCenter,
         child: Padding(
           padding: EdgeInsets.only(
             left: AppSpace.sm + 2,
-            right: AppSpace.sm + 2,
-            bottom: bottomInset > 0 ? bottomInset + AppSpace.sm : AppSpace.md,
+            right: docked ? AppSpace.xl : AppSpace.sm + 2,
+            bottom: bottomInset > 0 ? bottomInset + AppSpace.sm : (docked ? 96 : AppSpace.md),
           ),
           child: Material(
             color: Colors.transparent,
             child: Container(
               height: modalHeight,
-              width: math.min(mediaQuery.size.width - 20, 500.0),
+              width: math.min(mediaQuery.size.width - 20, docked ? 420.0 : 500.0),
               decoration: BoxDecoration(
                 color: c.paper,
                 borderRadius: radius,

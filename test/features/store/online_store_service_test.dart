@@ -68,4 +68,24 @@ void main() {
     expect(OnlineStoreService.errorMessage('not_allowed'), contains('dueño'));
     expect(OnlineStoreService.errorMessage('otra cosa'), contains('Inténtalo'));
   });
+
+  test('existencias como Nike: agotadas tachadas y «quedan pocas» sin el número', () {
+    final p = StoreProduct.fromJson({
+      'id': 'p1',
+      'name': 'Camiseta',
+      'price': 25000,
+      'variants': [
+        {'id': 'v1', 'size': 'S', 'sold_out': true, 'few': false},
+        {'id': 'v2', 'size': 'M', 'sold_out': false, 'few': true},
+        {'id': 'v3', 'size': 'L'},
+      ],
+    });
+    expect(p.variants, hasLength(3));
+    expect(p.variants.first.soldOut, isTrue);
+    expect(p.sizes, ['M', 'L']);
+    expect(p.runningLow, isTrue);
+    expect(StoreProduct.fromJson({'id': 'p2', 'name': 'Gorra', 'price': 1, 'few': true}).runningLow, isTrue);
+    // Sin la migración nueva la tienda sigue funcionando: nada agotado ni «pocas»
+    expect(StoreProduct.fromJson({'id': 'p3', 'name': 'Gorra', 'price': 1}).runningLow, isFalse);
+  });
 }

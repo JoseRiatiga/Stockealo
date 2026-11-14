@@ -69,9 +69,14 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Más ordenado
-            - Textos más claros: donde decía «empresa» ahora dice «negocio» (papelera, perfil y equipo).
-            - Los términos ya explican los planes actuales: Pro Negocio y Pro Servicios.
-            - La página stockealo.online estrena el mismo diseño de la app, en modo claro y oscuro.
+            ### Tienda en línea
+            - La portada es más baja: los productos se ven de una, también en el celular.
+            - Las tallas y colores agotados se ven tachados, y cuando quedan pocos dice «Quedan pocas, pide pronto».
+            - El carrito sale a la derecha en el computador y como página completa en el celular.
+            - Para hacer un pedido hay que escribir el nombre.
+
+            ### Stocky
+            - En el computador, el chat se abre en la esquina, encima de su botón.
+            - Ya no tapa los botones de Productos ni de Clientes y proveedores.
           draft: false
           prerelease: false

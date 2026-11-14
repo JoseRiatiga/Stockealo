@@ -159,14 +159,7 @@ class _StorePageState extends State<StorePage> {
         builder: (ctx) => Wrap(
           spacing: AppSpace.sm,
           runSpacing: AppSpace.sm,
-          children: [
-            for (final v in p.variants)
-              ActionChip(
-                avatar: ColorSwatchDot.hasSwatch(v.hex) ? ColorSwatchDot(hex: v.hex, size: 16) : null,
-                label: Text(v.label.isEmpty ? 'Única' : v.label),
-                onPressed: () => Navigator.pop(ctx, v),
-              ),
-          ],
+          children: [for (final v in p.variants) _VariantOption(variant: v, onTap: () => Navigator.pop(ctx, v))],
         ),
       );
 
@@ -312,8 +305,6 @@ class _StorePageState extends State<StorePage> {
                   child: Wrap(
                     spacing: AppSpace.lg,
                     children: [
-                      _navLink('INICIO', () => setState(_filters.clear)),
-                      _navLink('TIENDA', () => setState(() => _filters.onlyOffers = false)),
                       if (offers) _navLink('OFERTAS', () => setState(() => _filters.onlyOffers = true), active: _filters.onlyOffers),
                     ],
                   ),
@@ -348,68 +339,46 @@ class _StorePageState extends State<StorePage> {
       ),
     );
 
-    final photos = store.products.where((p) => p.imageUrl != null).take(3).toList();
+    // Portada baja (0.13.3): título y fotos pequeñas; los productos quedan a la vista sin bajar
+    final photos = wide ? store.products.where((p) => p.imageUrl != null).take(3).toList() : const <StoreProduct>[];
     final hero = Padding(
       padding: EdgeInsets.symmetric(horizontal: side),
       child: Container(
-        padding: EdgeInsets.all(wide ? AppSpace.xxl : AppSpace.xl),
+        padding: EdgeInsets.symmetric(horizontal: wide ? AppSpace.xl : AppSpace.lg, vertical: AppSpace.lg),
         decoration: BoxDecoration(
           color: c.surface,
-          borderRadius: BorderRadius.circular(AppRadius.sheet + 2),
+          borderRadius: BorderRadius.circular(AppRadius.card),
           border: Border.all(color: c.line),
         ),
-        child: Flex(
-          direction: wide ? Axis.horizontal : Axis.vertical,
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: wide ? CrossAxisAlignment.center : CrossAxisAlignment.stretch,
+        child: Row(
           children: [
-            _heroPart(
-              wide,
-              Column(
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (offers) const SectionLabel('HAY OFERTAS', padding: EdgeInsets.only(bottom: AppSpace.sm)),
+                  if (offers) const SectionLabel('HAY OFERTAS', padding: EdgeInsets.only(bottom: AppSpace.xs)),
                   Text(
                     (store.heroTitle ?? '').trim().isEmpty ? store.businessName : store.heroTitle!,
-                    style: AppText.figure(context, weight: FontWeight.w800).copyWith(height: 1.05, letterSpacing: -0.6),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.page(context, weight: FontWeight.w800).copyWith(height: 1.1),
                   ),
                   if (store.welcome?.isNotEmpty == true) ...[
-                    const SizedBox(height: AppSpace.md),
-                    Text(store.welcome!, style: AppText.bodyLarge(context, color: c.inkMuted)),
+                    const SizedBox(height: AppSpace.xs),
+                    Text(store.welcome!, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.body(context, color: c.inkMuted)),
                   ],
-                  const SizedBox(height: AppSpace.lg),
-                  FilledButton(
-                    style: FilledButton.styleFrom(shape: const StadiumBorder(), padding: const EdgeInsets.symmetric(horizontal: AppSpace.xl, vertical: AppSpace.md)),
-                    onPressed: () => setState(_filters.clear),
-                    child: const Text('Ver la colección'),
-                  ),
                 ],
               ),
             ),
-            if (photos.isNotEmpty) ...[
-              SizedBox(width: wide ? AppSpace.xl : 0, height: wide ? 0 : AppSpace.xl),
-              _heroPart(
-                wide,
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < photos.length; i++) ...[
-                      if (i > 0) const SizedBox(width: AppSpace.md),
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(top: i == 1 ? AppSpace.xl : 0),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(AppRadius.sheet - 4),
-                            child: AspectRatio(
-                              aspectRatio: 0.62,
-                              child: Image.network(photos[i].imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => ColoredBox(color: c.surfaceMuted)),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+            for (final photo in photos) ...[
+              const SizedBox(width: AppSpace.md),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                child: SizedBox(
+                  width: 88,
+                  height: 88,
+                  child: Image.network(photo.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => ColoredBox(color: c.surfaceMuted)),
                 ),
               ),
             ],
@@ -442,7 +411,7 @@ class _StorePageState extends State<StorePage> {
         slivers: [
           SliverToBoxAdapter(child: header),
           SliverToBoxAdapter(child: Divider(height: 1, color: c.line)),
-          const SliverToBoxAdapter(child: SizedBox(height: AppSpace.xl)),
+          const SliverToBoxAdapter(child: SizedBox(height: AppSpace.lg)),
           SliverToBoxAdapter(child: hero),
           ...grid,
           if (wide)
@@ -472,9 +441,6 @@ class _StorePageState extends State<StorePage> {
     );
   }
 
-  /// En pantalla ancha cada parte de la portada ocupa la mitad; en el celular, lo que necesita
-  Widget _heroPart(bool wide, Widget child) => wide ? Expanded(child: child) : child;
-
   Widget _navLink(String label, VoidCallback onTap, {bool active = false}) {
     final c = context.colors;
     return InkWell(
@@ -495,7 +461,7 @@ class _StorePageState extends State<StorePage> {
       label: Text('$n'),
       child: IconButton.outlined(
         tooltip: n == 0 ? 'Tu pedido' : 'Tu pedido: $n productos',
-        onPressed: () => _openCart(store),
+        onPressed: () => _openCart(context, store),
         icon: const Icon(Icons.shopping_bag_outlined),
       ),
     );
@@ -662,7 +628,7 @@ class _StorePageState extends State<StorePage> {
             constraints: const BoxConstraints(maxWidth: 560),
             child: FilledButton.icon(
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-              onPressed: () => _openCart(store),
+              onPressed: () => _openCart(context, store),
               icon: const Icon(Icons.shopping_bag_outlined),
               label: Text('Ver pedido · $units · ${CurrencyFormatter.formatIn(total, store.currency)}', overflow: TextOverflow.ellipsis),
             ),
@@ -672,16 +638,35 @@ class _StorePageState extends State<StorePage> {
     );
   }
 
-  Future<void> _openCart(PublicStore store) => AppSheet.show<void>(
-        context: context,
-        title: 'Tu pedido',
-        builder: (ctx) => _CartForm(
+  /// El carrito como en las tiendas grandes: a la derecha en el computador y en
+  /// página completa en el celular, con el total y «Hacer el pedido» fijos abajo
+  /// [ctx] es el de la plantilla: así el carrito toma su tema (Moda es oscura)
+  Future<void> _openCart(BuildContext ctx, PublicStore store) {
+    final theme = Theme.of(ctx);
+    Widget form({required bool pinned}) => _CartForm(
           store: store,
           lines: () => _lines,
           onChanged: _setLine,
           storeContext: context,
+          pinnedFooter: pinned,
+        );
+    if (MediaQuery.sizeOf(ctx).width >= AppSidePanel.wideFrom) {
+      return AppSidePanel.show<void>(context: ctx, title: 'Tu pedido', builder: (_) => form(pinned: false));
+    }
+    return Navigator.of(ctx).push<void>(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => Theme(
+        data: theme,
+        child: Builder(
+          builder: (page) => Scaffold(
+            backgroundColor: page.colors.paper,
+            appBar: AppBar(title: const Text('Tu pedido')),
+            body: SafeArea(child: form(pinned: true)),
+          ),
         ),
-      );
+      ),
+    ));
+  }
 }
 
 /// Logo del negocio, o su inicial
@@ -966,6 +951,9 @@ class _ProductCard extends StatelessWidget {
                         Text(sizes.join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption(context))
                       else if (p.stock != null)
                         Text('${p.stock} disponibles', style: AppText.caption(context)),
+                      if (p.runningLow)
+                        Text('Quedan pocas, pide pronto',
+                            style: AppText.caption(context, weight: FontWeight.w700, color: c.warning)),
                     ],
                   ),
                 ),
@@ -1002,7 +990,16 @@ class _CartForm extends StatefulWidget {
   final void Function(CartLine, int) onChanged;
   final BuildContext storeContext;
 
-  const _CartForm({required this.store, required this.lines, required this.onChanged, required this.storeContext});
+  /// En el celular (página completa): el total y «Hacer el pedido» quedan fijos abajo
+  final bool pinnedFooter;
+
+  const _CartForm({
+    required this.store,
+    required this.lines,
+    required this.onChanged,
+    required this.storeContext,
+    this.pinnedFooter = false,
+  });
 
   @override
   State<_CartForm> createState() => _CartFormState();
@@ -1011,6 +1008,9 @@ class _CartForm extends StatefulWidget {
 class _CartFormState extends State<_CartForm> {
   final _name = TextEditingController();
   final _note = TextEditingController();
+
+  /// Se intentó pedir sin nombre
+  bool _nameMissing = false;
 
   @override
   void dispose() {
@@ -1075,7 +1075,34 @@ class _CartFormState extends State<_CartForm> {
     final lines = widget.lines();
     final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
     String money(num v) => CurrencyFormatter.formatIn(v, widget.store.currency);
-    return Column(
+    final footer = <Widget>[
+      Row(
+        children: [
+          Expanded(child: Text('Total', style: AppText.title(context))),
+          Text(money(total), style: AppText.amount(context, size: AppText.sizeHeading)),
+        ],
+      ),
+      const SizedBox(height: AppSpace.md),
+      FilledButton.icon(
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+        onPressed: () {
+          if (_name.text.trim().isEmpty) {
+            setState(() => _nameMissing = true);
+            return;
+          }
+          _showTicket(lines);
+        },
+        icon: const Icon(Icons.receipt_long_outlined),
+        label: const Text('Hacer el pedido'),
+      ),
+      const SizedBox(height: AppSpace.sm),
+      Text(
+        'Te mostramos tu tiquete y lo envías por WhatsApp. La tienda te confirma el precio final y la entrega.',
+        textAlign: TextAlign.center,
+        style: AppText.caption(context),
+      ),
+    ];
+    final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (lines.isEmpty)
@@ -1113,17 +1140,16 @@ class _CartFormState extends State<_CartForm> {
           ),
         if (lines.isNotEmpty) ...[
           Divider(height: AppSpace.xl, color: c.line),
-          Row(
-            children: [
-              Expanded(child: Text('Total', style: AppText.title(context))),
-              Text(money(total), style: AppText.amount(context, size: AppText.sizeHeading)),
-            ],
-          ),
-          const SizedBox(height: AppSpace.lg),
           TextField(
             controller: _name,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(labelText: 'Tu nombre (opcional)'),
+            onChanged: (_) {
+              if (_nameMissing) setState(() => _nameMissing = false);
+            },
+            decoration: InputDecoration(
+              labelText: 'Tu nombre',
+              errorText: _nameMissing ? 'Escribe tu nombre para que la tienda sepa quién pide' : null,
+            ),
           ),
           const SizedBox(height: AppSpace.md),
           TextField(
@@ -1133,20 +1159,27 @@ class _CartFormState extends State<_CartForm> {
             minLines: 1,
             decoration: const InputDecoration(labelText: 'Nota (opcional)', hintText: 'Ej.: dirección de entrega, forma de pago'),
           ),
-          const SizedBox(height: AppSpace.lg),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-            onPressed: () => _showTicket(lines),
-            icon: const Icon(Icons.receipt_long_outlined),
-            label: const Text('Hacer el pedido'),
-          ),
-          const SizedBox(height: AppSpace.sm),
-          Text(
-            'Te mostramos tu tiquete y lo envías por WhatsApp. La tienda te confirma el precio final y la entrega.',
-            textAlign: TextAlign.center,
-            style: AppText.caption(context),
-          ),
+          if (!widget.pinnedFooter) ...[const SizedBox(height: AppSpace.lg), ...footer],
         ],
+      ],
+    );
+    if (!widget.pinnedFooter) return body;
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.lg),
+            child: body,
+          ),
+        ),
+        if (lines.isNotEmpty)
+          DecoratedBox(
+            decoration: BoxDecoration(color: c.surface, border: Border(top: BorderSide(color: c.line))),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, AppSpace.md),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: footer),
+            ),
+          ),
       ],
     );
   }
@@ -1261,6 +1294,60 @@ class _MaintenancePage extends StatelessWidget {
                 ],
                 const SizedBox(height: AppSpace.xl),
                 Text('Tienda hecha con Stockealo', style: AppText.caption(context, color: c.inkFaint)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Una talla o un color al agregar al pedido, como las tiendas grandes: la agotada se ve
+/// tachada y no se puede elegir; si quedan pocas lo dice sin dar el número.
+class _VariantOption extends StatelessWidget {
+  final StoreVariant variant;
+  final VoidCallback onTap;
+
+  const _VariantOption({required this.variant, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final v = variant;
+    final out = v.soldOut;
+    return Opacity(
+      opacity: out ? 0.5 : 1,
+      child: Material(
+        color: out ? c.surfaceMuted : c.accent.withValues(alpha: 0.06),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          side: BorderSide(color: out ? c.line : c.accent, width: out ? 1 : 1.4),
+        ),
+        child: InkWell(
+          onTap: out ? null : onTap,
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.sm),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (ColorSwatchDot.hasSwatch(v.hex)) ...[ColorSwatchDot(hex: v.hex, size: 16), const SizedBox(width: AppSpace.xs)],
+                    Text(
+                      v.label.isEmpty ? 'Única' : v.label,
+                      style: AppText.body(context, weight: FontWeight.w700, color: out ? c.inkFaint : c.ink).copyWith(
+                        decoration: out ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                  ],
+                ),
+                if (out)
+                  Text('Agotada', style: AppText.caption(context))
+                else if (v.few)
+                  Text('Quedan pocas, pide pronto', style: AppText.caption(context, weight: FontWeight.w700, color: c.warning)),
               ],
             ),
           ),

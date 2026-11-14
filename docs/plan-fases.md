@@ -59,18 +59,18 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 ### Bloque A · Barbería, peluquería y spa (primero)
 
-1. **Agenda de citas:**
+1. HECHO (14 nov). **Agenda de citas:**
    - por persona y por día, con la duración de cada servicio;
    - «Confirmada» y «No vino»;
    - recordatorio por WhatsApp (Pro Servicios);
    - al llegar el cliente, la cita pasa al tablero.
-2. **Reservas en línea desde la tienda** (Pro Servicios):
+2. HECHO (14 nov). **Reservas en línea desde la tienda** (Pro Servicios):
    - solo horas libres, según horario, duración, citas existentes y margen;
    - la nube nunca deja dos citas a la vez;
    - confirmación automática y el cliente puede cancelar hasta cierto tiempo antes;
    - el dueño ve quién creó o cambió cada cita y cuándo.
 3. **Precio por variante para todos:** corto/largo, moto/carro, pequeño/grande.
-4. **Historial del cliente por teléfono:** qué se hizo, con quién y cada cuánto viene.
+4. HECHO (14 nov). **Historial del cliente por teléfono:** qué se hizo, con quién y cada cuánto viene.
 5. **Productos vendidos dentro del servicio:** pomada, shampoo. Salen del inventario.
 6. **Alquiler de silla:** opción por persona, además de la comisión (Pro Servicios).
 7. **Abono y pago mixto:** por ejemplo, efectivo + Nequi. Cuadra con la caja y los reportes.
@@ -94,9 +94,9 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 ### Pendientes que se suman (14 nov)
 
 16. HECHO (14 nov). **Cada servicio con su propia tarjeta en el tablero:** se mueve cada servicio, no el vehículo completo. Lo pidió el lavadero. **Prioridad.**
-17. **«Habilitar múltiples servicios» en la nube:** hoy se guarda solo en el aparato.
-18. **Liquidación de comisiones y orden de servicio como tiquete.**
-19. **Antes de programar, preguntar al dueño:** ¿anular un servicio desde Ventas anula todo el cobro de esa orden?
+17. HECHO (14 nov). **«Habilitar múltiples servicios» en la nube:** hoy se guarda solo en el aparato.
+18. HECHO (14 nov). **Liquidación de comisiones y orden de servicio como tiquete.**
+19. HECHO (14 nov): preguntar «solo este servicio o todo el cobro». **Antes de programar, preguntar al dueño:** ¿anular un servicio desde Ventas anula todo el cobro de esa orden?
 20. HECHO (14 nov). **«¿Para qué usarás Stockealo?» al crear un negocio nuevo** (decidido el 14 nov):
     - **La respuesta queda guardada** en el negocio. Se puede saltar con «Ahora no» y responder después en Ajustes › Tu negocio.
     - **Si compra Pro Servicios**, al abrir Servicios la plantilla que corresponde sale **marcada por defecto como sugerencia**. Por ejemplo, quien eligió «Lavadero» ve «Lavadero» ya marcado, y puede cambiarlo.

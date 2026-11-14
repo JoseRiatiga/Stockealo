@@ -10,22 +10,24 @@ class FilterTabs<T> extends StatelessWidget {
   final T value;
   final ValueChanged<T> onChanged;
 
-  const FilterTabs({super.key, required this.options, required this.value, required this.onChanged});
+  /// Si no caben: false (por defecto) se desplazan de lado; true pasan a otra línea
+  final bool wrap;
+
+  const FilterTabs({super.key, required this.options, required this.value, required this.onChanged, this.wrap = false});
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Container(
+    final tabs = Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: c.surfaceMuted,
           borderRadius: BorderRadius.circular(AppRadius.control),
           border: Border.all(color: c.line),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Wrap(
+          spacing: 0,
+          runSpacing: 2,
           children: [
             for (final e in options.entries)
               Semantics(
@@ -55,7 +57,7 @@ class FilterTabs<T> extends StatelessWidget {
               ),
           ],
         ),
-      ),
-    );
+      );
+    return wrap ? tabs : SingleChildScrollView(scrollDirection: Axis.horizontal, child: tabs);
   }
 }

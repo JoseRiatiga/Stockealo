@@ -110,6 +110,7 @@ class _ServicesTabState extends State<ServicesTab> {
                   options: {for (final s in sections) s: s.label},
                   value: _section,
                   onChanged: (s) => setState(() => _section = s),
+                  wrap: true,
                 ),
               ),
             ),

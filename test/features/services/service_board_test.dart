@@ -134,7 +134,7 @@ void main() {
     });
 
     test('barbería: precio según el largo del cabello, opcional al recibir (0.14.0)', () {
-      final t = ServiceTemplate.barberia;
+      const t = ServiceTemplate.barberia;
       expect(t.usesVehicleKinds, isTrue);
       expect(t.kindsRequired, isFalse);
       expect(t.kindsTitle, 'Largo del cabello');

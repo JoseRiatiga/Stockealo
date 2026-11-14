@@ -14,6 +14,7 @@ import '../../models/service_models.dart';
 import 'checkout_sheet.dart';
 import 'receive_sheet.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/status_pill.dart';
 
 /// Servicios › Tablero: los trabajos del día por columna, cada servicio con su
 /// estado y quién lo hace. Aplica las reglas de [ServiceBoard].
@@ -356,16 +357,42 @@ actions: [
     if (board == null) return const Center(child: CircularProgressIndicator());
 
     final open = board.orders.where((o) => o.isOpen).toList();
-    final waiting = open.where((o) => o.status == WorkOrder.waiting).toList();
-    final working = open.where((o) => o.status == WorkOrder.inProgress).toList();
-    final ready = open.where((o) => o.status == WorkOrder.ready).toList();
     final deliveredToday = board.orders.where((o) => o.status == WorkOrder.delivered).length;
     final noneMarked = board.staff.isNotEmpty && board.attendance.isEmpty;
 
-    final columns = [
-      (_t.waitingLabel, waiting),
-      (_t.inProgress, working),
-      ('${_t.readyLabel}s para cobrar', ready),
+    // 0.14.0: el tablero es de SERVICIOS, no de vehículos. Cada servicio tiene su
+    // tarjeta y avanza solo; el vehículo completo aparece al final, para cobrar.
+    final pending = [
+      for (final o in open)
+        if (o.status != WorkOrder.ready)
+          for (var i = 0; i < o.lines.length; i++)
+            if (o.lines[i].isPending) (o, i),
+    ];
+    final working = [
+      for (final o in open)
+        for (var i = 0; i < o.lines.length; i++)
+          if (o.lines[i].isInProgress) (o, i),
+    ];
+    final ready = open.where((o) => o.status == WorkOrder.ready).toList();
+    // Servicios terminados de un vehículo que todavía tiene otros por hacer
+    final doneWaiting = [
+      for (final o in open)
+        if (o.status != WorkOrder.ready)
+          for (var i = 0; i < o.lines.length; i++)
+            if (o.lines[i].isDone) (o, i),
+    ];
+
+    final columns = <(String, int, List<Widget>)>[
+      (_t.waitingLabel, pending.length, [for (final (o, i) in pending) _serviceCard(board, o, i)]),
+      (_t.inProgress, working.length, [for (final (o, i) in working) _serviceCard(board, o, i)]),
+      (
+        '${_t.readyLabel}s para cobrar',
+        ready.length,
+        [
+          for (final o in ready) _orderCard(board, o),
+          for (final (o, i) in doneWaiting) _serviceCard(board, o, i),
+        ],
+      ),
     ];
 
     return Stack(
@@ -431,20 +458,20 @@ actions: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        for (final (title, list) in columns)
+                        for (final (title, count, cards) in columns)
                           Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: AppSpace.xs),
-                              child: _column(board, title, list),
+                              child: _column(title, count, cards),
                             ),
                           ),
                       ],
                     )
                   else
-                    for (final (title, list) in columns)
-                      if (list.isNotEmpty) Padding(
+                    for (final (title, count, cards) in columns)
+                      if (cards.isNotEmpty) Padding(
                         padding: const EdgeInsets.only(bottom: AppSpace.md),
-                        child: _column(board, title, list),
+                        child: _column(title, count, cards),
                       ),
                   if (open.isNotEmpty && deliveredToday > 0)
                     Padding(
@@ -505,21 +532,111 @@ actions: [
     );
   }
 
-  Widget _column(ServiceBoard board, String title, List<WorkOrder> orders) {
+  Widget _column(String title, int count, List<Widget> cards) {
     final c = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(AppSpace.xs, 0, 0, AppSpace.sm),
-          child: Text('${title.toUpperCase()} · ${orders.length}',
+          child: Text('${title.toUpperCase()} · $count',
               style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: c.inkFaint)),
         ),
-        for (final o in orders) ...[
-          _orderCard(board, o),
-          const SizedBox(height: AppSpace.sm),
-        ],
+        for (final card in cards) ...[card, const SizedBox(height: AppSpace.sm)],
       ],
+    );
+  }
+
+  /// La tarjeta de UN servicio (0.14.0): qué es, de qué vehículo o cliente, quién lo
+  /// hace y su botón. Cada servicio avanza solo, sin mover el vehículo completo.
+  Widget _serviceCard(ServiceBoard board, WorkOrder o, int i) {
+    final c = context.colors;
+    final l = o.lines[i];
+    final delay = board.delayOf(l, DateTime.now());
+    final turn = l.isPending && o.status == WorkOrder.waiting ? board.turnOf(o) : null;
+    final since = l.startedAt ?? o.since;
+    final minutes = DateTime.now().difference(since).inMinutes;
+    final missing = l.isDone ? [for (final x in o.lines) if (!x.isDone) x.name] : const <String>[];
+    final who = l.staffIds.isEmpty ? null : _names(l.staffIds);
+    final detail = [
+      if (o.vehicleKind != null) _t.vehicleLabel(o.vehicleKind),
+      if ((o.customerName ?? '').isNotEmpty && o.title != o.customerName) o.customerName!,
+      if (turn != null) 'turno $turn',
+      if (!l.isDone) (minutes < 1 ? 'ahora' : 'hace $minutes min'),
+    ].join(' · ');
+    final (tone, statusText) = switch (l.status) {
+      WorkOrderLine.inProgress => (AppTone.info, who == null ? _t.inProgress : 'Lo hace $who'),
+      WorkOrderLine.done => (AppTone.success, 'Terminado${who == null ? '' : ' · $who'}'),
+      _ => (AppTone.neutral, 'Pendiente'),
+    };
+
+    return Opacity(
+      opacity: l.isDone ? 0.75 : 1,
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.xs, AppSpace.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l.name, style: AppText.bodyLarge(context, weight: FontWeight.w700)),
+                      // El vehículo o cliente, para saber de quién es
+                      Text(o.title, style: AppText.body(context, weight: FontWeight.w600, color: c.accent)),
+                      if (detail.isNotEmpty) Text(detail, style: AppText.caption(context)),
+                    ],
+                  ),
+                ),
+                Text(CurrencyFormatter.format(l.price), style: AppText.body(context, weight: FontWeight.w700)),
+                PopupMenuButton<String>(
+                  tooltip: 'Más opciones',
+                  onSelected: (v) => switch (v) {
+                    'revert' => _revert(o),
+                    'cancel' => _cancel(o),
+                    'message' => _chooseMessage(o),
+                    _ => null,
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'revert', child: Text('Retroceder un servicio')),
+                    const PopupMenuItem(value: 'message', child: Text('Enviar mensaje por WhatsApp')),
+                    PopupMenuItem(value: 'cancel', child: Text('Cancelar ${o.title}')),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpace.xs),
+            Wrap(
+              spacing: AppSpace.xs,
+              runSpacing: AppSpace.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                StatusPill(statusText, tone: tone, compact: true),
+                if (delay != null) StatusPill('Demorado $delay min', tone: AppTone.danger, compact: true),
+                if (missing.isNotEmpty) StatusPill('Falta: ${missing.join(', ')}', tone: AppTone.warning, compact: true),
+              ],
+            ),
+            if (!l.isDone)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpace.sm, right: AppSpace.md),
+                child: l.isPending
+                    ? FilledButton.tonalIcon(
+                        onPressed: _busy ? null : () => _start(o, i),
+                        icon: const Icon(Icons.play_arrow_outlined, size: 18),
+                        label: const Text('Empezar'),
+                      )
+                    : FilledButton.icon(
+                        onPressed: _busy ? null : () => _finish(o, i),
+                        icon: const Icon(Icons.check_outlined, size: 18),
+                        label: const Text('Terminar'),
+                      ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 

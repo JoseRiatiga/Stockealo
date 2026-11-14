@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -198,19 +200,33 @@ void main() {
           businessId: businessId,
           plate: 'ABC12D',
           vehicleKind: 'MOTO',
-          lines: [WorkOrderLine(serviceId: completo.id, name: completo.name, price: 15000)],
+          lines: [
+            WorkOrderLine(serviceId: completo.id, name: completo.name, price: 15000),
+            WorkOrderLine(serviceId: completo.id, name: 'Polichado', price: 25000),
+          ],
         );
       });
 
+      final shot = GlobalKey();
       await tester.pumpWidget(MaterialApp(
         theme: AppTheme.build(Brightness.light),
-        home: ServicesTab(business: business, userRole: 'OWNER'),
+        home: RepaintBoundary(key: shot, child: ServicesTab(business: business, userRole: 'OWNER')),
       ));
       await settle(tester, find.text('ABC12D'));
+      final out = Platform.environment['PREVIEW_OUT'];
+      if (out != null) {
+        await tester.runAsync(() async {
+          final image = await (shot.currentContext!.findRenderObject()! as RenderRepaintBoundary).toImage();
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          File('$out/tablero_${tester.view.physicalSize.width.toInt()}.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+        });
+      }
 
-      // Tablero: el trabajo con su servicio pendiente y el aviso de marcar asistencia
-      expect(find.text('ABC12D'), findsOneWidget);
-      expect(find.text('Empezar'), findsOneWidget);
+      // Tablero (0.14.0): cada servicio con su propia tarjeta, cada una con su vehículo
+      expect(find.text('ABC12D'), findsNWidgets(2));
+      expect(find.text('Lavado completo'), findsOneWidget);
+      expect(find.text('Polichado'), findsOneWidget);
+      expect(find.text('Empezar'), findsNWidgets(2));
       expect(find.textContaining('Marca quién vino hoy'), findsOneWidget);
       expect(find.text('Juan · Sin marcar'), findsOneWidget);
       expect(tester.takeException(), isNull);

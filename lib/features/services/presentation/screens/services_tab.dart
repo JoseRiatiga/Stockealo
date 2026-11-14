@@ -14,6 +14,7 @@ import '../widgets/commissions_view.dart';
 import '../widgets/history_view.dart';
 import '../widgets/messages_view.dart';
 import '../../../../core/design/filter_tabs.dart';
+import '../../../../core/design/status_pill.dart';
 
 /// Secciones de la pestaña Servicios
 enum ServicesSection {
@@ -178,6 +179,7 @@ class _TemplatePickerState extends State<TemplatePicker> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final suggested = ServiceTemplate.suggestedFor(widget.business.icon);
     return Scaffold(
       backgroundColor: c.paper,
       body: ContentWidth(
@@ -195,16 +197,30 @@ class _TemplatePickerState extends State<TemplatePicker> {
               style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
             ),
             const SizedBox(height: AppSpace.lg),
-            for (final t in ServiceTemplate.all) ...[
+            // La sugerida (por lo que respondió al crear el negocio) va primero y marcada
+            for (final t in [
+              if (suggested != null) suggested,
+              for (final x in ServiceTemplate.all)
+                if (x != suggested) x,
+            ]) ...[
               AppCard(
                 onTap: widget.canConfigure && !_saving ? () => _choose(t) : null,
+                borderColor: t == suggested ? c.accent : null,
                 child: Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(t.label, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+                          Row(
+                            children: [
+                              Flexible(child: Text(t.label, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink))),
+                              if (t == suggested) ...[
+                                const SizedBox(width: AppSpace.sm),
+                                const StatusPill('Sugerida para tu negocio', tone: AppTone.accent, compact: true),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 2),
                           Text(
                             [

@@ -195,6 +195,19 @@ class ServiceTemplate {
 
   static const all = [lavadero, barberia, spa, taller, tecnico, lavanderia, otro];
 
+  /// La plantilla que se sugiere según lo que el negocio respondió en «¿Para qué usarás
+  /// Stockealo?» al crearse (su tipo, guardado en `icon`). null si es un negocio de
+  /// productos (licorera, tienda…): entonces no se marca ninguna.
+  static ServiceTemplate? suggestedFor(String? businessKind) => switch (businessKind) {
+        'lavadero' => lavadero,
+        'barberia' || 'belleza' => barberia,
+        'spa' || 'unas' => spa,
+        'taller' || 'llantas' || 'motos' || 'bicicletas' => taller,
+        'servicio_tecnico' || 'celulares' || 'computadores' || 'electronica' => tecnico,
+        'lavanderia' || 'sastreria' => lavanderia,
+        _ => null,
+      };
+
   /// Plantilla del negocio. Los códigos de la 0.11.0 siguen funcionando:
   /// "Lavadero de motos" pasó a "Lavadero de motos y carros".
   static ServiceTemplate of(String? code) {

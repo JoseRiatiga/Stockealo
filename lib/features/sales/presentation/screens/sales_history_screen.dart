@@ -198,15 +198,16 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     // Anular solo ventas recientes (límite del rol, 0.15.0)
     final hours = Permissions.myLimit(RoleLimit.voidHours);
     final age = DateTime.now().difference(sale.date).inMinutes / 60;
+    String? voidAuth;
     if (hours != null && age > hours) {
-      final allowed = await AuthorizationGate.allow(
+      voidAuth = await AuthorizationGate.allow(
         context,
         businessId: sale.businessId,
         action: 'Anular una venta de ${CurrencyFormatter.format(sale.totalAmount)}',
         reasons: ['La venta es de hace ${age.floor()} horas y tu rol solo anula las de las últimas ${hours.round()} horas.'],
         amount: sale.totalAmount,
       );
-      if (!allowed || !mounted) return;
+      if (voidAuth == null || !mounted) return;
     }
     const reasons = ['Se equivocó de producto', 'El cliente devolvió', 'Cobro repetido', 'Prueba'];
     final other = TextEditingController();
@@ -280,7 +281,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
       if (choice == null) return;
       onlyThis = choice;
     }
-    await _salesRepo.voidSale(sale, reason: reason, onlyThisLine: onlyThis);
+    await _salesRepo.voidSale(sale, reason: reason, onlyThisLine: onlyThis, voidAuthRequestId: voidAuth);
     await _loadSales();
     if (mounted) AppToast.showSuccess(context, 'Venta anulada. El stock volvió al inventario.');
   }

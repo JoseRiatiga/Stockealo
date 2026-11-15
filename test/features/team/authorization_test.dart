@@ -7,7 +7,7 @@ import 'package:stockealo/features/team/presentation/widgets/authorization_gate.
 /// 0.15.0, etapa 3: autorización de un solo uso, solo con internet
 void main() {
   testWidgets('sin conexión, pedir autorización lo dice y la acción no sigue', (tester) async {
-    bool? result;
+    String? result = 'sin tocar';
     await tester.pumpWidget(MaterialApp(
       theme: AppTheme.build(Brightness.light),
       home: Scaffold(
@@ -35,7 +35,7 @@ void main() {
     expect(find.textContaining('necesitas internet'), findsOneWidget);
     await tester.tap(find.text('Cerrar'));
     await tester.pumpAndSettle();
-    expect(result, isFalse);
+    expect(result, isNull, reason: 'no se autorizó: la acción no sigue');
     expect(tester.takeException(), isNull);
   });
 

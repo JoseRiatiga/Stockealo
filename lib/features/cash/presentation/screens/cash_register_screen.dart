@@ -216,18 +216,20 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
         'La salida es de ${CurrencyFormatter.format(value ?? 0)} y tu límite es '
             '${CurrencyFormatter.format(Permissions.myLimit(RoleLimit.cashOutMax)!)}.',
     ];
+    String? authId;
     if (needs.isNotEmpty) {
-      final allowed = await AuthorizationGate.allow(
+      authId = await AuthorizationGate.allow(
         context,
         businessId: widget.businessId,
         action: '${kind == CashMovement.exit ? 'Salida' : 'Entrada'} de caja de ${CurrencyFormatter.format(value ?? 0)}',
         reasons: needs,
         amount: value,
       );
-      if (!allowed || !mounted) return;
+      if (authId == null || !mounted) return;
     }
     try {
-      await _repo.addMovement(session: session, kind: kind, reason: reason, amount: value ?? 0, note: detail);
+      await _repo.addMovement(
+          session: session, kind: kind, reason: reason, amount: value ?? 0, note: detail, authRequestId: authId);
       await _load();
     } on StateError catch (e) {
       if (mounted) AppToast.showWarning(context, e.message);

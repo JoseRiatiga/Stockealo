@@ -177,6 +177,8 @@ class SalesRepository {
 
   /// Registra una venta multi-producto (carrito) con descuento mayorista y factura unificada
   Future<List<Sale>> recordMultiProductSale({
+    /// Autorización usada (0.15.0): la nube la exige si la venta pasa el límite del rol
+    String? authRequestId,
     required String businessId,
     required List<CartItem> items,
     required String paymentMethod,
@@ -408,9 +410,9 @@ class SalesRepository {
     });
 
     // Sincronización a la nube fuera de la transacción: cliente, ventas y stock final
-    await _syncCustomer(db, customerId, customerIsNew, finalTotal);
+    await _syncCustomer(db, customerId, customerIsNew, finalTotal, authRequestId: authRequestId);
     for (final sale in createdSales) {
-      SupabaseService.instance.insertSaleToCloud(sale.toMap());
+      SupabaseService.instance.insertSaleToCloud({...sale.toMap(), if (authRequestId != null) 'auth_request_id': authRequestId});
     }
     stockDeltas.forEach(SupabaseService.instance.adjustProductStockInCloud);
     variantDeltas.forEach(SupabaseService.instance.adjustVariantStockInCloud);
@@ -436,6 +438,8 @@ class SalesRepository {
   /// hizo en la nota. El descuento se reparte en proporción al precio.
   /// La propina no es venta del negocio: se guarda en la orden para el empleado.
   Future<List<Sale>> recordServiceSale({
+    /// Autorización usada (0.15.0): la nube la exige si el fiado pasa el límite del rol
+    String? authRequestId,
     required WorkOrder order,
     required String paymentMethod, // 'EFECTIVO' | 'TRANSFERENCIA' | 'FIADO'
     String? customerName,
@@ -568,9 +572,10 @@ class SalesRepository {
       }
     });
 
-    await _syncCustomer(db, customerId, customerIsNew, finalTotal);
+    await _syncCustomer(db, customerId, customerIsNew, finalTotal, authRequestId: authRequestId);
     for (final sale in created) {
-      SupabaseService.instance.insertSaleToCloud({...sale.toMap(), 'notes': null});
+      SupabaseService.instance.insertSaleToCloud(
+          {...sale.toMap(), 'notes': null, if (authRequestId != null) 'auth_request_id': authRequestId});
     }
     await CommissionsRepository.instance.recordForOrder(order: order, charged: charged, tip: tipAmount, now: at);
     final what = lines.length == 1 ? lines.first.name : '${lines.length} servicios';
@@ -588,10 +593,10 @@ class SalesRepository {
 
   /// Lleva a la nube el fiado: un cliente nuevo se crea con su deuda; a uno
   /// existente se le suma la diferencia, para no pisar abonos de otros dispositivos.
-  Future<void> _syncCustomer(Database db, String? customerId, bool isNew, double amount) async {
+  Future<void> _syncCustomer(Database db, String? customerId, bool isNew, double amount, {String? authRequestId}) async {
     if (customerId == null) return;
     if (!isNew) {
-      await SupabaseService.instance.adjustCustomerDebtInCloud(customerId, amount);
+      await SupabaseService.instance.adjustCustomerDebtInCloud(customerId, amount, authRequestId: authRequestId);
       return;
     }
     final rows = await db.query('customers', where: 'id = ?', whereArgs: [customerId], limit: 1);
@@ -902,7 +907,7 @@ class SalesRepository {
   ///
   /// [onlyThisLine] (0.14.0): anula solo esa línea (por ejemplo, un servicio cobrado por
   /// error) y deja cobrado lo demás de la venta, incluida la propina.
-  Future<void> voidSale(Sale sale, {String? reason, bool onlyThisLine = false}) async {
+  Future<void> voidSale(Sale sale, {String? reason, bool onlyThisLine = false, String? voidAuthRequestId}) async {
     final db = await _dbProvider.database;
     final user = AuthRepository.instance.currentUser;
     final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
@@ -996,7 +1001,12 @@ class SalesRepository {
     final cloud = SupabaseService.instance;
     final updated = await db.query('sales', where: 'id IN (${List.filled(lines.length, '?').join(',')})', whereArgs: [for (final l in lines) l.id]);
     for (final r in updated) {
-      await cloud.insertSaleToCloud({...saleFromRow(r).toMap(), 'notes': r['notes'], 'customer_id': r['customer_id']});
+      await cloud.insertSaleToCloud({
+        ...saleFromRow(r).toMap(),
+        'notes': r['notes'],
+        'customer_id': r['customer_id'],
+        if (voidAuthRequestId != null) 'void_auth_request_id': voidAuthRequestId,
+      });
     }
     for (final e in stock.entries) {
       await cloud.adjustProductStockInCloud(e.key, e.value);

@@ -294,15 +294,16 @@ class _SellScreenState extends State<SellScreen> {
     // Lo que el rol no permite o pasa su límite pide autorización (0.15.0)
     final reasons = await _needsApproval(method, customer, total);
     if (!mounted) return;
+    String? authId;
     if (reasons.isNotEmpty) {
-      final ok = await AuthorizationGate.allow(
+      authId = await AuthorizationGate.allow(
         context,
         businessId: widget.business.id,
         action: 'Venta de ${CurrencyFormatter.format(total)}',
         reasons: reasons,
         amount: total,
       );
-      if (!ok || !mounted) return;
+      if (authId == null || !mounted) return;
     } else if (_cart.hasLoss) {
       // Quien sí puede vender con pérdida lo confirma
       final ok = await AppDialog.confirm(
@@ -329,6 +330,7 @@ class _SellScreenState extends State<SellScreen> {
         customerName: customer.isEmpty ? null : customer,
         discountAmount: discount,
         paymentSplit: method == PaymentMethod.mixed ? _pay.split : null,
+        authRequestId: authId,
       );
       final change = method == PaymentMethod.cash && received != null ? received - total : 0.0;
       // Fiado: lo que queda debiendo, para el tiquete

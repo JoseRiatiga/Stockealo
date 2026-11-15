@@ -1245,7 +1245,11 @@ class SupabaseService {
       case 'adjust_variant_stock':
         await db.rpc('adjust_variant_stock', params: {'p_variant_id': p['id'], 'p_delta': p['delta']});
       case 'adjust_debt':
-        await db.rpc('adjust_customer_debt', params: {'p_customer_id': p['id'], 'p_delta': p['delta']});
+        await db.rpc('adjust_customer_debt', params: {
+          'p_customer_id': p['id'],
+          'p_delta': p['delta'],
+          if (p['auth_request_id'] != null) 'p_auth_request_id': p['auth_request_id'],
+        });
       case 'upsert_sale':
         await _sendSale(db, p);
       case 'delete_sale':
@@ -1480,7 +1484,7 @@ class SupabaseService {
 
   static const _saleV13Columns = [
     'voided_at', 'void_reason', 'voided_by', 'payment_split', 'promotion_id', 'promotion_name',
-    'delivery_status', 'delivery_note', 'delivered_at',
+    'delivery_status', 'delivery_note', 'delivered_at', 'auth_request_id', 'void_auth_request_id',
   ];
 
   static Map<String, dynamic> _saleV13Fields(Map<String, dynamic> s) => {
@@ -1512,6 +1516,9 @@ class SupabaseService {
       'customer_name': s['customer_name'],
       'sale_date': s['date'] ?? s['created_at'] ?? DateTime.now().toIso8601String(),
       ..._saleVariantFields(s),
+      // Autorización usada (0.15.0): la nube la exige si pasa el límite del rol
+      if (s['auth_request_id'] != null) 'auth_request_id': s['auth_request_id'],
+      if (s['void_auth_request_id'] != null) 'void_auth_request_id': s['void_auth_request_id'],
     };
 
     // upsert: si un reintento llega después de que la venta ya se guardó, no se duplica
@@ -1861,8 +1868,8 @@ class SupabaseService {
       _write('adjust_stock', {'id': productId, 'delta': delta});
 
   /// Suma o resta deuda de un cliente (fiados, abonos y anulaciones)
-  Future<void> adjustCustomerDebtInCloud(String customerId, double delta) =>
-      _write('adjust_debt', {'id': customerId, 'delta': delta});
+  Future<void> adjustCustomerDebtInCloud(String customerId, double delta, {String? authRequestId}) =>
+      _write('adjust_debt', {'id': customerId, 'delta': delta, if (authRequestId != null) 'auth_request_id': authRequestId});
 
   /// Guarda o actualiza una empresa en Supabase
   Future<void> upsertBusinessToCloud(Map<String, dynamic> b) => _write('upsert_business', b);

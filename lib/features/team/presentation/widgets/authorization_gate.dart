@@ -12,14 +12,15 @@ import '../../data/activity_repository.dart';
 import '../../data/authorization_service.dart';
 
 /// Cuando el rol no permite algo o pasa su límite: «Pedir autorización» (0.15.0).
-/// Devuelve true si alguien lo aprobó (una sola vez). Uso:
+/// Devuelve el número de la autorización si alguien la aprobó (sirve una sola vez); la
+/// app lo manda con el cambio y la nube lo comprueba. null = no se autorizó. Uso:
 ///
 /// ```dart
-/// if (reasons.isNotEmpty &&
-///     !await AuthorizationGate.allow(context, businessId: id, action: 'Descuento', reasons: reasons)) return;
+/// final id = await AuthorizationGate.allow(context, businessId: id, action: 'Descuento', reasons: reasons);
+/// if (id == null) return;
 /// ```
 abstract final class AuthorizationGate {
-  static Future<bool> allow(
+  static Future<String?> allow(
     BuildContext context, {
     required String businessId,
     required String action,
@@ -33,8 +34,8 @@ abstract final class AuthorizationGate {
       message: '${reasons.join('\n')}\n\nUn administrador o el dueño puede aprobarlo desde su celular. Sirve una sola vez.',
       confirmText: 'Pedir autorización',
     );
-    if (!ok || !context.mounted) return false;
-    final approved = await AppSheet.show<bool>(
+    if (!ok || !context.mounted) return null;
+    return AppSheet.show<String>(
       context: context,
       title: 'Pedir autorización',
       isDismissible: false,
@@ -45,7 +46,6 @@ abstract final class AuthorizationGate {
         amount: amount,
       ),
     );
-    return approved == true;
   }
 }
 
@@ -114,7 +114,7 @@ class _WaitingApprovalState extends State<_WaitingApproval> {
         if (!mounted) return;
         if (used) {
           AppToast.showSuccess(context, 'Autorizado por ${now.decidedName ?? 'un administrador'}.');
-          Navigator.pop(context, true);
+          Navigator.pop(context, now.id);
         } else {
           setState(() => _error = 'La aprobación venció. Pide otra.');
         }
@@ -169,7 +169,7 @@ class _WaitingApprovalState extends State<_WaitingApproval> {
         ],
         const SizedBox(height: AppSpace.lg),
         OutlinedButton(
-          onPressed: () => Navigator.pop(context, false),
+          onPressed: () => Navigator.pop(context),
           child: Text(rejected || expired || _error != null ? 'Cerrar' : 'Cancelar'),
         ),
       ],

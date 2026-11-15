@@ -98,6 +98,9 @@ class CashRegisterRepository {
     required String reason,
     required double amount,
     String? note,
+
+    /// Autorización usada (0.15.0): la nube la exige si pasa el límite del rol
+    String? authRequestId,
     DateTime? now,
   }) async {
     if (!session.isOpen) throw StateError('La caja ya está cerrada.');
@@ -116,7 +119,7 @@ class CashRegisterRepository {
     final db = await _dbProvider.database;
     final row = m.toMap();
     await db.insert('cash_movements', row);
-    _cloud.upsertCashMovementToCloud(row);
+    _cloud.upsertCashMovementToCloud({...row, if (authRequestId != null) 'auth_request_id': authRequestId});
     ActivityRepository.instance.log(
       businessId: session.businessId,
       action: 'cash_movement',

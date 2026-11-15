@@ -20,6 +20,8 @@ import '../../models/business_member.dart';
 import 'roles_screen.dart';
 import '../../data/roles_repository.dart';
 import '../../../../core/permissions/permissions.dart';
+import '../../../services/presentation/widgets/schedule_editor.dart';
+import '../../../services/models/work_schedule.dart';
 
 /// Ajustes › Equipo: dueño, colaboradores con su rol e invitación por código o QR
 class EmployeesScreen extends StatefulWidget {
@@ -853,8 +855,51 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               ],
             ),
           ),
+          // Horario de acceso (0.15.0, Pro Servicios): solo entra a la app en sus días y horas
+          if (!member.isOwner && (canEdit || member.accessSchedule != null))
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpace.sm, right: AppSpace.sm),
+              child: InkWell(
+                onTap: canEdit ? () => _editAccessSchedule(member) : null,
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+                  child: Row(
+                    children: [
+                      Icon(Icons.schedule_outlined, size: 16, color: c.inkMuted),
+                      const SizedBox(width: AppSpace.sm),
+                      Expanded(
+                        child: Text(
+                          WorkSchedule.decode(member.accessSchedule)?.describe() ?? 'Sin horario de acceso: entra cuando quiera',
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
+                        ),
+                      ),
+                      if (canEdit) Icon(Icons.edit_outlined, size: 16, color: c.inkFaint),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _editAccessSchedule(BusinessMember member) async {
+    if (!ProService.instance.status.value.services) {
+      AppToast.showWarning(context, 'El horario de acceso es de Pro Servicios.');
+      return;
+    }
+    final picked = await ScheduleEditor.show(
+      context,
+      title: 'Horario de acceso',
+      subtitle: '${member.displayName} solo podrá usar la app en estos días y horas.',
+      initial: WorkSchedule.decode(member.accessSchedule),
+      removeLabel: 'Sin horario: entra cuando quiera',
+    );
+    if (picked == null || !mounted) return;
+    await _teamRepo.setAccessSchedule(member, picked.isEmpty ? null : picked);
+    await _loadData();
+    if (mounted) AppToast.showSuccess(context, picked.isEmpty ? 'Quitaste el horario de acceso.' : 'Horario de acceso guardado.');
   }
 }

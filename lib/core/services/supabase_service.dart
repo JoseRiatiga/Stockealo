@@ -693,6 +693,7 @@ class SupabaseService {
               'name': memberName,
               'role': memberRole,
               'role_id': m['role_id'],
+              'access_schedule': m['access_schedule'],
               'status': 'ACTIVE',
               'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
             },
@@ -1313,6 +1314,8 @@ class SupabaseService {
           'role': p['role'] ?? 'CASHIER',
           // Rol propio (0.15.0); null = su rol por defecto
           'role_id': p['role_id'],
+          // Horario de acceso (0.15.0); null = sin horario
+          'access_schedule': p['access_schedule'],
           'created_at': p['created_at'] ?? DateTime.now().toIso8601String(),
         };
         try {
@@ -1320,8 +1323,13 @@ class SupabaseService {
             await db.from('business_members').upsert(row, onConflict: 'id');
           } on PostgrestException catch (e) {
             // La nube todavía no tiene la columna del rol propio: se guarda lo demás
-            if (!e.message.contains('role_id') && e.code != '42703' && e.code != 'PGRST204') rethrow;
-            row.remove('role_id');
+            if (!e.message.contains('role_id') && !e.message.contains('access_schedule') &&
+                e.code != '42703' && e.code != 'PGRST204') {
+              rethrow;
+            }
+            row
+              ..remove('role_id')
+              ..remove('access_schedule');
             await db.from('business_members').upsert(row, onConflict: 'id');
           }
         } on PostgrestException catch (e) {

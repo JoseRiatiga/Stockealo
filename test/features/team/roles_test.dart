@@ -17,6 +17,7 @@ import 'package:stockealo/features/team/data/team_repository.dart';
 import 'package:stockealo/features/team/models/business_member.dart';
 import 'package:stockealo/features/team/models/business_role.dart';
 import 'package:stockealo/features/team/presentation/screens/roles_screen.dart';
+import 'package:stockealo/features/services/models/work_schedule.dart';
 
 /// 0.15.0, etapa 2: roles propios del negocio
 void main() {
@@ -185,6 +186,29 @@ void main() {
     test('el resumen dice qué se encendió y qué se apagó', () {
       expect(RolesRepository.changeSummary('Cajero', {Perm.sell, Perm.credit}, {Perm.sell, Perm.costs}),
           'Cambió los permisos de Cajero: +Ver costos; −Fiar');
+    });
+  });
+
+  // 0.15.0, etapa 4: horario de acceso
+  group('Horario de acceso', () {
+    test('se guarda por persona, se lee al entrar y el Dueño nunca tiene', () async {
+      const schedule = WorkSchedule({1: ShiftTime(480, 1080), 2: ShiftTime(480, 1080)});
+      await TeamRepository.instance.setAccessSchedule(await luis(), schedule);
+      final read = await TeamRepository.instance.myAccessSchedule(businessId: bizId, userId: 'u2', userEmail: 'luis@x.com');
+      expect(read?.describe(), schedule.describe());
+      expect((await luis()).accessSchedule, isNotNull);
+      // Lunes 10:00 a. m.: dentro; lunes 7:00 p. m. y domingo: fuera
+      expect(read!.stateAt(DateTime(2026, 11, 16, 10)), ShiftState.during);
+      expect(read.stateAt(DateTime(2026, 11, 16, 19)), isNot(ShiftState.during));
+      expect(read.stateAt(DateTime(2026, 11, 15, 10)), isNot(ShiftState.during));
+      // El Dueño no tiene horario aunque se le ponga uno
+      final db = await appDb.database;
+      await db.update('business_members', {'access_schedule': schedule.encode()}, where: 'id = ?', whereArgs: ['m-owner']);
+      expect(await TeamRepository.instance.myAccessSchedule(businessId: bizId, userId: 'u1', userEmail: 'ana@x.com'), isNull);
+      // Quitarlo
+      await TeamRepository.instance.setAccessSchedule(await luis(), null);
+      expect(await TeamRepository.instance.myAccessSchedule(businessId: bizId, userId: 'u2', userEmail: 'luis@x.com'), isNull);
+      await SupabaseService.instance.waitForPendingWrites();
     });
   });
 

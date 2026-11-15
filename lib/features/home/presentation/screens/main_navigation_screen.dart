@@ -47,6 +47,8 @@ import '../../../../core/permissions/permissions.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 import '../../../team/presentation/widgets/authorization_gate.dart';
 import '../../../team/data/authorization_service.dart';
+import '../../../services/models/work_schedule.dart';
+import '../../../../core/widgets/app_toast.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -230,6 +232,35 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     await alerts.refreshVisitReminders();
   }
 
+  // Horario de acceso (0.15.0, Pro Servicios): fuera de horario la app se bloquea
+  WorkSchedule? _accessSchedule;
+  Timer? _accessTimer;
+  String? _accessWarned;
+
+  bool get _outOfHours =>
+      _accessSchedule != null &&
+      Permissions.viewAs.value == null &&
+      _accessSchedule!.stateAt(DateTime.now()) != ShiftState.during;
+
+  void _watchAccess(WorkSchedule? schedule) {
+    _accessTimer?.cancel();
+    _accessSchedule = schedule;
+    if (schedule == null) return;
+    // Cada minuto: aviso 10 minutos antes de que termine y bloqueo al terminar
+    _accessTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      final shift = schedule.on(now);
+      final minute = now.hour * 60 + now.minute;
+      final key = '${now.year}-${now.month}-${now.day}';
+      if (shift != null && minute >= shift.end - 10 && minute < shift.end && _accessWarned != key) {
+        _accessWarned = key;
+        AppToast.showWarning(context, 'Tu horario termina a las ${ShiftTime.clock(shift.end)}. Termina lo que estás haciendo.');
+      }
+      setState(() {});
+    });
+  }
+
   RealtimeChannel? _authChannel;
   final Set<String> _authShown = {};
 
@@ -259,6 +290,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     AppPlace.request.removeListener(_onPlaceRequest);
     Permissions.viewAs.removeListener(_onViewAs);
     _authChannel?.unsubscribe();
+    _accessTimer?.cancel();
     _lifecycle.dispose();
     _webUpdateTimer?.cancel();
     _ordersTimer?.cancel();
@@ -294,6 +326,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         StoreOrdersRepository.instance.pull(biz.id);
         // Autorizaciones (0.15.0): a quien puede autorizar le llegan al instante
         _wireAuthorizations(biz.id, role);
+        // Horario de acceso (0.15.0)
+        _watchAccess(await _teamRepo.myAccessSchedule(businessId: biz.id, userId: user.id, userEmail: user.email));
         AppointmentsRepository.instance.pullOnline(biz.id);
       }
       if (mounted) {
@@ -461,6 +495,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   @override
   Widget build(BuildContext context) {
+    // Fuera de su horario de acceso: la app se bloquea hasta su próximo turno
+    if (_outOfHours) {
+      return _OutOfHours(schedule: _accessSchedule!, businessName: _activeBusiness?.name, onLogout: widget.onLogout);
+    }
     // Si la persona deja de poder ver el lugar (rol o plan), vuelve a Inicio
     final place = AppPlace.byId(_currentIndex);
     if (_currentIndex != AppPlace.ajustes && !place.visibleFor(role: _userRole, services: _showServices)) {
@@ -613,3 +651,56 @@ class _ViewAsBanner extends StatelessWidget {
   }
 }
 
+/// Fuera del horario de acceso (0.15.0): qué días y horas puede entrar, y salir
+class _OutOfHours extends StatelessWidget {
+  final WorkSchedule schedule;
+  final String? businessName;
+  final VoidCallback onLogout;
+
+  const _OutOfHours({required this.schedule, required this.businessName, required this.onLogout});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final today = schedule.on(DateTime.now());
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpace.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.schedule_outlined, size: 48, color: c.accent),
+                  const SizedBox(height: AppSpace.md),
+                  Text('Estás fuera de tu horario', textAlign: TextAlign.center, style: AppText.heading(context)),
+                  const SizedBox(height: AppSpace.sm),
+                  Text(
+                    today == null
+                        ? 'Hoy no tienes turno${businessName == null ? '' : ' en $businessName'}.'
+                        : 'Hoy puedes usar la app de ${today.label}.',
+                    textAlign: TextAlign.center,
+                    style: AppText.bodyLarge(context, color: c.inkMuted),
+                  ),
+                  const SizedBox(height: AppSpace.sm),
+                  Text('Tu horario: ${schedule.describe()}', textAlign: TextAlign.center, style: AppText.small(context)),
+                  const SizedBox(height: AppSpace.xl),
+                  OutlinedButton.icon(
+                    onPressed: onLogout,
+                    icon: const Icon(Icons.logout_outlined, size: 18),
+                    label: const Text('Cerrar sesión'),
+                  ),
+                  const SizedBox(height: AppSpace.md),
+                  Text('Si necesitas entrar ahora, pídeselo al dueño.', style: AppText.caption(context)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

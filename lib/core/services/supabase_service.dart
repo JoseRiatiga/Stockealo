@@ -654,6 +654,24 @@ class SupabaseService {
         } catch (e) {
           debugPrint('No se pudieron bajar los roles del negocio: $e');
         }
+        // Metas de ventas (0.16.0): cada persona baja las del negocio y las suyas
+        try {
+          final List<dynamic> cloudGoals = await client!.from('sales_goals').select();
+          for (final g in cloudGoals) {
+            final row = Map<String, dynamic>.from(g as Map);
+            await db.insert(
+              'sales_goals',
+              {
+                for (final k in const ['id', 'business_id', 'period', 'member_user_id', 'member_name', 'starts_on', 'created_at', 'updated_at'])
+                  k: row[k] == null ? null : '${row[k]}',
+                'amount': (row['amount'] as num?)?.toDouble() ?? 0,
+              },
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+        } catch (e) {
+          debugPrint('No se pudieron bajar las metas de ventas: $e');
+        }
         final List<dynamic> cloudMembers = await client!.from('business_members').select();
         for (final m in cloudMembers) {
           final rawUserId = m['user_id'] as String?;
@@ -1348,7 +1366,12 @@ class SupabaseService {
       case 'delete_member':
         await db.from('business_members').delete().eq('id', p['id'] as String);
       case 'upsert_business_role':
-        await db.from('business_roles').upsert(p, onConflict: 'id');
+        await db.from('business_roles').upsert(Map<String, dynamic>.from(p)..remove(_editedAtKey), onConflict: 'id');
+      case 'upsert_sales_goal':
+        await db.from('sales_goals').upsert({
+          for (final k in const ['id', 'business_id', 'period', 'member_user_id', 'member_name', 'amount', 'starts_on', 'created_at', 'updated_at'])
+            k: p[k],
+        }, onConflict: 'id');
       case 'delete_business_role':
         await db.from('business_roles').delete().eq('id', p['id'] as String);
       case 'insert_activity':
@@ -1918,6 +1941,9 @@ class SupabaseService {
   /// Roles del negocio (0.15.0): ajustes del Administrador y del Cajero, y roles propios
   Future<void> upsertBusinessRoleToCloud(Map<String, dynamic> row) => _write('upsert_business_role', row);
   Future<void> deleteBusinessRoleFromCloud(String roleId) => _write('delete_business_role', {'id': roleId});
+
+  /// Sube una meta de ventas (0.16.0)
+  Future<void> upsertSalesGoalToCloud(Map<String, dynamic> row) => _write('upsert_sales_goal', row);
 
   /// Sube una anotación del registro de actividad (ver ActivityRepository)
   Future<void> insertActivityToCloud(Map<String, dynamic> row) => _write('insert_activity', row);

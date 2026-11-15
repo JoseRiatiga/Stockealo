@@ -149,6 +149,19 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 ## 0.16.0 · Tienda y crecimiento (antes 0.15.0)
 
+### Orden por fases (aprobado el 15 nov)
+
+- **Fase 0 · Metas de ventas** (lo pidió el dueño el 15 nov, va primero): punto 21.
+- **Fase 1 · La tienda se ve mejor:** puntos 13, 17 y 24.
+- **Fase 2 · Tipos de negocio que venden productos:** punto 16 (usa las plantillas de la fase 1).
+- **Fase 3 · Vender por redes:** puntos 14, 15 y 12.
+- **Fase 4 · Pedidos y números de la tienda:** puntos 18 y 11 (Firebase lo crea el dueño).
+- **Fase 5 · Calidad y confianza:** puntos 1 a 7.
+- **Fase 6 · Seguridad:** MFA, PIN o huella, limpieza y punto 22.
+- **Fase 7 · Crecimiento y detalles:** puntos 23, 20, 19, 25, 26 y 27.
+
+Las fases 1 a 3 van en ese orden porque dependen entre sí; las 4 a 7 se pueden mover.
+
 ### Movidos desde la 0.15.0 (15 nov)
 
 - MFA del panel admin (necesita la app de códigos en el celular del dueño).
@@ -213,7 +226,16 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 19. Guías de instalación para Android, web e iPhone.
 20. Página de novedades.
-21. Meta de ventas.
+21. **Metas de ventas** (pedido del dueño, 15 nov; ahora es la fase 0):
+    - El negocio elige si quiere meta **semanal**, **mensual** o las dos, y el valor de cada una.
+    - Se ve **en una gráfica**: barra de avance con el porcentaje, lo que falta y cuánto hay que vender por día para llegar.
+    - Gráfica de la semana o del mes: lo vendido día a día frente a la línea de la meta.
+    - Tarjeta en Inicio y detalle en Reportes; historial de metas pasadas (cumplida o no).
+    - **Decidido (15 nov):**
+      - Se mide **solo en ventas**.
+      - **Gratis para todos:** la meta del negocio (semanal y/o mensual), su barra y la gráfica.
+      - **Con Pro:** metas personales por empleado (las pone el jefe si quiere) e historial de metas pasadas.
+      - Cada empleado ve solo su propia meta; el jefe ve todas.
 22. Entrar con Google (y Apple).
 23. Cupones desde el panel.
 

@@ -34,6 +34,9 @@ abstract final class ActivityAction {
 
   /// Autorización de un solo uso (0.15.0)
   static const authorize = 'authorize';
+
+  /// Puso, cambió o quitó una meta de ventas (0.16.0)
+  static const goalChange = 'goal_change';
 }
 
 

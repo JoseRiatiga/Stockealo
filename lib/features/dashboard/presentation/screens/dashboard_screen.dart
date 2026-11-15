@@ -30,6 +30,7 @@ import '../widgets/quick_actions_section.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../pro/presentation/screens/pro_screen.dart';
 import '../../../pro/data/pro_service.dart';
+import '../../../goals/presentation/goals_widgets.dart';
 
 /// Inicio: cómo va el día de un vistazo y lo que necesita atención, con su
 /// solución a un toque. Diseño aprobado el 11 nov 2026 (re-diseño 0.13.0).
@@ -225,6 +226,8 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                 SizedBox(height: gap),
                 CloudSyncReminder(key: ValueKey('cloud-${_business?.id}-$_role'), canManage: _can(Perm.cloud)),
                 if (_role == Permissions.owner && _business != null) _ProExpiry(business: _business!),
+                // Metas de ventas (0.16.0)
+                if (_business != null) GoalsCard(key: ValueKey('goals-${_business!.id}-$_role'), business: _business!, role: _role),
                 _figures(wide, box.maxWidth - pad.horizontal),
                 SizedBox(height: gap),
                 _grid(

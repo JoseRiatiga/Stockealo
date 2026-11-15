@@ -62,6 +62,8 @@ const kAppFunctions = <AppFunction>[
       keywords: ['tienda', 'online', 'web', 'carrito', 'pedido en linea'], perm: Perm.store),
   AppFunction(id: 'profits', title: 'Ganancias', where: 'Reportes › Ganancias', tab: 4, icon: Icons.insights_outlined,
       keywords: ['ganancia', 'perdida', 'utilidad', 'reporte', 'margen'], perm: Perm.profits),
+  AppFunction(id: 'goals', title: 'Metas de ventas', where: 'Reportes › Metas', tab: 4, icon: Icons.flag_outlined,
+      keywords: ['meta', 'metas', 'objetivo', 'semanal', 'mensual', 'avance', 'vendedor'], perm: Perm.reportsSales),
   AppFunction(id: 'excel', title: 'Descargar Excel', where: 'Reportes › Descargar Excel', tab: 4, icon: Icons.table_chart_outlined,
       keywords: ['excel', 'descargar', 'exportar', 'reporte', 'xlsx'], perm: Perm.exportExcel),
   AppFunction(id: 'services', title: 'Servicios', where: 'Servicios', tab: 5, icon: Icons.view_kanban_outlined,

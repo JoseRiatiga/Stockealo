@@ -189,10 +189,11 @@ void main() {
         home: ReportsTab(userRole: role),
       ));
       expect(ReportsTab.allowed(role), sees);
-      // La pestaña reúne Ganancias y Descargar Excel (0.12.0)
+      // La pestaña reúne Ganancias, Metas (0.16.0) y Descargar Excel (0.12.0)
       if (sees) {
         expect(find.text('Ganancias'), findsOneWidget);
-        await tester.tap(find.text('Descargar Excel'));
+        expect(find.text('Metas'), findsOneWidget);
+        await tester.tap(find.text('Excel'));
         await tester.pump();
       }
       expect(find.text('1. ¿Qué incluir?'), sees ? findsOneWidget : findsNothing);

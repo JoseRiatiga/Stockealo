@@ -22,9 +22,21 @@ void main() {
     for (final p in [Perm.costs, Perm.voidSale, Perm.productsEdit, Perm.reportsSales, Perm.suppliers, Perm.store, Perm.team]) {
       expect(Permissions.can('CASHIER', p), isFalse, reason: p.name);
     }
-    // Un rol desconocido o vacío se trata como cajero
+    // Un rol desconocido o vacío se trata como cajero (nunca gana permisos)
     expect(Permissions.can(null, Perm.costs), isFalse);
+    expect(Permissions.can('', Perm.costs), isFalse);
+    expect(Permissions.can('SUPPORT', Perm.productsEdit), isFalse);
     expect(Permissions.can('cashier', Perm.sell), isTrue);
+  });
+
+  // Decisión de la 0.15.0 (revisión con Codex): el rol se lee sin importar mayúsculas,
+  // igual que ya hacían Ajustes y la nube (supabase_service guarda el rol en MAYÚSCULAS).
+  test('el rol se lee igual en minúsculas o mayúsculas', () {
+    for (final p in Perm.values) {
+      expect(Permissions.can('owner', p), Permissions.can('OWNER', p), reason: p.name);
+      expect(Permissions.can('admin', p), Permissions.can('ADMIN', p), reason: p.name);
+      expect(Permissions.can('Cashier', p), Permissions.can('CASHIER', p), reason: p.name);
+    }
   });
 
   test('encender un permiso enciende los que necesita', () {

@@ -8,6 +8,7 @@ import '../core/widgets/maintenance_gate.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import 'admin_widgets.dart';
 import '../core/design/filter_tabs.dart';
+import 'admin_backup_card.dart';
 
 /// Programar o activar el mantenimiento: nivel, partes, horario y mensaje
 class AdminMaintenancePage extends StatefulWidget {
@@ -207,6 +208,9 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
       children: state.blocking
           ? [state]
           : [
+              // Copia diaria propia y verificada (0.16.0, fase 5)
+              const AdminBackupCard(),
+              const SizedBox(height: AppSpace.md),
               _statusCard(c),
               const SizedBox(height: AppSpace.md),
               if (!owner)

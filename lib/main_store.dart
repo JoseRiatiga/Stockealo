@@ -6,12 +6,15 @@ import 'core/theme/app_theme.dart';
 import 'store_web/store_page.dart';
 import 'store_web/clean_url_stub.dart' if (dart.library.js_interop) 'store_web/clean_url_web.dart';
 import 'core/l10n/app_locale.dart';
+import 'core/services/error_reporter.dart';
 
 /// Tienda pública de un negocio (solo web, en stockealo.online/tienda/<slug>).
 /// Es una app aparte y no necesita cuenta.
 ///   flutter run -d chrome -t lib/main_store.dart --web-browser-flag=--disable-web-security
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Errores al panel de administración (0.16.0, fase 5)
+  ErrorReporter.instance.install('tienda');
   // Fechas en español (las pantallas usan DateFormat con 'es_CO')
   await initializeDateFormatting('es_CO', null);
   await SupabaseService.instance.initialize();

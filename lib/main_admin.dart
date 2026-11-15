@@ -9,12 +9,15 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/app_tokens.dart';
 import 'features/pro/data/pro_admin_service.dart';
 import 'core/l10n/app_locale.dart';
+import 'core/services/error_reporter.dart';
 
 /// Panel de administrador de Stockealo (solo web, en stockealo.online/admin).
 /// Es una app aparte: no está dentro de la app de los negocios.
 ///   flutter run -d chrome -t lib/main_admin.dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Errores al panel de administración (0.16.0, fase 5)
+  ErrorReporter.instance.install('admin');
   // Fechas en español (las pantallas usan DateFormat con 'es_CO')
   await initializeDateFormatting('es_CO', null);
   await SupabaseService.instance.initialize();

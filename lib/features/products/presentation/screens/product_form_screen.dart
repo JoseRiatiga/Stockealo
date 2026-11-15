@@ -27,6 +27,8 @@ import '../../../../core/codes/barcode_check.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../data/pricing.dart';
+import '../widgets/lots_widgets.dart';
+import '../../data/product_templates.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -87,6 +89,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   // Variantes (tallas y colores)
   bool _hasVariants = false;
+
+  /// Controla vencimiento por lote (0.16.0, fase 2b)
+  bool _tracksExpiry = false;
   final _variants = VariantEditorController();
 
   // Proveedor principal (opcional)
@@ -115,6 +120,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _stockController = TextEditingController(text: p?.stock.toString() ?? '0');
     _minStockController = TextEditingController(text: p?.minStock.toString() ?? '5');
     _photoPath = p?.photoPath;
+    _tracksExpiry = p?.tracksExpiry ?? false;
+    // Producto nuevo en una droguería o tienda de barrio: viene encendido
+    if (p == null) {
+      ProductTemplate.applied(widget.businessId).then((t) {
+        if (mounted && (t == ProductTemplate.drogueria || t == ProductTemplate.barrio)) setState(() => _tracksExpiry = true);
+      });
+    }
     if (p != null) {
       _selectedCategory = p.category;
       _hasVariants = p.hasVariants;
@@ -407,6 +419,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       hasVariants: _hasVariants,
       variants: variants,
       supplierId: _supplierId,
+      tracksExpiry: _tracksExpiry && !_hasVariants,
     );
 
     try {
@@ -764,6 +777,26 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         ],
                       ),
                     ),
+                  const SizedBox(height: 16),
+
+                  // Lotes con vencimiento (0.16.0, fase 2b)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: const Icon(Icons.event_outlined),
+                    title: const Text('Controla vencimiento por lote'),
+                    subtitle: Text(
+                      _hasVariants
+                          ? 'No disponible en productos con tallas o variantes.'
+                          : 'Cada entrada pide su fecha y lo vencido no se vende. Avisamos 30 días antes.',
+                      style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.inkMuted),
+                    ),
+                    value: _tracksExpiry && !_hasVariants,
+                    onChanged: _hasVariants ? null : (v) => setState(() => _tracksExpiry = v),
+                  ),
+                  if (widget.productToEdit != null && _tracksExpiry && !_hasVariants && widget.productToEdit!.tracksExpiry) ...[
+                    const SizedBox(height: AppSpace.sm),
+                    ProductLotsSection(product: widget.productToEdit!),
+                  ],
                   const SizedBox(height: 16),
 
                   // 5. Stock y Variantes (tallas y colores)

@@ -10,6 +10,7 @@ import '../../team/data/activity_repository.dart';
 import '../models/purchase.dart';
 import '../models/supplier.dart';
 import '../models/supplier_order.dart';
+import '../../products/data/lots_repository.dart';
 
 /// Proveedores y entradas de mercancía. Todo se guarda primero en el equipo y
 /// luego se sube a la nube con la cola, como el resto de la app.
@@ -245,6 +246,23 @@ class SupplierRepository {
   /// [newCosts] trae el costo nuevo de los productos a los que el usuario le
   /// aceptó actualizarlo.
   Future<void> registerPurchase(Purchase purchase, {Map<String, double> newCosts = const {}}) async {
+    await _registerPurchase(purchase, newCosts: newCosts);
+    // Lotes con vencimiento (0.16.0, fase 2b): cada renglón con fecha queda como lote
+    for (final item in purchase.items) {
+      if (item.expiresOn == null || item.quantity <= 0 || item.variantId != null) continue;
+      await LotsRepository.instance.addLot(
+        businessId: purchase.businessId,
+        productId: item.productId,
+        quantity: item.quantity,
+        expiresOn: item.expiresOn!,
+        code: item.lotCode,
+        cost: item.unitCost,
+        purchaseId: purchase.id,
+      );
+    }
+  }
+
+  Future<void> _registerPurchase(Purchase purchase, {Map<String, double> newCosts = const {}}) async {
     final db = await _dbProvider.database;
     final now = DateTime.now().toIso8601String();
     final byProduct = <String, int>{};

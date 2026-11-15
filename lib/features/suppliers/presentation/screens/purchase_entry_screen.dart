@@ -28,6 +28,7 @@ import '../../models/supplier_order.dart';
 import '../widgets/supplier_picker.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/design/app_dialog.dart';
+import 'package:intl/intl.dart';
 
 /// Un producto en la entrada, con su cantidad (o una por talla y color) y su costo
 class _Line {
@@ -36,6 +37,11 @@ class _Line {
   final Map<String, TextEditingController> variantQty;
   final TextEditingController cost;
   bool updateCost = true;
+
+  /// Lote y vencimiento (0.16.0, fase 2b)
+  final TextEditingController lot = TextEditingController();
+  DateTime? expiresOn;
+  bool get tracksExpiry => product.tracksExpiry && !withVariants;
 
   _Line(this.product,
       {int initialQty = 0, String? variantId, Map<String, int> initialVariantQty = const {}, double? cost})
@@ -86,7 +92,14 @@ class _Line {
         ]
       : [
           if (_n(qty) > 0)
-            PurchaseItem(productId: product.id, productName: product.name, quantity: _n(qty), unitCost: unitCost),
+            PurchaseItem(
+              productId: product.id,
+              productName: product.name,
+              quantity: _n(qty),
+              unitCost: unitCost,
+              lotCode: tracksExpiry && lot.text.trim().isNotEmpty ? lot.text.trim() : null,
+              expiresOn: tracksExpiry ? expiresOn : null,
+            ),
         ];
 
   void addOne(String? variantId) {
@@ -97,6 +110,7 @@ class _Line {
   void dispose() {
     qty.dispose();
     cost.dispose();
+    lot.dispose();
     for (final c in variantQty.values) {
       c.dispose();
     }
@@ -511,6 +525,12 @@ actions: [
     final items = [for (final l in _lines) ...l.items];
     if (items.isEmpty) {
       AppToast.showWarning(context, 'Escribe cuántas unidades llegaron.');
+      return;
+    }
+    // Lo que controla vencimiento necesita su fecha (0.16.0, fase 2b)
+    final noDate = _lines.where((l) => l.tracksExpiry && l.units > 0 && l.expiresOn == null).firstOrNull;
+    if (noDate != null) {
+      AppToast.showWarning(context, 'Pon la fecha de vencimiento de ${noDate.product.name}.');
       return;
     }
     setState(() => _saving = true);
@@ -939,6 +959,45 @@ actions: [
                 ),
               ],
             ),
+            // Lote y vencimiento (0.16.0, fase 2b)
+            if (l.tracksExpiry)
+              Padding(
+                padding: const EdgeInsets.only(left: 52, top: AppSpace.sm),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: l.lot,
+                        decoration: const InputDecoration(isDense: true, labelText: 'Lote (opcional)'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: l.expiresOn == null && l.units > 0 ? c.warning : null,
+                        ),
+                        icon: const Icon(Icons.event_outlined, size: 18),
+                        label: Text(
+                          l.expiresOn == null ? 'Vence: elegir' : 'Vence: ${DateFormat('d MMM y', 'es_CO').format(l.expiresOn!)}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () async {
+                          final now = DateTime.now();
+                          final d = await showDatePicker(
+                            context: context,
+                            initialDate: l.expiresOn ?? DateTime(now.year + 1, now.month, now.day),
+                            firstDate: DateTime(now.year - 2),
+                            lastDate: DateTime(now.year + 10),
+                            helpText: 'Fecha de vencimiento',
+                          );
+                          if (d != null) setState(() => l.expiresOn = d);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (_costHint(l.product) case final hint?)
               Padding(
                 padding: const EdgeInsets.only(left: 52, top: AppSpace.xs),

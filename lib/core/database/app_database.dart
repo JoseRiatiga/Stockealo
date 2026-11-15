@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 28;
+  static const int _schemaVersion = 29;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -586,11 +586,53 @@ class AppDatabase {
     if (oldVersion < 26 && newVersion >= 26) await salesReturnsV26(db);
     if (oldVersion < 27 && newVersion >= 27) await salesGoalsV27(db);
     if (oldVersion < 28 && newVersion >= 28) await productBrandV28(db);
+    if (oldVersion < 29 && newVersion >= 29) await productLotsV29(db);
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
   /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
   /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  /// 0.16.0, fase 2b: lotes con vencimiento y cambios con el proveedor
+  static Future<void> productLotsV29(Database db) async {
+    await _addColumnIfMissing(db, 'products', 'tracks_expiry', 'INTEGER NOT NULL DEFAULT 0');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS product_lots (
+        id TEXT PRIMARY KEY,
+        business_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        code TEXT,
+        expires_on TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        initial_quantity INTEGER NOT NULL DEFAULT 0,
+        cost REAL NOT NULL DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'ENTRADA',
+        purchase_id TEXT,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_lots_product ON product_lots(product_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_lots_biz ON product_lots(business_id)');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS lot_exchanges (
+        id TEXT PRIMARY KEY,
+        business_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT NOT NULL,
+        lot_id TEXT NOT NULL,
+        supplier_id TEXT,
+        supplier_name TEXT,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        new_lot_id TEXT,
+        created_at TEXT NOT NULL,
+        closed_at TEXT
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_exchanges_biz ON lot_exchanges(business_id)');
+  }
+
   /// 0.16.0: la marca de cada producto
   static Future<void> productBrandV28(Database db) async {
     await _addColumnIfMissing(db, 'products', 'brand', 'TEXT');
@@ -1046,6 +1088,7 @@ class AppDatabase {
     await salesReturnsV26(db);
     await salesGoalsV27(db);
     await productBrandV28(db);
+    await productLotsV29(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

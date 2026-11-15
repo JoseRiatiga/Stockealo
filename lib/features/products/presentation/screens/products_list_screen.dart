@@ -35,6 +35,7 @@ import '../../../../core/design/stat_card.dart';
 import '../../../sales/presentation/screens/promotions_screen.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../widgets/product_template_sheet.dart';
+import '../widgets/lots_widgets.dart';
 
 /// Productos (el catálogo) y, en [ProductsListMode.stock], el lugar Stock: la
 /// misma lista arrancando en «por reponer», con el aviso del proveedor que pasa
@@ -459,6 +460,15 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                         business: _activeBusiness!,
                         onApplied: () => _loadData(silent: true),
                       ),
+                    ),
+                  ),
+
+                // Vencimientos (0.16.0, fase 2b)
+                if (_stockMode && canEditProducts && _activeBusiness != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
+                      child: ExpiryAlert(key: ValueKey('expiry-${_activeBusiness!.id}'), business: _activeBusiness!),
                     ),
                   ),
 

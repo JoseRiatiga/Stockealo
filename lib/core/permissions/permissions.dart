@@ -87,6 +87,26 @@ enum Perm {
   }
 }
 
+/// Límites con números (0.15.0, Pro): pasar de ahí pide autorización
+enum RoleLimit {
+  discountPct('Descuento máximo', 'Más de este porcentaje pide autorización', '%'),
+  creditMax('Fiado máximo por cliente', 'Lo que puede quedar debiendo cada cliente', '\$'),
+  voidHours('Anular solo ventas recientes', 'Horas desde la venta; más viejas piden autorización', 'h'),
+  cashOutMax('Salida de caja máxima', 'Por cada salida de dinero', '\$');
+
+  final String label;
+  final String help;
+  final String unit;
+  const RoleLimit(this.label, this.help, this.unit);
+
+  static RoleLimit? byName(String name) {
+    for (final l in values) {
+      if (l.name == name) return l;
+    }
+    return null;
+  }
+}
+
 /// Plantilla para crear un rol propio más rápido (no es un rol aparte)
 class RoleTemplate {
   final String id;
@@ -164,12 +184,18 @@ class Permissions {
 
   static final Map<String, Set<Perm>> _builtins = {};
   static final Map<String, ({String name, Set<Perm> perms})> _custom = {};
+  static final Map<String, Map<RoleLimit, double>> _limits = {};
 
-  /// Pone los roles del negocio activo (reemplaza los del negocio anterior)
+  /// Pone los roles del negocio activo (reemplaza los del negocio anterior).
+  /// [limits] va por rol: 'ADMIN', 'CASHIER' o 'ROLE:<id>'.
   static void applyBusiness({
     Map<String, Set<Perm>> builtins = const {},
     Map<String, ({String name, Set<Perm> perms})> custom = const {},
+    Map<String, Map<RoleLimit, double>> limits = const {},
   }) {
+    _limits
+      ..clear()
+      ..addAll(limits);
     _builtins
       ..clear()
       ..addAll({
@@ -196,6 +222,13 @@ class Permissions {
 
   /// ¿Puede este rol hacer esto?
   static bool can(String? role, Perm perm) => defaultsFor(role).contains(perm);
+
+  /// El límite de un rol; null = sin límite. El Dueño nunca tiene límites.
+  static double? limitOf(String? role, RoleLimit limit) {
+    final r = role ?? cashier;
+    if (!isCustom(r) && r.toUpperCase() == owner) return null;
+    return _limits[isCustom(r) ? r : r.toUpperCase()]?[limit];
+  }
 
   /// El nombre del rol para mostrar
   static String labelOf(String? role) {
@@ -225,6 +258,9 @@ class Permissions {
 
   /// ¿El rol activo puede hacer esto? Tiene en cuenta «Ver como»
   static bool mine(Perm perm) => can(viewAs.value ?? current, perm);
+
+  /// El límite del rol activo; null = sin límite
+  static double? myLimit(RoleLimit limit) => limitOf(viewAs.value ?? current, limit);
 
   /// Enciende también los permisos de los que depende (en cadena)
   static Set<Perm> withDependencies(Set<Perm> perms) {

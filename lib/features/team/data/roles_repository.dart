@@ -30,6 +30,7 @@ class RolesRepository {
     Permissions.applyBusiness(
       builtins: {for (final r in roles) if (r.isBuiltin) r.builtin!: r.perms},
       custom: {for (final r in roles) if (!r.isBuiltin) r.id: (name: r.name, perms: r.perms)},
+      limits: {for (final r in roles) if (r.limits.isNotEmpty) r.roleKey: r.limits},
     );
   }
 
@@ -50,7 +51,7 @@ class RolesRepository {
   }
 
   /// El ajuste de un rol por defecto ('ADMIN' o 'CASHIER') con estos permisos
-  BusinessRole builtinWith(String businessId, String code, Set<Perm> perms) {
+  BusinessRole builtinWith(String businessId, String code, Set<Perm> perms, {Map<RoleLimit, double> limits = const {}}) {
     final now = DateTime.now();
     return BusinessRole(
       id: BusinessRole.builtinId(businessId, code),
@@ -59,6 +60,7 @@ class RolesRepository {
       baseRole: code,
       builtin: code,
       perms: perms,
+      limits: limits,
       createdAt: now,
       updatedAt: now,
     );
@@ -128,6 +130,16 @@ class RolesRepository {
       summary: 'Cambió el rol de ${member.displayName}: ${member.roleDisplayName} → ${role?.name ?? Permissions.labelOf(code)}',
       data: {'member_id': member.id},
     );
+  }
+
+  /// Texto para Actividad: los límites que quedaron
+  static String limitsSummary(Map<RoleLimit, double> limits) {
+    if (limits.isEmpty) return 'sin límites';
+    return [
+      for (final l in RoleLimit.values)
+        if (limits[l] != null)
+          '${l.label.toLowerCase()} ${l.unit == '\$' ? '\$${limits[l]!.round()}' : '${limits[l]!.round()} ${l.unit}'}',
+    ].join(', ');
   }
 
   /// Texto para Actividad: qué permisos se encendieron y cuáles se apagaron

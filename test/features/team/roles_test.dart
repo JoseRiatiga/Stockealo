@@ -166,6 +166,22 @@ void main() {
       await SupabaseService.instance.waitForPendingWrites();
     });
 
+    test('los límites se guardan con el rol y se cargan por rol; el Dueño no tiene', () async {
+      await repo.save(repo.builtinWith(bizId, Permissions.cashier, Permissions.factoryDefaults(Permissions.cashier),
+          limits: {RoleLimit.discountPct: 10, RoleLimit.cashOutMax: 50000}));
+      Permissions.applyBusiness();
+      await repo.apply(bizId);
+      expect(Permissions.limitOf('CASHIER', RoleLimit.discountPct), 10);
+      expect(Permissions.limitOf('cashier', RoleLimit.cashOutMax), 50000);
+      expect(Permissions.limitOf('CASHIER', RoleLimit.creditMax), isNull, reason: 'sin límite');
+      expect(Permissions.limitOf('OWNER', RoleLimit.discountPct), isNull);
+      final role = (await repo.list(bizId)).single;
+      expect(BusinessRole.fromMap(role.toMap()).limits, {RoleLimit.discountPct: 10, RoleLimit.cashOutMax: 50000});
+      expect(role.cloudRow()['limits'], {'discountPct': 10.0, 'cashOutMax': 50000.0});
+      expect(RolesRepository.limitsSummary(role.limits), 'descuento máximo 10 %, salida de caja máxima \$50000');
+      await SupabaseService.instance.waitForPendingWrites();
+    });
+
     test('el resumen dice qué se encendió y qué se apagó', () {
       expect(RolesRepository.changeSummary('Cajero', {Perm.sell, Perm.credit}, {Perm.sell, Perm.costs}),
           'Cambió los permisos de Cajero: +Ver costos; −Fiar');
@@ -224,6 +240,10 @@ void main() {
       await settle(tester, find.text('Lo que puede hacer cada rol'));
       expect(find.text('Crear rol'), findsNothing);
       expect(find.textContaining('Solo el dueño puede cambiar los roles'), findsOneWidget);
+      // Los límites se ven, pero sin Pro (y sin ser el dueño) no se editan
+      expect(find.text('LÍMITES'), findsOneWidget);
+      final fields = tester.widgetList<TextField>(find.byType(TextField));
+      expect(fields.every((f) => f.enabled == false), isTrue);
       final switches = tester.widgetList<Switch>(find.byType(Switch));
       expect(switches.every((s) => s.onChanged == null), isTrue);
     });

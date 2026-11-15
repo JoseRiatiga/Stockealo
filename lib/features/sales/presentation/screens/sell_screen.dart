@@ -30,6 +30,7 @@ import '../../data/promotions_repository.dart';
 import '../widgets/deliveries.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../../core/permissions/permission_guard.dart';
+import '../../../team/presentation/widgets/authorization_gate.dart';
 
 /// Vender: el punto de venta. Buscar o escanear (también con lector USB: el código
 /// entra solo al carrito), tocar productos, cobrar con F9 y seguir con la
@@ -275,8 +276,6 @@ class _SellScreenState extends State<SellScreen> {
     final method = _pay.method;
     final customer = _customer.text.trim();
 
-    if (method == PaymentMethod.credit && !PermissionGuard.check(context, Perm.credit)) return;
-    if (_cart.discount > 0 && !PermissionGuard.check(context, Perm.discount)) return;
     if (method == PaymentMethod.credit && customer.isEmpty) {
       AppToast.showWarning(context, 'Para fiar escribe a quién le fías.');
       return;
@@ -292,12 +291,20 @@ class _SellScreenState extends State<SellScreen> {
       AppToast.showWarning(context, 'Recibiste menos del total: faltan ${CurrencyFormatter.format(total - received)}.');
       return;
     }
-    // Vender por debajo del costo: el cajero no puede; el dueño lo autoriza
-    if (_cart.hasLoss) {
-      if (!_canBelowCost) {
-        AppToast.showError(context, 'Ese descuento deja pérdida. Solo el dueño o un administrador pueden autorizarlo.');
-        return;
-      }
+    // Lo que el rol no permite o pasa su límite pide autorización (0.15.0)
+    final reasons = await _needsApproval(method, customer, total);
+    if (!mounted) return;
+    if (reasons.isNotEmpty) {
+      final ok = await AuthorizationGate.allow(
+        context,
+        businessId: widget.business.id,
+        action: 'Venta de ${CurrencyFormatter.format(total)}',
+        reasons: reasons,
+        amount: total,
+      );
+      if (!ok || !mounted) return;
+    } else if (_cart.hasLoss) {
+      // Quien sí puede vender con pérdida lo confirma
       final ok = await AppDialog.confirm(
         context: context,
         title: 'Venta por debajo del costo',
@@ -353,6 +360,37 @@ class _SellScreenState extends State<SellScreen> {
       setState(() => _saving = false);
       AppToast.showError(context, e.toString().replaceFirst('Exception: ', ''));
     }
+  }
+
+  /// Por qué esta venta necesita autorización; vacío = puede seguir
+  Future<List<String>> _needsApproval(String method, String customer, double total) async {
+    final reasons = <String>[];
+    if (_cart.discount > 0) {
+      final base = _cart.subtotal - _cart.promoDiscount;
+      final pct = base <= 0 ? 0.0 : _cart.discount * 100 / base;
+      final limit = Permissions.myLimit(RoleLimit.discountPct);
+      if (!Permissions.mine(Perm.discount)) {
+        reasons.add('Tu rol no permite dar descuentos.');
+      } else if (limit != null && pct > limit + 0.01) {
+        reasons.add('El descuento es de ${pct.toStringAsFixed(pct % 1 == 0 ? 0 : 1)} % y tu límite es ${limit.round()} %.');
+      }
+    }
+    if (method == PaymentMethod.credit) {
+      final limit = Permissions.myLimit(RoleLimit.creditMax);
+      if (!Permissions.mine(Perm.credit)) {
+        reasons.add('Tu rol no permite fiar.');
+      } else if (limit != null && customer.isNotEmpty) {
+        final current = (await CustomerRepository.instance.findByName(widget.business.id, customer))?.debtBalance ?? 0;
+        if (current + total > limit + 0.5) {
+          reasons.add('$customer quedaría debiendo ${CurrencyFormatter.format(current + total)} y el límite de fiado es '
+              '${CurrencyFormatter.format(limit)}.');
+        }
+      }
+    }
+    if (_cart.hasLoss && !_canBelowCost) {
+      reasons.add('Con ese descuento la venta deja pérdida de ${CurrencyFormatter.format(_cart.loss)}.');
+    }
+    return reasons;
   }
 
   Future<void> _quote() async {

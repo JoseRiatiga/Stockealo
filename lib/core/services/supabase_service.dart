@@ -642,6 +642,7 @@ class SupabaseService {
                 'base_role': row['base_role'] ?? 'CASHIER',
                 'builtin': row['builtin'],
                 'perms': jsonEncode(row['perms'] ?? const []),
+                'limits': jsonEncode(row['limits'] ?? const {}),
                 'template_id': row['template_id'],
                 'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
                 'updated_at': row['updated_at'] ?? DateTime.now().toIso8601String(),

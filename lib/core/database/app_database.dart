@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 22;
+  static const int _schemaVersion = 23;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -580,11 +580,17 @@ class AppDatabase {
     if (oldVersion < 20 && newVersion >= 20) await chairRentV20(db);
     if (oldVersion < 21 && newVersion >= 21) await variantPhotosV21(db);
     if (oldVersion < 22 && newVersion >= 22) await rolesV22(db);
+    if (oldVersion < 23 && newVersion >= 23) await roleLimitsV23(db);
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
   /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
   /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  /// 0.15.0: límites con números de cada rol
+  static Future<void> roleLimitsV23(Database db) async {
+    await _addColumnIfMissing(db, 'business_roles', 'limits', "TEXT NOT NULL DEFAULT '{}'");
+  }
+
   /// 0.15.0: roles propios del negocio y el rol propio de cada persona
   static Future<void> rolesV22(Database db) async {
     await db.execute('''
@@ -991,6 +997,7 @@ class AppDatabase {
     await chairRentV20(db);
     await variantPhotosV21(db);
     await rolesV22(db);
+    await roleLimitsV23(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

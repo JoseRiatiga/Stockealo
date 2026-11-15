@@ -9,6 +9,8 @@ import '../../../business/models/business.dart';
 import '../../../pro/data/pro_service.dart';
 import '../../data/roles_repository.dart';
 import '../../models/business_role.dart';
+import '../../../../core/design/status_pill.dart';
+import 'package:flutter/services.dart';
 
 /// Ajustes › Equipo › Roles y permisos (0.15.0, etapa 2 de `docs/plan-roles.md`).
 ///
@@ -46,6 +48,13 @@ class _RolesScreenState extends State<RolesScreen> {
   List<_Col> _cols = const [];
   final Map<String, Set<Perm>> _orig = {};
   final Map<String, Set<Perm>> _draft = {};
+
+  /// Límites con números (Pro): lo guardado y lo que se está cambiando
+  final Map<String, Map<RoleLimit, double>> _origLimits = {};
+  final Map<String, Map<RoleLimit, double>> _draftLimits = {};
+  final Map<String, TextEditingController> _limitFields = {};
+
+  bool get _pro => ProService.instance.status.value.active;
   String _selected = Permissions.cashier;
   bool _loading = true;
   bool _saving = false;
@@ -82,6 +91,22 @@ class _RolesScreenState extends State<RolesScreen> {
     _draft
       ..clear()
       ..addAll({for (final e in _orig.entries) e.key: {...e.value}});
+    _origLimits
+      ..clear()
+      ..addAll({for (final c in cols) if (!c.locked) c.key: {...?c.role?.limits}});
+    _draftLimits
+      ..clear()
+      ..addAll({for (final e in _origLimits.entries) e.key: {...e.value}});
+    for (final f in _limitFields.values) {
+      f.dispose();
+    }
+    _limitFields
+      ..clear()
+      ..addAll({
+        for (final e in _origLimits.entries)
+          for (final l in RoleLimit.values)
+            '${e.key}|${l.name}': TextEditingController(text: e.value[l] == null ? '' : e.value[l]!.round().toString()),
+      });
     if (!mounted) return;
     setState(() {
       _cols = cols;
@@ -95,11 +120,25 @@ class _RolesScreenState extends State<RolesScreen> {
 
   bool _changed(String key, Perm p) => _draft[key]!.contains(p) != _orig[key]!.contains(p);
 
+  bool _limitChanged(String key, RoleLimit l) => _draftLimits[key]?[l] != _origLimits[key]?[l];
+
   int get _changes => [
-        for (final c in _cols)
+        for (final c in _cols) ...[
           for (final p in Perm.values)
             if (_changed(c.key, p)) 1,
+          if (!c.locked)
+            for (final l in RoleLimit.values)
+              if (_limitChanged(c.key, l)) 1,
+        ],
       ].length;
+
+  @override
+  void dispose() {
+    for (final f in _limitFields.values) {
+      f.dispose();
+    }
+    super.dispose();
+  }
 
   int get _active => _draft.values.fold(0, (t, s) => t + s.length);
 
@@ -140,6 +179,12 @@ class _RolesScreenState extends State<RolesScreen> {
         for (final e in _orig.entries) {
           _draft[e.key] = {...e.value};
         }
+        for (final e in _origLimits.entries) {
+          _draftLimits[e.key] = {...e.value};
+          for (final l in RoleLimit.values) {
+            _limitFields['${e.key}|${l.name}']?.text = e.value[l] == null ? '' : e.value[l]!.round().toString();
+          }
+        }
         _note = null;
       });
 
@@ -150,12 +195,18 @@ class _RolesScreenState extends State<RolesScreen> {
         if (col.locked) continue;
         final before = _orig[col.key]!;
         final after = _draft[col.key]!;
-        if (before.length == after.length && before.containsAll(after)) continue;
-        final summary = RolesRepository.changeSummary(col.name, before, after);
+        final limits = {..._draftLimits[col.key]!};
+        final permsSame = before.length == after.length && before.containsAll(after);
+        final limitsSame = RoleLimit.values.every((l) => !_limitChanged(col.key, l));
+        if (permsSame && limitsSame) continue;
+        final summary = [
+          if (!permsSame) RolesRepository.changeSummary(col.name, before, after),
+          if (!limitsSame) 'Cambió los límites de ${col.name}: ${RolesRepository.limitsSummary(limits)}',
+        ].join('. ');
         if (col.custom) {
-          await _repo.save(col.role!.copyWith(perms: {...after}), summary: summary);
+          await _repo.save(col.role!.copyWith(perms: {...after}, limits: limits), summary: summary);
         } else {
-          await _repo.save(_repo.builtinWith(_bizId, col.key, {...after}), summary: summary);
+          await _repo.save(_repo.builtinWith(_bizId, col.key, {...after}, limits: limits), summary: summary);
         }
       }
       final n = _changes;
@@ -368,6 +419,19 @@ class _RolesScreenState extends State<RolesScreen> {
         ));
       }
     }
+    rows.add(_limitsTitle(c));
+    for (final l in RoleLimit.values) {
+      rows.add(Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.line))),
+        child: Row(
+          children: [
+            SizedBox(width: _labelWidth, child: _limitLabel(c, l)),
+            for (final col in _cols) SizedBox(width: _colWidth, child: Center(child: _limitField(c, col, l))),
+          ],
+        ),
+      ));
+    }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: SizedBox(
@@ -551,6 +615,83 @@ class _RolesScreenState extends State<RolesScreen> {
               child: Row(children: [Expanded(child: _permLabel(c, p)), _switch(c, col, p)]),
             ),
         ],
+        _limitsTitle(c),
+        for (final l in RoleLimit.values)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.line))),
+            child: Row(children: [Expanded(child: _limitLabel(c, l)), const SizedBox(width: AppSpace.sm), _limitField(c, col, l)]),
+          ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Límites con números (Pro)
+  // ---------------------------------------------------------------------------
+
+  Widget _limitsTitle(StockealoColors c) => Padding(
+        padding: const EdgeInsets.only(top: AppSpace.lg, bottom: AppSpace.xs),
+        child: Row(
+          children: [
+            Text('LÍMITES', style: AppText.caption(context, weight: FontWeight.w700, color: c.inkFaint)),
+            const SizedBox(width: AppSpace.sm),
+            const StatusPill('Pro', tone: AppTone.accent, compact: true),
+            const SizedBox(width: AppSpace.sm),
+            Flexible(
+              child: Text('Vacío = sin límite. Si se pasa, pide autorización.',
+                  maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.caption(context)),
+            ),
+          ],
+        ),
+      );
+
+  Widget _limitLabel(StockealoColors c, RoleLimit l) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l.label, style: AppText.body(context, weight: FontWeight.w600)),
+          Text(l.help, style: AppText.caption(context)),
+        ],
+      );
+
+  Widget _limitField(StockealoColors c, _Col col, RoleLimit l) {
+    if (col.locked) return Text('Sin límite', style: AppText.caption(context, color: c.inkFaint));
+    final field = _limitFields['${col.key}|${l.name}']!;
+    final editable = widget.canEdit && _pro;
+    final box = SizedBox(
+      width: 112,
+      child: TextField(
+        controller: field,
+        enabled: editable,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        textAlign: TextAlign.center,
+        onChanged: (v) => setState(() {
+          final n = double.tryParse(v.trim());
+          if (n == null) {
+            _draftLimits[col.key]!.remove(l);
+          } else {
+            _draftLimits[col.key]![l] = n;
+          }
+        }),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'Sin límite',
+          prefixText: l.unit == '\$' ? '\$ ' : null,
+          suffixText: l.unit == '\$' ? null : l.unit,
+        ),
+      ),
+    );
+    if (!_limitChanged(col.key, l)) return box;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        box,
+        Positioned(
+          right: -4,
+          top: -2,
+          child: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.warning, shape: BoxShape.circle)),
+        ),
       ],
     );
   }

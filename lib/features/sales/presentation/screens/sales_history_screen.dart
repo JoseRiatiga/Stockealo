@@ -29,6 +29,8 @@ import '../widgets/deliveries.dart';
 import '../../../store/data/store_orders_repository.dart';
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/permissions/permissions.dart';
+import '../../../team/presentation/widgets/authorization_gate.dart';
+import '../../../../core/utils/currency_formatter.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -193,6 +195,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
 
   /// Anular sin borrar: se pide el motivo y la venta queda en el historial como «Anulada»
   Future<void> _cancelSale(Sale sale) async {
+    // Anular solo ventas recientes (límite del rol, 0.15.0)
+    final hours = Permissions.myLimit(RoleLimit.voidHours);
+    final age = DateTime.now().difference(sale.date).inMinutes / 60;
+    if (hours != null && age > hours) {
+      final allowed = await AuthorizationGate.allow(
+        context,
+        businessId: sale.businessId,
+        action: 'Anular una venta de ${CurrencyFormatter.format(sale.totalAmount)}',
+        reasons: ['La venta es de hace ${age.floor()} horas y tu rol solo anula las de las últimas ${hours.round()} horas.'],
+        amount: sale.totalAmount,
+      );
+      if (!allowed || !mounted) return;
+    }
     const reasons = ['Se equivocó de producto', 'El cliente devolvió', 'Cobro repetido', 'Prueba'];
     final other = TextEditingController();
     String? picked;

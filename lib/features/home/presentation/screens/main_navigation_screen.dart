@@ -44,6 +44,9 @@ import '../../../services/data/appointments_repository.dart';
 import '../../../services/models/service_template.dart';
 import '../../../team/data/roles_repository.dart';
 import '../../../../core/permissions/permissions.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
+import '../../../team/presentation/widgets/authorization_gate.dart';
+import '../../../team/data/authorization_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -227,6 +230,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     await alerts.refreshVisitReminders();
   }
 
+  RealtimeChannel? _authChannel;
+  final Set<String> _authShown = {};
+
+  void _wireAuthorizations(String businessId, String role) {
+    _authChannel?.unsubscribe();
+    _authChannel = null;
+    if (!Permissions.can(role, Perm.authorize)) return;
+    final service = AuthorizationService.instance;
+    void prompt(AuthRequest r) {
+      if (!mounted || r.requestedBy == service.myUserId || !_authShown.add(r.id)) return;
+      AuthorizationPrompt.show(context, r);
+    }
+
+    _authChannel = service.listen(businessId, prompt);
+    // Las que llegaron con la app cerrada y siguen esperando
+    service.pendingFor(businessId).then((list) => list.forEach(prompt)).catchError((_) {});
+  }
+
   /// Empieza o termina «Ver como»: se redibuja todo con ese rol
   void _onViewAs() {
     if (!mounted) return;
@@ -237,6 +258,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   void dispose() {
     AppPlace.request.removeListener(_onPlaceRequest);
     Permissions.viewAs.removeListener(_onViewAs);
+    _authChannel?.unsubscribe();
     _lifecycle.dispose();
     _webUpdateTimer?.cancel();
     _ordersTimer?.cancel();
@@ -270,6 +292,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         // Pedidos de la tienda: aviso al llegar y número en Ventas (0.13.5)
         _wireOrderAlerts(biz.id);
         StoreOrdersRepository.instance.pull(biz.id);
+        // Autorizaciones (0.15.0): a quien puede autorizar le llegan al instante
+        _wireAuthorizations(biz.id, role);
         AppointmentsRepository.instance.pullOnline(biz.id);
       }
       if (mounted) {

@@ -20,6 +20,7 @@ import '../widgets/open_cash.dart';
 import '../../../sales/presentation/widgets/sale_document.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../../core/permissions/permission_guard.dart';
+import '../../../team/presentation/widgets/authorization_gate.dart';
 
 /// Caja (lugar del menú): abrir el turno con una base, registrar entradas y
 /// salidas, ver lo cobrado por forma de pago y cerrar contando el dinero (también
@@ -157,7 +158,6 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
   Future<void> _movement(String kind) async {
     final session = _open;
     if (session == null) return;
-    if (!PermissionGuard.check(context, Perm.cashMoves)) return;
     final reasons = kind == CashMovement.exit ? CashMovement.exitReasons : CashMovement.entryReasons;
     var reason = reasons.first;
     final amount = TextEditingController();
@@ -206,7 +206,26 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
     final detail = note.text;
     amount.dispose();
     note.dispose();
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
+    // Sin permiso o una salida por encima del límite: pide autorización (0.15.0)
+    final needs = <String>[
+      if (!Permissions.mine(Perm.cashMoves)) 'Tu rol no permite registrar entradas o salidas de dinero.',
+      if (kind == CashMovement.exit &&
+          Permissions.myLimit(RoleLimit.cashOutMax) != null &&
+          (value ?? 0) > Permissions.myLimit(RoleLimit.cashOutMax)! + 0.5)
+        'La salida es de ${CurrencyFormatter.format(value ?? 0)} y tu límite es '
+            '${CurrencyFormatter.format(Permissions.myLimit(RoleLimit.cashOutMax)!)}.',
+    ];
+    if (needs.isNotEmpty) {
+      final allowed = await AuthorizationGate.allow(
+        context,
+        businessId: widget.businessId,
+        action: '${kind == CashMovement.exit ? 'Salida' : 'Entrada'} de caja de ${CurrencyFormatter.format(value ?? 0)}',
+        reasons: needs,
+        amount: value,
+      );
+      if (!allowed || !mounted) return;
+    }
     try {
       await _repo.addMovement(session: session, kind: kind, reason: reason, amount: value ?? 0, note: detail);
       await _load();

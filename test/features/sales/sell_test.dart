@@ -28,6 +28,7 @@ import 'package:stockealo/features/sales/models/sale.dart';
 import 'package:stockealo/features/sales/data/promotions_repository.dart';
 import 'package:stockealo/features/sales/models/promotion.dart';
 import 'package:stockealo/features/sales/presentation/screens/sell_screen.dart';
+import 'package:stockealo/features/reports/data/daily_close.dart';
 
 /// Vender (bloque 4): pago mixto, caja obligatoria, anular sin borrar y cómo se
 /// ve el punto de venta. Con PREVIEW_OUT=<carpeta> guarda imágenes.
@@ -157,6 +158,20 @@ void main() {
     final row = (await (await appDb.database).query('sales', where: 'id = ?', whereArgs: [line.id])).single;
     expect(row['discount_amount'], 3800);
     cart.reset();
+  });
+
+  // 0.15.0: cierre del día por WhatsApp
+  test('el cierre del día dice ventas, ganancia y cuánto entró por cada medio', () async {
+    await initializeDateFormatting('es_CO');
+    await cash.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Rosa');
+    await sales.recordMultiProductSale(businessId: businessId, items: await items({'huevos': 1}), paymentMethod: PaymentMethod.cash);
+    await sales.recordMultiProductSale(businessId: businessId, items: await items({'gaseosa': 2}), paymentMethod: PaymentMethod.nequi);
+    final text = await DailyClose.text(business);
+    expect(text, contains('*Cierre del día · Variedades Rosita*'));
+    expect(text, contains('Ventas: 2'));
+    expect(text, contains('• Efectivo: \$18.900'));
+    expect(text, contains('• Nequi: \$11.200'));
+    expect(text, contains('Ganancia:'));
   });
 
   test('caja obligatoria: con la caja cerrada no se registra ninguna venta', () async {

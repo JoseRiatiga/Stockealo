@@ -19,6 +19,7 @@ import '../utils/currency_formatter.dart';
 import 'data_events.dart';
 import '../../features/pro/data/pro_service.dart';
 import '../../features/cash/data/cash_register_repository.dart';
+import '../../features/reports/data/daily_close.dart';
 
 /// Avisos en la barra del celular, aunque la app esté cerrada:
 /// • stock bajo: cuando un producto llega a su mínimo después de una venta
@@ -406,13 +407,16 @@ class PhoneAlertsService {
         body = 'Toca para ver cómo te fue hoy.';
       }
 
+      final pro = await ProService.lastKnown(business.id);
       await _plugin.zonedSchedule(
         _summaryId,
         title,
-        body,
+        pro?.active == true ? '$body Toca para enviar el cierre por WhatsApp.' : body,
         tz.TZDateTime.from(when.toUtc(), tz.UTC),
         const NotificationDetails(android: _summaryChannel),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        // Con Pro, tocar el aviso abre WhatsApp con el cierre del día (0.15.0)
+        payload: pro?.active == true ? jsonEncode({'type': 'daily_close', 'businessId': business.id}) : null,
       );
     } catch (e) {
       debugPrint('Resumen del día: $e');
@@ -561,6 +565,12 @@ class PhoneAlertsService {
       final raw = response.payload;
       if (raw == null || raw.isEmpty) return;
       final data = jsonDecode(raw) as Map<String, dynamic>;
+      if (data['type'] == 'daily_close') {
+        final db = await AppDatabase.instance.database;
+        final rows = await db.query('businesses', where: 'id = ?', whereArgs: [data['businessId']], limit: 1);
+        if (rows.isNotEmpty) await DailyClose.send(Business.fromMap(rows.first));
+        return;
+      }
       if (data['type'] != 'debt') return;
       final customer = await CustomerRepository.instance.getCustomerById(data['customerId'] as String);
       if (customer == null || !customer.hasDebt) return;

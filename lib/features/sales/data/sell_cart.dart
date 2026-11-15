@@ -63,11 +63,27 @@ class SellCart extends ChangeNotifier {
   bool get isEmpty => lines.isEmpty;
   int get units => lines.fold<int>(0, (s, l) => s + l.quantity);
   double get subtotal => lines.fold<double>(0, (s, l) => s + l.subtotal);
-  double get total => (subtotal - promoDiscount - discount).clamp(0, double.infinity);
+  /// Descuentos de cada línea (0.15.0)
+  double get lineDiscounts => lines.fold<double>(0, (s, l) => s + l.lineDiscount);
+
+  /// Todo lo descontado a mano: por línea y a toda la venta (las promociones no cuentan)
+  double get manualDiscount => lineDiscounts + discount;
+
+  double get total => (subtotal - promoDiscount - lineDiscounts - discount).clamp(0, double.infinity);
   double get cost => lines.fold<double>(0, (s, l) => s + l.totalCost);
 
   /// El descuento más alto sin vender por debajo del costo
-  double get maxSafeDiscount => (subtotal - promoDiscount - cost).clamp(0, double.infinity);
+  double get maxSafeDiscount => (subtotal - promoDiscount - lineDiscounts - cost).clamp(0, double.infinity);
+
+  /// Descuento de una línea, en dinero (0.15.0); 0 lo quita
+  void setLineDiscount(int index, double amount) {
+    if (index < 0 || index >= lines.length) return;
+    final l = lines[index];
+    final max = (l.subtotal - l.promoDiscount).clamp(0, double.infinity).toDouble();
+    l.lineDiscount = amount.clamp(0, max).toDouble();
+    _fitDiscount();
+    notifyListeners();
+  }
 
   /// Con ese descuento la venta deja pérdida
   bool get hasLoss => lines.isNotEmpty && total < cost - 0.5;
@@ -119,7 +135,11 @@ class SellCart extends ChangeNotifier {
   /// El descuento nunca supera lo que se está vendiendo (y las promociones se recalculan)
   void _fitDiscount() {
     _applyPromotions();
-    final max = subtotal - promoDiscount;
+    for (final l in lines) {
+      final lineMax = l.subtotal - l.promoDiscount;
+      if (l.lineDiscount > lineMax) l.lineDiscount = lineMax < 0 ? 0 : lineMax;
+    }
+    final max = subtotal - promoDiscount - lineDiscounts;
     if (discount > max) discount = max < 0 ? 0 : max;
   }
 
@@ -161,6 +181,7 @@ class SellCart extends ChangeNotifier {
                 'quantity': l.quantity,
                 'unit_price': l.customUnitPrice,
                 'discount_percent': l.discountPercent,
+                'line_discount': l.lineDiscount,
               },
           ],
         },
@@ -196,7 +217,7 @@ class SellCart extends ChangeNotifier {
               quantity: (l['quantity'] as num).toInt(),
               customUnitPrice: (l['unit_price'] as num?)?.toDouble(),
               discountPercent: (l['discount_percent'] as num?)?.toDouble(),
-            ));
+            )..lineDiscount = (l['line_discount'] as num?)?.toDouble() ?? 0);
           }
           if (saved.isEmpty) continue;
           held.add(HeldSale(

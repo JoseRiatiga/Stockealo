@@ -133,6 +133,32 @@ void main() {
     cart.reset();
   });
 
+  // 0.15.0: descuento por línea
+  test('descuento de una línea: baja el total, el precio queda y la venta guarda cuánto se descontó', () async {
+    await cash.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Rosa');
+    final cart = SellCart.instance;
+    final huevos = (await ProductRepository.instance.getProductById('huevos', businessId))!;
+    final gaseosa = (await ProductRepository.instance.getProductById('gaseosa', businessId))!;
+    cart.lines
+      ..add(CartItem(product: huevos, quantity: 2))
+      ..add(CartItem(product: gaseosa));
+    cart.setLineDiscount(0, 3800); // 10 % de 37.800
+    expect(cart.lines.first.netSubtotal, 34000);
+    expect(cart.total, 34000 + 5600);
+    expect(cart.manualDiscount, 3800);
+    // No puede pasar lo que vale la línea
+    cart.setLineDiscount(1, 999999);
+    expect(cart.lines[1].lineDiscount, 5600);
+    cart.setLineDiscount(1, 0);
+    final done = await sales.recordMultiProductSale(businessId: businessId, items: List.of(cart.lines), paymentMethod: PaymentMethod.cash);
+    final line = done.firstWhere((s) => s.productId == 'huevos');
+    expect(line.unitPrice, 18900, reason: 'el precio no cambia: la nube calcula el descuento');
+    expect(line.totalAmount, 34000);
+    final row = (await (await appDb.database).query('sales', where: 'id = ?', whereArgs: [line.id])).single;
+    expect(row['discount_amount'], 3800);
+    cart.reset();
+  });
+
   test('caja obligatoria: con la caja cerrada no se registra ninguna venta', () async {
     await setCash(true);
     await expectLater(

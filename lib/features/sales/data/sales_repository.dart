@@ -354,7 +354,7 @@ class SalesRepository {
           'payment_status': paymentMethod == 'FIADO' ? 'PENDIENTE' : 'PAGADO',
           'notes': notes,
           'invoice_number': invoiceNumber,
-          'discount_amount': itemDiscount + (promo == null ? 0 : item.promoDiscount),
+          'discount_amount': itemDiscount + item.lineDiscount + (promo == null ? 0 : item.promoDiscount),
           'variant_id': item.variant?.id,
           'variant_name': item.variant?.label,
           'payment_split': itemSplit,

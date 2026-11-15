@@ -18,6 +18,7 @@ import '../../../sales/presentation/screens/sell_screen.dart';
 import '../../../home/navigation/app_places.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/permissions/permissions.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -57,8 +58,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  bool get canEdit => _userRole == 'OWNER' || _userRole == 'ADMIN';
-  bool get canViewCosts => _userRole == 'OWNER' || _userRole == 'ADMIN';
+  bool get canEdit => Permissions.can(_userRole, Perm.productsEdit);
+  bool get canViewCosts => Permissions.can(_userRole, Perm.costs);
 
   bool get _withVariants => _product.hasVariants && _product.variants.isNotEmpty;
 

@@ -16,6 +16,7 @@ import '../../data/business_repository.dart';
 import '../../models/business.dart';
 import '../widgets/business_selector_modal.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/permissions/permissions.dart';
 
 class BusinessInfoScreen extends StatefulWidget {
   final Business business;
@@ -77,7 +78,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
     }
   }
 
-  bool get _canEdit => _userRole == 'OWNER' || _userRole == 'ADMIN';
+  bool get _canEdit => Permissions.can(_userRole, Perm.businessInfo);
 
   Future<void> _editBusinessDetails() async {
     if (!_canEdit) {

@@ -17,6 +17,7 @@ import '../../../../core/design/filter_tabs.dart';
 import '../../../../core/design/status_pill.dart';
 import '../widgets/agenda_view.dart';
 import '../../../pro/data/pro_service.dart';
+import '../../../../core/permissions/permissions.dart';
 
 /// Secciones de la pestaña Servicios
 enum ServicesSection {
@@ -54,7 +55,8 @@ class _ServicesTabState extends State<ServicesTab> {
   ServicesSection _section = ServicesSection.board;
   bool _migrating = false;
 
-  bool get _canConfigure => widget.userRole == 'OWNER' || widget.userRole == 'ADMIN';
+  bool get _canConfigure => Permissions.can(widget.userRole, Perm.servicesSetup);
+  bool get _canCommissions => Permissions.can(widget.userRole, Perm.allCommissions);
 
   @override
   void initState() {
@@ -100,7 +102,8 @@ class _ServicesTabState extends State<ServicesTab> {
     final sections = [
       for (final s in ServicesSection.values)
         // Comisiones y catálogo: solo dueño o administrador
-        if ((!const {ServicesSection.catalog, ServicesSection.commissions, ServicesSection.messages}.contains(s) || _canConfigure) &&
+        if ((!const {ServicesSection.catalog, ServicesSection.messages}.contains(s) || _canConfigure) &&
+            (s != ServicesSection.commissions || _canCommissions) &&
             (pro || !const {ServicesSection.commissions, ServicesSection.messages}.contains(s)))
           s,
     ];
@@ -141,7 +144,7 @@ class _ServicesTabState extends State<ServicesTab> {
                   key: ValueKey('employees-${b.id}'),
                   business: b,
                   canEdit: _canConfigure,
-                  onOpenCommissions: _canConfigure ? () => setState(() => _section = ServicesSection.commissions) : null,
+                  onOpenCommissions: _canCommissions ? () => setState(() => _section = ServicesSection.commissions) : null,
                 ),
               ServicesSection.history => HistoryView(key: ValueKey('history-${b.id}'), business: b, template: template),
               ServicesSection.commissions => CommissionsView(key: ValueKey('commissions-${b.id}'), business: b),

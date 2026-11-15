@@ -14,6 +14,7 @@ import '../../services/models/commission_models.dart';
 import '../../services/models/service_models.dart';
 import '../../team/data/team_repository.dart';
 import '../../sales/models/payment_method.dart';
+import '../../../core/permissions/permissions.dart';
 
 /// Partes que se pueden descargar desde Reportes
 enum ReportSection {
@@ -106,7 +107,7 @@ class ReportExportService {
       userId: userId,
       userEmail: userEmail,
     );
-    return role == 'OWNER' || role == 'ADMIN';
+    return Permissions.can(role, Perm.exportExcel);
   }
 
   /// Genera y comparte los archivos. Devuelve sus nombres.

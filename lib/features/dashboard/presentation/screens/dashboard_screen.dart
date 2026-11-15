@@ -27,6 +27,7 @@ import '../widgets/attention_panel.dart';
 import '../widgets/cloud_sync_reminder.dart';
 import '../widgets/home_sales_chart.dart';
 import '../widgets/quick_actions_section.dart';
+import '../../../../core/permissions/permissions.dart';
 
 /// Inicio: cómo va el día de un vistazo y lo que necesita atención, con su
 /// solución a un toque. Diseño aprobado el 11 nov 2026 (re-diseño 0.13.0).
@@ -61,7 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
   List<WorkOrder>? _board;
   List<ActivityEntry>? _activity;
 
-  bool get _manager => _role == 'OWNER' || _role == 'ADMIN';
+  bool _can(Perm p) => Permissions.can(_role, p);
 
   @override
   void onActiveBusinessChanged() {
@@ -152,7 +153,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
       _loading = false;
     });
     // La actividad puede venir de la nube: llega después, sin frenar el resto
-    if (role == 'OWNER' || role == 'ADMIN') {
+    if (Permissions.can(role, Perm.activity)) {
       try {
         final activity = await ActivityRepository.instance.list(biz.id, limit: 4);
         if (mounted && _business?.id == biz.id) setState(() => _activity = activity);
@@ -220,7 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
               children: [
                 _greeting(wide),
                 SizedBox(height: gap),
-                CloudSyncReminder(key: ValueKey('cloud-${_business?.id}-$_role'), canManage: _manager),
+                CloudSyncReminder(key: ValueKey('cloud-${_business?.id}-$_role'), canManage: _can(Perm.cloud)),
                 _figures(wide, box.maxWidth - pad.horizontal),
                 SizedBox(height: gap),
                 _grid(
@@ -241,7 +242,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                   gap: gap,
                   children: [
                     _topCard(),
-                    if (_manager) _activityCard(),
+                    if (_can(Perm.activity)) _activityCard(),
                     if (_board != null) _servicesCard(),
                   ],
                 ),
@@ -355,7 +356,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     final compact = !wide;
     final cards = <Widget>[
       sales,
-      if (_manager)
+      if (_can(Perm.profits))
         StatCard(
           compact: compact,
           title: 'Ganancia de ${DateFormat('MMMM', 'es_CO').format(DateTime.now())}',

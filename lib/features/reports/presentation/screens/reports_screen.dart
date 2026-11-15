@@ -9,6 +9,7 @@ import '../../../business/presentation/active_business_scope.dart';
 import '../../../pro/data/pro_service.dart';
 import '../../data/report_export_service.dart';
 import 'profit_report_screen.dart';
+import '../../../../core/permissions/permissions.dart';
 
 /// Reportes: el dueño elige qué descargar, de qué periodo y si va todo en un solo
 /// Excel (una hoja por parte) o en un archivo por cada parte.
@@ -257,7 +258,7 @@ class ReportsTab extends StatefulWidget {
   const ReportsTab({super.key, required this.userRole});
 
   /// Solo el dueño y los administradores ven reportes (tienen costos y ganancias)
-  static bool allowed(String role) => role == 'OWNER' || role == 'ADMIN';
+  static bool allowed(String role) => Permissions.can(role, Perm.reportsSales);
 
   @override
   State<ReportsTab> createState() => _ReportsTabState();

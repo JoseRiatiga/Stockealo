@@ -41,6 +41,7 @@ import '../../../../core/services/phone_alerts_service.dart';
 import '../../../backup/data/backup_service.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/services/sync_queue.dart';
+import '../../../../core/permissions/permissions.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -805,7 +806,7 @@ actions: [
                             MaterialPageRoute(builder: (_) => EmployeesScreen(business: _activeBusiness!)),
                           ),
                         ),
-                        if (_currentBusinessRole.toUpperCase() != 'CASHIER')
+                        if (Permissions.can(_currentBusinessRole, Perm.activity))
                           SettingsRow(
                             icon: Icons.history_outlined,
                             title: 'Actividad del equipo',
@@ -819,7 +820,7 @@ actions: [
                           onTap: () => ModulesScreen.open(
                             context,
                             business: _activeBusiness!,
-                            canEdit: _currentBusinessRole.toUpperCase() != 'CASHIER',
+                            canEdit: Permissions.can(_currentBusinessRole, Perm.modules),
                           ),
                         ),
                         ValueListenableBuilder<ProStatus>(

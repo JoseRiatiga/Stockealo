@@ -33,6 +33,7 @@ import '../../../../core/widgets/stocky_empty_state.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/design/stat_card.dart';
 import '../../../sales/presentation/screens/promotions_screen.dart';
+import '../../../../core/permissions/permissions.dart';
 
 /// Productos (el catálogo) y, en [ProductsListMode.stock], el lugar Stock: la
 /// misma lista arrancando en «por reponer», con el aviso del proveedor que pasa
@@ -86,8 +87,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   bool _isLoading = true;
   String _effectiveRole = 'OWNER';
 
-  bool get canEditProducts => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
-  bool get canViewCosts => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
+  bool get canEditProducts => Permissions.can(_effectiveRole, Perm.productsEdit);
+  bool get canViewCosts => Permissions.can(_effectiveRole, Perm.costs);
 
   int _currentPage = 1;
   static const int _pageSize = 12;
@@ -765,7 +766,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
 
   Widget _buildEmptyState() {
     final hasSearch = _searchController.text.isNotEmpty;
-    final canCreate = widget.userRole != 'CASHIER';
+    final canCreate = Permissions.can(widget.userRole ?? Permissions.owner, Perm.productsEdit);
 
     return StockyEmptyState(
       title: hasSearch ? 'No se encontraron productos' : 'Catálogo de Inventario Vacío',

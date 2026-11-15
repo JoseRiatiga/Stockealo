@@ -25,6 +25,7 @@ import '../../../team/data/team_repository.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/codes/barcode_check.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/permissions/permissions.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -160,7 +161,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             userId: user.id,
             userEmail: user.email,
           );
-      if (role == 'CASHIER' && mounted) {
+      if (!Permissions.can(role, Perm.productsEdit) && mounted) {
         AppToast.show(context, message: 'Acceso restringido: Solo administradores pueden gestionar productos', type: ToastType.error);
         Navigator.pop(context);
       }

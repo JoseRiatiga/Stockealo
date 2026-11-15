@@ -1,3 +1,5 @@
+import '../../../core/permissions/permissions.dart';
+
 class BusinessMember {
   final String id;
   final String businessId;
@@ -24,10 +26,11 @@ class BusinessMember {
   bool get isCashier => role == 'CASHIER';
 
   // Permisos derivados para control de acceso y seguridad
-  bool get canViewCosts => role == 'OWNER' || role == 'ADMIN';
-  bool get canEditProducts => role == 'OWNER' || role == 'ADMIN';
-  bool get canManageTeam => role == 'OWNER';
-  bool get canAdjustStockDirectly => role == 'OWNER' || role == 'ADMIN';
+  bool can(Perm p) => Permissions.can(role, p);
+  bool get canViewCosts => can(Perm.costs);
+  bool get canEditProducts => can(Perm.productsEdit);
+  bool get canManageTeam => can(Perm.team);
+  bool get canAdjustStockDirectly => can(Perm.stockAdjust);
 
   String get displayName {
     if (name != null && name!.trim().isNotEmpty) {

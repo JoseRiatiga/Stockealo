@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/permissions/permissions.dart';
 
 /// Una función de la app con su único lugar (0.12.0, «nada duplicado»).
 /// Esta lista alimenta el buscador y los accesos rápidos de Inicio (0.12.1):
@@ -17,8 +18,8 @@ class AppFunction {
   final IconData icon;
   final List<String> keywords;
 
-  /// Solo dueño o administrador
-  final bool managersOnly;
+  /// Permiso que necesita (0.15.0); null = lo ve cualquiera
+  final Perm? perm;
 
   /// Solo con Pro Servicios
   final bool needsServices;
@@ -30,7 +31,7 @@ class AppFunction {
     required this.tab,
     required this.icon,
     required this.keywords,
-    this.managersOnly = false,
+    this.perm,
     this.needsServices = false,
   });
 }
@@ -47,22 +48,22 @@ const kAppFunctions = <AppFunction>[
   AppFunction(id: 'new_product', title: 'Nuevo producto', where: 'Productos', tab: 1, icon: Icons.add_box_outlined,
       keywords: ['producto', 'agregar', 'nuevo', 'inventario', 'crear']),
   AppFunction(id: 'import_excel', title: 'Importar desde Excel', where: 'Productos › Importar desde Excel', tab: 1, icon: Icons.upload_file_outlined,
-      keywords: ['importar', 'excel', 'cargar', 'subir', 'plantilla'], managersOnly: true),
+      keywords: ['importar', 'excel', 'cargar', 'subir', 'plantilla'], perm: Perm.importExcel),
   AppFunction(id: 'suppliers', title: 'Proveedores y entradas', where: 'Clientes y proveedores › Proveedores', tab: 9,
       icon: Icons.move_to_inbox_outlined, keywords: ['proveedor', 'pedido', 'entrada', 'mercancia', 'compra', 'pagar'],
-      managersOnly: true),
+      perm: Perm.suppliers),
   AppFunction(id: 'stock', title: 'Stock por reponer', where: 'Stock', tab: 8, icon: Icons.layers_outlined,
       keywords: ['stock', 'reponer', 'agotado', 'falta', 'minimo', 'pedir', 'faltante']),
   AppFunction(id: 'catalog', title: 'Catálogo', where: 'Productos › Catálogo', tab: 1, icon: Icons.menu_book_outlined,
       keywords: ['catalogo', 'pdf', 'historia', 'compartir']),
   AppFunction(id: 'promotions', title: 'Promociones', where: 'Productos › Promociones', tab: 1, icon: Icons.local_offer_outlined,
-      keywords: ['promocion', 'descuento', 'oferta', '2x1', '3x2', 'rebaja', 'black friday'], managersOnly: true),
+      keywords: ['promocion', 'descuento', 'oferta', '2x1', '3x2', 'rebaja', 'black friday'], perm: Perm.promotions),
   AppFunction(id: 'online_store', title: 'Tienda en línea', where: 'Tienda en línea', tab: 10, icon: Icons.storefront_outlined,
-      keywords: ['tienda', 'online', 'web', 'carrito', 'pedido en linea'], managersOnly: true),
+      keywords: ['tienda', 'online', 'web', 'carrito', 'pedido en linea'], perm: Perm.store),
   AppFunction(id: 'profits', title: 'Ganancias', where: 'Reportes › Ganancias', tab: 4, icon: Icons.insights_outlined,
-      keywords: ['ganancia', 'perdida', 'utilidad', 'reporte', 'margen'], managersOnly: true),
+      keywords: ['ganancia', 'perdida', 'utilidad', 'reporte', 'margen'], perm: Perm.profits),
   AppFunction(id: 'excel', title: 'Descargar Excel', where: 'Reportes › Descargar Excel', tab: 4, icon: Icons.table_chart_outlined,
-      keywords: ['excel', 'descargar', 'exportar', 'reporte', 'xlsx'], managersOnly: true),
+      keywords: ['excel', 'descargar', 'exportar', 'reporte', 'xlsx'], perm: Perm.exportExcel),
   AppFunction(id: 'services', title: 'Servicios', where: 'Servicios', tab: 5, icon: Icons.view_kanban_outlined,
       keywords: ['servicio', 'tablero', 'lavado', 'turno', 'cola', 'asistencia', 'comision', 'placa'], needsServices: true),
   AppFunction(id: 'agenda', title: 'Agenda de citas', where: 'Servicios › Agenda', tab: 5, icon: Icons.event_outlined,
@@ -94,10 +95,9 @@ String _fold(String s) {
 /// Funciones que puede ver la persona y que coinciden con lo escrito (vacío = todas)
 List<AppFunction> findFunctions(String query, {required String role, required bool services}) {
   final q = _fold(query.trim());
-  final managers = role == 'OWNER' || role == 'ADMIN';
   return [
     for (final f in kAppFunctions)
-      if ((!f.managersOnly || managers) &&
+      if ((f.perm == null || Permissions.can(role, f.perm!)) &&
           (!f.needsServices || services) &&
           (q.isEmpty || _fold(f.title).contains(q) || f.keywords.any((k) => k.contains(q) || (k.length >= 4 && q.contains(k)))))
         f,

@@ -28,6 +28,7 @@ import '../../../../core/services/sync_queue.dart';
 import '../widgets/deliveries.dart';
 import '../../../store/data/store_orders_repository.dart';
 import '../../../../core/design/status_pill.dart';
+import '../../../../core/permissions/permissions.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -64,8 +65,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
   String? _userRole;
 
   String get _effectiveRole => widget.userRole ?? _userRole ?? 'OWNER';
-  bool get canViewCosts => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
-  bool get canCancelSale => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
+  bool get canViewCosts => Permissions.can(_effectiveRole, Perm.costs);
+  bool get canCancelSale => Permissions.can(_effectiveRole, Perm.voidSale);
 
   // Filtros y paginación
   String _selectedDateFilter = 'all'; // 'all', 'today', '7days', 'month', 'custom'

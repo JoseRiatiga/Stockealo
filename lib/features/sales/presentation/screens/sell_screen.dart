@@ -28,6 +28,7 @@ import '../widgets/variant_picker.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../data/promotions_repository.dart';
 import '../widgets/deliveries.dart';
+import '../../../../core/permissions/permissions.dart';
 
 /// Vender: el punto de venta. Buscar o escanear (también con lector USB: el código
 /// entra solo al carrito), tocar productos, cobrar con F9 y seguir con la
@@ -147,7 +148,7 @@ class _SellScreenState extends State<SellScreen> {
   bool _cashClosed = false;
   _LastSale? _last;
 
-  bool get _manager => widget.role == 'OWNER' || widget.role == 'ADMIN';
+  bool get _canBelowCost => Permissions.can(widget.role, Perm.sellBelowCost);
   String get _userName => AuthRepository.instance.currentUser?.displayName ?? '';
 
   @override
@@ -290,7 +291,7 @@ class _SellScreenState extends State<SellScreen> {
     }
     // Vender por debajo del costo: el cajero no puede; el dueño lo autoriza
     if (_cart.hasLoss) {
-      if (!_manager) {
+      if (!_canBelowCost) {
         AppToast.showError(context, 'Ese descuento deja pérdida. Solo el dueño o un administrador pueden autorizarlo.');
         return;
       }
@@ -353,7 +354,7 @@ class _SellScreenState extends State<SellScreen> {
 
   Future<void> _quote() async {
     if (_cart.isEmpty) return;
-    if (_cart.hasLoss && !_manager) {
+    if (_cart.hasLoss && !_canBelowCost) {
       AppToast.showError(context, 'No se puede cotizar por debajo del costo.');
       return;
     }

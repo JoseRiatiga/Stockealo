@@ -14,6 +14,7 @@ import '../../data/business_repository.dart';
 import '../../models/business.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/status_pill.dart';
+import '../../../../core/permissions/permissions.dart';
 
 class BusinessSelectorModal extends StatefulWidget {
   final String userId;
@@ -192,7 +193,7 @@ actions: [
 
   Future<void> _showEditBusinessDialog(Business biz) async {
     final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
-    if (role == 'CASHIER') {
+    if (!Permissions.can(role, Perm.businessInfo)) {
       if (mounted) {
         AppToast.showPermission(
           context,
@@ -438,7 +439,7 @@ actions: [
     final isSelected = _currentBusiness?.id == biz.id;
     final role = _rolesByBusinessId[biz.id] ?? 'CASHIER';
     final isOwner = role == 'OWNER';
-    final canManage = isOwner || role == 'ADMIN';
+    final canManage = Permissions.can(role, Perm.businessInfo);
     final roleLabel = isOwner ? 'Dueño' : (role == 'ADMIN' ? 'Administrador' : 'Cajero');
 
     return Material(

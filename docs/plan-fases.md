@@ -177,13 +177,15 @@ Las fases 1 a 3 van en ese orden porque dependen entre sí; las 4 a 7 se pueden 
 5. Primeros pasos para negocios nuevos.
 6. Alerta de productos sin ventas en 30 días.
 7. Revisión de Supabase y copia diaria verificada.
+    - **Fase 5, decidido (15 nov, boceto aprobado):** la nube siempre a la vista en la barra; primeros pasos para negocios nuevos; productos quietos (30 días sin ventas) en Inicio y Stock; «Descargar todos mis datos» en Excel (Perfil › Privacidad); errores en el panel de administración (sin datos de clientes); toda la app en español.
+    - **Copia diaria: copia propia** (decisión del dueño): cada noche una tarea en la nube guarda los datos importantes en el almacenamiento de Supabase, la verifica contando filas y el panel muestra la última copia. Sin pasar al plan de pago.
 
 ### Tienda y pedidos (Pro)
 
 8. ~~Pedidos con número, sección Pedidos y «Convertir en venta».~~ HECHO en la 0.13.4 (T-0001, Cotizaciones «Tienda», «Por entregar»).
 9. ~~Aviso de pedido nuevo.~~ HECHO en la 0.13.5 con la app abierta o en segundo plano (`docs/plan-avisos.md`).
 10. ~~Nombre obligatorio y precio por unidad en el mensaje.~~ HECHO en la 0.13.3.
-11. **Avisos con la app cerrada (Firebase), fase D de `docs/plan-avisos.md`:**
+11. **EN PAUSA (decisión del dueño, 15 nov: no lo convence por ahora).** **Avisos con la app cerrada (Firebase), fase D de `docs/plan-avisos.md`:**
     - el pedido de la tienda avisa aunque la app esté cerrada del todo;
     - sirve también para los demás avisos que lleguen de la nube.
     - Hace falta:

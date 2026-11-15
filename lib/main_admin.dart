@@ -8,6 +8,7 @@ import 'core/services/supabase_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_tokens.dart';
 import 'features/pro/data/pro_admin_service.dart';
+import 'core/l10n/app_locale.dart';
 
 /// Panel de administrador de Stockealo (solo web, en stockealo.online/admin).
 /// Es una app aparte: no está dentro de la app de los negocios.
@@ -26,6 +27,9 @@ class AdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+          locale: AppLocale.locale,
+          supportedLocales: AppLocale.supported,
+          localizationsDelegates: AppLocale.delegates,
       title: 'Stockealo · Administrador',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

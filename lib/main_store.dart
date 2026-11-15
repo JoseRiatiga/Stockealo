@@ -5,6 +5,7 @@ import 'core/services/supabase_service.dart';
 import 'core/theme/app_theme.dart';
 import 'store_web/store_page.dart';
 import 'store_web/clean_url_stub.dart' if (dart.library.js_interop) 'store_web/clean_url_web.dart';
+import 'core/l10n/app_locale.dart';
 
 /// Tienda pública de un negocio (solo web, en stockealo.online/tienda/<slug>).
 /// Es una app aparte y no necesita cuenta.
@@ -33,6 +34,9 @@ class StoreApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+          locale: AppLocale.locale,
+          supportedLocales: AppLocale.supported,
+          localizationsDelegates: AppLocale.delegates,
       title: 'Tienda',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

@@ -1,4 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+
+import '../../../core/database/app_database.dart';
+import '../../products/data/product_repository.dart';
 
 import '../../products/models/product.dart';
 import '../../products/models/product_variant.dart';
@@ -27,6 +32,9 @@ class SellCart extends ChangeNotifier {
 
   final List<CartItem> lines = [];
   final List<HeldSale> held = [];
+
+  /// Negocio de las ventas en espera cargadas (0.15.0: se guardan en el celular)
+  String? businessId;
 
   /// Descuento a toda la venta, en dinero
   double discount = 0;
@@ -129,7 +137,80 @@ class SellCart extends ChangeNotifier {
     lines.clear();
     discount = 0;
     customer = '';
+    _saveHeld();
     notifyListeners();
+  }
+
+  static String _key(String businessId) => 'held_sales_$businessId';
+
+  /// Guarda las ventas en espera en el celular: no se pierden al cerrar la app (0.15.0)
+  void _saveHeld() {
+    final b = businessId;
+    if (b == null) return;
+    final data = [
+      for (final h in held)
+        {
+          'at': h.at.toIso8601String(),
+          'discount': h.discount,
+          'customer': h.customer,
+          'lines': [
+            for (final l in h.lines)
+              {
+                'product_id': l.product.id,
+                'variant_id': l.variant?.id,
+                'quantity': l.quantity,
+                'unit_price': l.customUnitPrice,
+                'discount_percent': l.discountPercent,
+              },
+          ],
+        },
+    ];
+    AppDatabase.instance.setSetting(_key(b), data.isEmpty ? null : jsonEncode(data)).catchError((Object e) {
+      debugPrint('Ventas en espera sin guardar: $e');
+    });
+  }
+
+  /// Carga las ventas en espera guardadas del negocio. Un producto que ya no existe se
+  /// salta; si la venta se queda sin productos, no se carga.
+  Future<void> restore(String forBusiness) async {
+    businessId = forBusiness;
+    held.clear();
+    try {
+      final raw = await AppDatabase.instance.getSetting(_key(forBusiness));
+      if (raw != null) {
+        final repo = ProductRepository.instance;
+        for (final h in jsonDecode(raw) as List) {
+          final saved = <CartItem>[];
+          for (final l in (h['lines'] as List)) {
+            final product = await repo.getProductById(l['product_id'] as String, forBusiness);
+            if (product == null) continue;
+            ProductVariant? variant;
+            final variantId = l['variant_id'] as String?;
+            if (variantId != null) {
+              variant = (await repo.getVariantsForProduct(product.id)).where((v) => v.id == variantId).firstOrNull;
+              if (variant == null) continue;
+            }
+            saved.add(CartItem(
+              product: product,
+              variant: variant,
+              quantity: (l['quantity'] as num).toInt(),
+              customUnitPrice: (l['unit_price'] as num?)?.toDouble(),
+              discountPercent: (l['discount_percent'] as num?)?.toDouble(),
+            ));
+          }
+          if (saved.isEmpty) continue;
+          held.add(HeldSale(
+            lines: saved,
+            discount: (h['discount'] as num?)?.toDouble() ?? 0,
+            customer: h['customer'] as String? ?? '',
+            at: DateTime.tryParse('${h['at']}') ?? DateTime.now(),
+          ));
+        }
+      }
+    } catch (e) {
+      debugPrint('Ventas en espera sin cargar: $e');
+    }
+    if (businessId == forBusiness) notifyListeners();
   }
 
   /// Retoma una venta en espera. Si había algo en la cuenta, eso pasa a En espera.
@@ -145,13 +226,16 @@ class SellCart extends ChangeNotifier {
     _applyPromotions();
     discount = h.discount;
     customer = h.customer;
+    _saveHeld();
     notifyListeners();
   }
 
-  /// Al cambiar de negocio la cuenta y lo que estaba en espera ya no aplican
+  /// Al cambiar de negocio la cuenta y lo que estaba en espera ya no aplican (lo guardado
+  /// de cada negocio sigue en el celular y vuelve al volver a ese negocio)
   void reset() {
     lines.clear();
     held.clear();
+    businessId = null;
     discount = 0;
     customer = '';
     notifyListeners();

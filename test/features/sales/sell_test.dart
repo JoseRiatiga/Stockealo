@@ -105,6 +105,34 @@ void main() {
           CartItem(product: (await ProductRepository.instance.getProductById(e.key, businessId))!, quantity: e.value),
       ];
 
+  // 0.15.0: las ventas en espera no se pierden al cerrar la app
+  test('las ventas en espera se guardan en el celular y vuelven al abrir la app', () async {
+    final cart = SellCart.instance;
+    await cart.restore(businessId);
+    final huevos = (await ProductRepository.instance.getProductById('huevos', businessId))!;
+    final aceite = (await ProductRepository.instance.getProductById('aceite', businessId))!;
+    cart.lines
+      ..add(CartItem(product: huevos, quantity: 2))
+      ..add(CartItem(product: aceite, customUnitPrice: 12000));
+    cart.customer = 'Doña Marta';
+    cart.hold();
+    expect(cart.held, hasLength(1));
+    // «Se cierra la app»: la memoria se borra y al volver se carga lo guardado
+    cart.reset();
+    expect(cart.held, isEmpty);
+    await cart.restore(businessId);
+    expect(cart.held, hasLength(1));
+    final h = cart.held.single;
+    expect(h.customer, 'Doña Marta');
+    expect(h.lines.map((l) => '${l.product.id} x${l.quantity} ${l.unitPrice.round()}'), ['huevos x2 18900', 'aceite x1 12000']);
+    // Al retomarla deja de estar en espera, también en lo guardado
+    cart.resume(0);
+    cart.reset();
+    await cart.restore(businessId);
+    expect(cart.held, isEmpty);
+    cart.reset();
+  });
+
   test('caja obligatoria: con la caja cerrada no se registra ninguna venta', () async {
     await setCash(true);
     await expectLater(

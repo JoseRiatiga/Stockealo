@@ -159,6 +159,8 @@ class _SellScreenState extends State<SellScreen> {
     // La cuenta es de un negocio: al cambiar de negocio no se arrastra
     final other = [..._cart.lines, for (final h in _cart.held) ...h.lines].any((l) => l.product.businessId != widget.business.id);
     if (other) _cart.reset();
+    // Las ventas en espera de este negocio, guardadas en el celular (0.15.0)
+    if (_cart.businessId != widget.business.id) _cart.restore(widget.business.id);
     _customer.text = _cart.customer;
     _load();
     DataEvents.instance.salesVersion.addListener(_reloadStock);

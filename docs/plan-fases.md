@@ -107,7 +107,7 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 ### Roles y permisos (`docs/plan-roles.md`)
 
-1. Una sola lista de permisos (`permissions.dart`). Cada función nueva registra ahí los suyos.
+1. HECHO (14 nov). Una sola lista de permisos (`permissions.dart`). Cada función nueva registra ahí los suyos.
 2. Roles por defecto: Dueño, Administrador y Cajero. Plantillas para crear roles: Vendedor, Bodega, Solo ver, Encargado y Atiende servicios.
 3. Roles personalizados: gratis 1, Pro y Pro Servicios sin límite. **Solo el dueño** los crea y edita.
 4. Límites con números (Pro).
@@ -141,6 +141,7 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 20. **El tiquete con NIT, dirección y despedida propia del negocio.**
 21. **Stocky:** límite mayor para Pro (50 preguntas al día) y las claves de respaldo (Gemini y OpenRouter).
 22. **Seguridad:** el código del correo vence a los 10 minutos (revisar en Supabase).
+23. HECHO (14 nov). **Portada propia en la tienda en línea** (pedido del dueño): «Fotos de productos», «Mi propia foto» o «Sin fotos». Migración store_cover aplicada con permiso.
 
 ## 0.16.0 · Tienda y crecimiento (antes 0.15.0)
 

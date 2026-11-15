@@ -1,6 +1,6 @@
 # Permisos que se cumplen también en la nube (0.15.0, punto 7)
 
-> **Estado:** PLAN, falta que el dueño elija la opción. No se toca código ni Supabase hasta aprobarlo.
+> **Estado:** opción A HECHA el 14 nov 2026 (migraciones 20261202500000 y 20261202600000, aplicadas con permiso y probadas con un cajero simulado). Falta el punto 5, «Ver costos».
 > Origen: la revisión de Codex del 14 nov 2026. Hoy los permisos y límites se cumplen solo dentro de la app.
 
 ## 1. Cómo está hoy

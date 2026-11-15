@@ -45,6 +45,13 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="stockealo" android:host="pago"/>
             </intent-filter>
+            <!-- 0.16.0: volver a la app después de entrar con Google (stockealo://login-callback) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="stockealo" android:host="login-callback"/>
+            </intent-filter>
             <!-- Flutter no navega con el enlace (no hay pantalla /pago): la app sigue donde estaba -->
             <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>
         </activity>

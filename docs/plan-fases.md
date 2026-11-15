@@ -167,7 +167,7 @@ Las fases 1 a 3 van en ese orden porque dependen entre sí; las 4 a 7 se pueden 
 - MFA del panel admin (necesita la app de códigos en el celular del dueño).
 - Bloqueo opcional con PIN o huella para abrir la app (librería local_auth y cambio en Android; probar en un celular real).
 - Limpieza de seguridad: contraseña vieja, `crypto` y `legacy-login` (antes, revisar si alguien todavía los usa).
-- **Fase 6, decidido (15 nov, boceto aprobado):** verificación en dos pasos **obligatoria** en el panel (la nube también la exige); bloqueo opcional con PIN o huella (Perfil › Privacidad, 5 min por defecto, olvidé el PIN = contraseña); `crypto` **se queda**: ya no la usa la contraseña vieja, pero ahora cifra el PIN. `legacy-login` **se mantiene** mientras quede 1 cuenta con contraseña vieja (15 nov). Entrar con Google: pendiente de que el dueño decida.
+- **Fase 6, decidido (15 nov, boceto aprobado):** verificación en dos pasos **obligatoria** en el panel (la nube también la exige); bloqueo opcional con PIN o huella (Perfil › Privacidad, 5 min por defecto, olvidé el PIN = contraseña); `crypto` **se queda**: ya no la usa la contraseña vieja, pero ahora cifra el PIN. `legacy-login` **se mantiene** mientras quede 1 cuenta con contraseña vieja (15 nov). Entrar con Google: **incluido** (decisión del dueño, 15 nov). Vuelve por stockealo://login-callback en el celular y a /app/ en la web; necesita que el dueño configure Google Cloud y Supabase.
 
 ### Calidad y confianza
 

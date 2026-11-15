@@ -10,6 +10,7 @@ import 'core/theme/app_tokens.dart';
 import 'features/pro/data/pro_admin_service.dart';
 import 'core/l10n/app_locale.dart';
 import 'core/services/error_reporter.dart';
+import 'admin/admin_mfa_gate.dart';
 
 /// Panel de administrador de Stockealo (solo web, en stockealo.online/admin).
 /// Es una app aparte: no está dentro de la app de los negocios.
@@ -71,9 +72,13 @@ class _AdminGate extends StatelessWidget {
                 onSignOut: () => client.auth.signOut(),
               );
             }
-            return AdminShell(
-              email: session.user.email ?? '',
+            // Verificación en dos pasos obligatoria (0.16.0, fase 6)
+            return AdminMfaGate(
               onSignOut: () => client.auth.signOut(),
+              child: AdminShell(
+                email: session.user.email ?? '',
+                onSignOut: () => client.auth.signOut(),
+              ),
             );
           },
         );

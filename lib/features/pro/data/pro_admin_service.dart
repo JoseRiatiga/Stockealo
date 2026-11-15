@@ -414,7 +414,14 @@ class ProAdminService {
     final client = _client;
     if (client == null) return false;
     try {
-      return await client.rpc('is_app_admin') == true;
+      // 0.16.0: «está en la lista» (sin pedir todavía el código de dos pasos); si la
+      // nube aún no lo tiene, la de siempre
+      try {
+        return await client.rpc('is_app_admin_listed') == true;
+      } on PostgrestException catch (e) {
+        if (e.code != 'PGRST202') rethrow;
+        return await client.rpc('is_app_admin') == true;
+      }
     } catch (e) {
       debugPrint('Administración no disponible: $e');
       return false;

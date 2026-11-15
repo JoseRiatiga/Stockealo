@@ -26,6 +26,7 @@ import '../../../../core/codes/code_reader.dart';
 import '../../../../core/codes/barcode_check.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/permissions/permissions.dart';
+import '../../data/pricing.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -669,6 +670,26 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ),
                     ],
                   ),
+                  // Precio sugerido por margen (0.15.0): con el costo, un toque pone el precio
+                  if (purchasePrice > 0) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text('Precio para ganar', style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.inkMuted)),
+                        for (final m in Pricing.margins)
+                          ActionChip(
+                            visualDensity: VisualDensity.compact,
+                            label: Text('$m % · ${CurrencyFormatter.format(Pricing.priceForMargin(purchasePrice, m))}',
+                                style: const TextStyle(fontSize: AppText.sizeCaption)),
+                            onPressed: () => setState(() =>
+                                _salePriceController.text = Pricing.priceForMargin(purchasePrice, m).round().toString()),
+                          ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   // Oferta en la tienda en línea: el precio de antes se ve tachado
                   TextFormField(

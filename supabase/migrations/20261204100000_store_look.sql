@@ -12,6 +12,10 @@
 
 alter table public.online_stores add column if not exists look jsonb not null default '{}'::jsonb;
 
+alter table public.online_stores drop constraint if exists online_stores_template_check;
+alter table public.online_stores add constraint online_stores_template_check
+  check (template in ('clasica', 'moda', 'mercado', 'menu', 'boutique'));
+
 -- Plantillas que se aceptan al guardar
 do $$
 declare d text;

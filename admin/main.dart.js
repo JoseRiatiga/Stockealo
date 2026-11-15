@@ -31275,7 +31275,7 @@ if(B.c.m(a,"invalid_count"))return"Puedes crear de 1 a 50 c\xf3digos por vez."
 if(B.c.m(a,"invalid_valid_days"))return"El plazo para canjear debe ser de 1 a 3650 d\xedas."
 if(B.c.m(a,"invalid_days"))return"La duraci\xf3n debe ser de 1 a 3650 d\xedas."
 if(B.c.m(a,"invalid_max_uses"))return"Los usos por c\xf3digo deben ser de 1 a 1000."
-if(B.c.m(a,"invalid_kind"))return"Elige un plan v\xe1lido: Pro Negocio o Pro Servicios."
+if(B.c.m(a,"invalid_kind"))return"Elige un plan v\xe1lido: Pro o Pro Servicios."
 if(B.c.m(a,"business_not_found"))return"Ese negocio no existe o fue eliminado."
 if(B.c.m(a,"invalid_price"))return"Revisa el precio."
 if(B.c.m(a,"invalid_setting"))return"Ese ajuste no se puede cambiar desde aqu\xed."
@@ -32453,7 +32453,7 @@ return r?"hoy a las "+n:""+A.bU(a)+" de "+B.cA[A.aY(a)-1]+" a las "+n},
 qc(a){var s
 A:{if("global"===a){s="Pro Global"
 break A}if("services"===a){s="Pro Servicios"
-break A}s="Pro Negocio"
+break A}s="Pro"
 break A}return s},
 bbM(a){switch(a.a){case 0:return B.q0
 case 2:return B.Ln
@@ -114912,7 +114912,7 @@ B.abV=new A.a7("Aviso de precios","Se muestra debajo de los planes")
 B.acf=new A.a7("Llave p\xfablica de Wompi","pub_test_\u2026 solo la ven los administradores; pub_prod_\u2026 cobra de verdad")
 B.Ha=new A.Y(B.a9T,[B.ac1,B.acw,B.acd,B.acn,B.ach,B.abV,B.acf],t.dM)
 B.a9P={business:0,services:1}
-B.Hb=new A.Y(B.a9P,["Pro Negocio","Pro Servicios"],t.w)
+B.Hb=new A.Y(B.a9P,["Pro","Pro Servicios"],t.w)
 B.a9I={in:0,iw:1,ji:2,jw:3,mo:4,aam:5,adp:6,aue:7,ayx:8,bgm:9,bjd:10,ccq:11,cjr:12,cka:13,cmk:14,coy:15,cqu:16,drh:17,drw:18,gav:19,gfx:20,ggn:21,gti:22,guv:23,hrr:24,ibi:25,ilw:26,jeg:27,kgc:28,kgh:29,koj:30,krm:31,ktr:32,kvs:33,kwq:34,kxe:35,kzj:36,kzt:37,lii:38,lmm:39,meg:40,mst:41,mwj:42,myt:43,nad:44,ncp:45,nnx:46,nts:47,oun:48,pcr:49,pmc:50,pmu:51,ppa:52,ppr:53,pry:54,puz:55,sca:56,skk:57,tdu:58,thc:59,thx:60,tie:61,tkk:62,tlw:63,tmp:64,tne:65,tnf:66,tsf:67,uok:68,xba:69,xia:70,xkh:71,xsj:72,ybd:73,yma:74,ymt:75,yos:76,yuu:77}
 B.cS=new A.Y(B.a9I,["id","he","yi","jv","ro","aas","dz","ktz","nun","bcg","drl","rki","mom","cmr","xch","pij","quh","khk","prs","dev","vaj","gvr","nyc","duz","jal","opa","gal","oyb","tdf","kml","kwv","bmf","dtp","gdj","yam","tvd","dtp","dtp","raq","rmx","cir","mry","vaj","mry","xny","kdz","ngv","pij","vaj","adx","huw","phr","bfy","lcq","prt","pub","hle","oyb","dtp","tpo","oyb","ras","twm","weo","tyj","kak","prs","taj","ema","cax","acn","waw","suj","rki","lrr","mtm","zom","yug"],t.w)
 B.Pg=new A.bR(-1,B.a9,B.cu,B.lQ,1)

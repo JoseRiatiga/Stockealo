@@ -82,6 +82,10 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
   // Avisos en el celular
   bool _stockAlerts = false;
   bool _summaryAlerts = false;
+
+  /// Recordatorio para cerrar la caja (0.15.0)
+  bool _cashAlerts = true;
+  int _cashHour = PhoneAlertsService.defaultCashHour;
   bool _orderAlerts = true;
 
   /// Android dio permiso para mostrar avisos
@@ -110,10 +114,14 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       final summary = await alerts.summaryEnabled();
       final hour = await alerts.summaryHour();
       final orders = await alerts.ordersEnabled();
+      final cash = await alerts.cashReminderEnabled();
+      final cashHour = await alerts.cashHour();
       final allowed = await alerts.hasPermission();
       if (mounted) {
         setState(() {
           _orderAlerts = orders;
+          _cashAlerts = cash;
+          _cashHour = cashHour;
           _alertsAllowed = allowed;
           _stockAlerts = stock;
           _summaryAlerts = summary;
@@ -151,6 +159,18 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
     if (picked == null || !mounted) return;
     await PhoneAlertsService.instance.setSummaryHour(picked.hour);
     setState(() => _summaryHour = picked.hour);
+  }
+
+  Future<void> _pickCashHour() async {
+    final picked = await showAppTimePicker(
+      context,
+      initialTime: TimeOfDay(hour: _cashHour, minute: 0),
+      helpText: 'Hora de cerrar la caja',
+    );
+    if (picked == null || !mounted) return;
+    await PhoneAlertsService.instance.setCashHour(picked.hour);
+    setState(() => _cashHour = picked.hour);
+    _refresh.value++;
   }
 
   void _openAlerts() {
@@ -206,6 +226,29 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
               title: 'Hora del resumen',
               subtitle: _hourLabel(_summaryHour),
               onTap: _pickSummaryHour,
+            ),
+          SettingsRow.toggle(
+            icon: Icons.point_of_sale_outlined,
+            title: 'Cerrar la caja',
+            subtitle: 'Si la caja sigue abierta a la hora de cierre',
+            value: _cashAlerts,
+            onChanged: (v) async {
+              final ok = await PhoneAlertsService.instance.setCashReminder(v);
+              if (!mounted) return;
+              if (!ok) {
+                AppToast.showWarning(context, 'Android no dio permiso para mostrar avisos.');
+                return;
+              }
+              setState(() => _cashAlerts = v);
+              _refresh.value++;
+            },
+          ),
+          if (_cashAlerts)
+            SettingsRow(
+              icon: Icons.schedule_outlined,
+              title: 'Hora de cerrar la caja',
+              subtitle: _hourLabel(_cashHour),
+              onTap: _pickCashHour,
             ),
         ]),
         Padding(

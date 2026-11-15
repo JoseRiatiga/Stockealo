@@ -268,6 +268,11 @@ void main() {
     expect(await alerts.ordersEnabled(), isTrue);
     expect(await alerts.stockAlertsEnabled(), isTrue);
     expect(await alerts.summaryEnabled(), isTrue);
+    // 0.15.0: recordatorio de cerrar la caja, encendido a las 7:00 p. m.
+    expect(await alerts.cashReminderEnabled(), isTrue);
+    expect(await alerts.cashHour(), 19);
+    await appDb.setSetting(PhoneAlertsService.cashHourKey, '21');
+    expect(await alerts.cashHour(), 21);
     await appDb.setSetting(PhoneAlertsService.ordersKey, '0');
     expect(await alerts.ordersEnabled(), isFalse);
   });

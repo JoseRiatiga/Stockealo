@@ -228,6 +228,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     await alerts.init();
     await alerts.seedDefaults();
     await alerts.refreshDailySummary();
+    await alerts.refreshCashReminder();
     await alerts.refreshDebtReminders();
     await alerts.refreshVisitReminders();
   }

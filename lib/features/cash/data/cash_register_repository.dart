@@ -10,6 +10,7 @@ import '../../team/data/activity_repository.dart';
 import '../../business/models/business.dart';
 import '../models/cash_session.dart';
 import '../../sales/models/payment_method.dart';
+import '../../../core/services/phone_alerts_service.dart';
 
 /// Arqueo de caja por negocio (0.12.0: con movimientos, propinas, cierre por forma
 /// de pago y en la nube).
@@ -85,6 +86,7 @@ class CashRegisterRepository {
       data: {'session_id': session.id},
     );
     DataEvents.instance.cashChanged();
+    PhoneAlertsService.instance.refreshCashReminder();
     return session;
   }
 
@@ -277,6 +279,7 @@ class CashRegisterRepository {
       data: {'session_id': session.id, 'difference': difference},
     );
     DataEvents.instance.cashChanged();
+    PhoneAlertsService.instance.refreshCashReminder();
     return closed;
   }
 

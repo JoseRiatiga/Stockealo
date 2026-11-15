@@ -108,8 +108,8 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 ### Roles y permisos (`docs/plan-roles.md`)
 
 1. HECHO (14 nov). Una sola lista de permisos (`permissions.dart`). Cada función nueva registra ahí los suyos.
-2. Roles por defecto: Dueño, Administrador y Cajero. Plantillas para crear roles: Vendedor, Bodega, Solo ver, Encargado y Atiende servicios.
-3. Roles personalizados: gratis 1, Pro y Pro Servicios sin límite. **Solo el dueño** los crea y edita.
+2. HECHO (14 nov). Roles por defecto: Dueño, Administrador y Cajero. Plantillas para crear roles: Vendedor, Bodega, Solo ver, Encargado y Atiende servicios.
+3. HECHO (14 nov), con «Ver como» y la matriz de interruptores. Roles personalizados: gratis 1, Pro y Pro Servicios sin límite. **Solo el dueño** los crea y edita.
 4. Límites con números (Pro).
 5. Autorización de un solo uso, nunca con PIN fijo, y arqueo ciego. Las dos cosas, gratis.
 6. Horario de acceso (Pro Servicios).
@@ -142,6 +142,10 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 21. **Stocky:** límite mayor para Pro (50 preguntas al día) y las claves de respaldo (Gemini y OpenRouter).
 22. **Seguridad:** el código del correo vence a los 10 minutos (revisar en Supabase).
 23. HECHO (14 nov). **Portada propia en la tienda en línea** (pedido del dueño): «Fotos de productos», «Mi propia foto» o «Sin fotos». Migración store_cover aplicada con permiso.
+24. HECHO (14 nov). **Tallas y colores en la tarjeta de la tienda**, con lo agotado tachado en diagonal y el carrito que agrega directo.
+25. HECHO (14 nov). **Carrito en dos pasos:** el pedido con foto, talla y color; después los datos del comprador.
+26. HECHO (14 nov). **Una foto por color** en los productos, en la tarjeta y en el carrito. Migración variant_color_photos aplicada con permiso.
+27. HECHO (14 nov). **Tienda en línea:** la tarjeta de tienda publicada con el diseño nuevo.
 
 ## 0.16.0 · Tienda y crecimiento (antes 0.15.0)
 

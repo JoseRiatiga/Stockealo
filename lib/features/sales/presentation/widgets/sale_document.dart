@@ -13,6 +13,7 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
+import '../../../business/models/ticket_info.dart';
 
 /// Una línea del tiquete: lo vendido o cotizado
 class SaleDocumentLine {
@@ -101,15 +102,19 @@ class SaleDocument {
 
   String get _totalLabel => totalLabel ?? (isQuotation ? 'Total estimado' : 'Total');
 
-  /// Texto para WhatsApp (va junto a la imagen, o solo al copiarlo)
-  String toText(String businessName) {
+  /// Texto para WhatsApp (va junto a la imagen, o solo al copiarlo). [info]: NIT,
+  /// dirección, teléfono y despedida del negocio (0.15.0)
+  String toText(String businessName, [TicketInfo info = TicketInfo.empty]) {
     const money = CurrencyFormatter.format;
     final date = DateFormat('dd/MM/yyyy hh:mm a');
     final day = DateFormat('dd/MM/yyyy');
     final b = StringBuffer()
       ..writeln('*${title.toUpperCase()}*')
-      ..writeln('*$businessName*')
-      ..writeln('N.º $number · ${isQuotation ? day.format(this.date) : date.format(this.date)}');
+      ..writeln('*$businessName*');
+    for (final l in info.headerLines) {
+      b.writeln(l);
+    }
+    b.writeln('N.º $number · ${isQuotation ? day.format(this.date) : date.format(this.date)}');
     if (stamp != null) b.writeln('*${stamp!.label}*${stamp!.detail == null ? '' : ' · ${stamp!.detail}'}');
     if (validUntil != null) b.writeln('Válida hasta el ${day.format(validUntil!)}');
     if (customerName?.isNotEmpty == true) b.writeln('Cliente: $customerName');
@@ -136,7 +141,7 @@ class SaleDocument {
     if (notes?.isNotEmpty == true) b.writeln('Notas: $notes');
     b
       ..writeln('--------------------------------')
-      ..writeln(closing)
+      ..writeln(info.closingFor(closing))
       ..write('Hecho con Stockealo');
     return b.toString();
   }
@@ -240,6 +245,9 @@ class TicketPaper extends StatelessWidget {
                       child: Text(business!.description!.trim(),
                           textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: mono.copyWith(color: muted)),
                     ),
+                  // NIT, dirección y teléfono del negocio (0.15.0)
+                  for (final line in TicketInfo.of(business).headerLines)
+                    Text(line, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: mono.copyWith(color: muted)),
                   const _Dashes(),
                   pair(doc.title.toUpperCase(), doc.number),
                   pair('FECHA', date),
@@ -279,7 +287,7 @@ class TicketPaper extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(doc.number, textAlign: TextAlign.center, style: mono.copyWith(color: muted, letterSpacing: 3)),
                   const SizedBox(height: AppSpace.sm),
-                  Text(doc.closing,
+                  Text(TicketInfo.of(business).closingFor(doc.closing),
                       textAlign: TextAlign.center,
                       style: AppText.small(context, color: AppPalette.inkMuted).copyWith(fontStyle: FontStyle.italic)),
                   const SizedBox(height: 2),
@@ -466,7 +474,7 @@ class _TicketViewerState extends State<TicketViewer> with SingleTickerProviderSt
   late final AnimationController _print = AnimationController(vsync: this, duration: AppMotion.print);
   bool _sharing = false;
 
-  String get _text => widget.text ?? widget.doc.toText(widget.businessName);
+  String get _text => widget.text ?? widget.doc.toText(widget.businessName, TicketInfo.of(widget.business));
 
   @override
   void didChangeDependencies() {

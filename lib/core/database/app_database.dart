@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 24;
+  static const int _schemaVersion = 25;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -582,11 +582,17 @@ class AppDatabase {
     if (oldVersion < 22 && newVersion >= 22) await rolesV22(db);
     if (oldVersion < 23 && newVersion >= 23) await roleLimitsV23(db);
     if (oldVersion < 24 && newVersion >= 24) await accessScheduleV24(db);
+    if (oldVersion < 25 && newVersion >= 25) await ticketInfoV25(db);
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
   /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
   /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  /// 0.15.0: datos del tiquete del negocio (NIT, dirección, teléfono y despedida)
+  static Future<void> ticketInfoV25(Database db) async {
+    await _addColumnIfMissing(db, 'businesses', 'ticket_info', 'TEXT');
+  }
+
   /// 0.15.0: horario de acceso de cada persona del equipo
   static Future<void> accessScheduleV24(Database db) async {
     await _addColumnIfMissing(db, 'business_members', 'access_schedule', 'TEXT');
@@ -1005,6 +1011,7 @@ class AppDatabase {
     await rolesV22(db);
     await roleLimitsV23(db);
     await accessScheduleV24(db);
+    await ticketInfoV25(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

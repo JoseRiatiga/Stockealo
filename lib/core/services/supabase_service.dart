@@ -592,6 +592,7 @@ class SupabaseService {
                   : (b['service_messages'] is String ? b['service_messages'] : jsonEncode(b['service_messages'])),
               'services_schedule': b['services_schedule'],
               'services_multi': b['services_multi'] == true ? 1 : 0,
+              'ticket_info': b['ticket_info'],
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
               'deleted_at': b['deleted_at'],
               'created_at': b['created_at'] ?? DateTime.now().toIso8601String(),
@@ -1392,6 +1393,8 @@ class SupabaseService {
           if (b['services_schedule'] != null) 'services_schedule': b['services_schedule'],
           if (b['services_multi'] != null) 'services_multi': b['services_multi'] == 1 || b['services_multi'] == true,
         },
+        // Datos del tiquete (0.15.0): solo si el negocio los puso
+        if (b['ticket_info'] != null) 'ticket_info': b['ticket_info'],
         'is_deleted': (b['is_deleted'] as int?) ?? 0,
       };
 

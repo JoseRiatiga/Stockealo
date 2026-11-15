@@ -190,6 +190,9 @@ class BusinessRepository extends ChangeNotifier {
 
     /// «Habilitar múltiples servicios» (0.14.0)
     bool? servicesMulti,
+
+    /// Datos del tiquete (0.15.0, JSON de TicketInfo); '' los quita
+    String? ticketInfo,
   }) async {
     final db = await _dbProvider.database;
     final Map<String, dynamic> updateData = {
@@ -206,6 +209,7 @@ class BusinessRepository extends ChangeNotifier {
       if (serviceMessages != null) 'service_messages': serviceMessages,
       if (servicesSchedule != null) 'services_schedule': servicesSchedule.isEmpty ? null : servicesSchedule,
       if (servicesMulti != null) 'services_multi': servicesMulti ? 1 : 0,
+      if (ticketInfo != null) 'ticket_info': ticketInfo.isEmpty ? null : ticketInfo,
     };
 
     await db.update(

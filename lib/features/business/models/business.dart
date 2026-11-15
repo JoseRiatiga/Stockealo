@@ -31,6 +31,9 @@ class Business {
   /// Horario de trabajo de los empleados (JSON de [WorkSchedule]); null = sin horario
   final String? servicesSchedule;
   final String? description;
+
+  /// Datos del tiquete (0.15.0): JSON de TicketInfo; null = el tiquete de siempre
+  final String? ticketInfo;
   final DateTime createdAt;
   final bool isSynced;
   final bool isDeleted;
@@ -51,6 +54,7 @@ class Business {
     this.serviceMessages,
     this.servicesSchedule,
     this.description,
+    this.ticketInfo,
     required this.createdAt,
     this.isSynced = false,
     this.isDeleted = false,
@@ -89,6 +93,7 @@ class Business {
     String? serviceMessages,
     String? servicesSchedule,
     String? description,
+    String? ticketInfo,
     DateTime? createdAt,
     bool? isSynced,
     bool? isDeleted,
@@ -109,6 +114,7 @@ class Business {
       serviceMessages: serviceMessages ?? this.serviceMessages,
       servicesSchedule: servicesSchedule ?? this.servicesSchedule,
       description: description ?? this.description,
+      ticketInfo: ticketInfo ?? this.ticketInfo,
       createdAt: createdAt ?? this.createdAt,
       isSynced: isSynced ?? this.isSynced,
       isDeleted: isDeleted ?? this.isDeleted,
@@ -132,6 +138,7 @@ class Business {
       'service_messages': serviceMessages,
       'services_schedule': servicesSchedule,
       'description': description,
+      'ticket_info': ticketInfo,
       'created_at': createdAt.toIso8601String(),
       'is_synced': isSynced ? 1 : 0,
       'is_deleted': isDeleted ? 1 : 0,
@@ -158,6 +165,7 @@ class Business {
           : jsonEncode(map['service_messages']),
       servicesSchedule: map['services_schedule'] as String?,
       description: map['description'] as String?,
+      ticketInfo: map['ticket_info'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       isSynced: (map['is_synced'] as int?) == 1,
       isDeleted: (map['is_deleted'] as int? ?? 0) == 1,

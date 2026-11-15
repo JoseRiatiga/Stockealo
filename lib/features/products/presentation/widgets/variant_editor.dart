@@ -10,17 +10,32 @@ import '../../models/product_variant.dart';
 import 'photo_color_picker.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/widgets/app_toast.dart';
+import '../../data/product_image_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 /// Un color: nombre libre ("Blanco con rojo") y su muestra.
 class VariantColor {
   String name;
   String? hex; // '#RRGGBB' o 'multi'
   String? hex2; // segundo tono
-  VariantColor(this.name, {this.hex, this.hex2});
+
+  /// Foto de este color (0.15.0); null = la foto principal del producto
+  String? imageUrl;
+  VariantColor(this.name, {this.hex, this.hex2, this.imageUrl});
 
   String get key => name.trim().toLowerCase();
 
-  VariantColor copy() => VariantColor(name, hex: hex, hex2: hex2);
+  VariantColor copy() => VariantColor(name, hex: hex, hex2: hex2, imageUrl: imageUrl);
+}
+
+/// Fotos por color (0.15.0)
+abstract final class VariantEditorPhotos {
+  /// Nombre del archivo de la foto de un color: uno por color, al cambiarla se reemplaza
+  static String name(String productId, String colorKey) {
+    final slug = colorKey.replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
+    return '$productId-color-${slug.isEmpty ? 'x' : slug}';
+  }
 }
 
 class VariantCell {
@@ -110,7 +125,7 @@ class VariantEditorController extends ChangeNotifier {
       if (colorName.isNotEmpty) {
         final list = _colorsBySize.putIfAbsent(_sizeKey(size), () => []);
         if (!list.any((c) => c.key == colorName.toLowerCase())) {
-          list.add(VariantColor(colorName, hex: v.colorHex, hex2: v.colorHex2));
+          list.add(VariantColor(colorName, hex: v.colorHex, hex2: v.colorHex2, imageUrl: v.imageUrl));
         }
       }
       _putCell(cellKey(size, colorName.isEmpty ? null : colorName),
@@ -252,6 +267,16 @@ class VariantEditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// La foto de un color: la comparten todas las tallas de ese color
+  void setColorImage(String colorKey, String? url) {
+    for (final list in _colorsBySize.values) {
+      for (final c in list) {
+        if (c.key == colorKey) c.imageUrl = url;
+      }
+    }
+    notifyListeners();
+  }
+
   void setBarcode(String key, String code) {
     cellFor(key).barcode = code;
     notifyListeners();
@@ -276,6 +301,7 @@ class VariantEditorController extends ChangeNotifier {
           attribute2Value: c.color?.name.trim(),
           colorHex: ProductVariant.validHex(c.color?.hex, allowMulti: true),
           colorHex2: ProductVariant.validHex(c.color?.hex2),
+          imageUrl: c.color?.imageUrl,
           skuOrBarcode: (cellFor(c.key).barcode ?? '').trim().isEmpty ? null : cellFor(c.key).barcode!.trim(),
           stock: cellFor(c.key).value.clamp(0, 1 << 30),
           createdAt: now,
@@ -468,7 +494,11 @@ class VariantEditor extends StatefulWidget {
   /// Foto del producto, para tomar el color tocando la prenda
   final String? photoPath;
 
-  const VariantEditor({super.key, required this.controller, this.photoPath});
+  /// Para subir la foto de cada color (0.15.0); sin ellos no se muestra esa parte
+  final String? businessId;
+  final String? productId;
+
+  const VariantEditor({super.key, required this.controller, this.photoPath, this.businessId, this.productId});
 
   @override
   State<VariantEditor> createState() => _VariantEditorState();
@@ -639,9 +669,94 @@ class _VariantEditorState extends State<VariantEditor> {
             const SizedBox(height: AppSpace.sm),
             _totals(c),
           ],
+          if (ctrl.colors.isNotEmpty && widget.businessId != null && widget.productId != null) ...[
+            const SizedBox(height: AppSpace.lg),
+            _colorPhotos(c, section),
+          ],
         ],
       ),
     );
+  }
+
+  /// 3. Una foto por color (opcional): en la tienda, al elegir el color se ve su foto
+  final Set<String> _uploading = {};
+
+  Widget _colorPhotos(StockealoColors c, TextStyle section) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Fotos por color', style: section),
+        const SizedBox(height: 2),
+        Text(
+          'Opcional. En la tienda, al elegir un color se ve su foto. Sin foto, se usa la principal.',
+          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
+        ),
+        const SizedBox(height: AppSpace.sm),
+        for (final color in ctrl.colors)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpace.sm),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: ColoredBox(
+                      color: c.surfaceMuted,
+                      child: color.imageUrl != null
+                          ? Image.network(color.imageUrl!, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(Icons.image_outlined, color: c.inkFaint))
+                          : Center(child: ColorSwatchDot(hex: color.hex, hex2: color.hex2, size: 22)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpace.md),
+                Expanded(
+                  child: Text(color.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w600, color: c.ink)),
+                ),
+                if (_uploading.contains(color.key))
+                  const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                else ...[
+                  TextButton.icon(
+                    onPressed: () => _pickColorPhoto(color),
+                    icon: Icon(color.imageUrl == null ? Icons.add_photo_alternate_outlined : Icons.photo_library_outlined, size: 18),
+                    label: Text(color.imageUrl == null ? 'Subir foto' : 'Cambiar'),
+                  ),
+                  if (color.imageUrl != null)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Quitar la foto de ${color.name}',
+                      icon: Icon(Icons.close_outlined, size: 18, color: c.inkMuted),
+                      onPressed: () => ctrl.setColorImage(color.key, null),
+                    ),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _pickColorPhoto(VariantColor color) async {
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
+    if (file == null || !mounted) return;
+    setState(() => _uploading.add(color.key));
+    try {
+      final url = await ProductImageService.instance.uploadBytes(
+        businessId: widget.businessId!,
+        productId: VariantEditorPhotos.name(widget.productId!, color.key),
+        bytes: await file.readAsBytes(),
+        mimeType: file.mimeType,
+      );
+      ctrl.setColorImage(color.key, url);
+    } catch (e) {
+      if (mounted) AppToast.showError(context, '$e');
+    } finally {
+      if (mounted) setState(() => _uploading.remove(color.key));
+    }
   }
 
   Widget _legacyBanner(StockealoColors c) {

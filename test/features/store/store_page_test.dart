@@ -300,4 +300,61 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  // 0.15.0: una foto por color
+  testWidgets('al elegir un color con foto, la tarjeta y el carrito la muestran', (tester) async {
+    bool showsPhoto(String url) => find
+        .byWidgetPredicate((w) => w is Image && w.image is NetworkImage && (w.image as NetworkImage).url == url)
+        .evaluate()
+        .isNotEmpty;
+    const main = 'https://x.co/blanca.jpg';
+    const black = 'https://x.co/negra.jpg';
+    const store = PublicStore(
+      slug: 's',
+      whatsapp: '573001234567',
+      businessName: 'Nova',
+      currency: 'COP',
+      template: StoreTemplate.fashion,
+      products: [
+        StoreProduct(
+          id: 'c',
+          name: 'Camiseta',
+          category: 'Camisetas',
+          price: 25000,
+          imageUrl: main,
+          variants: [
+            StoreVariant(id: 'm-b', size: 'M', color: 'Blanco', hex: '#FFFFFF'),
+            StoreVariant(id: 'm-n', size: 'M', color: 'Negro', hex: '#111111', imageUrl: black),
+          ],
+        ),
+      ],
+    );
+    await _pump(tester, store, size: const Size(390, 1600), ratio: 1);
+    expect(showsPhoto(main), isTrue);
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Color Negro\b')));
+    await tester.pumpAndSettle();
+    expect(showsPhoto(black), isTrue, reason: 'la foto del color negro');
+    expect(showsPhoto(main), isFalse);
+    // El blanco no tiene foto propia: vuelve la principal
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Color Blanco\b')));
+    await tester.pumpAndSettle();
+    expect(showsPhoto(main), isTrue);
+    // Agregar el negro: en el carrito sale con su foto
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Color Negro\b')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Agregar al pedido').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Ver pedido'));
+    await tester.pumpAndSettle();
+    expect(find.text('Talla M'), findsOneWidget);
+    expect(showsPhoto(black), isTrue, reason: 'el carrito muestra la foto del color elegido');
+    expect(tester.takeException(), isNull);
+  });
+
+  test('la foto de un color solo se acepta si es https', () {
+    StoreVariant v(Object? image) => StoreVariant.fromJson({'id': '1', 'image': image});
+    expect(v('https://x.co/a.jpg').imageUrl, 'https://x.co/a.jpg');
+    expect(v('javascript:alert(1)').imageUrl, isNull);
+    expect(v(null).imageUrl, isNull);
+  });
 }

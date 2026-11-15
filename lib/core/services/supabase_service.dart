@@ -764,6 +764,7 @@ class SupabaseService {
               'attribute2_value': row['attribute2_value'],
               'color_hex': row['color_hex'],
               'color_hex2': row['color_hex2'],
+              'image_url': row['image_url'],
               'sku_or_barcode': row['sku_or_barcode'],
               'stock': (row['stock'] as num?)?.toInt() ?? 0,
               'additional_price': (row['additional_price'] as num?)?.toDouble() ?? 0.0,

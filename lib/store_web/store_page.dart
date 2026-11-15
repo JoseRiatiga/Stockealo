@@ -1016,6 +1016,12 @@ class _ProductCardState extends State<_ProductCard> {
     ];
   }
 
+  /// Foto del color elegido (o del único color de la talla); null = la del producto
+  String? get _photo {
+    if (_color == null) return null;
+    return _all.where((v) => _colorKey(v) == _color && v.imageUrl != null).firstOrNull?.imageUrl;
+  }
+
   bool _sizeOut(String size) => _all.where((v) => v.size == size).every((v) => v.soldOut);
 
   /// ¿Hay este color? En la talla elegida o, sin talla, en alguna
@@ -1173,8 +1179,9 @@ class _ProductCardState extends State<_ProductCard> {
               children: [
                 ColoredBox(
                   color: c.surfaceMuted,
-                  child: p.imageUrl != null
-                      ? Image.network(p.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder(c))
+                  // Con un color elegido se ve la foto de ese color (0.15.0)
+                  child: (_photo ?? p.imageUrl) != null
+                      ? Image.network(_photo ?? p.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder(c))
                       : _placeholder(c),
                 ),
                 if (p.onOffer || p.promo != null)
@@ -1576,7 +1583,7 @@ class _CartFormState extends State<_CartForm> {
             ),
             child: Row(
               children: [
-                _ThumbStack(products: [for (final l in lines) l.product]),
+                _ThumbStack(lines: lines),
                 const SizedBox(width: AppSpace.sm),
                 Expanded(child: Text(products, style: AppText.small(context))),
                 Text(money(total), style: AppText.body(context, weight: FontWeight.w700)),
@@ -1694,7 +1701,7 @@ class _CartItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CartThumb(product: l.product, size: 64),
+          _CartThumb(product: l.product, imageUrl: l.variant?.imageUrl, size: 64),
           const SizedBox(width: AppSpace.md),
           Expanded(
             child: Column(
@@ -1781,16 +1788,18 @@ class _QtyButton extends StatelessWidget {
   }
 }
 
-/// La foto del producto en el pedido (o un ícono si no tiene)
+/// La foto del producto en el pedido: la del color elegido o la principal (o un ícono)
 class _CartThumb extends StatelessWidget {
   final StoreProduct product;
+  final String? imageUrl;
   final double size;
 
-  const _CartThumb({required this.product, required this.size});
+  const _CartThumb({required this.product, this.imageUrl, required this.size});
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final url = imageUrl ?? product.imageUrl;
     final icon = Icon(Icons.checkroom_outlined, size: size * 0.45, color: c.inkFaint);
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.control + 2),
@@ -1799,8 +1808,8 @@ class _CartThumb extends StatelessWidget {
         height: size,
         child: ColoredBox(
           color: c.surfaceMuted,
-          child: product.imageUrl != null
-              ? Image.network(product.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: icon))
+          child: url != null
+              ? Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: icon))
               : Center(child: icon),
         ),
       ),
@@ -1810,14 +1819,14 @@ class _CartThumb extends StatelessWidget {
 
 /// Las fotos del pedido encimadas (hasta 3), para el resumen del paso 2
 class _ThumbStack extends StatelessWidget {
-  final List<StoreProduct> products;
+  final List<CartLine> lines;
 
-  const _ThumbStack({required this.products});
+  const _ThumbStack({required this.lines});
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final shown = products.take(3).toList();
+    final shown = lines.take(3).toList();
     const size = 36.0;
     const step = 26.0;
     return SizedBox(
@@ -1833,7 +1842,7 @@ class _ThumbStack extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.control + 4),
                   border: Border.all(color: c.surface, width: 2),
                 ),
-                child: _CartThumb(product: shown[i], size: size - 4),
+                child: _CartThumb(product: shown[i].product, imageUrl: shown[i].variant?.imageUrl, size: size - 4),
               ),
             ),
         ],

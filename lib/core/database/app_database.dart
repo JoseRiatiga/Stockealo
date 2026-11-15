@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 20;
+  static const int _schemaVersion = 21;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -578,11 +578,17 @@ class AppDatabase {
     if (oldVersion < 18 && newVersion >= 18) await appointmentsV18(db);
     if (oldVersion < 19 && newVersion >= 19) await workOrdersV19(db);
     if (oldVersion < 20 && newVersion >= 20) await chairRentV20(db);
+    if (oldVersion < 21 && newVersion >= 21) await variantPhotosV21(db);
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
   /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
   /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  /// 0.15.0: una foto por color
+  static Future<void> variantPhotosV21(Database db) async {
+    await _addColumnIfMissing(db, 'product_variants', 'image_url', 'TEXT');
+  }
+
   /// 0.14.0: alquiler de silla
   static Future<void> chairRentV20(Database db) async {
     await _addColumnIfMissing(db, 'staff', 'chair_rent', 'REAL');
@@ -963,6 +969,7 @@ class AppDatabase {
     await appointmentsV18(db);
     await workOrdersV19(db);
     await chairRentV20(db);
+    await variantPhotosV21(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

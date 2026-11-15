@@ -85,6 +85,9 @@ class StoreVariant {
   /// Quedan 3 o menos: «Quedan pocas, pide pronto»
   final bool few;
 
+  /// Foto de este color (0.15.0); null = la del producto
+  final String? imageUrl;
+
   const StoreVariant({
     required this.id,
     this.size,
@@ -94,6 +97,7 @@ class StoreVariant {
     this.stock,
     this.soldOut = false,
     this.few = false,
+    this.imageUrl,
   });
 
   String get label => [if (size != null) size!, if (color != null) color!].join(' · ');
@@ -112,6 +116,7 @@ class StoreVariant {
         stock: (j['stock'] as num?)?.toInt(),
         soldOut: j['sold_out'] == true,
         few: j['few'] == true,
+        imageUrl: (j['image'] as String?)?.startsWith('https://') == true ? j['image'] as String : null,
       );
 }
 

@@ -828,7 +828,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     )
                   else ...[
                     // Si SÍ tiene variantes: tallas, colores y existencias por combinación
-                    VariantEditor(controller: _variants, photoPath: _photoPath),
+                    VariantEditor(controller: _variants, photoPath: _photoPath, businessId: _photoBusinessId, productId: _productId),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _minStockController,

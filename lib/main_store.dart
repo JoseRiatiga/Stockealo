@@ -29,7 +29,7 @@ class StoreApp extends StatelessWidget {
       title: 'Tienda',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: StorePage(slug: slugFromUri(Uri.base)),
+      home: StorePage(slug: slugFromUri(Uri.base), sharedProductId: sharedProductFromUri(Uri.base)),
     );
   }
 }

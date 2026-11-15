@@ -28,6 +28,12 @@ String? slugFromUri(Uri uri) {
   return null;
 }
 
+/// Producto compartido (?p=<id>, 0.16.0): sale primero y resaltado
+String? sharedProductFromUri(Uri uri) {
+  final p = uri.queryParameters['p']?.trim();
+  return p == null || p.isEmpty ? null : p;
+}
+
 /// Lo que se está filtrando en la tienda
 class StoreFilters {
   String query = '';
@@ -79,7 +85,10 @@ class StorePage extends StatefulWidget {
   /// Estado del mantenimiento (por defecto, el servidor; las pruebas pasan el suyo)
   final Future<MaintenanceState> Function()? maintenanceLoader;
 
-  const StorePage({super.key, required this.slug, this.loader, this.maintenanceLoader});
+  /// Producto que le compartieron al cliente (0.16.0): va primero con «Te compartieron este producto»
+  final String? sharedProductId;
+
+  const StorePage({super.key, required this.slug, this.loader, this.maintenanceLoader, this.sharedProductId});
 
   static Future<MaintenanceState> _serverMaintenance() async {
     try {
@@ -112,6 +121,9 @@ class _StorePageState extends State<StorePage> {
 
   /// Aviso +18 (0.16.0): ya dijo que es mayor de edad en esta visita
   bool _adultOk = false;
+
+  /// Cerró el aviso del producto compartido
+  bool _sharedClosed = false;
   bool _adultNo = false;
 
   Future<void> _loadBooking(String slug) async {
@@ -175,7 +187,11 @@ class _StorePageState extends State<StorePage> {
       if (store != null && widget.loader == null) _loadBooking(slug);
       if (mounted) {
         setState(() {
-          _store = store;
+          // El producto compartido va primero, como un destacado más
+          final shared = widget.sharedProductId;
+          _store = store != null && shared != null && store.products.any((p) => p.id == shared)
+              ? store.copyWith(look: store.look.copyWith(featured: [shared, ...store.look.featured.where((f) => f != shared)]))
+              : store;
           _maintenance = maintenance;
         });
       }
@@ -241,6 +257,7 @@ class _StorePageState extends State<StorePage> {
       return Theme(data: AppTheme.build(Brightness.light, accent: accent), child: _MaintenancePage(store: store, maintenance: _maintenance));
     }
     final notice = _maintenance.affects('stores') && (_maintenance.notice || _maintenance.active);
+    final shared = widget.sharedProductId == null ? null : store.products.where((p) => p.id == widget.sharedProductId).firstOrNull;
     if (store.look.adult && !_adultOk) {
       return Theme(data: theme, child: Builder(builder: (context) => _adultGate(context, store)));
     }
@@ -256,7 +273,19 @@ class _StorePageState extends State<StorePage> {
             StoreTemplate.boutique => _boutique(context, store),
             _ => _classic(context, store),
           };
-          return notice ? Column(children: [_MaintenanceNotice(maintenance: _maintenance), Expanded(child: view)]) : view;
+          final banner = shared == null || _sharedClosed
+              ? null
+              : MaterialBanner(
+                  leading: const Icon(Icons.share_outlined),
+                  content: Text('Te compartieron este producto: ${shared.name}. Va de primero.'),
+                  actions: [TextButton(onPressed: () => setState(() => _sharedClosed = true), child: const Text('Entendido'))],
+                );
+          if (!notice && banner == null) return view;
+          return Column(children: [
+            if (notice) _MaintenanceNotice(maintenance: _maintenance),
+            if (banner != null) banner,
+            Expanded(child: view),
+          ]);
         },
       ),
     );

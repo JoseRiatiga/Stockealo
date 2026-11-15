@@ -59,6 +59,9 @@ class OnlineStoreConfig {
       );
 
   String get url => '$storeBaseUrl/$slug';
+
+  /// Link que abre la tienda con ese producto primero y resaltado (0.16.0, fase 3)
+  String productUrl(String productId) => '$url?p=$productId';
 }
 
 /// Las plantillas de la tienda
@@ -197,7 +200,44 @@ class StoreLook {
   /// Al entrar pregunta «¿Tienes 18 años o más?» (licoreras y vapers, fase 2a)
   final bool adult;
 
-  const StoreLook({this.accent, this.dark = false, this.featured = const [], this.schedule, this.payment, this.adult = false});
+  /// Hashtags propios del negocio para Instagram (fase 3): «#VariedadesRosita»
+  final List<String> hashtags;
+
+  const StoreLook({
+    this.accent,
+    this.dark = false,
+    this.featured = const [],
+    this.schedule,
+    this.payment,
+    this.adult = false,
+    this.hashtags = const [],
+  });
+
+  static const maxHashtags = 10;
+
+  /// «#VariedadesRosita, domicilios» → ['#VariedadesRosita', '#domicilios']: cada palabra
+  /// separada por coma o espacio queda como un hashtag limpio, sin repetir
+  static List<String> parseHashtags(String raw) {
+    final out = <String>[];
+    for (final part in raw.split(RegExp(r'[\s,;]+'))) {
+      final tag = cleanHashtag(part);
+      if (tag != null && !out.any((t) => t.toLowerCase() == tag.toLowerCase())) out.add(tag);
+      if (out.length >= maxHashtags) break;
+    }
+    return out;
+  }
+
+  /// '#Mi_Tienda' válido, o null
+  static String? cleanHashtag(String raw) {
+    final body = raw.trim().replaceFirst(RegExp(r'^#+'), '').replaceAll(RegExp(r'[^0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ_]'), '');
+    if (body.isEmpty || body.length > 40) return null;
+    return '#$body';
+  }
+
+  /// El nombre del negocio como hashtag: «Variedades Rosita» → «#VariedadesRosita»
+  static String? nameHashtag(String businessName) => cleanHashtag(
+        businessName.split(RegExp(r'\s+')).map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1)).join(),
+      );
 
   static const none = StoreLook();
   static const maxFeatured = 6;
@@ -216,6 +256,10 @@ class StoreLook {
       schedule: StoreSchedule.fromJson(raw['schedule']),
       payment: payment.isEmpty ? null : payment,
       adult: raw['adult'] == true,
+      hashtags: [
+        for (final h in (raw['hashtags'] as List? ?? const []))
+          if (h is String && cleanHashtag(h) != null) cleanHashtag(h)!,
+      ].take(maxHashtags).toList(),
     );
   }
 
@@ -226,10 +270,11 @@ class StoreLook {
         if (schedule != null) 'schedule': schedule!.toJson(),
         if (payment != null) 'payment': payment,
         'adult': adult,
+        if (hashtags.isNotEmpty) 'hashtags': hashtags.take(maxHashtags).toList(),
       };
 
   StoreLook copyWith({String? accent, bool clearAccent = false, bool? dark, List<String>? featured, StoreSchedule? schedule,
-          bool clearSchedule = false, String? payment, bool clearPayment = false, bool? adult}) =>
+          bool clearSchedule = false, String? payment, bool clearPayment = false, bool? adult, List<String>? hashtags}) =>
       StoreLook(
         accent: clearAccent ? null : accent ?? this.accent,
         dark: dark ?? this.dark,
@@ -237,6 +282,7 @@ class StoreLook {
         schedule: clearSchedule ? null : schedule ?? this.schedule,
         payment: clearPayment ? null : payment ?? this.payment,
         adult: adult ?? this.adult,
+        hashtags: hashtags ?? this.hashtags,
       );
 }
 

@@ -12,7 +12,7 @@ const _locks = <String, int>{
   'colores a mano (Color(0x…))': 0,
   'colores de Material a mano (Colors.x)': 0,
   'claro/oscuro decidido a mano (isDark)': 2, // el tema de la app y la plantilla Moda de la tienda (oscura a propósito)
-  'tamaños de letra sueltos (fontSize: 13)': 26,
+  'tamaños de letra sueltos (fontSize: 13)': 15, // 0.16.0: los PDF usan PdfPt; queda el estado de cuenta
   'avisos viejos (SnackBar)': 0,
   'ventanas armadas a mano (AlertDialog)': 0,
   'íconos redondeados (familia vieja)': 0,

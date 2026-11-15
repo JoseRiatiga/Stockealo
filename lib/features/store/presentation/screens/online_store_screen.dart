@@ -27,6 +27,7 @@ import '../../../../core/services/maintenance_service.dart';
 import '../../../../core/design/app_time_picker.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../products/data/product_templates.dart';
+import '../widgets/store_qr_sheet.dart';
 
 /// Tienda en línea (lugar del menú): publica el catálogo en stockealo.online/tienda/<slug> con
 /// carrito; los pedidos llegan por WhatsApp (Stockealo Pro).
@@ -54,6 +55,9 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
   final _welcomeController = TextEditingController();
   final _heroController = TextEditingController();
   final _paymentController = TextEditingController();
+
+  /// Hashtags propios para Instagram (0.16.0, fase 3)
+  final _hashtagsController = TextEditingController();
   String _template = StoreTemplate.classic;
 
   /// Personalizar tienda (0.16.0): color, modo oscuro, destacados y horario
@@ -97,6 +101,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
     _welcomeController.dispose();
     _heroController.dispose();
     _paymentController.dispose();
+    _hashtagsController.dispose();
     super.dispose();
   }
 
@@ -129,6 +134,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         _heroController.text = saved?.heroTitle ?? '';
         _look = saved?.look ?? StoreLook(adult: suggested?.adult ?? false);
         _paymentController.text = _look.payment ?? '';
+        _hashtagsController.text = _look.hashtags.join(' ');
       });
     } catch (e) {
       if (mounted) setState(() => _loadError = '$e');
@@ -460,6 +466,18 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
           ),
         ),
         const SizedBox(height: AppSpace.sm),
+        TextField(
+          controller: _hashtagsController,
+          maxLines: 2,
+          minLines: 1,
+          decoration: InputDecoration(
+            labelText: 'Tus hashtags (opcional)',
+            hintText: '${StoreLook.nameHashtag(widget.business.name) ?? '#MiNegocio'} #Domicilios',
+            helperText: 'Salen en el texto de Instagram, junto a los sugeridos para tu tipo de negocio.',
+            helperMaxLines: 2,
+          ),
+        ),
+        const SizedBox(height: AppSpace.sm),
         OutlinedButton.icon(
           onPressed: _preview,
           icon: const Icon(Icons.visibility_outlined, size: 18),
@@ -471,7 +489,8 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
 
   StoreLook get _lookToSave {
     final pay = _paymentController.text.trim();
-    return pay.isEmpty ? _look.copyWith(clearPayment: true) : _look.copyWith(payment: pay);
+    final look = _look.copyWith(hashtags: StoreLook.parseHashtags(_hashtagsController.text));
+    return pay.isEmpty ? look.copyWith(clearPayment: true) : look.copyWith(payment: pay);
   }
 
   Future<void> _pickFeatured() async {
@@ -792,6 +811,12 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                   tooltip: 'Copiar el enlace',
                   onPressed: () => _copyLink(store.url),
                   icon: const Icon(Icons.copy_outlined, size: 18),
+                ),
+                // QR para el mostrador (0.16.0, fase 3)
+                OutlinedButton.icon(
+                  onPressed: () => StoreQrSheet.show(context, business: widget.business, store: store),
+                  icon: const Icon(Icons.qr_code_2_outlined, size: 18),
+                  label: const Text('QR'),
                 ),
               ],
             ),

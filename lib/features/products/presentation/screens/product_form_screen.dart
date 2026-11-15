@@ -29,6 +29,7 @@ import '../../../../core/permissions/permissions.dart';
 import '../../data/pricing.dart';
 import '../widgets/lots_widgets.dart';
 import '../../data/product_templates.dart';
+import '../../../store/presentation/widgets/store_qr_sheet.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -463,6 +464,15 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Editar Producto' : 'Nuevo Producto'),
+        actions: [
+          // Compartir el producto con el link de la tienda (0.16.0, fase 3)
+          if (isEditing)
+            IconButton(
+              tooltip: 'Compartir',
+              icon: const Icon(Icons.share_outlined),
+              onPressed: () => ProductShare.share(context, product: widget.productToEdit!),
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

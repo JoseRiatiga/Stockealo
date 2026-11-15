@@ -11,7 +11,19 @@ class CatalogStyle {
     'vitrina': 'Vitrina',
     'lista': 'Lista de precios',
     'promo': 'Promoción',
+    // 0.16.0, fase 3: a juego con las plantillas de la tienda
+    'moda': 'Moda',
+    'menu': 'Menú',
   };
+
+  /// La plantilla del catálogo que le queda a cada plantilla de la tienda
+  static String fromStoreTemplate(String storeTemplate) => switch (storeTemplate) {
+        'moda' => 'moda',
+        'menu' => 'menu',
+        'mercado' => 'lista',
+        'boutique' => 'vitrina',
+        _ => 'clasica',
+      };
 
   /// Colores de la paleta corta (gratis); la paleta completa es de Pro
   static const freeColorKeys = ['verde', 'azul', 'rojo', 'grafito'];

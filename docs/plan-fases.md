@@ -201,7 +201,10 @@ Las fases 1 a 3 van en ese orden porque dependen entre sí; las 4 a 7 se pueden 
     - las 4 plantillas actuales (Clásica, Vitrina, Lista de precios y Promoción) pasan al diseño nuevo, con la cinta de promociones;
     - se agregan **Moda** y **Menú**;
     - el catálogo sale por defecto con el mismo estilo de la tienda.
+    - **Fase 3, decidido (15 nov, boceto aprobado):** el catálogo sale por defecto con el estilo de la tienda y lleva el QR de la tienda en la portada.
 15. **Instagram** (decidido el 14 nov). Hoy solo hay historias 9:16:
+    - **Decidido (15 nov):** hashtags **propios** (se escriben una vez en Personalizar tienda) **y sugeridos** por el tipo de negocio. «Compartir en Instagram» abre el **menú de compartir del celular** (Android, iPhone y web); sin pieza nativa directa a la historia.
+    - Además: QR de la tienda para el mostrador (imagen y cartel en PDF) y **compartir un producto** con un link que abre la tienda con ese producto primero y resaltado.
     - **Formatos:** historia 9:16, publicación cuadrada 1:1, vertical 4:5 y **carrusel** (hasta 10 imágenes, una por producto).
     - **Enlace:** el link o el QR de la tienda en la imagen («Pide en stockealo.online/tienda/…»).
     - **Texto listo para copiar:** nombre, precios, promoción, link y hashtags del negocio.

@@ -48,6 +48,9 @@ class ProductTemplate {
   /// Usa la marca del producto (la tienda filtra por marca)
   final bool usesBrand;
 
+  /// Hashtags sugeridos para Instagram (fase 3)
+  final List<String> hashtags;
+
   const ProductTemplate({
     required this.code,
     required this.label,
@@ -58,6 +61,7 @@ class ProductTemplate {
     this.preset,
     this.adult = false,
     this.usesBrand = false,
+    this.hashtags = const ['#Domicilios'],
   });
 
   static const licorera = ProductTemplate(
@@ -70,6 +74,7 @@ class ProductTemplate {
     adult: true,
     storeTemplate: StoreTemplate.market,
     usesBrand: true,
+    hashtags: ['#Licorera', '#Licores', '#Domicilios'],
   );
 
   static const vapers = ProductTemplate(
@@ -82,6 +87,7 @@ class ProductTemplate {
     adult: true,
     storeTemplate: StoreTemplate.boutique,
     usesBrand: true,
+    hashtags: ['#Vape', '#Vapers', '#Pods'],
   );
 
   static const drogueria = ProductTemplate(
@@ -92,6 +98,7 @@ class ProductTemplate {
     categories: ['Medicamentos', 'Vitaminas', 'Cuidado personal', 'Bebés', 'Primeros auxilios', 'Higiene', 'Dermocosmética'],
     storeTemplate: StoreTemplate.market,
     usesBrand: true,
+    hashtags: ['#Droguería', '#Farmacia', '#Domicilios'],
   );
 
   static const ropa = ProductTemplate(
@@ -102,6 +109,7 @@ class ProductTemplate {
     categories: ['Camisetas', 'Pantalones', 'Vestidos', 'Chaquetas', 'Ropa interior', 'Calzado', 'Accesorios'],
     preset: VariantPreset.clothes,
     storeTemplate: StoreTemplate.fashion,
+    hashtags: ['#Moda', '#Ropa', '#Outfit'],
   );
 
   static const comidas = ProductTemplate(
@@ -111,6 +119,7 @@ class ProductTemplate {
     summary: 'Desayunos, almuerzos, panes, postres… · descripción del plato · tienda Menú',
     categories: ['Desayunos', 'Almuerzos', 'Panes', 'Postres', 'Bebidas', 'Adicionales'],
     storeTemplate: StoreTemplate.menu,
+    hashtags: ['#Comida', '#Antojos', '#Domicilios'],
   );
 
   static const barrio = ProductTemplate(
@@ -120,6 +129,7 @@ class ProductTemplate {
     summary: 'Granos, lácteos, aseo, bebidas, snacks… · tienda Mercado',
     categories: ['Granos', 'Lácteos y huevos', 'Aseo', 'Bebidas', 'Snacks y dulces', 'Enlatados', 'Panadería', 'Carnes frías'],
     storeTemplate: StoreTemplate.market,
+    hashtags: ['#TiendaDeBarrio', '#Mercado', '#Domicilios'],
   );
 
   static const all = [licorera, vapers, drogueria, ropa, comidas, barrio];

@@ -230,11 +230,13 @@ class CashRegisterRepository {
     );
   }
 
-  /// Cierra el turno. Si el conteo no cuadra con lo esperado, la nota es obligatoria.
+  /// Cierra el turno. Si el conteo no cuadra con lo esperado, la nota es obligatoria,
+  /// salvo en el arqueo ciego ([blind]): quien cuenta no sabe cuánto debía haber.
   Future<CashSession> closeSession({
     required CashSession session,
     required double countedAmount,
     String? notes,
+    bool blind = false,
     Map<int, int> denominations = const {},
     Map<String, dynamic> extra = const {},
     DateTime? now,
@@ -246,7 +248,7 @@ class CashRegisterRepository {
     final summary = await summarize(session.copyWith(closedAt: closedAt));
     final difference = countedAmount - summary.expected;
     final cleanNotes = (notes ?? '').trim();
-    if (difference.abs() >= 1 && cleanNotes.isEmpty) {
+    if (difference.abs() >= 1 && cleanNotes.isEmpty && !blind) {
       throw StateError('La caja no cuadra: escribe una nota que explique la diferencia.');
     }
     final closed = session.copyWith(

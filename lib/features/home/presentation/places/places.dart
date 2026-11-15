@@ -26,6 +26,7 @@ class CashPlace extends StatelessWidget {
         key: ValueKey('cash-place-${biz.id}'),
         businessId: biz.id,
         userName: AuthRepository.instance.currentUser?.displayName ?? '',
+        role: role,
         embedded: true,
       );
     }

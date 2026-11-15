@@ -428,6 +428,17 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
         onTap: () => _go(AppPlace.caja),
       );
     }
+    // Arqueo ciego (0.15.0): sin «Ver lo esperado en caja» no se muestra la cifra
+    if (!_can(Perm.cashExpected)) {
+      return StatCard(
+        compact: compact,
+        title: 'Caja',
+        value: 'Abierta',
+        detail: '${s.cashSalesCount} ${s.cashSalesCount == 1 ? 'venta' : 'ventas'} en efectivo',
+        actionLabel: 'Cerrar caja',
+        onTap: () => _go(AppPlace.caja),
+      );
+    }
     return StatCard(
       compact: compact,
       title: 'Efectivo en caja',

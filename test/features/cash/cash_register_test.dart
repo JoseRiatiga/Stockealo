@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:stockealo/core/database/app_database.dart';
@@ -10,6 +11,7 @@ import 'package:stockealo/features/auth/models/app_user.dart';
 import 'package:stockealo/features/business/models/business.dart';
 import 'package:stockealo/features/cash/data/cash_register_repository.dart';
 import 'package:stockealo/features/cash/models/cash_session.dart';
+import 'package:stockealo/features/cash/presentation/screens/cash_register_screen.dart';
 
 /// Arqueo de caja mejorado (0.12.0): movimientos, propinas, mercancía de contado,
 /// cierre por forma de pago, nota obligatoria si no cuadra y comprobante
@@ -149,6 +151,24 @@ void main() {
       repo.addMovement(session: closed, kind: CashMovement.exit, reason: 'GASTO', amount: 1000),
       throwsStateError,
     );
+  });
+
+  // 0.15.0: arqueo ciego
+  test('en el arqueo ciego no se pide nota: quien cuenta no sabe cuánto debía haber', () async {
+    final session = await repo.openSession(businessId: businessId, openingAmount: 10000, openedBy: 'Luis', now: opened);
+    final closed = await repo.closeSession(
+      session: session,
+      countedAmount: 8000,
+      blind: true,
+      now: opened.add(const Duration(hours: 1)),
+    );
+    // El dueño igual ve la diferencia en el cierre
+    expect(closed.difference, -2000);
+    expect(closed.expectedAmount, 10000);
+    await initializeDateFormatting('es_CO');
+    final doc = blindCashTicket(closed);
+    expect(doc.before.map((r) => r.label), isNot(contains('Esperado')));
+    expect(doc.stamp?.label, 'ENTREGADA');
   });
 
   test('una caja abierta desde ayer se marca para cerrarla', () {

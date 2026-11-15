@@ -219,6 +219,9 @@ Las fases 1 a 3 van en ese orden porque dependen entre sí; las 4 a 7 se pueden 
       - **Tienda de barrio o miscelánea:** categorías de barrio y tienda «Mercado».
     - La pregunta «¿Para qué usarás Stockealo?» al crear el negocio se hace en la **0.14.0** (punto 20). Aquí solo se suman las opciones de productos.
     - Las plantillas de servicios (Lavadero, Barbería, Spa, Taller, Servicio técnico y Lavandería) ya funcionan así y se revisan en la 0.14.0.
+    - **Decidido (15 nov, boceto aprobado):** tarjeta en Productos según «¿Para qué usarás Stockealo?», elegir el tipo (el sugerido primero), revisar y quitar lo que no sirva, y «Cargar plantilla» (no crea productos ni toca los que hay). Aviso +18 en la tienda para licorera y vapers (una vez por visita; interruptor en Personalizar tienda). Se agrega «Vapers» a las respuestas.
+    - **Fase 2a:** los 6 tipos, aviso +18, **marca** del producto (la tienda filtra por marca) y variantes **nicotina · sabor** (la segunda lista del editor acepta sabores, sin muestra de color).
+    - **Fase 2b:** droguería con **lotes**: cada entrada de mercancía con cantidad y fecha de vencimiento; al vender se descuenta primero el que vence antes; aviso 30 días antes en Inicio y Stock; sincronizado en la nube.
 17. «Personalizar tienda»: portada, color, destacados, horario, modo oscuro, datos de pago y vista previa.
     - **Decidido (15 nov, boceto aprobado):** color propio de la tienda, modo oscuro en cualquier plantilla, hasta 6 destacados que salen primero, horario con «Abierto»/«Cerrado», datos de pago al final del pedido y vista previa con los productos del negocio antes de guardar.
     - **Fuera del horario los pedidos se reciben con aviso** («Estamos cerrados, te atendemos al abrir»), no se bloquean.

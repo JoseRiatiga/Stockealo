@@ -756,7 +756,7 @@ class SupabaseService {
         final List<dynamic> cloudProducts = await client!.from('products').select();
         // Lo que la nube no guardaba antes (variantes, descripción) no se pierde al reescribir
         final localExtras = <String, Map<String, Object?>>{
-          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description', 'supplier_id', 'compare_price']))
+          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description', 'supplier_id', 'compare_price', 'brand']))
             r['id'] as String: r,
         };
         for (final p in cloudProducts) {
@@ -773,6 +773,7 @@ class SupabaseService {
               'has_variants': (p['has_variants'] == true || localHasVariants) ? 1 : 0,
               'supplier_id': p.containsKey('supplier_id') ? p['supplier_id'] : local?['supplier_id'],
               'compare_price': p.containsKey('compare_price') ? p['compare_price'] : local?['compare_price'],
+              'brand': p.containsKey('brand') ? p['brand'] : local?['brand'],
               'category': p['category'] ?? 'General',
               'purchase_price': (p['cost_price'] as num?)?.toDouble() ?? 0.0,
               'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
@@ -1492,14 +1493,20 @@ class SupabaseService {
       'supplier_id': p['supplier_id'],
       // Precio de antes (oferta en la tienda en línea)
       'compare_price': (p['compare_price'] as num?)?.toDouble(),
+      // Marca (0.16.0)
+      'brand': (p['brand'] as String?)?.trim().isEmpty == true ? null : (p['brand'] as String?)?.trim(),
     };
     try {
       await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
     } catch (e) {
       // Nube sin la columna del proveedor o del precio de antes todavía: se guarda el resto
-      if (!e.toString().contains('supplier_id') && !e.toString().contains('compare_price') && !e.toString().contains('42703')) rethrow;
+      if (!e.toString().contains('supplier_id') && !e.toString().contains('compare_price') && !e.toString().contains('brand') &&
+          !e.toString().contains('42703') && !e.toString().contains('PGRST204')) {
+        rethrow;
+      }
       row.remove('supplier_id');
       row.remove('compare_price');
+      row.remove('brand');
       await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
     }
   }

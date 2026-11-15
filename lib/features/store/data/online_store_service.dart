@@ -194,7 +194,10 @@ class StoreLook {
   /// Cómo pagarle al negocio («Nequi 300 123 4567 a nombre de Rosa»): sale al final del pedido
   final String? payment;
 
-  const StoreLook({this.accent, this.dark = false, this.featured = const [], this.schedule, this.payment});
+  /// Al entrar pregunta «¿Tienes 18 años o más?» (licoreras y vapers, fase 2a)
+  final bool adult;
+
+  const StoreLook({this.accent, this.dark = false, this.featured = const [], this.schedule, this.payment, this.adult = false});
 
   static const none = StoreLook();
   static const maxFeatured = 6;
@@ -212,6 +215,7 @@ class StoreLook {
       ].take(maxFeatured).toList(),
       schedule: StoreSchedule.fromJson(raw['schedule']),
       payment: payment.isEmpty ? null : payment,
+      adult: raw['adult'] == true,
     );
   }
 
@@ -221,16 +225,18 @@ class StoreLook {
         'featured': featured.take(maxFeatured).toList(),
         if (schedule != null) 'schedule': schedule!.toJson(),
         if (payment != null) 'payment': payment,
+        'adult': adult,
       };
 
   StoreLook copyWith({String? accent, bool clearAccent = false, bool? dark, List<String>? featured, StoreSchedule? schedule,
-          bool clearSchedule = false, String? payment, bool clearPayment = false}) =>
+          bool clearSchedule = false, String? payment, bool clearPayment = false, bool? adult}) =>
       StoreLook(
         accent: clearAccent ? null : accent ?? this.accent,
         dark: dark ?? this.dark,
         featured: featured ?? this.featured,
         schedule: clearSchedule ? null : schedule ?? this.schedule,
         payment: clearPayment ? null : payment ?? this.payment,
+        adult: adult ?? this.adult,
       );
 }
 
@@ -254,6 +260,10 @@ class StoreVariant {
   /// Foto de este color (0.15.0); null = la del producto
   final String? imageUrl;
 
+  /// Cómo se llaman las dos listas (0.16.0): «Talla» y «Color», o «Nicotina» y «Sabor»
+  final String sizeName;
+  final String optionName;
+
   const StoreVariant({
     required this.id,
     this.size,
@@ -264,6 +274,8 @@ class StoreVariant {
     this.soldOut = false,
     this.few = false,
     this.imageUrl,
+    this.sizeName = 'Talla',
+    this.optionName = 'Color',
   });
 
   String get label => [if (size != null) size!, if (color != null) color!].join(' · ');
@@ -283,6 +295,8 @@ class StoreVariant {
         soldOut: j['sold_out'] == true,
         few: j['few'] == true,
         imageUrl: (j['image'] as String?)?.startsWith('https://') == true ? j['image'] as String : null,
+        sizeName: _clean(j['size_name']) ?? 'Talla',
+        optionName: _clean(j['option_name']) ?? 'Color',
       );
 }
 
@@ -332,6 +346,9 @@ class StoreProduct {
   /// Descripción del producto (la plantilla Menú la muestra debajo del nombre) (0.16.0)
   final String? description;
 
+  /// Marca (0.16.0); la tienda filtra por marca cuando hay varias
+  final String? brand;
+
   /// Unidades disponibles; null si el negocio no las muestra
   final int? stock;
 
@@ -354,6 +371,7 @@ class StoreProduct {
     required this.price,
     this.imageUrl,
     this.description,
+    this.brand,
     this.stock,
     this.oldPrice,
     this.variants = const [],
@@ -368,6 +386,10 @@ class StoreProduct {
   bool get runningLow => variants.isEmpty ? few : available.any((v) => v.few);
 
   bool get onOffer => (oldPrice ?? 0) > price;
+
+  /// Cómo se llaman sus listas: «Talla»/«Color» o «Nicotina»/«Sabor» (0.16.0)
+  String get sizeName => variants.firstOrNull?.sizeName ?? 'Talla';
+  String get optionName => variants.firstOrNull?.optionName ?? 'Color';
   List<String> get sizes => [for (final s in available.map((v) => v.size).whereType<String>().toSet()) s];
   List<String> get colorHexes => [for (final h in available.map((v) => v.hex).whereType<String>().toSet()) h];
 
@@ -385,6 +407,7 @@ class StoreProduct {
         price: price,
         imageUrl: j['image_url'] as String?,
         description: (j['description'] as String?)?.trim().isEmpty == true ? null : (j['description'] as String?)?.trim(),
+        brand: (j['brand'] as String?)?.trim().isEmpty == true ? null : (j['brand'] as String?)?.trim(),
         stock: (j['stock'] as num?)?.toInt(),
         oldPrice: pct ? ((before ?? 0) > base ? before : base) : before,
         few: j['few'] == true,
@@ -485,6 +508,10 @@ class PublicStore {
       ],
     );
   }
+
+  /// Marcas, sin repetir, en orden alfabético (0.16.0)
+  List<String> get brands => {for (final p in products) if (p.brand != null) p.brand!}.toList()
+    ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
   /// Categorías en el orden en que aparecen
   List<String> get categories => [

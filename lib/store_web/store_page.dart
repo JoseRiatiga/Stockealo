@@ -34,21 +34,30 @@ class StoreFilters {
   String? category;
   String? size;
   String? colorHex;
+
+  /// Marca (0.16.0)
+  String? brand;
   RangeValues? price;
   bool onlyOffers = false;
 
-  bool get any => category != null || size != null || colorHex != null || price != null || onlyOffers;
+  bool get any => category != null || size != null || colorHex != null || brand != null || price != null || onlyOffers;
 
   void clear() {
-    category = size = colorHex = null;
+    category = size = colorHex = brand = null;
     price = null;
     onlyOffers = false;
   }
 
   bool matches(StoreProduct p) {
     final q = query.trim().toLowerCase();
-    if (q.isNotEmpty && !p.name.toLowerCase().contains(q) && !p.category.toLowerCase().contains(q)) return false;
+    if (q.isNotEmpty &&
+        !p.name.toLowerCase().contains(q) &&
+        !p.category.toLowerCase().contains(q) &&
+        !(p.brand?.toLowerCase().contains(q) ?? false)) {
+      return false;
+    }
     if (category != null && p.category != category) return false;
+    if (brand != null && p.brand != brand) return false;
     if (size != null && !p.sizes.contains(size)) return false;
     if (colorHex != null && !p.colorHexes.contains(colorHex)) return false;
     if (onlyOffers && !p.onOffer) return false;
@@ -100,6 +109,10 @@ class _StorePageState extends State<StorePage> {
 
   /// Reservas en línea (0.14.0); null si el negocio no las recibe
   PublicBooking? _booking;
+
+  /// Aviso +18 (0.16.0): ya dijo que es mayor de edad en esta visita
+  bool _adultOk = false;
+  bool _adultNo = false;
 
   Future<void> _loadBooking(String slug) async {
     final now = DateTime.now();
@@ -228,6 +241,9 @@ class _StorePageState extends State<StorePage> {
       return Theme(data: AppTheme.build(Brightness.light, accent: accent), child: _MaintenancePage(store: store, maintenance: _maintenance));
     }
     final notice = _maintenance.affects('stores') && (_maintenance.notice || _maintenance.active);
+    if (store.look.adult && !_adultOk) {
+      return Theme(data: theme, child: Builder(builder: (context) => _adultGate(context, store)));
+    }
     return Theme(
       data: theme,
       child: Builder(
@@ -242,6 +258,51 @@ class _StorePageState extends State<StorePage> {
           };
           return notice ? Column(children: [_MaintenanceNotice(maintenance: _maintenance), Expanded(child: view)]) : view;
         },
+      ),
+    );
+  }
+
+  /// «Esta tienda vende productos para mayores de 18 años» (0.16.0)
+  Widget _adultGate(BuildContext context, PublicStore store) {
+    final c = context.colors;
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpace.xl),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _Logo(store: store, size: 56),
+                const SizedBox(height: AppSpace.md),
+                Text(store.businessName, textAlign: TextAlign.center, style: AppText.title(context)),
+                const SizedBox(height: AppSpace.xl),
+                Icon(Icons.warning_amber_outlined, size: 36, color: c.warning),
+                const SizedBox(height: AppSpace.sm),
+                Text('Esta tienda vende productos para mayores de 18 años',
+                    textAlign: TextAlign.center, style: AppText.bodyLarge(context, weight: FontWeight.w700)),
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  _adultNo ? 'Lo sentimos: solo pueden entrar mayores de edad.' : '¿Tienes 18 años o más?',
+                  textAlign: TextAlign.center,
+                  style: AppText.body(context, color: c.inkMuted),
+                ),
+                const SizedBox(height: AppSpace.lg),
+                if (!_adultNo)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      OutlinedButton(onPressed: () => setState(() => _adultNo = true), child: const Text('No')),
+                      const SizedBox(width: AppSpace.md),
+                      FilledButton(onPressed: () => setState(() => _adultOk = true), child: const Text('Sí, entrar')),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -457,6 +518,7 @@ class _StorePageState extends State<StorePage> {
                 ),
               ),
             ),
+          if (store.brands.length > 1) SliverToBoxAdapter(child: _brandChips(store, side)),
           if (visible.isEmpty) ..._grid(context, store, visible, side, minWidth: 180, extent: 300, fashion: false),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(side, AppSpace.sm, side, 0),
@@ -882,7 +944,28 @@ class _StorePageState extends State<StorePage> {
   // ---------------------------------------------------------------------------
 
   bool _hasExtraFilters(PublicStore store) =>
-      store.products.any((p) => p.variants.isNotEmpty || p.onOffer) || store.products.length > 8;
+      store.products.any((p) => p.variants.isNotEmpty || p.onOffer) || store.products.length > 8 || store.brands.length > 1;
+
+  /// Marcas como chips (Mercado), si hay más de una (0.16.0)
+  Widget _brandChips(PublicStore store, double side) => SizedBox(
+        height: 52,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.fromLTRB(side, AppSpace.sm, side, 0),
+          children: [
+            for (final b in <String?>[null, ...store.brands])
+              Padding(
+                padding: const EdgeInsets.only(right: AppSpace.sm),
+                child: ChoiceChip(
+                  showCheckmark: false,
+                  label: Text(b ?? 'Todas las marcas'),
+                  selected: _filters.brand == b,
+                  onSelected: (_) => setState(() => _filters.brand = b),
+                ),
+              ),
+          ],
+        ),
+      );
 
   Widget _searchField({bool pill = false}) => TextField(
         onChanged: (v) => setState(() => _filters.query = v),
@@ -1191,6 +1274,22 @@ class _FiltersPanel extends StatelessWidget {
               );
             }(),
         ],
+        if (store.brands.length > 1) ...[
+          label('MARCA'),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final b in store.brands)
+                ChoiceChip(
+                  showCheckmark: false,
+                  label: Text(b),
+                  selected: filters.brand == b,
+                  onSelected: (v) => set(() => filters.brand = v ? b : null),
+                ),
+            ],
+          ),
+        ],
         if (sizes.isNotEmpty) ...[
           label('TALLA'),
           Wrap(
@@ -1392,12 +1491,17 @@ class _ProductCardState extends State<_ProductCard> {
 
   String get _hint {
     // Un color sin nombre (solo la muestra) no se escribe
-    if (_chosen != null) return [if (_size != null) 'Talla $_size', if (_chosen!.color != null) _chosen!.color!].join(' · ');
+    final p = widget.product;
+    final sizeName = p.sizeName, option = p.optionName.toLowerCase();
+    if (_chosen != null) return [if (_size != null) '$sizeName $_size', if (_chosen!.color != null) _chosen!.color!].join(' · ');
     final missSize = _sizes.isNotEmpty && _size == null;
     final missColor = _colors.isNotEmpty && _color == null;
-    if (missSize && missColor) return _nudge ? 'Elige la talla y el color' : 'Elige talla y color';
-    if (missSize) return 'Elige la talla';
-    if (missColor) return _size == null ? 'Elige el color' : 'Talla $_size · elige el color';
+    // «la talla», «la nicotina», «la presentación»; «el color», «el sabor»
+    String art(String w) => const {'color', 'sabor', 'tamaño', 'aroma'}.contains(w.toLowerCase()) ? 'el' : 'la';
+    final size = sizeName.toLowerCase();
+    if (missSize && missColor) return _nudge ? 'Elige ${art(size)} $size y ${art(option)} $option' : 'Elige $size y $option';
+    if (missSize) return 'Elige ${art(size)} $size';
+    if (missColor) return _size == null ? 'Elige ${art(option)} $option' : '$sizeName $_size · elige ${art(option)} $option';
     return 'Esa combinación está agotada';
   }
 
@@ -2070,7 +2174,7 @@ class _CartItem extends StatelessWidget {
                     spacing: 4,
                     runSpacing: 4,
                     children: [
-                      if (v.size != null) tag(Text('Talla ${v.size}', style: AppText.caption(context, color: c.inkMuted))),
+                      if (v.size != null) tag(Text('${v.sizeName} ${v.size}', style: AppText.caption(context, color: c.inkMuted))),
                       if (v.color != null || hasSwatch)
                         tag(Row(
                           mainAxisSize: MainAxisSize.min,

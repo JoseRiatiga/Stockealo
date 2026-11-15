@@ -26,6 +26,7 @@ import '../../../products/data/product_repository.dart';
 import '../../../../core/services/maintenance_service.dart';
 import '../../../../core/design/app_time_picker.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../products/data/product_templates.dart';
 
 /// Tienda en línea (lugar del menú): publica el catálogo en stockealo.online/tienda/<slug> con
 /// carrito; los pedidos llegan por WhatsApp (Stockealo Pro).
@@ -118,13 +119,15 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         _enabled = saved?.enabled ?? true;
         _showStock = saved?.showStock ?? false;
         _heroPhotos = saved?.heroPhotos ?? true;
-        _template = saved?.template ?? StoreTemplate.classic;
+        // Sin tienda todavía: la plantilla y el aviso +18 que le quedan a su tipo de negocio
+        final suggested = ProductTemplate.suggestedFor(widget.business.icon);
+        _template = saved?.template ?? suggested?.storeTemplate ?? StoreTemplate.classic;
         _coverUrl = saved?.heroImageUrl;
         _cover = _coverUrl != null
             ? _coverOwn
             : (_template == StoreTemplate.fashion && _heroPhotos ? _coverProducts : _coverNone);
         _heroController.text = saved?.heroTitle ?? '';
-        _look = saved?.look ?? StoreLook.none;
+        _look = saved?.look ?? StoreLook(adult: suggested?.adult ?? false);
         _paymentController.text = _look.payment ?? '';
       });
     } catch (e) {
@@ -344,6 +347,8 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                                   Icon(_templateIcon(t), size: 18, color: _template == t ? c.accent : c.inkMuted),
                                   const SizedBox(width: AppSpace.sm),
                                   Expanded(child: Text(StoreTemplate.label(t), style: AppText.body(context, weight: FontWeight.w700))),
+                                  if (ProductTemplate.suggestedFor(widget.business.icon)?.storeTemplate == t)
+                                    const StatusPill('Sugerida', tone: AppTone.accent, compact: true),
                                 ],
                               ),
                               const SizedBox(height: AppSpace.xs),
@@ -402,6 +407,13 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                 ),
               ),
           ],
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text('Aviso +18', style: AppText.body(context)),
+          subtitle: Text('Al entrar pregunta «¿Tienes 18 años o más?». Para licores y vapers.', style: AppText.small(context)),
+          value: _look.adult,
+          onChanged: (v) => setState(() => _look = _look.copyWith(adult: v)),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,

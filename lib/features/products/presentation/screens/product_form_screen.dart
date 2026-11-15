@@ -60,6 +60,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   late TextEditingController _codeController;
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
+
+  /// Marca (0.16.0)
+  late TextEditingController _brandController;
   late TextEditingController _purchasePriceController;
   late TextEditingController _salePriceController;
 
@@ -99,6 +102,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _codeController = TextEditingController(text: p?.code ?? CodeGenerator.generateUniqueCode());
     _nameController = TextEditingController(text: p?.name ?? '');
     _descriptionController = TextEditingController(text: p?.description ?? '');
+    _brandController = TextEditingController(text: p?.brand ?? '');
     _purchasePriceController = TextEditingController(
       text: p != null && p.purchasePrice > 0 ? p.purchasePrice.toStringAsFixed(0) : '',
     );
@@ -174,6 +178,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _codeController.dispose();
     _nameController.dispose();
     _descriptionController.dispose();
+    _brandController.dispose();
     _purchasePriceController.dispose();
     _salePriceController.dispose();
     _comparePriceController.dispose();
@@ -388,6 +393,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           ? null
           : _descriptionController.text.trim(),
       category: _selectedCategory!,
+      brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
       purchasePrice: purchasePrice,
       salePrice: salePrice,
       comparePrice: (double.tryParse(_comparePriceController.text.trim()) ?? 0) > salePrice
@@ -904,6 +910,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Marca (0.16.0): la tienda en línea filtra por marca
+                  TextFormField(
+                    controller: _brandController,
+                    textCapitalization: TextCapitalization.words,
+                    maxLength: 60,
+                    decoration: const InputDecoration(
+                      labelText: 'Marca (opcional)',
+                      hintText: 'Ej.: Elf Bar, Tecnoquímicas',
+                      counterText: '',
+                    ),
                   ),
                   const SizedBox(height: 16),
 

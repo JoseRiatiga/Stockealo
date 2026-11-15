@@ -49,6 +49,8 @@ const List<BusinessKind> kBusinessKinds = [
   BusinessKind('domicilios', 'Domicilios', Icons.delivery_dining_outlined, _tiendas, 'envios entregas'),
   BusinessKind('caja', 'Punto de venta', Icons.point_of_sale_outlined, _tiendas, 'caja registradora'),
   BusinessKind('tienda_online', 'Tienda en línea', Icons.language_outlined, _tiendas, 'internet web virtual'),
+  // 0.16.0: tipo nuevo para la plantilla de productos Vapers
+  BusinessKind('vapers', 'Vapers', Icons.air_outlined, _tiendas, 'vape vapeador pods cigarrillo electronico'),
   // Comida
   BusinessKind('comida', 'Restaurante', Icons.restaurant_outlined, _comida, 'almuerzos corrientazo'),
   BusinessKind('casera', 'Comida casera', Icons.dinner_dining_outlined, _comida, 'menu del dia pasta'),

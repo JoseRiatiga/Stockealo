@@ -20,6 +20,7 @@ import '../../../../core/design/status_pill.dart';
 import '../../../products/data/product_image_service.dart';
 import '../../../../core/design/filter_tabs.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/design/app_card.dart';
 
 /// Tienda en línea (lugar del menú): publica el catálogo en stockealo.online/tienda/<slug> con
 /// carrito; los pedidos llegan por WhatsApp (Stockealo Pro).
@@ -319,7 +320,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_loadError!, textAlign: TextAlign.center, style: TextStyle(color: c.inkMuted)),
+              Text(_loadError!, textAlign: TextAlign.center, style: AppText.body(context, color: c.inkMuted)),
               const SizedBox(height: AppSpace.md),
               OutlinedButton(onPressed: _load, child: const Text('Reintentar')),
             ],
@@ -327,15 +328,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         ),
       );
 
-  Widget _card(StockealoColors c, {required Widget child, Color? color}) => Container(
-        padding: const EdgeInsets.all(AppSpace.lg),
-        decoration: BoxDecoration(
-          color: color ?? c.surface,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          border: color == null ? Border.all(color: c.line) : null,
-        ),
-        child: child,
-      );
+  Widget _card(StockealoColors c, {required Widget child, Color? color}) => AppCard(color: color, child: child);
 
   Widget _introCard(StockealoColors c) => _card(
         c,
@@ -351,8 +344,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                   Row(
                     children: [
                       Flexible(
-                        child: Text('Tu catálogo con carrito',
-                            style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink)),
+                        child: Text('Tu catálogo con carrito', style: AppText.title(context)),
                       ),
                       if (!_pro) ...[const SizedBox(width: AppSpace.sm), const ProCrown()],
                     ],
@@ -361,7 +353,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                   Text(
                     'Tus clientes ven los productos con stock, eligen y te mandan el pedido por WhatsApp. '
                     'No muestra costos ni datos de tus clientes.',
-                    style: TextStyle(fontSize: AppText.sizeSmall, height: 1.4, color: c.inkMuted),
+                    style: AppText.small(context, color: c.inkMuted),
                   ),
                 ],
               ),
@@ -370,41 +362,55 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         ),
       );
 
-  Widget _liveCard(StockealoColors c, OnlineStoreConfig store) => _card(
-        c,
-        color: c.successSoft,
+  /// La tienda publicada (diseño nuevo, 0.15.0): el enlace, su estado y qué hacer
+  Widget _liveCard(StockealoColors c, OnlineStoreConfig store) => AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(Icons.check_circle_outlined, color: c.success),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: c.successSoft, borderRadius: BorderRadius.circular(AppRadius.tile)),
+                  child: Icon(Icons.storefront_outlined, color: c.success),
+                ),
+                const SizedBox(width: AppSpace.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Tu tienda', style: AppText.title(context)),
+                      const SizedBox(height: 2),
+                      SelectableText(store.url, maxLines: 1, style: AppText.small(context, weight: FontWeight.w600, color: c.accent)),
+                    ],
+                  ),
+                ),
                 const SizedBox(width: AppSpace.sm),
-                Text('Tu tienda está publicada', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+                const StatusPill('Publicada', tone: AppTone.success, dot: true),
               ],
             ),
-            const SizedBox(height: AppSpace.sm),
-            SelectableText(store.url, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w600, color: c.accent)),
             const SizedBox(height: AppSpace.md),
             Wrap(
               spacing: AppSpace.sm,
               runSpacing: AppSpace.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
+                FilledButton.icon(
+                  onPressed: () => launchUrl(Uri.parse(store.url), mode: LaunchMode.externalApplication),
+                  icon: const Icon(Icons.open_in_new_outlined, size: 18),
+                  label: const Text('Ver mi tienda'),
+                ),
                 OutlinedButton.icon(
                   onPressed: () => Share.share('Mira mi tienda y haz tu pedido aquí: ${store.url}',
                       subject: widget.business.name),
                   icon: const Icon(Icons.share_outlined, size: 18),
                   label: const Text('Compartir'),
                 ),
-                OutlinedButton.icon(
+                IconButton.outlined(
+                  tooltip: 'Copiar el enlace',
                   onPressed: () => _copyLink(store.url),
                   icon: const Icon(Icons.copy_outlined, size: 18),
-                  label: const Text('Copiar'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => launchUrl(Uri.parse(store.url), mode: LaunchMode.externalApplication),
-                  icon: const Icon(Icons.open_in_new_outlined, size: 18),
-                  label: const Text('Ver'),
                 ),
               ],
             ),
@@ -418,11 +424,11 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Activa la nube para tu tienda', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+            Text('Activa la nube para tu tienda', style: AppText.body(context, weight: FontWeight.w700)),
             const SizedBox(height: AppSpace.xs),
             Text(
               'La tienda muestra los productos guardados en la nube. Hoy tu inventario está solo en este celular.',
-              style: TextStyle(fontSize: AppText.sizeSmall, color: c.ink),
+              style: AppText.small(context),
             ),
             const SizedBox(height: AppSpace.sm),
             TextButton(onPressed: _turnOnCloud, child: const Text('Activar la nube y subir mis productos')),
@@ -437,8 +443,8 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
           children: [
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('Tienda encendida', style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
-              subtitle: Text('Apágala cuando no quieras recibir pedidos', style: TextStyle(color: c.inkMuted)),
+              title: Text('Tienda encendida', style: AppText.body(context, weight: FontWeight.w600)),
+              subtitle: Text('Apágala cuando no quieras recibir pedidos', style: AppText.small(context, color: c.inkMuted)),
               value: _enabled,
               onChanged: (v) => setState(() => _enabled = v),
             ),

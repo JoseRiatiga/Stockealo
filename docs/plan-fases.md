@@ -220,6 +220,8 @@ Las fases 1 a 3 van en ese orden porque dependen entre sí; las 4 a 7 se pueden 
     - La pregunta «¿Para qué usarás Stockealo?» al crear el negocio se hace en la **0.14.0** (punto 20). Aquí solo se suman las opciones de productos.
     - Las plantillas de servicios (Lavadero, Barbería, Spa, Taller, Servicio técnico y Lavandería) ya funcionan así y se revisan en la 0.14.0.
 17. «Personalizar tienda»: portada, color, destacados, horario, modo oscuro, datos de pago y vista previa.
+    - **Decidido (15 nov, boceto aprobado):** color propio de la tienda, modo oscuro en cualquier plantilla, hasta 6 destacados que salen primero, horario con «Abierto»/«Cerrado», datos de pago al final del pedido y vista previa con los productos del negocio antes de guardar.
+    - **Fuera del horario los pedidos se reciben con aviso** («Estamos cerrados, te atendemos al abrir»), no se bloquean.
 18. Estadísticas de la tienda.
 
 ### Crecimiento

@@ -219,9 +219,11 @@ class _StorePageState extends State<StorePage> {
         onRetry: _error != null ? _load : null,
       );
     }
-    final accent = AppPalette.fromHex(store.color) ?? AppPalette.brand;
+    // Color propio de la tienda o el del negocio; Moda siempre es oscura y las demás
+    // con «Modo oscuro» (0.16.0)
+    final accent = AppPalette.fromHex(store.accentHex) ?? AppPalette.brand;
     final fashion = store.template == StoreTemplate.fashion;
-    final theme = AppTheme.build(fashion ? Brightness.dark : Brightness.light, accent: accent);
+    final theme = AppTheme.build(fashion || store.look.dark ? Brightness.dark : Brightness.light, accent: accent);
     if (_maintenance.storesClosed) {
       return Theme(data: AppTheme.build(Brightness.light, accent: accent), child: _MaintenancePage(store: store, maintenance: _maintenance));
     }
@@ -231,7 +233,13 @@ class _StorePageState extends State<StorePage> {
       child: Builder(
         builder: (context) {
           _themed = context;
-          final view = fashion ? _fashion(context, store) : _classic(context, store);
+          final view = switch (store.template) {
+            StoreTemplate.fashion => _fashion(context, store),
+            StoreTemplate.market => _market(context, store),
+            StoreTemplate.menu => _menu(context, store),
+            StoreTemplate.boutique => _boutique(context, store),
+            _ => _classic(context, store),
+          };
           return notice ? Column(children: [_MaintenanceNotice(maintenance: _maintenance), Expanded(child: view)]) : view;
         },
       ),
@@ -244,7 +252,7 @@ class _StorePageState extends State<StorePage> {
 
   Widget _classic(BuildContext context, PublicStore store) {
     final c = context.colors;
-    final visible = store.products.where(_filters.matches).toList();
+    final visible = store.ordered.where(_filters.matches).toList();
     final width = MediaQuery.sizeOf(context).width;
     final side = width > 1100 ? (width - 1040) / 2 : AppSpace.lg;
     final hasMore = _hasExtraFilters(store);
@@ -313,6 +321,7 @@ class _StorePageState extends State<StorePage> {
                     const SizedBox(height: AppSpace.xs),
                     Text(store.welcome!, style: AppText.body(context, color: c.onAccent)),
                   ],
+                  if (store.look.schedule != null) ...[const SizedBox(height: AppSpace.sm), _openPill(store, onAccent: true)],
                 ],
               ),
             ),
@@ -358,13 +367,309 @@ class _StorePageState extends State<StorePage> {
     );
   }
 
+
+  /// «Abierto · cierra 8 p. m.» o «Cerrado · abre mañana 7 a. m.» (0.16.0); nada sin horario
+  Widget _openPill(PublicStore store, {bool onAccent = false}) {
+    final schedule = store.look.schedule;
+    if (schedule == null) return const SizedBox.shrink();
+    final now = DateTime.now();
+    final open = schedule.isOpen(now);
+    if (onAccent) {
+      final c = context.colors;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(open ? Icons.schedule_outlined : Icons.do_not_disturb_on_outlined, size: 16, color: c.onAccent),
+          const SizedBox(width: AppSpace.xs),
+          Flexible(child: Text(schedule.status(now), style: AppText.small(context, color: c.onAccent, weight: FontWeight.w600))),
+        ],
+      );
+    }
+    return StatusPill(schedule.status(now), tone: open ? AppTone.success : AppTone.warning, dot: true);
+  }
+
+  /// Agregar o quitar uno desde una fila (Mercado y Menú)
+  Widget _rowControls(PublicStore store, StoreProduct p) {
+    final qty = _qtyOf(p);
+    return _RowAdd(
+      quantity: qty,
+      onAdd: () => _add(p),
+      onRemove: () {
+        final line = _cart.values.where((l) => l.product.id == p.id).lastOrNull;
+        if (line != null) _setLine(line, line.quantity - 1);
+      },
+    );
+  }
+
+  Widget _compactHeader(StockealoColors c, PublicStore store, double side, {bool soft = true}) => Container(
+        color: soft ? c.accent.withValues(alpha: 0.12) : c.surface,
+        padding: EdgeInsets.fromLTRB(side, AppSpace.md, side, AppSpace.md),
+        child: Row(
+          children: [
+            _Logo(store: store, size: 40),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(store.businessName, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.title(context)),
+                  if (store.look.schedule != null) ...[const SizedBox(height: AppSpace.xs), _openPill(store)],
+                ],
+              ),
+            ),
+            _bookButton(store, compact: true),
+          ],
+        ),
+      );
+
+  // ---------------------------------------------------------------------------
+  // Plantilla Mercado (0.16.0): lista compacta con botón +
+  // ---------------------------------------------------------------------------
+
+  Widget _market(BuildContext context, PublicStore store) {
+    final c = context.colors;
+    final visible = store.ordered.where(_filters.matches).toList();
+    final width = MediaQuery.sizeOf(context).width;
+    final side = width > 900 ? (width - 820) / 2 : AppSpace.md;
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _compactHeader(c, store, side)),
+          if (store.welcome?.isNotEmpty == true)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(side, AppSpace.md, side, 0),
+                child: Text(store.welcome!, style: AppText.body(context, color: c.inkMuted)),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: Padding(padding: EdgeInsets.fromLTRB(side, AppSpace.md, side, 0), child: _searchField()),
+          ),
+          if (store.categories.length > 1)
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 56,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.fromLTRB(side, AppSpace.sm, side, 0),
+                  children: [_categoryChip(store, null), for (final cat in store.categories) _categoryChip(store, cat)],
+                ),
+              ),
+            ),
+          if (visible.isEmpty) ..._grid(context, store, visible, side, minWidth: 180, extent: 300, fashion: false),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(side, AppSpace.sm, side, 0),
+            sliver: SliverList.separated(
+              itemCount: visible.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: c.line),
+              itemBuilder: (context, i) {
+                final p = visible[i];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
+                  child: Row(
+                    children: [
+                      _RowThumb(url: p.imageUrl, size: 52),
+                      const SizedBox(width: AppSpace.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            _RowPrice(product: p, currency: store.currency, featured: store.isFeatured(p)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.sm),
+                      _rowControls(store, p),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          SliverToBoxAdapter(child: _footer(context, side, _lines.isEmpty)),
+        ],
+      ),
+      bottomNavigationBar: _lines.isEmpty ? null : _cartBar(context, store),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Plantilla Menú (0.16.0): cada categoría es una sección de la carta
+  // ---------------------------------------------------------------------------
+
+  Widget _menu(BuildContext context, PublicStore store) {
+    final c = context.colors;
+    final visible = store.ordered.where(_filters.matches).toList();
+    final width = MediaQuery.sizeOf(context).width;
+    final side = width > 860 ? (width - 760) / 2 : AppSpace.lg;
+    final featured = _filters.any ? const <StoreProduct>[] : visible.where(store.isFeatured).toList();
+    final sections = <String, List<StoreProduct>>{};
+    for (final p in visible) {
+      if (featured.contains(p)) continue;
+      sections.putIfAbsent(p.category.isEmpty ? 'Otros' : p.category, () => []).add(p);
+    }
+    Widget section(String title) => Padding(
+          padding: EdgeInsets.fromLTRB(side, AppSpace.xl, side, AppSpace.xs),
+          child: Container(
+            padding: const EdgeInsets.only(bottom: AppSpace.xs + 2),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.lineStrong))),
+            child: Text(title.toUpperCase(), style: AppText.caption(context, color: c.inkMuted).copyWith(letterSpacing: 1.6)),
+          ),
+        );
+    Widget dish(StoreProduct p) => Padding(
+          padding: EdgeInsets.fromLTRB(side, AppSpace.sm + 2, side, AppSpace.sm + 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(p.name, style: AppText.bodyLarge(context, weight: FontWeight.w600)),
+                    if (p.description != null) ...[
+                      const SizedBox(height: 2),
+                      Text(p.description!, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.small(context, color: c.inkMuted)),
+                    ],
+                    const SizedBox(height: AppSpace.xs),
+                    _RowPrice(product: p, currency: store.currency, featured: false),
+                  ],
+                ),
+              ),
+              if (p.imageUrl != null) ...[const SizedBox(width: AppSpace.md), _RowThumb(url: p.imageUrl, size: 72)],
+              const SizedBox(width: AppSpace.sm),
+              _rowControls(store, p),
+            ],
+          ),
+        );
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(side, AppSpace.xl, side, 0),
+              child: Column(
+                children: [
+                  Row(children: [const Spacer(), _bookButton(store, compact: true)]),
+                  _Logo(store: store, size: 64),
+                  const SizedBox(height: AppSpace.md),
+                  Text(store.businessName, textAlign: TextAlign.center, style: AppText.page(context)),
+                  if (store.welcome?.isNotEmpty == true) ...[
+                    const SizedBox(height: AppSpace.xs),
+                    Text(store.welcome!, textAlign: TextAlign.center, style: AppText.body(context, color: c.inkMuted)),
+                  ],
+                  if (store.look.schedule != null) ...[const SizedBox(height: AppSpace.sm), _openPill(store)],
+                  if (store.heroImageUrl != null) ...[
+                    const SizedBox(height: AppSpace.lg),
+                    _coverImage(c, store, height: width > 700 ? 220 : 150),
+                  ],
+                  const SizedBox(height: AppSpace.lg),
+                  _searchField(pill: true),
+                ],
+              ),
+            ),
+          ),
+          if (visible.isEmpty) ..._grid(context, store, visible, side, minWidth: 180, extent: 300, fashion: false),
+          if (featured.isNotEmpty) ...[
+            SliverToBoxAdapter(child: section('Recomendados')),
+            SliverList.list(children: [for (final p in featured) dish(p)]),
+          ],
+          for (final e in sections.entries) ...[
+            SliverToBoxAdapter(child: section(e.key)),
+            SliverList.list(children: [for (final p in e.value) dish(p)]),
+          ],
+          SliverToBoxAdapter(child: _footer(context, side, _lines.isEmpty)),
+        ],
+      ),
+      bottomNavigationBar: _lines.isEmpty ? null : _cartBar(context, store),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Plantilla Boutique (0.16.0): fotos grandes y mucho espacio
+  // ---------------------------------------------------------------------------
+
+  Widget _boutique(BuildContext context, PublicStore store) {
+    final c = context.colors;
+    final visible = store.ordered.where(_filters.matches).toList();
+    final width = MediaQuery.sizeOf(context).width;
+    final side = width > 1200 ? (width - 1100) / 2 : (width >= 700 ? AppSpace.xxl : AppSpace.lg);
+    final hero = !_filters.any ? visible.where((p) => store.isFeatured(p) && p.imageUrl != null).firstOrNull : null;
+    final rest = hero == null ? visible : visible.where((p) => p != hero).toList();
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(side, AppSpace.xl, side, AppSpace.md),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Spacer(),
+                      _bookButton(store, compact: true),
+                      _cartButton(context, store),
+                    ],
+                  ),
+                  Text(
+                    store.businessName.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: AppText.heading(context, weight: FontWeight.w500).copyWith(letterSpacing: 6),
+                  ),
+                  if (store.welcome?.isNotEmpty == true) ...[
+                    const SizedBox(height: AppSpace.sm),
+                    Text(store.welcome!, textAlign: TextAlign.center, style: AppText.body(context, color: c.inkMuted)),
+                  ],
+                  if (store.look.schedule != null) ...[const SizedBox(height: AppSpace.sm), _openPill(store)],
+                ],
+              ),
+            ),
+          ),
+          if (store.heroImageUrl != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(side, 0, side, AppSpace.lg),
+                child: _coverImage(c, store, height: width > 700 ? 320 : 200),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(side, 0, side, 0),
+              child: Row(children: [Expanded(child: _searchField(pill: true)), if (_hasExtraFilters(store)) ...[const SizedBox(width: AppSpace.sm), _filtersButton(store)]]),
+            ),
+          ),
+          if (hero != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(side, AppSpace.xl, side, 0),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: SizedBox(height: (width > 600 ? 600 : 470) + _optionsExtra(store), child: _card(store, hero, fashion: false)),
+                  ),
+                ),
+              ),
+            ),
+          SliverToBoxAdapter(child: SizedBox(height: hero == null ? AppSpace.md : AppSpace.lg)),
+          ..._grid(context, store, rest, side, minWidth: width > 600 ? 240 : 150, extent: (width > 600 ? 400 : 320) + _optionsExtra(store), fashion: false),
+          SliverToBoxAdapter(child: _footer(context, side, _lines.isEmpty)),
+        ],
+      ),
+      bottomNavigationBar: _lines.isEmpty ? null : _cartBar(context, store),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Plantilla Moda
   // ---------------------------------------------------------------------------
 
   Widget _fashion(BuildContext context, PublicStore store) {
     final c = context.colors;
-    final visible = store.products.where(_filters.matches).toList();
+    final visible = store.ordered.where(_filters.matches).toList();
     final width = MediaQuery.sizeOf(context).width;
     final side = width > 1380 ? (width - 1320) / 2 : (width >= 700 ? AppSpace.xl : AppSpace.md + 2);
     final wide = width >= 980;
@@ -1574,6 +1879,17 @@ class _CartFormState extends State<_CartForm> {
             ],
           ),
           stepLabel('Paso 2 de 2 · para que la tienda te confirme'),
+          // Fuera del horario se recibe igual, con aviso (0.16.0)
+          if (widget.store.look.schedule case final s? when !s.isOpen(DateTime.now()))
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpace.md),
+              child: _CartNotice(
+                icon: Icons.schedule_outlined,
+                tone: AppTone.warning,
+                title: 'Estamos cerrados en este momento',
+                text: 'Puedes hacer tu pedido igual: te atendemos al abrir. Horario: ${s.text}.',
+              ),
+            ),
           // Resumen: las fotos, cuántos productos, el total y «Editar»
           Container(
             padding: const EdgeInsets.all(AppSpace.sm + 2),
@@ -1633,6 +1949,11 @@ class _CartFormState extends State<_CartForm> {
           icon: const Icon(Icons.receipt_long_outlined),
           label: Text(_sending ? 'Guardando tu pedido…' : 'Hacer el pedido · ${money(total)}'),
         ),
+        // Cómo pagarle al negocio (0.16.0)
+        if (widget.store.look.payment != null) ...[
+          const SizedBox(height: AppSpace.sm),
+          _CartNotice(icon: Icons.payments_outlined, tone: AppTone.info, title: 'Cómo pagar', text: widget.store.look.payment!),
+        ],
         const SizedBox(height: AppSpace.sm),
         Text(
           'Te mostramos tu tiquete y lo envías por WhatsApp. La tienda te confirma el precio final y la entrega.',
@@ -1668,6 +1989,41 @@ class _CartFormState extends State<_CartForm> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Aviso dentro del carrito: «Estamos cerrados» o «Cómo pagar» (0.16.0)
+class _CartNotice extends StatelessWidget {
+  final IconData icon;
+  final AppTone tone;
+  final String title;
+  final String text;
+  const _CartNotice({required this.icon, required this.tone, required this.title, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ToneColors.of(context, tone);
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(color: t.soft, borderRadius: BorderRadius.circular(AppRadius.card)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: t.strong),
+          const SizedBox(width: AppSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppText.body(context, weight: FontWeight.w700, color: t.text)),
+                const SizedBox(height: 2),
+                SelectableText(text, style: AppText.small(context, color: t.text)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2167,6 +2523,89 @@ class _OptionChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+/// Foto pequeña de una fila (Mercado y Menú)
+class _RowThumb extends StatelessWidget {
+  final String? url;
+  final double size;
+  const _RowThumb({required this.url, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.tile),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: url == null
+            ? ColoredBox(color: c.surfaceMuted, child: Icon(Icons.inventory_2_outlined, color: c.inkFaint, size: size * 0.4))
+            : Image.network(url!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => ColoredBox(color: c.surfaceMuted)),
+      ),
+    );
+  }
+}
+
+/// Precio de una fila, con el de antes tachado y «Destacado»
+class _RowPrice extends StatelessWidget {
+  final StoreProduct product;
+  final String currency;
+  final bool featured;
+  const _RowPrice({required this.product, required this.currency, required this.featured});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final p = product;
+    return Wrap(
+      spacing: AppSpace.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('${p.variants.isNotEmpty && p.variants.any((v) => v.extra > 0) ? 'Desde ' : ''}${CurrencyFormatter.formatIn(p.price, currency)}',
+            style: AppText.body(context, weight: FontWeight.w700, color: c.ink)),
+        if (p.onOffer)
+          Text(CurrencyFormatter.formatIn(p.oldPrice!, currency),
+              style: AppText.small(context, color: c.inkFaint).copyWith(decoration: TextDecoration.lineThrough)),
+        if (featured) const StatusPill('Destacado', tone: AppTone.accent, compact: true),
+      ],
+    );
+  }
+}
+
+/// «+» o «− 2 +» al lado de cada producto (Mercado y Menú)
+class _RowAdd extends StatelessWidget {
+  final int quantity;
+  final VoidCallback onAdd;
+  final VoidCallback onRemove;
+  const _RowAdd({required this.quantity, required this.onAdd, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    if (quantity == 0) {
+      return IconButton.filled(
+        tooltip: 'Agregar',
+        onPressed: onAdd,
+        style: IconButton.styleFrom(backgroundColor: c.accent, foregroundColor: c.onAccent),
+        icon: const Icon(Icons.add),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.outlined(tooltip: 'Quitar uno', onPressed: onRemove, icon: const Icon(Icons.remove, size: 18)),
+        SizedBox(width: 28, child: Text('$quantity', textAlign: TextAlign.center, style: AppText.title(context))),
+        IconButton.filled(
+          tooltip: 'Agregar otro',
+          onPressed: onAdd,
+          style: IconButton.styleFrom(backgroundColor: c.accent, foregroundColor: c.onAccent),
+          icon: const Icon(Icons.add, size: 18),
+        ),
+      ],
     );
   }
 }

@@ -29,6 +29,9 @@ class OnlineStoreConfig {
   /// Foto de portada propia (0.15.0): su logo grande, un banner o una foto del local
   final String? heroImageUrl;
 
+  /// Personalizar tienda (0.16.0): color, modo oscuro, destacados, horario y pago
+  final StoreLook look;
+
   const OnlineStoreConfig({
     required this.slug,
     required this.enabled,
@@ -39,6 +42,7 @@ class OnlineStoreConfig {
     this.heroTitle,
     this.heroPhotos = true,
     this.heroImageUrl,
+    this.look = StoreLook.none,
   });
 
   factory OnlineStoreConfig.fromJson(Map<String, dynamic> j) => OnlineStoreConfig(
@@ -51,6 +55,7 @@ class OnlineStoreConfig {
         heroTitle: j['hero_title'] as String?,
         heroPhotos: j['hero_photos'] != false,
         heroImageUrl: j['hero_image_url'] as String?,
+        look: StoreLook.fromJson(j['look']),
       );
 
   String get url => '$storeBaseUrl/$slug';
@@ -64,8 +69,169 @@ abstract final class StoreTemplate {
   /// Oscura, de portada grande, con filtros por talla, color y precio (ropa, calzado)
   static const fashion = 'moda';
 
-  static String of(String? v) => v == fashion ? fashion : classic;
-  static String label(String v) => v == fashion ? 'Moda' : 'Clásica';
+  /// Lista compacta con botón + (tiendas de barrio, misceláneas, droguerías) (0.16.0)
+  static const market = 'mercado';
+
+  /// Cada categoría es una sección de la carta (comidas, panaderías, heladerías) (0.16.0)
+  static const menu = 'menu';
+
+  /// Fotos grandes y mucho espacio (joyería, cosméticos, artesanías) (0.16.0)
+  static const boutique = 'boutique';
+
+  static const all = [classic, fashion, market, menu, boutique];
+
+  static String of(String? v) => all.contains(v) ? v! : classic;
+
+  static String label(String v) => switch (v) {
+        fashion => 'Moda',
+        market => 'Mercado',
+        menu => 'Menú',
+        boutique => 'Boutique',
+        _ => 'Clásica',
+      };
+
+  static String description(String v) => switch (v) {
+        fashion => 'Oscura, con portada grande, filtros por talla, color y precio, y ofertas. Para ropa y calzado.',
+        market => 'Lista compacta con botón +: se ven muchos productos. Para tiendas de barrio, misceláneas y droguerías.',
+        menu => 'Cada categoría es una sección de la carta, con la descripción del plato. Para comidas, panaderías y heladerías.',
+        boutique => 'Fotos grandes y mucho espacio; lo destacado va primero en grande. Para joyería, cosméticos y artesanías.',
+        _ => 'Clara, con el color de tu negocio arriba. Para cualquier negocio.',
+      };
+}
+
+/// Horario de la tienda (0.16.0): días (1 = lunes … 7 = domingo) y la hora de abrir
+/// y de cerrar ("07:00", "20:00"). Fuera del horario se ve «Cerrado», pero los
+/// pedidos se reciben con aviso (decisión del dueño, 15 nov).
+class StoreSchedule {
+  final Set<int> days;
+  final String open;
+  final String close;
+
+  const StoreSchedule({required this.days, required this.open, required this.close});
+
+  static const _dayNames = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+  static const dayShort = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+  static int? _minutes(String hhmm) {
+    final m = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(hhmm.trim());
+    if (m == null) return null;
+    final h = int.parse(m.group(1)!), min = int.parse(m.group(2)!);
+    return h > 23 || min > 59 ? null : h * 60 + min;
+  }
+
+  static StoreSchedule? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final days = <int>{
+      for (final d in (raw['days'] as List? ?? const []))
+        if (d is num && d >= 1 && d <= 7) d.toInt(),
+    };
+    final open = '${raw['open'] ?? ''}', close = '${raw['close'] ?? ''}';
+    if (days.isEmpty || _minutes(open) == null || _minutes(close) == null) return null;
+    return StoreSchedule(days: days, open: open, close: close);
+  }
+
+  Map<String, dynamic> toJson() => {'days': (days.toList()..sort()), 'open': open, 'close': close};
+
+  /// Abierto a esta hora. Si cierra pasada la medianoche (18:00 a 02:00), la madrugada
+  /// cuenta para el día anterior.
+  bool isOpen(DateTime now) {
+    final o = _minutes(open)!, c = _minutes(close)!;
+    final t = now.hour * 60 + now.minute;
+    if (o == c) return days.contains(now.weekday);
+    if (o < c) return days.contains(now.weekday) && t >= o && t < c;
+    final yesterday = now.weekday == 1 ? 7 : now.weekday - 1;
+    return (days.contains(now.weekday) && t >= o) || (days.contains(yesterday) && t < c);
+  }
+
+  /// "7 a. m.", "8:30 p. m."
+  static String hourText(String hhmm) {
+    final m = _minutes(hhmm) ?? 0;
+    final h = m ~/ 60, min = m % 60;
+    final h12 = h % 12 == 0 ? 12 : h % 12;
+    return '$h12${min == 0 ? '' : ':${min.toString().padLeft(2, '0')}'} ${h < 12 ? 'a. m.' : 'p. m.'}';
+  }
+
+  /// "Lun a sáb · 7 a. m. – 8 p. m."
+  String get text {
+    final sorted = days.toList()..sort();
+    String cap(String s) => s[0].toUpperCase() + s.substring(1, 3);
+    final consecutive = sorted.length > 1 && sorted.last - sorted.first == sorted.length - 1;
+    final which = sorted.length == 7
+        ? 'Todos los días'
+        : consecutive
+            ? '${cap(_dayNames[sorted.first - 1])} a ${_dayNames[sorted.last - 1].substring(0, 3)}'
+            : sorted.map((d) => cap(_dayNames[d - 1])).join(', ');
+    return '$which · ${hourText(open)} – ${hourText(close)}';
+  }
+
+  /// «Abierto · cierra 8 p. m.» o «Cerrado · abre el lunes 7 a. m.»
+  String status(DateTime now) {
+    if (isOpen(now)) return 'Abierto · cierra ${hourText(close)}';
+    final o = _minutes(open)!;
+    for (var i = 0; i < 8; i++) {
+      final d = now.add(Duration(days: i));
+      if (!days.contains(d.weekday)) continue;
+      if (i == 0 && now.hour * 60 + now.minute >= o) continue;
+      final when = i == 0 ? 'hoy' : i == 1 ? 'mañana' : 'el ${_dayNames[d.weekday - 1]}';
+      return 'Cerrado · abre $when ${hourText(open)}';
+    }
+    return 'Cerrado';
+  }
+}
+
+/// «Personalizar tienda» (0.16.0)
+class StoreLook {
+  /// Color propio de la tienda (#RRGGBB); null = el del negocio
+  final String? accent;
+
+  /// Modo oscuro en cualquier plantilla (Moda siempre es oscura)
+  final bool dark;
+
+  /// Hasta 6 productos que salen primero
+  final List<String> featured;
+  final StoreSchedule? schedule;
+
+  /// Cómo pagarle al negocio («Nequi 300 123 4567 a nombre de Rosa»): sale al final del pedido
+  final String? payment;
+
+  const StoreLook({this.accent, this.dark = false, this.featured = const [], this.schedule, this.payment});
+
+  static const none = StoreLook();
+  static const maxFeatured = 6;
+
+  static StoreLook fromJson(Object? raw) {
+    if (raw is! Map) return none;
+    final accent = '${raw['accent'] ?? ''}';
+    final payment = '${raw['payment'] ?? ''}'.trim();
+    return StoreLook(
+      accent: RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(accent) ? accent.toUpperCase() : null,
+      dark: raw['dark'] == true,
+      featured: [
+        for (final f in (raw['featured'] as List? ?? const []))
+          if (f is String && f.isNotEmpty) f,
+      ].take(maxFeatured).toList(),
+      schedule: StoreSchedule.fromJson(raw['schedule']),
+      payment: payment.isEmpty ? null : payment,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        if (accent != null) 'accent': accent,
+        'dark': dark,
+        'featured': featured.take(maxFeatured).toList(),
+        if (schedule != null) 'schedule': schedule!.toJson(),
+        if (payment != null) 'payment': payment,
+      };
+
+  StoreLook copyWith({String? accent, bool clearAccent = false, bool? dark, List<String>? featured, StoreSchedule? schedule,
+          bool clearSchedule = false, String? payment, bool clearPayment = false}) =>
+      StoreLook(
+        accent: clearAccent ? null : accent ?? this.accent,
+        dark: dark ?? this.dark,
+        featured: featured ?? this.featured,
+        schedule: clearSchedule ? null : schedule ?? this.schedule,
+        payment: clearPayment ? null : payment ?? this.payment,
+      );
 }
 
 /// Una talla, un color o los dos de un producto de la tienda
@@ -163,6 +329,9 @@ class StoreProduct {
   final double price;
   final String? imageUrl;
 
+  /// Descripción del producto (la plantilla Menú la muestra debajo del nombre) (0.16.0)
+  final String? description;
+
   /// Unidades disponibles; null si el negocio no las muestra
   final int? stock;
 
@@ -184,6 +353,7 @@ class StoreProduct {
     required this.category,
     required this.price,
     this.imageUrl,
+    this.description,
     this.stock,
     this.oldPrice,
     this.variants = const [],
@@ -214,6 +384,7 @@ class StoreProduct {
         category: (j['category'] as String? ?? '').trim(),
         price: price,
         imageUrl: j['image_url'] as String?,
+        description: (j['description'] as String?)?.trim().isEmpty == true ? null : (j['description'] as String?)?.trim(),
         stock: (j['stock'] as num?)?.toInt(),
         oldPrice: pct ? ((before ?? 0) > base ? before : base) : before,
         few: j['few'] == true,
@@ -244,6 +415,9 @@ class PublicStore {
   /// Foto de portada propia del negocio (0.15.0); null = la portada de siempre
   final String? heroImageUrl;
 
+  /// Personalizar tienda (0.16.0)
+  final StoreLook look;
+
   const PublicStore({
     required this.slug,
     required this.whatsapp,
@@ -257,7 +431,39 @@ class PublicStore {
     this.heroTitle,
     this.heroPhotos = true,
     this.heroImageUrl,
+    this.look = StoreLook.none,
   });
+
+  /// La misma tienda con otro diseño (la vista previa de «Personalizar»)
+  PublicStore copyWith({String? template, String? heroTitle, bool? heroPhotos, String? heroImageUrl, StoreLook? look, String? welcome}) =>
+      PublicStore(
+        slug: slug,
+        whatsapp: whatsapp,
+        businessName: businessName,
+        currency: currency,
+        products: products,
+        welcome: welcome ?? this.welcome,
+        logoUrl: logoUrl,
+        color: color,
+        template: template ?? this.template,
+        heroTitle: heroTitle ?? this.heroTitle,
+        heroPhotos: heroPhotos ?? this.heroPhotos,
+        heroImageUrl: heroImageUrl ?? this.heroImageUrl,
+        look: look ?? this.look,
+      );
+
+  /// El color de la tienda: el propio o el del negocio
+  String? get accentHex => look.accent ?? color;
+
+  /// Los destacados primero (en el orden elegido) y después los demás
+  List<StoreProduct> get ordered {
+    if (look.featured.isEmpty) return products;
+    final rank = {for (final (i, id) in look.featured.indexed) id: i};
+    final first = products.where((p) => rank.containsKey(p.id)).toList()..sort((a, b) => rank[a.id]!.compareTo(rank[b.id]!));
+    return [...first, ...products.where((p) => !rank.containsKey(p.id))];
+  }
+
+  bool isFeatured(StoreProduct p) => look.featured.contains(p.id);
 
   factory PublicStore.fromJson(Map<String, dynamic> j) {
     final b = Map<String, dynamic>.from(j['business'] as Map? ?? const {});
@@ -273,6 +479,7 @@ class PublicStore {
       heroTitle: j['hero_title'] as String?,
       heroPhotos: j['hero_photos'] != false,
       heroImageUrl: (j['hero_image_url'] as String?)?.startsWith('https://') == true ? j['hero_image_url'] as String : null,
+      look: StoreLook.fromJson(j['look']),
       products: [
         for (final p in (j['products'] as List? ?? const [])) StoreProduct.fromJson(Map<String, dynamic>.from(p as Map)),
       ],
@@ -381,6 +588,21 @@ class OnlineStoreService {
       }
     }
     throw const OnlineStoreException('No se pudo guardar la tienda.');
+  }
+
+  /// Guarda «Personalizar tienda» (0.16.0)
+  Future<StoreLook> saveLook({required String businessId, required StoreLook look}) async {
+    final client = _client;
+    if (client == null || client.auth.currentSession == null) {
+      throw const OnlineStoreException('Necesitas iniciar sesión y tener internet.');
+    }
+    try {
+      final data = await client.rpc('save_my_store_look', params: {'p_business_id': businessId, 'p_look': look.toJson()});
+      return StoreLook.fromJson(data);
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST202') throw const OnlineStoreException('Actualiza la nube para guardar el diseño de la tienda.');
+      throw OnlineStoreException(errorMessage(e.message));
+    }
   }
 
   /// Tienda pública; null si no existe o no está disponible

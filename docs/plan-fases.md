@@ -129,15 +129,15 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 ### Ventas (movidas desde la 0.13.0)
 
 16. Devolución parcial.
-17. Cálculo del vuelto.
-18. Precio sugerido por margen.
-19. Cierre del día por WhatsApp: a mano en gratis, automático con Pro.
-20. Recordatorio en el celular para cerrar la caja.
+17. HECHO (ya estaba: «Recibí» con atajos y el vuelto en grande). Cálculo del vuelto.
+18. HECHO (15 nov). Precio sugerido por margen (20, 30, 40 y 50 % en el formulario del producto).
+19. HECHO (15 nov). Cierre del día por WhatsApp: a mano en Reportes; con Pro, el aviso de la noche lo deja listo.
+20. HECHO (15 nov). Recordatorio en el celular para cerrar la caja (7:00 p. m., se cambia en Ajustes › Avisos).
 
 ### Pendientes que se suman (14 nov)
 
-18. **Descuento por línea en Vender**, además del descuento a toda la venta.
-19. **Las ventas en espera no se pierden al cerrar la app:** hoy viven solo en memoria.
+18. HECHO (15 nov). **Descuento por línea en Vender**, además del descuento a toda la venta.
+19. HECHO (15 nov). **Las ventas en espera no se pierden al cerrar la app:** hoy viven solo en memoria.
 20. **El tiquete con NIT, dirección y despedida propia del negocio.**
 21. **Stocky:** límite mayor para Pro (50 preguntas al día) y las claves de respaldo (Gemini y OpenRouter).
 22. **Seguridad:** el código del correo vence a los 10 minutos (revisar en Supabase).

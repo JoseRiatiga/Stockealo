@@ -112,7 +112,7 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 3. HECHO (14 nov), con «Ver como» y la matriz de interruptores. Roles personalizados: gratis 1, Pro y Pro Servicios sin límite. **Solo el dueño** los crea y edita.
 4. HECHO (14 nov). Límites con números (Pro).
 5. HECHO (14 nov). Autorización de un solo uso (solo con internet, decisión del dueño) y arqueo ciego. Las dos cosas, gratis. También: cada acción revisa el permiso del rol.
-6. Horario de acceso (Pro Servicios).
+6. HECHO (15 nov). Horario de acceso (Pro Servicios): por persona, la app avisa 10 minutos antes y bloquea fuera de turno. Migración access_schedule aplicada con permiso.
 7. HECHO (14 nov), opción A de `docs/plan-permisos-nube.md`: migraciones permissions_in_cloud y limit_cashier_updates_roles aplicadas y probadas con un cajero simulado. «Ver costos»: opción 1 del dueño (15 nov): se oculta en las pantallas y la nube pone el costo de cada venta desde el producto (migración sale_cost_from_product aplicada). Permisos que se cumplen también en Supabase. La revisión con Codex del 14 nov lo confirmó: hoy los límites y permisos se cumplen solo en la app; las ventas y los movimientos de caja se pueden insertar directo en la nube.
 
 ### Planes, ingresos y seguridad

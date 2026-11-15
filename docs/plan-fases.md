@@ -117,14 +117,14 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 ### Planes, ingresos y seguridad
 
-8. Quitar Pro Global: quedan Pro y Pro Servicios.
-9. Elegir el plan por lo que se necesita.
+8. HECHO (15 nov). Quitar Pro Global: quedan Pro y Pro Servicios (no había suscripciones Global).
+9. HECHO (15 nov). Elegir el plan por lo que se necesita («¿Qué necesitas para tu negocio?» en la pantalla de Pro; sin sedes por ahora).
 10. Precio de Pro Servicios, cuando termine la negociación, y encender «Mostrar precios».
-11. Aviso de vencimiento de Pro y renovar en un toque.
-12. Recordatorios de cobro en pausa sin Pro.
-13. MFA del panel admin.
-14. Bloqueo opcional con PIN o huella para abrir la app.
-15. Limpieza de seguridad: contraseña vieja, `crypto` y `legacy-login`.
+11. HECHO (15 nov). Aviso de vencimiento de Pro (7 días antes y hasta 15 después, en Inicio) y renovar en un toque.
+12. HECHO (15 nov). Recordatorios de cobro en pausa sin Pro (vuelven solos al renovar).
+13. MOVIDO a la 0.16.0 (decisión del dueño, 15 nov). MFA del panel admin.
+14. MOVIDO a la 0.16.0 (decisión del dueño, 15 nov). Bloqueo opcional con PIN o huella para abrir la app.
+15. MOVIDO a la 0.16.0 (decisión del dueño, 15 nov). Limpieza de seguridad: contraseña vieja, `crypto` y `legacy-login`.
 
 ### Ventas (movidas desde la 0.13.0)
 
@@ -148,6 +148,12 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 27. HECHO (14 nov). **Tienda en línea:** la tarjeta de tienda publicada con el diseño nuevo.
 
 ## 0.16.0 · Tienda y crecimiento (antes 0.15.0)
+
+### Movidos desde la 0.15.0 (15 nov)
+
+- MFA del panel admin (necesita la app de códigos en el celular del dueño).
+- Bloqueo opcional con PIN o huella para abrir la app (librería local_auth y cambio en Android; probar en un celular real).
+- Limpieza de seguridad: contraseña vieja, `crypto` y `legacy-login` (antes, revisar si alguien todavía los usa).
 
 ### Calidad y confianza
 

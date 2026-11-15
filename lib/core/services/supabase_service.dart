@@ -1348,7 +1348,8 @@ class SupabaseService {
       case 'delete_member':
         await db.from('business_members').delete().eq('id', p['id'] as String);
       case 'upsert_business_role':
-        await db.from('business_roles').upsert(p, onConflict: 'id');
+        // La marca interna _edited_at no es una columna de la nube (0.15.1)
+        await db.from('business_roles').upsert(Map<String, dynamic>.from(p)..remove(_editedAtKey), onConflict: 'id');
       case 'delete_business_role':
         await db.from('business_roles').delete().eq('id', p['id'] as String);
       case 'insert_activity':

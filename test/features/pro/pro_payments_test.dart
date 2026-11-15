@@ -33,7 +33,7 @@ void main() {
       'created_at': '2026-11-03T10:00:00Z',
     });
     expect(p.amount, 6900);
-    expect(p.planLabel, 'Pro Negocio · Mensual');
+    expect(p.planLabel, 'Pro · Mensual');
     expect(p.statusLabel, 'Aprobado');
     expect(p.methodLabel, 'Nequi');
     expect(AdminPayment.fromRow({...{'reference': 'X', 'status': 'DECLINED'}}).statusLabel, 'Rechazado');

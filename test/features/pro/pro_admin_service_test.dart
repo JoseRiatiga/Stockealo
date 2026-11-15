@@ -29,7 +29,7 @@ void main() {
       'note': null,
       'created_at': '2026-10-31T10:00:00Z',
     });
-    expect(code.kindLabel, 'Pro Negocio');
+    expect(code.kindLabel, 'Pro');
     expect(code.durationLabel, 'Permanente');
     expect(code.exhausted, isFalse);
   });

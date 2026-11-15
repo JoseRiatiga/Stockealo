@@ -46,10 +46,10 @@ void main() {
 
   group('Pro Servicios (0.12.0)', () {
     test('cada plan tiene su nombre', () {
-      expect(proKindLabel('business'), 'Pro Negocio');
+      expect(proKindLabel('business'), 'Pro');
       expect(proKindLabel('global'), 'Pro Global');
       expect(proKindLabel('services'), 'Pro Servicios');
-      expect(proKindLabel(null), 'Pro Negocio');
+      expect(proKindLabel(null), 'Pro');
       expect(const ProStatus(active: true, kind: 'services', services: true).kindLabel, 'Pro Servicios');
     });
 

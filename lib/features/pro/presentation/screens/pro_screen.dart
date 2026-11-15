@@ -322,7 +322,8 @@ class _ProScreenState extends State<ProScreen> {
 
   Widget _plans(StockealoColors c, List<ProPlan> all) {
     // Pro Servicios aparece solo si su plan está encendido para esta moneda
-    final kinds = [for (final k in const ['business', 'global', 'services']) if (all.any((p) => p.kind == k)) k];
+    // Quedan Pro y Pro Servicios (0.15.0: Pro Global ya no se vende)
+    final kinds = [for (final k in const ['business', 'services']) if (all.any((p) => p.kind == k)) k];
     if (!kinds.contains(_kind) && kinds.isNotEmpty) _kind = kinds.first;
     final plans = all.where((p) => p.kind == _kind).toList();
     return Column(
@@ -343,7 +344,6 @@ class _ProScreenState extends State<ProScreen> {
           padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.sm, AppSpace.xs, AppSpace.md),
           child: Text(
             switch (_kind) {
-              'global' => 'Para todos los negocios donde eres dueño, también los que crees después.',
               'services' => 'Para "${widget.business.name}": todo Pro más el módulo Servicios, con soporte.',
               _ => 'Para "${widget.business.name}" y todo su equipo.',
             },

@@ -545,7 +545,7 @@ class ProAdminService {
           .map(AdminSubscription.fromRow)
           .toList();
 
-  /// Pro Negocio o Pro Servicios a mano ([kind] 'business' o 'services'); [days] null = permanente
+  /// Pro o Pro Servicios a mano ([kind] 'business' o 'services'); [days] null = permanente
   Future<void> grantPro(String businessId, int? days, {String kind = 'business'}) =>
       _rpc('admin_grant_pro', {'p_business_id': businessId, 'p_days': days, 'p_kind': kind});
 
@@ -623,7 +623,7 @@ class ProAdminService {
     if (serverMessage.contains('invalid_valid_days')) return 'El plazo para canjear debe ser de 1 a 3650 días.';
     if (serverMessage.contains('invalid_days')) return 'La duración debe ser de 1 a 3650 días.';
     if (serverMessage.contains('invalid_max_uses')) return 'Los usos por código deben ser de 1 a 1000.';
-    if (serverMessage.contains('invalid_kind')) return 'Elige un plan válido: Pro Negocio o Pro Servicios.';
+    if (serverMessage.contains('invalid_kind')) return 'Elige un plan válido: Pro o Pro Servicios.';
     if (serverMessage.contains('business_not_found')) return 'Ese negocio no existe o fue eliminado.';
     if (serverMessage.contains('invalid_price')) return 'Revisa el precio.';
     if (serverMessage.contains('invalid_setting')) return 'Ese ajuste no se puede cambiar desde aquí.';

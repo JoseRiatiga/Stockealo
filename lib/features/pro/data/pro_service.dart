@@ -2,12 +2,14 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/database/app_database.dart';
+import 'dart:convert';
 
 /// Estado Pro de un negocio
 class ProStatus {
   final bool active;
 
-  /// 'business' (Pro Negocio), 'global' (Pro Global) o 'services' (Pro Servicios)
+  /// 'business' (Pro) o 'services' (Pro Servicios). 'global' ya no se vende (0.15.0)
   final String? kind;
 
   /// null con Pro activo = permanente
@@ -29,7 +31,7 @@ class ProStatus {
 String proKindLabel(String? kind) => switch (kind) {
       'global' => 'Pro Global',
       'services' => 'Pro Servicios',
-      _ => 'Pro Negocio',
+      _ => 'Pro',
     };
 
 /// Un plan con su precio en una moneda
@@ -142,10 +144,48 @@ class ProService {
         services: map['services'] == true,
       );
       if (_statusBusinessId == businessId) status.value = result;
+      // Se recuerda por negocio: avisa cuándo vence y pausa los recordatorios sin Pro (0.15.0)
+      await _remember(businessId, result);
       return result;
     } catch (e) {
       debugPrint('Estado Pro no disponible: $e');
       return status.value;
+    }
+  }
+
+  static String _key(String businessId) => 'pro_last_$businessId';
+
+  Future<void> _remember(String businessId, ProStatus s) async {
+    try {
+      final before = await lastKnown(businessId);
+      await AppDatabase.instance.setSetting(
+        _key(businessId),
+        jsonEncode({
+          'active': s.active,
+          'kind': s.kind,
+          'ends_at': s.endsAt?.toIso8601String(),
+          // Cuándo venció la última vez (para «Tu Pro venció el…»)
+          'ended_at': s.active ? null : (before?.active == true ? before?.endsAt?.toIso8601String() : before?.endedAt?.toIso8601String()),
+        }),
+      );
+    } catch (e) {
+      debugPrint('Estado Pro sin guardar: $e');
+    }
+  }
+
+  /// El último estado Pro conocido del negocio (sirve sin conexión); null = nunca se consultó
+  static Future<({bool active, DateTime? endsAt, DateTime? endedAt})?> lastKnown(String businessId) async {
+    try {
+      final raw = await AppDatabase.instance.getSetting(_key(businessId));
+      if (raw == null) return null;
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      return (
+        active: m['active'] == true,
+        endsAt: DateTime.tryParse('${m['ends_at']}')?.toLocal(),
+        endedAt: DateTime.tryParse('${m['ended_at']}')?.toLocal(),
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -184,7 +224,7 @@ class ProService {
       final data = await client.rpc('redeem_pro_code', params: {'p_code': clean, 'p_business_id': businessId});
       final map = Map<String, dynamic>.from(data as Map);
       await refresh(businessId);
-      final kind = map['kind'] == 'global' ? 'Pro Global' : 'Pro Negocio';
+      final kind = proKindLabel(map['kind'] as String?);
       final days = map['days'] as int?;
       return RedeemResult(true, days == null ? '¡Listo! Tienes $kind para siempre.' : '¡Listo! Sumaste $days días de $kind.');
     } on PostgrestException catch (e) {
@@ -273,7 +313,7 @@ class ProService {
     if (serverMessage.contains('code_expired')) return 'Ese código ya venció.';
     if (serverMessage.contains('code_already_redeemed')) return 'Ya canjeaste ese código.';
     if (serverMessage.contains('code_used')) return 'Ese código ya fue usado.';
-    if (serverMessage.contains('owner_only')) return 'Solo el dueño del negocio puede activar Pro Negocio.';
+    if (serverMessage.contains('owner_only')) return 'Solo el dueño del negocio puede activar Pro.';
     return 'No se pudo canjear el código. Inténtalo de nuevo.';
   }
 }

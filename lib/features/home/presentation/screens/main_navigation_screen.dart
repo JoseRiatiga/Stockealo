@@ -320,7 +320,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
           onRemoteSale: () => SupabaseService.instance.syncFromCloud(user.id, user.email),
         );
         // Estado Pro del negocio: decide si se ve el módulo Servicios (Pro Servicios)
-        ProService.instance.refresh(biz.id);
+        ProService.instance.refresh(biz.id).then((_) => PhoneAlertsService.instance.refreshDebtReminders());
         // Pedidos de la tienda: aviso al llegar y número en Ventas (0.13.5)
         _wireOrderAlerts(biz.id);
         StoreOrdersRepository.instance.pull(biz.id);

@@ -28,6 +28,8 @@ import '../widgets/cloud_sync_reminder.dart';
 import '../widgets/home_sales_chart.dart';
 import '../widgets/quick_actions_section.dart';
 import '../../../../core/permissions/permissions.dart';
+import '../../../pro/presentation/screens/pro_screen.dart';
+import '../../../pro/data/pro_service.dart';
 
 /// Inicio: cómo va el día de un vistazo y lo que necesita atención, con su
 /// solución a un toque. Diseño aprobado el 11 nov 2026 (re-diseño 0.13.0).
@@ -222,6 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                 _greeting(wide),
                 SizedBox(height: gap),
                 CloudSyncReminder(key: ValueKey('cloud-${_business?.id}-$_role'), canManage: _can(Perm.cloud)),
+                if (_role == Permissions.owner && _business != null) _ProExpiry(business: _business!),
                 _figures(wide, box.maxWidth - pad.horizontal),
                 SizedBox(height: gap),
                 _grid(
@@ -690,3 +693,70 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     return DateFormat('d MMM, h:mm a', 'es_CO').format(at);
   }
 }
+
+/// Aviso de vencimiento del Pro (0.15.0): 7 días antes y hasta 15 días después, con
+/// «Renovar» en un toque. Solo lo ve el dueño.
+class _ProExpiry extends StatefulWidget {
+  final Business business;
+  const _ProExpiry({required this.business});
+
+  @override
+  State<_ProExpiry> createState() => _ProExpiryState();
+}
+
+class _ProExpiryState extends State<_ProExpiry> {
+  DateTime? _endedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    ProService.instance.status.addListener(_reload);
+    _reload();
+  }
+
+  @override
+  void dispose() {
+    ProService.instance.status.removeListener(_reload);
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    final last = await ProService.lastKnown(widget.business.id);
+    if (mounted) setState(() => _endedAt = last?.endedAt);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ProService.instance.status.value;
+    final now = DateTime.now();
+    final fmt = DateFormat("d 'de' MMMM", 'es_CO');
+    String? title;
+    String? detail;
+    var tone = AppTone.warning;
+    if (s.active && s.endsAt != null) {
+      final days = s.endsAt!.difference(now).inHours / 24;
+      if (days <= 7) {
+        final n = days.ceil();
+        title = n <= 1 ? 'Tu ${s.kindLabel} vence mañana' : 'Tu ${s.kindLabel} vence en $n días';
+        detail = 'Vence el ${fmt.format(s.endsAt!)}. Renuévalo para no perder la tienda en línea y lo demás de Pro.';
+      }
+    } else if (!s.active && _endedAt != null && now.difference(_endedAt!).inDays <= 15) {
+      title = 'Tu Pro venció el ${fmt.format(_endedAt!)}';
+      detail = 'La tienda en línea y los recordatorios de cobro están en pausa. Al renovar vuelven solos.';
+      tone = AppTone.danger;
+    }
+    if (title == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpace.md),
+      child: AttentionRow(
+        icon: Icons.workspace_premium_outlined,
+        tone: tone,
+        title: title,
+        detail: detail,
+        pill: 'Renovar',
+        onTap: () => ProScreen.open(context, widget.business),
+      ),
+    );
+  }
+}
+

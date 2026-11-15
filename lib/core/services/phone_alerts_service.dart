@@ -17,6 +17,7 @@ import '../../features/suppliers/models/supplier.dart';
 import '../database/app_database.dart';
 import '../utils/currency_formatter.dart';
 import 'data_events.dart';
+import '../../features/pro/data/pro_service.dart';
 
 /// Avisos en la barra del celular, aunque la app esté cerrada:
 /// • stock bajo: cuando un producto llega a su mínimo después de una venta
@@ -473,6 +474,9 @@ class PhoneAlertsService {
     }
     // Sin deuda no hay nada que cobrar; el recordatorio queda guardado por si vuelve a fiar
     if (!customer.hasDebt) return;
+    // Sin Pro el recordatorio queda en pausa (guardado); vuelve solo al renovar (0.15.0)
+    final pro = await ProService.lastKnown(schedule.businessId);
+    if (pro != null && !pro.active) return;
 
     final db = await AppDatabase.instance.database;
     final rows = await db.query('businesses', columns: ['currency'], where: 'id = ?', whereArgs: [schedule.businessId]);

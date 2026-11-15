@@ -69,6 +69,9 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
+            ### Arreglo de la 0.15.1
+            - Los roles propios que crea el dueño ahora sí se guardan en la nube y llegan a los celulares de todo el equipo.
+
             ### Tu equipo, con sus propios permisos
             - Crea roles a tu medida (por ejemplo «Cajero de la tarde») y elige qué puede hacer cada uno. Con «Ver como» ves la app igual que tu empleado.
             - Con Pro: límites por rol (descuento, fiado, horas para anular y salidas de caja). Si alguien los pasa, te llega la solicitud al celular para aprobarla.

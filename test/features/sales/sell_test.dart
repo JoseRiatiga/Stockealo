@@ -29,6 +29,7 @@ import 'package:stockealo/features/sales/data/promotions_repository.dart';
 import 'package:stockealo/features/sales/models/promotion.dart';
 import 'package:stockealo/features/sales/presentation/screens/sell_screen.dart';
 import 'package:stockealo/features/reports/data/daily_close.dart';
+import 'package:stockealo/features/customers/data/customer_repository.dart';
 
 /// Vender (bloque 4): pago mixto, caja obligatoria, anular sin borrar y cómo se
 /// ve el punto de venta. Con PREVIEW_OUT=<carpeta> guarda imágenes.
@@ -172,6 +173,38 @@ void main() {
     expect(text, contains('• Efectivo: \$18.900'));
     expect(text, contains('• Nequi: \$11.200'));
     expect(text, contains('Ganancia:'));
+  });
+
+  // 0.15.0: devolución parcial
+  test('devolución parcial: efectivo vuelve al stock y baja la caja; fiado baja la deuda; no se devuelve de más', () async {
+    await setCash(true);
+    final session = await cash.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Rosa');
+    final venta = (await sales.recordMultiProductSale(businessId: businessId, items: await items({'gaseosa': 3}), paymentMethod: PaymentMethod.cash)).single;
+    final before = (await ProductRepository.instance.getProductById('gaseosa', businessId))!.stock;
+    final dev = await sales.returnSale(venta, quantity: 1, restock: true, reason: 'Venía abierta');
+    expect(dev.quantity, -1);
+    expect(dev.totalAmount, -5600);
+    expect(dev.returnOf, venta.id);
+    expect((await ProductRepository.instance.getProductById('gaseosa', businessId))!.stock, before + 1);
+    expect(await sales.returnedQuantity(venta.id), 1);
+    // La caja espera solo lo de 2 gaseosas
+    final sum = await cash.summarize(session);
+    expect(sum.expected, 11200);
+    // Dañada: no vuelve al inventario
+    await sales.returnSale(venta, quantity: 1, restock: false);
+    expect((await ProductRepository.instance.getProductById('gaseosa', businessId))!.stock, before + 1);
+    // Queda 1: no deja devolver 2
+    await expectLater(sales.returnSale(venta, quantity: 2, restock: true), throwsStateError);
+    // Fiado: la deuda baja lo devuelto
+    final fiado = (await sales.recordMultiProductSale(
+      businessId: businessId,
+      items: await items({'huevos': 2}),
+      paymentMethod: PaymentMethod.credit,
+      customerName: 'Marta',
+    )).single;
+    await sales.returnSale(fiado, quantity: 1, restock: true);
+    final marta = await CustomerRepository.instance.findByName(businessId, 'Marta');
+    expect(marta!.debtBalance, 18900);
   });
 
   test('caja obligatoria: con la caja cerrada no se registra ninguna venta', () async {

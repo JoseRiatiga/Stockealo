@@ -820,10 +820,11 @@ class SalesRepository {
       productName: map['product_name'] as String,
       productPhotoPath: photoPath,
       quantity: (map['quantity'] as num).toInt(),
-      unitPrice: (map['quantity'] as num).toInt() > 0
+      // Una devolución lleva la cantidad en negativo: el precio por unidad es el mismo
+      unitPrice: (map['quantity'] as num).toInt() != 0
           ? ((map['total'] as num).toDouble()) / ((map['quantity'] as num).toInt())
           : 0.0,
-      unitCost: (map['quantity'] as num).toInt() > 0
+      unitCost: (map['quantity'] as num).toInt() != 0
           ? ((map['total_cost'] as num).toDouble()) / ((map['quantity'] as num).toInt())
           : 0.0,
       totalAmount: (map['total'] as num).toDouble(),
@@ -851,8 +852,128 @@ class SalesRepository {
       deliveryStatus: map['delivery_status'] as String?,
       deliveryNote: map['delivery_note'] as String?,
       deliveredAt: DateTime.tryParse('${map['delivered_at'] ?? ''}'),
+      returnOf: map['return_of'] as String?,
     );
   }
+
+  /// Cuántas unidades ya se devolvieron de una línea de venta (0.15.0)
+  Future<int> returnedQuantity(String saleId) async {
+    final db = await _dbProvider.database;
+    final rows = await db.rawQuery(
+      'SELECT COALESCE(SUM(-quantity), 0) AS q FROM sales WHERE return_of = ? AND voided_at IS NULL',
+      [saleId],
+    );
+    return (rows.first['q'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Devolución parcial (0.15.0, decisiones del dueño del 15 nov): una venta en negativo
+  /// con el mismo medio de pago, así la caja, los reportes y los totales por medio se
+  /// ajustan solos (efectivo: la caja espera menos; fiado: baja la deuda). Si [restock],
+  /// las unidades vuelven al inventario; si no (llegó dañado), queda anotado como baja.
+  Future<Sale> returnSale(Sale line, {required int quantity, required bool restock, String? reason, DateTime? now}) async {
+    if (line.isVoided || line.isReturn || line.isService) throw StateError('Esa venta no se puede devolver.');
+    final left = line.quantity - await returnedQuantity(line.id);
+    if (quantity < 1 || quantity > left) throw StateError('Solo quedan $left por devolver.');
+    final db = await _dbProvider.database;
+    final at = now ?? DateTime.now();
+    final user = AuthRepository.instance.currentUser;
+    final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
+    final amount = _round(line.totalAmount / line.quantity * quantity);
+    final cost = _round(line.unitCost * quantity);
+    final cleanReason = (reason ?? '').trim();
+    final id = const Uuid().v4();
+    final original = (await db.query('sales', where: 'id = ?', whereArgs: [line.id], limit: 1)).first;
+    final customerId = original['customer_id'] as String?;
+
+    await db.transaction((txn) async {
+      await txn.insert('sales', {
+        'id': id,
+        'business_id': line.businessId,
+        'product_id': line.productId,
+        'product_name': line.productName,
+        'quantity': -quantity,
+        'customer_id': customerId,
+        'customer_name': line.customerName,
+        'seller_name': by,
+        'date': at.toIso8601String(),
+        'total': -amount,
+        'total_cost': -cost,
+        'net_profit': -(amount - cost),
+        'payment_method': line.paymentMethod,
+        'payment_status': 'PAGADO',
+        'notes': 'Devolución${cleanReason.isEmpty ? '' : ': $cleanReason'}${restock ? '' : ' (no volvió al inventario)'}',
+        'invoice_number': line.invoiceNumber,
+        'variant_id': line.variantId,
+        'variant_name': line.variantName,
+        'return_of': line.id,
+        'created_at': at.toIso8601String(),
+        'is_synced': 0,
+      });
+      if (restock && line.productId.isNotEmpty) {
+        await txn.rawUpdate('UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
+            [quantity, line.productId, line.businessId]);
+        if (line.variantId != null) {
+          await txn.rawUpdate('UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?',
+              [quantity, at.toIso8601String(), line.variantId]);
+        }
+        final p = await txn.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [line.productId], limit: 1);
+        await txn.insert('stock_movements', {
+          'id': const Uuid().v4(),
+          'business_id': line.businessId,
+          'product_id': line.productId,
+          'type': 'AJUSTE',
+          'quantity': quantity,
+          'resulting_stock': p.isEmpty ? 0 : p.first['stock'] as int,
+          'reason': 'Devolución ${line.invoiceNumber ?? ''}'.trim(),
+          'date': at.toIso8601String(),
+        });
+      }
+      // Fiado: lo devuelto baja la deuda
+      if (line.paymentMethod == PaymentMethod.credit && customerId != null) {
+        await txn.rawUpdate('UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE id = ?', [amount, customerId]);
+      }
+    });
+
+    final sale = Sale(
+      id: id,
+      businessId: line.businessId,
+      productId: line.productId,
+      productName: line.productName,
+      quantity: -quantity,
+      unitPrice: line.unitPrice,
+      unitCost: line.unitCost,
+      totalAmount: -amount,
+      netProfit: -(amount - cost),
+      paymentMethod: line.paymentMethod,
+      customerName: line.customerName,
+      sellerName: by,
+      date: at,
+      variantId: line.variantId,
+      variantName: line.variantName,
+      invoiceNumber: line.invoiceNumber,
+      returnOf: line.id,
+    );
+    final cloud = SupabaseService.instance;
+    await cloud.insertSaleToCloud({...sale.toMap(), 'customer_id': customerId, 'notes': null});
+    if (restock && line.productId.isNotEmpty) {
+      await cloud.adjustProductStockInCloud(line.productId, quantity);
+      if (line.variantId != null) await cloud.adjustVariantStockInCloud(line.variantId!, quantity);
+    }
+    if (line.paymentMethod == PaymentMethod.credit && customerId != null) {
+      await cloud.adjustCustomerDebtInCloud(customerId, -amount);
+    }
+    ActivityRepository.instance.log(
+      businessId: line.businessId,
+      action: ActivityAction.saleCancel,
+      summary: 'Devolvió $quantity × ${line.productName} por ${CurrencyFormatter.format(amount)}'
+          '${restock ? '' : ' (no volvió al inventario)'}${cleanReason.isEmpty ? '' : ' ($cleanReason)'}',
+      data: {'sale_id': line.id, 'return_id': id},
+    );
+    DataEvents.instance.salesChanged();
+    return sale;
+  }
+
+  static double _round(double v) => (v * 100).roundToDouble() / 100;
 
   /// Obtiene el resumen de ventas del día actual de la empresa
   Future<Map<String, dynamic>> getTodaySummary(String businessId) {

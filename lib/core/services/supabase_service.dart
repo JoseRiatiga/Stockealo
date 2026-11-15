@@ -1495,7 +1495,7 @@ class SupabaseService {
 
   static const _saleV13Columns = [
     'voided_at', 'void_reason', 'voided_by', 'payment_split', 'promotion_id', 'promotion_name',
-    'delivery_status', 'delivery_note', 'delivered_at', 'auth_request_id', 'void_auth_request_id',
+    'delivery_status', 'delivery_note', 'delivered_at', 'auth_request_id', 'void_auth_request_id', 'return_of',
   ];
 
   static Map<String, dynamic> _saleV13Fields(Map<String, dynamic> s) => {

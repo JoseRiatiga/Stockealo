@@ -165,9 +165,10 @@ class CashRegisterRepository {
       final parts = PaymentMethod.amounts('${r['method'] ?? 'OTRO'}', (r['total'] as num).toDouble(), r['payment_split'] as String?);
       for (final e in parts.entries) {
         byMethod[e.key] = (byMethod[e.key] ?? 0) + e.value;
-        if (e.key == _cash && e.value > 0) {
+        // Las devoluciones en efectivo (en negativo, 0.15.0) restan, pero no cuentan como venta
+        if (e.key == _cash) {
           cashSales += e.value;
-          cashInvoices.add('${r['invoice']}');
+          if (e.value > 0) cashInvoices.add('${r['invoice']}');
         }
       }
     }

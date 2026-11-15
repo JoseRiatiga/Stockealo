@@ -23,10 +23,13 @@ class SaleCard extends StatelessWidget {
   /// Anular la venta; null oculta el botón (cajeros, o ya anulada)
   final VoidCallback? onCancel;
 
+  /// Devolver unidades de esta venta (0.15.0); null = el rol no puede devolver
+  final VoidCallback? onReturn;
+
   /// Todavía no sube a la nube (se hizo sin conexión): «Pendiente de subir»
   final bool pendingUpload;
 
-  const SaleCard({super.key, required this.sale, required this.showProfit, this.onCancel, this.pendingUpload = false});
+  const SaleCard({super.key, required this.sale, required this.showProfit, this.onCancel, this.onReturn, this.pendingUpload = false});
 
   String get _title {
     final variant = sale.variantName;
@@ -88,6 +91,17 @@ class SaleCard extends StatelessWidget {
             icon: const Icon(Icons.receipt_long_outlined),
             label: const Text('Ver comprobante'),
           ),
+          if (onReturn != null && !sale.isVoided && !sale.isReturn && !sale.isService) ...[
+            const SizedBox(height: AppSpace.sm),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                onReturn!();
+              },
+              icon: const Icon(Icons.assignment_return_outlined),
+              label: const Text('Devolver'),
+            ),
+          ],
           if (onCancel != null && !sale.isVoided) ...[
             const SizedBox(height: AppSpace.sm),
             TextButton(

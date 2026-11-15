@@ -42,6 +42,7 @@ import '../../../backup/data/backup_service.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/services/sync_queue.dart';
 import '../../../../core/permissions/permissions.dart';
+import '../../data/personal_data_export.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -929,6 +930,13 @@ actions: [
                         subtitle: 'Tu clave de acceso',
                         onTap: _user == null ? null : () => ChangePasswordDialog.show(context, userId: _user!.id),
                       ),
+                      // Ley 1581 (0.16.0, fase 5): un Excel con todo lo de tus negocios
+                      SettingsRow(
+                        icon: Icons.download_outlined,
+                        title: 'Descargar todos mis datos',
+                        subtitle: 'Un Excel con tu negocio, productos, clientes, ventas…',
+                        onTap: _user == null ? null : _downloadMyData,
+                      ),
                       SettingsRow(
                         icon: Icons.shield_outlined,
                         title: 'Términos y privacidad',
@@ -1334,6 +1342,20 @@ actions: [
           ),
       ];
     });
+  }
+
+  Future<void> _downloadMyData() async {
+    final user = _user;
+    if (user == null) return;
+    AppToast.show(context, message: 'Preparando tus datos…', type: ToastType.info);
+    try {
+      final rows = await PersonalDataExport.instance.exportAndShare(userId: user.id, userEmail: user.email);
+      if (!mounted) return;
+      final total = rows.values.fold<int>(0, (s, v) => s + v);
+      AppToast.show(context, message: 'Listo: ${rows.length} hojas, $total filas.', type: ToastType.success);
+    } catch (e) {
+      if (mounted) AppToast.show(context, message: 'No se pudo preparar el archivo: $e', type: ToastType.error);
+    }
   }
 
   void _openDeletion() {

@@ -166,21 +166,33 @@ void main() {
     expect(find.text('Abrigo largo camel'), findsOneWidget);
     expect(find.text('Buzo con capota'), findsNothing);
 
-    // Agregar pide la talla
-    await tester.tap(find.byTooltip('Elegir talla o color').first);
+    // 0.15.0: la talla y el color se eligen en la misma tarjeta
+    expect(find.text('Elige talla y color'), findsOneWidget);
+    // La M está agotada: se ve tachada y no se puede elegir
+    expect(find.bySemanticsLabel(RegExp(r'^Talla M agotada\b')), findsOneWidget);
+    // Agregar sin elegir no agrega: lo pide
+    await tester.tap(find.byTooltip('Elige talla o color').first);
     await tester.pumpAndSettle();
-    // Primero la talla, debajo los colores de esa talla; la M está agotada
-    expect(find.byTooltip('Agotada'), findsOneWidget);
-    expect(find.text('Elige una talla'), findsOneWidget);
-    await tester.tap(find.text('S').last);
+    expect(find.text('Elige la talla y el color'), findsOneWidget);
+    expect(find.text('1 en tu pedido'), findsNothing);
+    // Talla L: el negro no existe en L, se ve tachado
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Talla L\b')));
     await tester.pumpAndSettle();
-    expect(find.text('Color en talla S'), findsOneWidget);
-    await tester.tap(find.text('Negro'));
+    expect(find.bySemanticsLabel(RegExp(r'^Color Negro agotado\b')), findsOneWidget);
+    // Talla S y negro (quedan pocas): se agrega directo, sin abrir nada
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Talla S\b')));
     await tester.pumpAndSettle();
-    expect(find.text('Quedan pocas, pide pronto'), findsWidgets);
-    await tester.tap(find.textContaining('Agregar al pedido ·'));
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Color Negro\b')));
+    await tester.pumpAndSettle();
+    expect(find.text('Talla S · Negro · quedan pocas'), findsOneWidget);
+    await tester.tap(find.byTooltip('Agregar al pedido').first);
     await tester.pumpAndSettle();
     expect(find.text('1 en tu pedido'), findsOneWidget);
+    expect(find.text('Elige talla y color'), findsOneWidget, reason: 'la tarjeta queda lista para otra');
+    // Con una sola talla y un solo color disponibles, quedan elegidos solos
+    await tester.tap(find.widgetWithText(ChoiceChip, 'S'));
+    await tester.pumpAndSettle();
+    expect(find.text('Talla L'), findsOneWidget, reason: 'la chaqueta solo tiene la L');
     expect(tester.takeException(), isNull);
   });
 
@@ -192,14 +204,13 @@ void main() {
     await _save(tester, key, 'tienda_moda_celular');
 
     // El carrito es una página completa con el total y «Hacer el pedido» fijos abajo
-    await tester.tap(find.byTooltip('Elegir talla o color').first);
+    // Talla y color en la tarjeta (0.15.0), también en el celular
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Talla S\b')).first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('S').last);
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Color Camel\b')).first);
     await tester.pumpAndSettle();
     await _save(tester, key, 'tienda_talla_celular');
-    await tester.tap(find.text('Camel').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Agregar al pedido ·'));
+    await tester.tap(find.byTooltip('Agregar al pedido').first);
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Ver pedido'));
     await tester.pumpAndSettle();
@@ -247,4 +258,26 @@ void main() {
     expect(PublicStore.fromJson(json('javascript:alert(1)')).heroImageUrl, isNull);
     expect(PublicStore.fromJson(json(null)).heroImageUrl, isNull);
   });
+
+  // 0.15.0: tallas y colores en la tarjeta también en la Clásica, en celular y computador
+  for (final size in const [Size(360, 1600), Size(1200, 1400)]) {
+    testWidgets('Clásica con tallas y colores a ${size.width.toInt()} px', (tester) async {
+      final key = GlobalKey();
+      final store = PublicStore(
+        slug: _moda.slug,
+        whatsapp: _moda.whatsapp,
+        businessName: _moda.businessName,
+        currency: _moda.currency,
+        products: _moda.products,
+      );
+      await _pump(tester, store, size: size, ratio: 1, key: key);
+      // La M agotada: tachada, con el aviso «Agotada»
+      expect(find.byTooltip('Agotada'), findsOneWidget);
+      await tester.tap(find.text('S').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Talla S · elige el color'), findsOneWidget);
+      await _save(tester, key, 'tienda_clasica_tallas_${size.width.toInt()}');
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

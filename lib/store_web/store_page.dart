@@ -187,10 +187,11 @@ class _StorePageState extends State<StorePage> {
     });
   }
 
-  /// Agregar uno; si tiene tallas o colores, primero se elige
-  Future<void> _add(StoreProduct p) async {
-    StoreVariant? variant;
-    if (p.variants.isNotEmpty) {
+  /// Agregar uno. La talla y el color se eligen en la misma tarjeta (0.15.0); si el
+  /// producto tiene otras opciones (sin talla ni color), se elige en el panel.
+  Future<void> _add(StoreProduct p, [StoreVariant? chosen]) async {
+    var variant = chosen;
+    if (variant == null && p.variants.isNotEmpty) {
       variant = await _pickVariant(p);
       if (variant == null) return;
     }
@@ -288,7 +289,7 @@ class _StorePageState extends State<StorePage> {
                 ),
               ),
             ),
-          ..._grid(context, store, visible, side, minWidth: 180, extent: 300, fashion: false),
+          ..._grid(context, store, visible, side, minWidth: 180, extent: 300 + _optionsExtra(store), fashion: false),
           SliverToBoxAdapter(child: _footer(context, side, _lines.isEmpty)),
         ],
       ),
@@ -515,7 +516,7 @@ class _StorePageState extends State<StorePage> {
                     const SizedBox(width: AppSpace.xl - 4),
                     Expanded(
                       child: LayoutBuilder(
-                        builder: (context, box) => _staticGrid(context, store, visible, box.maxWidth, minWidth: 230, extent: 360),
+                        builder: (context, box) => _staticGrid(context, store, visible, box.maxWidth, minWidth: 230, extent: 360 + _optionsExtra(store)),
                       ),
                     ),
                   ],
@@ -523,7 +524,7 @@ class _StorePageState extends State<StorePage> {
               ),
             )
           else
-            ..._grid(context, store, visible, side, minWidth: 160, extent: 320, fashion: true),
+            ..._grid(context, store, visible, side, minWidth: 160, extent: 320 + _optionsExtra(store), fashion: true),
           SliverToBoxAdapter(child: _footer(context, side, _lines.isEmpty, fashion: true)),
         ],
       ),
@@ -681,12 +682,16 @@ class _StorePageState extends State<StorePage> {
     );
   }
 
+  /// Alto extra de las tarjetas cuando alguna trae tallas o colores para elegir
+  static double _optionsExtra(PublicStore store) => store.products.any(_ProductCard.hasOptions) ? 84 : 0;
+
   Widget _card(PublicStore store, StoreProduct p, {required bool fashion}) => _ProductCard(
+        key: ValueKey('card-${p.id}'),
         product: p,
         currency: store.currency,
         quantity: _qtyOf(p),
         fashion: fashion,
-        onAdd: () => _add(p),
+        onAdd: (variant) => _add(p, variant),
         onRemove: () {
           final line = _cart.values.where((l) => l.product.id == p.id).lastOrNull;
           if (line != null) _setLine(line, line.quantity - 1);
@@ -960,17 +965,21 @@ class _FiltersPanel extends StatelessWidget {
   }
 }
 
-/// Tarjeta de producto: foto grande, oferta, precio (con el de antes tachado),
-/// tallas y el botón de agregar
-class _ProductCard extends StatelessWidget {
+/// Tarjeta de producto: foto grande, oferta, precio (con el de antes tachado) y el botón
+/// de agregar. Desde la 0.15.0 la talla y el color se eligen aquí mismo: lo agotado se ve
+/// tachado en diagonal y el carrito agrega directo, sin abrir nada.
+class _ProductCard extends StatefulWidget {
   final StoreProduct product;
   final String currency;
   final int quantity;
   final bool fashion;
-  final VoidCallback onAdd;
+
+  /// Agregar: con la talla y el color elegidos en la tarjeta (null si no tiene)
+  final ValueChanged<StoreVariant?> onAdd;
   final VoidCallback onRemove;
 
   const _ProductCard({
+    super.key,
     required this.product,
     required this.currency,
     required this.quantity,
@@ -979,13 +988,175 @@ class _ProductCard extends StatelessWidget {
     required this.onRemove,
   });
 
+  /// Tiene tallas o colores para elegir en la tarjeta
+  static bool hasOptions(StoreProduct p) =>
+      p.variants.any((v) => v.size != null || v.color != null || ColorSwatchDot.hasSwatch(v.hex));
+
+  @override
+  State<_ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<_ProductCard> {
+  String? _size;
+  String? _color;
+
+  /// Tocó agregar sin elegir: la línea de ayuda lo pide con otro color
+  bool _nudge = false;
+
+  List<StoreVariant> get _all => widget.product.variants;
+  static String? _colorKey(StoreVariant v) => v.color ?? (ColorSwatchDot.hasSwatch(v.hex) ? v.hex : null);
+
+  /// Tallas y colores en el orden en que se crearon, también los agotados
+  List<String> get _sizes => [for (final x in _all.map((v) => v.size).whereType<String>().toSet()) x];
+  List<StoreVariant> get _colors {
+    final seen = <String>{};
+    return [
+      for (final v in _all)
+        if (_colorKey(v) != null && seen.add(_colorKey(v)!)) v,
+    ];
+  }
+
+  bool _sizeOut(String size) => _all.where((v) => v.size == size).every((v) => v.soldOut);
+
+  /// ¿Hay este color? En la talla elegida o, sin talla, en alguna
+  bool _colorOpen(String key) =>
+      _all.any((v) => _colorKey(v) == key && !v.soldOut && (_size == null || v.size == _size));
+
+  /// La opción que quedó elegida; null si falta algo
+  StoreVariant? get _chosen {
+    final needSize = _sizes.isNotEmpty;
+    final needColor = _colors.isNotEmpty;
+    if ((needSize && _size == null) || (needColor && _color == null)) return null;
+    return _all.where((v) => !v.soldOut && (!needSize || v.size == _size) && (!needColor || _colorKey(v) == _color)).firstOrNull;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _autoPick();
+  }
+
+  /// Si solo queda una talla o un color disponible, queda elegido solo
+  void _autoPick() {
+    if (_size == null) {
+      final open = _sizes.where((x) => !_sizeOut(x)).toList();
+      if (open.length == 1) _size = open.single;
+    }
+    if (_color == null) {
+      final open = [for (final v in _colors) if (_colorOpen(_colorKey(v)!)) _colorKey(v)!];
+      if (open.length == 1) _color = open.single;
+    }
+  }
+
+  void _pickSize(String size) => setState(() {
+        _nudge = false;
+        _size = _size == size ? null : size;
+        // El color elegido no existe en la talla nueva: se quita
+        if (_color != null && _size != null && !_colorOpen(_color!)) _color = null;
+        if (_size != null) _autoPick();
+      });
+
+  void _pickColor(String key) => setState(() {
+        _nudge = false;
+        _color = _color == key ? null : key;
+        // Si ese color solo existe en una talla, queda elegida
+        if (_color != null && _size == null) {
+          final sizes = {for (final v in _all) if (_colorKey(v) == key && !v.soldOut && v.size != null) v.size!};
+          if (sizes.length == 1) _size = sizes.single;
+        }
+      });
+
+  void _add() {
+    final p = widget.product;
+    if (!_ProductCard.hasOptions(p)) return widget.onAdd(null);
+    final chosen = _chosen;
+    if (chosen == null) return setState(() => _nudge = true);
+    widget.onAdd(chosen);
+    setState(() {
+      _size = null;
+      _color = null;
+      _autoPick();
+    });
+  }
+
+  String get _hint {
+    // Un color sin nombre (solo la muestra) no se escribe
+    if (_chosen != null) return [if (_size != null) 'Talla $_size', if (_chosen!.color != null) _chosen!.color!].join(' · ');
+    final missSize = _sizes.isNotEmpty && _size == null;
+    final missColor = _colors.isNotEmpty && _color == null;
+    if (missSize && missColor) return _nudge ? 'Elige la talla y el color' : 'Elige talla y color';
+    if (missSize) return 'Elige la talla';
+    if (missColor) return _size == null ? 'Elige el color' : 'Talla $_size · elige el color';
+    return 'Esa combinación está agotada';
+  }
+
+  Widget _options(BuildContext context) {
+    final c = context.colors;
+    final chosen = _chosen;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_sizes.isNotEmpty)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final size in _sizes)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _SizeChip(label: size, selected: _size == size, soldOut: _sizeOut(size), onTap: () => _pickSize(size)),
+                  ),
+              ],
+            ),
+          ),
+        if (_colors.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final v in _colors)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _ColorChoice(
+                      name: v.color ?? 'Color',
+                      hex: v.hex,
+                      selected: _color == _colorKey(v),
+                      soldOut: !_colorOpen(_colorKey(v)!),
+                      onTap: () => _pickColor(_colorKey(v)!),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 6),
+        Text(
+          chosen != null && chosen.few ? '$_hint · quedan pocas' : _hint,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppText.caption(
+            context,
+            weight: _nudge || chosen != null ? FontWeight.w700 : FontWeight.w400,
+            color: _nudge ? c.warning : (chosen != null ? c.ink : c.inkFaint),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final p = product;
+    final p = widget.product;
+    final quantity = widget.quantity;
+    final fashion = widget.fashion;
+    final currency = widget.currency;
     final maxed = p.variants.isEmpty && p.stock != null && quantity >= p.stock!;
     final radius = BorderRadius.circular(fashion ? AppRadius.sheet - 2 : AppRadius.card);
-    final sizes = p.sizes;
+    final inline = _ProductCard.hasOptions(p);
+    final sizes = inline ? const <String>[] : p.sizes;
     return Container(
       decoration: BoxDecoration(
         color: c.surface,
@@ -1032,7 +1203,7 @@ class _ProductCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpace.md + 2, AppSpace.md, AppSpace.md, AppSpace.md + 2),
+            padding: EdgeInsets.fromLTRB(AppSpace.md + 2, AppSpace.md, AppSpace.md, inline ? AppSpace.sm : AppSpace.md + 2),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -1057,7 +1228,7 @@ class _ProductCard extends StatelessWidget {
                         Text(sizes.join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption(context))
                       else if (p.stock != null)
                         Text('${p.stock} disponibles', style: AppText.caption(context)),
-                      if (p.runningLow)
+                      if (p.runningLow && !inline)
                         Text('Quedan pocas, pide pronto',
                             style: AppText.caption(context, weight: FontWeight.w700, color: c.warning)),
                     ],
@@ -1065,27 +1236,151 @@ class _ProductCard extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpace.sm),
                 if (quantity > 0 && p.variants.isEmpty)
-                  IconButton.outlined(tooltip: 'Quitar uno', onPressed: onRemove, icon: const Icon(Icons.remove_outlined, size: 18)),
+                  IconButton.outlined(tooltip: 'Quitar uno', onPressed: widget.onRemove, icon: const Icon(Icons.remove_outlined, size: 18)),
                 const SizedBox(width: 4),
                 SizedBox(
                   width: 44,
                   height: 44,
                   child: IconButton.filled(
-                    tooltip: p.variants.isEmpty ? 'Agregar al pedido' : 'Elegir talla o color',
+                    tooltip: inline && _chosen == null ? 'Elige talla o color' : 'Agregar al pedido',
                     style: IconButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control + 2))),
-                    onPressed: maxed ? null : onAdd,
+                    onPressed: maxed ? null : _add,
                     icon: const Icon(Icons.add_shopping_cart_outlined, size: 20),
                   ),
                 ),
               ],
             ),
           ),
+          if (inline)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.md + 2, 0, AppSpace.md, AppSpace.md + 2),
+              child: _options(context),
+            ),
         ],
       ),
     );
   }
 
   Widget _placeholder(StockealoColors c) => Center(child: Icon(Icons.checkroom_outlined, size: 36, color: c.inkFaint));
+}
+
+/// Una talla en la tarjeta: la elegida llena y con borde grueso; la agotada tachada
+class _SizeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool soldOut;
+  final VoidCallback onTap;
+
+  const _SizeChip({required this.label, required this.selected, required this.soldOut, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: soldOut ? 'Talla $label agotada' : 'Talla $label',
+      child: Tooltip(
+        message: soldOut ? 'Agotada' : '',
+        child: InkWell(
+          onTap: soldOut ? null : onTap,
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 34, minHeight: 30),
+            padding: const EdgeInsets.symmetric(horizontal: 9),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? c.ink : null,
+              borderRadius: BorderRadius.circular(AppRadius.control),
+              border: Border.all(color: selected ? c.ink : (soldOut ? c.line : c.lineStrong), width: selected ? 2 : 1),
+            ),
+            foregroundDecoration: soldOut ? _Crossed(c.inkMuted) : null,
+            child: Text(
+              label,
+              style: AppText.caption(
+                context,
+                weight: selected ? FontWeight.w800 : FontWeight.w600,
+                color: selected ? c.surface : (soldOut ? c.inkFaint : c.ink),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Un color en la tarjeta: el círculo del color (o su nombre si no tiene muestra); el
+/// elegido con un aro; el que no hay en esa talla, tachado
+class _ColorChoice extends StatelessWidget {
+  final String name;
+  final String? hex;
+  final bool selected;
+  final bool soldOut;
+  final VoidCallback onTap;
+
+  const _ColorChoice({required this.name, required this.hex, required this.selected, required this.soldOut, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final swatch = ColorSwatchDot.hasSwatch(hex);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: soldOut ? 'Color $name agotado' : 'Color $name',
+      child: Tooltip(
+        message: soldOut ? '$name · agotado en esta talla' : name,
+        child: InkWell(
+          onTap: soldOut ? null : onTap,
+          customBorder: swatch ? const CircleBorder() : null,
+          borderRadius: swatch ? null : BorderRadius.circular(AppRadius.control),
+          child: Container(
+            height: 30,
+            width: swatch ? 30 : null,
+            padding: swatch ? const EdgeInsets.all(3) : const EdgeInsets.symmetric(horizontal: 9),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: swatch ? BoxShape.circle : BoxShape.rectangle,
+              borderRadius: swatch ? null : BorderRadius.circular(AppRadius.control),
+              border: Border.all(color: selected ? c.ink : c.lineStrong, width: selected ? 2 : 1),
+            ),
+            foregroundDecoration: soldOut ? _Crossed(c.inkMuted) : null,
+            child: swatch
+                ? ColorSwatchDot(hex: hex, size: 20)
+                : Text(name,
+                    style: AppText.caption(context,
+                        weight: selected ? FontWeight.w800 : FontWeight.w600, color: soldOut ? c.inkFaint : c.ink)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tachado en diagonal para lo agotado (de abajo a la izquierda hacia arriba a la derecha)
+class _Crossed extends Decoration {
+  final Color color;
+  const _Crossed(this.color);
+
+  @override
+  BoxPainter createBoxPainter([VoidCallback? onChanged]) => _CrossedPainter(color);
+}
+
+class _CrossedPainter extends BoxPainter {
+  final Color color;
+  _CrossedPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
+    final size = configuration.size;
+    if (size == null) return;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(offset + Offset(2, size.height - 2), offset + Offset(size.width - 2, 2), paint);
+  }
 }
 
 /// El pedido: cantidades, nombre, nota y enviar. Al enviar sale el tiquete «Por

@@ -279,16 +279,47 @@ create trigger cash_movements_check_permissions
 -- ---------------------------------------------------------------------------
 -- Stock y deuda: en el servidor, con su propia revisión
 -- ---------------------------------------------------------------------------
+-- ¿Puede mover el stock en este sentido? Restar es vender; sumar es anular, recibir
+-- mercancía o ajustar (revisión con Codex, 14 nov)
+create or replace function public._can_move_stock(p_business_id text, p_delta integer)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when auth.uid() is null then true
+    when p_delta < 0 then public.has_permission(p_business_id, 'sell')
+      or public.has_permission(p_business_id, 'servicesCharge')
+      or public.has_permission(p_business_id, 'stockAdjust')
+    else public.has_permission(p_business_id, 'voidSale')
+      or public.has_permission(p_business_id, 'stockAdjust')
+      or public.has_permission(p_business_id, 'suppliers')
+      or public.has_permission(p_business_id, 'productsEdit')
+  end;
+$$;
+
+revoke all on function public._can_move_stock(text, integer) from public, anon;
+grant execute on function public._can_move_stock(text, integer) to authenticated;
+
 create or replace function public.adjust_product_stock(p_product_id text, p_delta integer)
 returns void
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  v_business text;
 begin
-  update public.products p
-  set current_stock = p.current_stock + p_delta
-  where p.id = p_product_id and public.my_business_role(p.business_id) is not null;
+  select p.business_id into v_business from public.products p where p.id = p_product_id;
+  if v_business is null then
+    return;
+  end if;
+  if public.my_business_role(v_business) is null or not public._can_move_stock(v_business, p_delta) then
+    raise exception 'perm_denied:stock';
+  end if;
+  update public.products set current_stock = current_stock + p_delta where id = p_product_id;
 end;
 $$;
 
@@ -298,10 +329,17 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  v_business text;
 begin
-  update public.product_variants v
-  set stock = greatest(0, v.stock + p_delta), updated_at = now()
-  where v.id = p_variant_id and public.my_business_role(v.business_id) is not null;
+  select v.business_id into v_business from public.product_variants v where v.id = p_variant_id;
+  if v_business is null then
+    return;
+  end if;
+  if public.my_business_role(v_business) is null or not public._can_move_stock(v_business, p_delta) then
+    raise exception 'perm_denied:stock';
+  end if;
+  update public.product_variants set stock = greatest(0, stock + p_delta), updated_at = now() where id = p_variant_id;
 end;
 $$;
 

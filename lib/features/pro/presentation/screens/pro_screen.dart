@@ -11,6 +11,7 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../business/models/business.dart';
 import '../../data/pro_admin_service.dart';
 import '../../data/pro_service.dart';
+import '../widgets/plan_finder.dart';
 
 /// Lo que suma Pro (también lo muestra la ventana de Pro). Todo lo demás sigue gratis.
 /// Correo de soporte (el mismo de los Términos y la Política de privacidad)
@@ -131,12 +132,14 @@ class _ProScreenState extends State<ProScreen> {
   }
 
   /// Sin Nequi (otro país o datos sin configurar): pedir Pro por WhatsApp o por correo
-  Future<void> _askForPro(ProPlan? plan, String? whatsapp) async {
+  Future<void> _askForPro(ProPlan? plan, String? whatsapp, {String? kind, Set<ProNeed> needs = const {}}) async {
     final email = AuthRepository.instance.currentUser?.email ?? '';
     final wanted = plan == null
-        ? 'Stockealo Pro'
+        ? 'Stockealo ${kind == null ? 'Pro' : proKindLabel(kind)}'
         : 'Stockealo ${plan.kindLabel} ${plan.periodLabel.toLowerCase()} (${_money(plan.price)})';
-    final message = 'Hola, quiero activar $wanted para el negocio "${widget.business.name}". '
+    // Lo que marcó en «¿Qué necesitas?», para responderle con la oferta (0.15.0)
+    final what = needs.isEmpty ? '' : ' Necesito: ${needs.map((n) => n.label.toLowerCase()).join(', ')}.';
+    final message = 'Hola, quiero activar $wanted para el negocio "${widget.business.name}".$what '
         'Mi cuenta es $email. ¿Cómo puedo pagar?';
     final digits = whatsapp?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
     final uri = digits.isNotEmpty
@@ -167,6 +170,27 @@ class _ProScreenState extends State<ProScreen> {
             padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
             children: [
               _statusCard(c),
+              const SizedBox(height: AppSpace.xl),
+              // Elegir el plan por lo que se necesita (0.15.0, punto 9)
+              _section(c, '¿Qué necesitas para tu negocio?'),
+              _card(
+                c,
+                PlanFinder(
+                  pricingVisible: showPricing && plans.isNotEmpty,
+                  onChoose: (kind, needs) {
+                    if (showPricing && plans.any((p) => p.kind == kind)) {
+                      setState(() {
+                        _kind = kind;
+                        _selectedPlanId = null;
+                      });
+                      _scroll.animateTo(_scroll.position.maxScrollExtent,
+                          duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
+                    } else {
+                      _askForPro(null, settings['whatsapp'], kind: kind, needs: needs);
+                    }
+                  },
+                ),
+              ),
               const SizedBox(height: AppSpace.xl),
               _section(c, 'Lo que suma Pro'),
               _card(c, Column(children: [for (final b in proBenefits) _benefit(c, b.$1, b.$2, b.$3)])),
@@ -322,7 +346,8 @@ class _ProScreenState extends State<ProScreen> {
 
   Widget _plans(StockealoColors c, List<ProPlan> all) {
     // Pro Servicios aparece solo si su plan está encendido para esta moneda
-    final kinds = [for (final k in const ['business', 'global', 'services']) if (all.any((p) => p.kind == k)) k];
+    // Quedan Pro y Pro Servicios (0.15.0: Pro Global ya no se vende)
+    final kinds = [for (final k in const ['business', 'services']) if (all.any((p) => p.kind == k)) k];
     if (!kinds.contains(_kind) && kinds.isNotEmpty) _kind = kinds.first;
     final plans = all.where((p) => p.kind == _kind).toList();
     return Column(
@@ -343,7 +368,6 @@ class _ProScreenState extends State<ProScreen> {
           padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.sm, AppSpace.xs, AppSpace.md),
           child: Text(
             switch (_kind) {
-              'global' => 'Para todos los negocios donde eres dueño, también los que crees después.',
               'services' => 'Para "${widget.business.name}": todo Pro más el módulo Servicios, con soporte.',
               _ => 'Para "${widget.business.name}" y todo su equipo.',
             },

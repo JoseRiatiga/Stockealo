@@ -135,7 +135,9 @@ Con Pro Servicios, el dueño también puede **aprobar a distancia**: le llega un
 2. Al administrador o al dueño le llega un aviso **en su propio celular** con ese detalle, y toca «Aprobar» o «Rechazar».
 3. La aprobación sirve **solo para esa acción** y vence en **5 minutos** si no se usa.
 
-**Sin internet o si el administrador está al lado:**
+> **Decisión del dueño (14 nov 2026):** por ahora la autorización es **solo con internet**. El código de 6 dígitos sin internet no se hace: para comprobarlo, el celular del cajero tendría que guardar la clave del administrador y alguien podría sacarla. Si más adelante hace falta sin internet, la opción segura es un **código QR firmado** (el celular del administrador lo muestra y el del cajero lo escanea con la clave pública).
+
+~~**Sin internet o si el administrador está al lado:**~~ (descartado por ahora, ver la decisión de arriba)
 1. El celular del cajero muestra un **número de solicitud** (por ejemplo, 4821).
 2. El administrador abre «Autorizar» en **su** celular, escribe ese número y su app le da un **código de un solo uso** de 6 dígitos.
    - El código sale de la solicitud, de la hora y de una clave secreta de ese administrador. Funciona sin internet, como los códigos de los bancos.

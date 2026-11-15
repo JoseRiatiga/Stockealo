@@ -57,6 +57,42 @@ void main() {
     });
   });
 
+  // 0.15.0: una foto por color
+  group('Foto por color', () {
+    test('todas las tallas del mismo color comparten la foto y se guarda en cada variante', () {
+      final c = VariantEditorController()..setSizes(['S', 'M']);
+      c.addColorTo('S', VariantColor('Negro', hex: '#111111'));
+      c.addColorTo('M', VariantColor('Negro', hex: '#111111'));
+      c.addColorTo('M', VariantColor('Blanco', hex: '#FFFFFF'));
+      c.setColorImage('negro', 'https://x.co/p1-color-negro.jpg');
+      final built = c.build(businessId: 'b1', productId: 'p1', now: DateTime(2026, 11, 14));
+      expect({for (final v in built) '${v.attributeValue} ${v.attribute2Value}': v.imageUrl}, {
+        'S Negro': 'https://x.co/p1-color-negro.jpg',
+        'M Negro': 'https://x.co/p1-color-negro.jpg',
+        'M Blanco': null,
+      });
+      // Al volver a abrir el producto, la foto sigue ahí
+      final again = VariantEditorController()..load(built);
+      expect(again.colors.firstWhere((x) => x.key == 'negro').imageUrl, 'https://x.co/p1-color-negro.jpg');
+      // Quitarla
+      again.setColorImage('negro', null);
+      expect(again.colors.firstWhere((x) => x.key == 'negro').imageUrl, isNull);
+    });
+
+    test('la nube solo recibe direcciones https y la base local guarda la foto', () {
+      final v = _v('1', 'M', color: 'Negro');
+      expect(ProductVariant.cloudRow(v.copyWith(imageUrl: 'https://x.co/a.jpg').toMap())['image_url'], 'https://x.co/a.jpg');
+      expect(ProductVariant.cloudRow(v.copyWith(imageUrl: 'C:/fotos/a.jpg').toMap())['image_url'], isNull);
+      expect(ProductVariant.fromMap(v.copyWith(imageUrl: 'https://x.co/a.jpg').toMap()).imageUrl, 'https://x.co/a.jpg');
+      expect(v.copyWith(imageUrl: 'https://x.co/a.jpg').copyWith(clearImage: true).imageUrl, isNull);
+    });
+
+    test('el archivo de la foto tiene un nombre por color', () {
+      expect(VariantEditorPhotos.name('p1', 'azul oscuro'), 'p1-color-azul-oscuro');
+      expect(VariantEditorPhotos.name('p1', 'ñandú'), 'p1-color-and');
+    });
+  });
+
   group('VariantEditorController', () {
     test('cada talla tiene sus propios colores (S solo rojo, M rojo y verde)', () {
       final c = VariantEditorController()..setSizes(['S', 'M']);
@@ -194,6 +230,32 @@ void main() {
 
   group('VariantEditor', () {
     for (final width in [360.0, 1200.0]) {
+      testWidgets('fotos por color sin desbordes a ${width.toInt()} px', (tester) async {
+        tester.view.physicalSize = Size(width, 2400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final c = VariantEditorController()..setSizes(['S', 'M']);
+        c.addColorTo('S', VariantColor('Azul oscuro con rayas blancas', hex: '#1F2F5A'));
+        c.addColorTo('M', VariantColor('Negro', hex: '#111111', imageUrl: 'https://x.co/negro.jpg'));
+        await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.build(Brightness.light),
+          home: Scaffold(body: SingleChildScrollView(child: VariantEditor(controller: c, businessId: 'b1', productId: 'p1'))),
+        ));
+        await tester.pump();
+        expect(find.text('Fotos por color'), findsOneWidget);
+        expect(find.text('Subir foto'), findsOneWidget, reason: 'el azul no tiene foto');
+        expect(find.text('Cambiar'), findsOneWidget, reason: 'el negro ya tiene');
+        expect(find.byTooltip('Quitar la foto de Negro'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        // Sin negocio ni producto (otras pantallas) no se ofrece subir fotos
+        await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.build(Brightness.light),
+          home: Scaffold(body: SingleChildScrollView(child: VariantEditor(controller: c))),
+        ));
+        expect(find.text('Fotos por color'), findsNothing);
+        c.dispose();
+      });
+
       testWidgets('se dibuja sin desbordes a ${width.toInt()} px', (tester) async {
         tester.view.physicalSize = Size(width, 2400);
         tester.view.devicePixelRatio = 1;

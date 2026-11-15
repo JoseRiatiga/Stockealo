@@ -27,6 +27,9 @@ import '../widgets/attention_panel.dart';
 import '../widgets/cloud_sync_reminder.dart';
 import '../widgets/home_sales_chart.dart';
 import '../widgets/quick_actions_section.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../pro/presentation/screens/pro_screen.dart';
+import '../../../pro/data/pro_service.dart';
 
 /// Inicio: cómo va el día de un vistazo y lo que necesita atención, con su
 /// solución a un toque. Diseño aprobado el 11 nov 2026 (re-diseño 0.13.0).
@@ -61,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
   List<WorkOrder>? _board;
   List<ActivityEntry>? _activity;
 
-  bool get _manager => _role == 'OWNER' || _role == 'ADMIN';
+  bool _can(Perm p) => Permissions.can(_role, p);
 
   @override
   void onActiveBusinessChanged() {
@@ -152,7 +155,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
       _loading = false;
     });
     // La actividad puede venir de la nube: llega después, sin frenar el resto
-    if (role == 'OWNER' || role == 'ADMIN') {
+    if (Permissions.can(role, Perm.activity)) {
       try {
         final activity = await ActivityRepository.instance.list(biz.id, limit: 4);
         if (mounted && _business?.id == biz.id) setState(() => _activity = activity);
@@ -220,7 +223,8 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
               children: [
                 _greeting(wide),
                 SizedBox(height: gap),
-                CloudSyncReminder(key: ValueKey('cloud-${_business?.id}-$_role'), canManage: _manager),
+                CloudSyncReminder(key: ValueKey('cloud-${_business?.id}-$_role'), canManage: _can(Perm.cloud)),
+                if (_role == Permissions.owner && _business != null) _ProExpiry(business: _business!),
                 _figures(wide, box.maxWidth - pad.horizontal),
                 SizedBox(height: gap),
                 _grid(
@@ -241,7 +245,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                   gap: gap,
                   children: [
                     _topCard(),
-                    if (_manager) _activityCard(),
+                    if (_can(Perm.activity)) _activityCard(),
                     if (_board != null) _servicesCard(),
                   ],
                 ),
@@ -355,7 +359,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     final compact = !wide;
     final cards = <Widget>[
       sales,
-      if (_manager)
+      if (_can(Perm.profits))
         StatCard(
           compact: compact,
           title: 'Ganancia de ${DateFormat('MMMM', 'es_CO').format(DateTime.now())}',
@@ -424,6 +428,17 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
         value: 'Cerrada',
         detail: 'Ábrela para empezar a vender',
         actionLabel: 'Abrir caja',
+        onTap: () => _go(AppPlace.caja),
+      );
+    }
+    // Arqueo ciego (0.15.0): sin «Ver lo esperado en caja» no se muestra la cifra
+    if (!_can(Perm.cashExpected)) {
+      return StatCard(
+        compact: compact,
+        title: 'Caja',
+        value: 'Abierta',
+        detail: '${s.cashSalesCount} ${s.cashSalesCount == 1 ? 'venta' : 'ventas'} en efectivo',
+        actionLabel: 'Cerrar caja',
         onTap: () => _go(AppPlace.caja),
       );
     }
@@ -678,3 +693,70 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     return DateFormat('d MMM, h:mm a', 'es_CO').format(at);
   }
 }
+
+/// Aviso de vencimiento del Pro (0.15.0): 7 días antes y hasta 15 días después, con
+/// «Renovar» en un toque. Solo lo ve el dueño.
+class _ProExpiry extends StatefulWidget {
+  final Business business;
+  const _ProExpiry({required this.business});
+
+  @override
+  State<_ProExpiry> createState() => _ProExpiryState();
+}
+
+class _ProExpiryState extends State<_ProExpiry> {
+  DateTime? _endedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    ProService.instance.status.addListener(_reload);
+    _reload();
+  }
+
+  @override
+  void dispose() {
+    ProService.instance.status.removeListener(_reload);
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    final last = await ProService.lastKnown(widget.business.id);
+    if (mounted) setState(() => _endedAt = last?.endedAt);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ProService.instance.status.value;
+    final now = DateTime.now();
+    final fmt = DateFormat("d 'de' MMMM", 'es_CO');
+    String? title;
+    String? detail;
+    var tone = AppTone.warning;
+    if (s.active && s.endsAt != null) {
+      final days = s.endsAt!.difference(now).inHours / 24;
+      if (days <= 7) {
+        final n = days.ceil();
+        title = n <= 1 ? 'Tu ${s.kindLabel} vence mañana' : 'Tu ${s.kindLabel} vence en $n días';
+        detail = 'Vence el ${fmt.format(s.endsAt!)}. Renuévalo para no perder la tienda en línea y lo demás de Pro.';
+      }
+    } else if (!s.active && _endedAt != null && now.difference(_endedAt!).inDays <= 15) {
+      title = 'Tu Pro venció el ${fmt.format(_endedAt!)}';
+      detail = 'La tienda en línea y los recordatorios de cobro están en pausa. Al renovar vuelven solos.';
+      tone = AppTone.danger;
+    }
+    if (title == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpace.md),
+      child: AttentionRow(
+        icon: Icons.workspace_premium_outlined,
+        tone: tone,
+        title: title,
+        detail: detail,
+        pill: 'Renovar',
+        onTap: () => ProScreen.open(context, widget.business),
+      ),
+    );
+  }
+}
+

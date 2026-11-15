@@ -592,6 +592,7 @@ class SupabaseService {
                   : (b['service_messages'] is String ? b['service_messages'] : jsonEncode(b['service_messages'])),
               'services_schedule': b['services_schedule'],
               'services_multi': b['services_multi'] == true ? 1 : 0,
+              'ticket_info': b['ticket_info'],
               'is_deleted': (b['is_deleted'] as int?) ?? 0,
               'deleted_at': b['deleted_at'],
               'created_at': b['created_at'] ?? DateTime.now().toIso8601String(),
@@ -627,6 +628,32 @@ class SupabaseService {
       // 1.2 Descargar Miembros de equipo
       int membersCount = 0;
       try {
+        // Roles del negocio (0.15.0): antes que los miembros, que pueden tener uno propio
+        try {
+          // Solo se agregan o actualizan: un rol creado sin conexión que aún no sube no se pierde
+          final List<dynamic> cloudRoles = await client!.from('business_roles').select();
+          for (final r in cloudRoles) {
+            final row = Map<String, dynamic>.from(r as Map);
+            await db.insert(
+              'business_roles',
+              {
+                'id': row['id'],
+                'business_id': row['business_id'],
+                'name': row['name'],
+                'base_role': row['base_role'] ?? 'CASHIER',
+                'builtin': row['builtin'],
+                'perms': jsonEncode(row['perms'] ?? const []),
+                'limits': jsonEncode(row['limits'] ?? const {}),
+                'template_id': row['template_id'],
+                'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+                'updated_at': row['updated_at'] ?? DateTime.now().toIso8601String(),
+              },
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+        } catch (e) {
+          debugPrint('No se pudieron bajar los roles del negocio: $e');
+        }
         final List<dynamic> cloudMembers = await client!.from('business_members').select();
         for (final m in cloudMembers) {
           final rawUserId = m['user_id'] as String?;
@@ -666,6 +693,8 @@ class SupabaseService {
               'email': memberEmail,
               'name': memberName,
               'role': memberRole,
+              'role_id': m['role_id'],
+              'access_schedule': m['access_schedule'],
               'status': 'ACTIVE',
               'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
             },
@@ -764,6 +793,7 @@ class SupabaseService {
               'attribute2_value': row['attribute2_value'],
               'color_hex': row['color_hex'],
               'color_hex2': row['color_hex2'],
+              'image_url': row['image_url'],
               'sku_or_barcode': row['sku_or_barcode'],
               'stock': (row['stock'] as num?)?.toInt() ?? 0,
               'additional_price': (row['additional_price'] as num?)?.toDouble() ?? 0.0,
@@ -1217,7 +1247,11 @@ class SupabaseService {
       case 'adjust_variant_stock':
         await db.rpc('adjust_variant_stock', params: {'p_variant_id': p['id'], 'p_delta': p['delta']});
       case 'adjust_debt':
-        await db.rpc('adjust_customer_debt', params: {'p_customer_id': p['id'], 'p_delta': p['delta']});
+        await db.rpc('adjust_customer_debt', params: {
+          'p_customer_id': p['id'],
+          'p_delta': p['delta'],
+          if (p['auth_request_id'] != null) 'p_auth_request_id': p['auth_request_id'],
+        });
       case 'upsert_sale':
         await _sendSale(db, p);
       case 'delete_sale':
@@ -1279,10 +1313,26 @@ class SupabaseService {
                   (userEmail.isNotEmpty ? userEmail.split('@').first : 'Colaborador'))
               .toString(),
           'role': p['role'] ?? 'CASHIER',
+          // Rol propio (0.15.0); null = su rol por defecto
+          'role_id': p['role_id'],
+          // Horario de acceso (0.15.0); null = sin horario
+          'access_schedule': p['access_schedule'],
           'created_at': p['created_at'] ?? DateTime.now().toIso8601String(),
         };
         try {
-          await db.from('business_members').upsert(row, onConflict: 'id');
+          try {
+            await db.from('business_members').upsert(row, onConflict: 'id');
+          } on PostgrestException catch (e) {
+            // La nube todavía no tiene la columna del rol propio: se guarda lo demás
+            if (!e.message.contains('role_id') && !e.message.contains('access_schedule') &&
+                e.code != '42703' && e.code != 'PGRST204') {
+              rethrow;
+            }
+            row
+              ..remove('role_id')
+              ..remove('access_schedule');
+            await db.from('business_members').upsert(row, onConflict: 'id');
+          }
         } on PostgrestException catch (e) {
           // El dueño de un negocio que aún no existe en la nube (creado sin conexión o
           // cuya creación se perdió): crearlo con su dueño en el servidor y reintentar
@@ -1297,6 +1347,10 @@ class SupabaseService {
         }
       case 'delete_member':
         await db.from('business_members').delete().eq('id', p['id'] as String);
+      case 'upsert_business_role':
+        await db.from('business_roles').upsert(p, onConflict: 'id');
+      case 'delete_business_role':
+        await db.from('business_roles').delete().eq('id', p['id'] as String);
       case 'insert_activity':
         // Quién la hizo lo pone el servidor con la sesión (actor_email por defecto)
         try {
@@ -1339,6 +1393,8 @@ class SupabaseService {
           if (b['services_schedule'] != null) 'services_schedule': b['services_schedule'],
           if (b['services_multi'] != null) 'services_multi': b['services_multi'] == 1 || b['services_multi'] == true,
         },
+        // Datos del tiquete (0.15.0): solo si el negocio los puso
+        if (b['ticket_info'] != null) 'ticket_info': b['ticket_info'],
         'is_deleted': (b['is_deleted'] as int?) ?? 0,
       };
 
@@ -1439,7 +1495,7 @@ class SupabaseService {
 
   static const _saleV13Columns = [
     'voided_at', 'void_reason', 'voided_by', 'payment_split', 'promotion_id', 'promotion_name',
-    'delivery_status', 'delivery_note', 'delivered_at',
+    'delivery_status', 'delivery_note', 'delivered_at', 'auth_request_id', 'void_auth_request_id', 'return_of',
   ];
 
   static Map<String, dynamic> _saleV13Fields(Map<String, dynamic> s) => {
@@ -1471,6 +1527,9 @@ class SupabaseService {
       'customer_name': s['customer_name'],
       'sale_date': s['date'] ?? s['created_at'] ?? DateTime.now().toIso8601String(),
       ..._saleVariantFields(s),
+      // Autorización usada (0.15.0): la nube la exige si pasa el límite del rol
+      if (s['auth_request_id'] != null) 'auth_request_id': s['auth_request_id'],
+      if (s['void_auth_request_id'] != null) 'void_auth_request_id': s['void_auth_request_id'],
     };
 
     // upsert: si un reintento llega después de que la venta ya se guardó, no se duplica
@@ -1820,8 +1879,8 @@ class SupabaseService {
       _write('adjust_stock', {'id': productId, 'delta': delta});
 
   /// Suma o resta deuda de un cliente (fiados, abonos y anulaciones)
-  Future<void> adjustCustomerDebtInCloud(String customerId, double delta) =>
-      _write('adjust_debt', {'id': customerId, 'delta': delta});
+  Future<void> adjustCustomerDebtInCloud(String customerId, double delta, {String? authRequestId}) =>
+      _write('adjust_debt', {'id': customerId, 'delta': delta, if (authRequestId != null) 'auth_request_id': authRequestId});
 
   /// Guarda o actualiza una empresa en Supabase
   Future<void> upsertBusinessToCloud(Map<String, dynamic> b) => _write('upsert_business', b);
@@ -1855,6 +1914,10 @@ class SupabaseService {
 
   /// Elimina un miembro de equipo de Supabase
   Future<void> deleteBusinessMemberFromCloud(String memberId) => _write('delete_member', {'id': memberId});
+
+  /// Roles del negocio (0.15.0): ajustes del Administrador y del Cajero, y roles propios
+  Future<void> upsertBusinessRoleToCloud(Map<String, dynamic> row) => _write('upsert_business_role', row);
+  Future<void> deleteBusinessRoleFromCloud(String roleId) => _write('delete_business_role', {'id': roleId});
 
   /// Sube una anotación del registro de actividad (ver ActivityRepository)
   Future<void> insertActivityToCloud(Map<String, dynamic> row) => _write('insert_activity', row);

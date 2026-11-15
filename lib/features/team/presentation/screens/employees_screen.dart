@@ -17,6 +17,11 @@ import '../../../pro/data/pro_service.dart';
 import '../../../services/presentation/widgets/staff_section.dart';
 import '../../data/team_repository.dart';
 import '../../models/business_member.dart';
+import 'roles_screen.dart';
+import '../../data/roles_repository.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../services/presentation/widgets/schedule_editor.dart';
+import '../../../services/models/work_schedule.dart';
 
 /// Ajustes › Equipo: dueño, colaboradores con su rol e invitación por código o QR
 class EmployeesScreen extends StatefulWidget {
@@ -128,7 +133,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   bool get canInvite => isOwner || isAdmin;
 
   Future<void> _showEditRoleDialog(BusinessMember member) async {
-    String selectedRole = member.role;
+    String selectedRole = member.roleKey;
+    final customRoles = (await RolesRepository.instance.list(widget.business.id)).where((r) => !r.isBuiltin).toList();
+    if (!mounted) return;
 
     final updated = await showDialog<bool>(
       context: context,
@@ -177,30 +184,30 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   onChanged: (val) => setDialogState(() => selectedRole = val!),
                   child: Column(
                     children: [
-                    RadioListTile<String>(
-                      value: 'CASHIER',
-                      contentPadding: EdgeInsets.zero,
-                      activeColor: c.accent,
-                      title: Text('Cajero o vendedor',
-                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppText.sizeBody, color: c.ink)),
-                      subtitle: Text(
-                        'Solo registra ventas. Los precios de compra y los costos quedan protegidos.',
-                        style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
-                      ),
-                    ),
-                    RadioListTile<String>(
-                      value: 'ADMIN',
-                      contentPadding: EdgeInsets.zero,
-                      activeColor: c.accent,
-                      title: Text('Administrador',
-                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppText.sizeBody, color: c.ink)),
-                      subtitle: Text(
-                        'Puede ingresar inventario, cambiar precios y ver márgenes.',
-                        style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
-                      ),
-                    ),
+                      for (final (value, title, help) in [
+                        ('CASHIER', 'Cajero', 'Vende, fía y maneja su caja. Los costos quedan protegidos.'),
+                        ('ADMIN', 'Administrador', 'Inventario, precios, márgenes y reportes.'),
+                        // Roles propios del negocio (0.15.0)
+                        for (final r in customRoles)
+                          (Permissions.customRole(r.id), r.name, 'Rol propio · ${r.perms.length} permisos'),
+                      ])
+                        RadioListTile<String>(
+                          value: value,
+                          contentPadding: EdgeInsets.zero,
+                          activeColor: c.accent,
+                          title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppText.sizeBody, color: c.ink)),
+                          subtitle: Text(help, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
+                        ),
                     ],
                   ),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx, false);
+                    RolesScreen.open(context, business: widget.business, canEdit: isOwner).then((_) => _loadData());
+                  },
+                  icon: const Icon(Icons.tune_outlined, size: 18),
+                  label: const Text('Ver y cambiar lo que puede cada rol'),
                 ),
               ],
             ),
@@ -213,7 +220,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               FilledButton(
                 onPressed: () async {
                   try {
-                    await _teamRepo.updateRole(member.id, selectedRole);
+                    final custom = customRoles.where((r) => Permissions.customRole(r.id) == selectedRole).firstOrNull;
+                    if (custom != null) {
+                      await RolesRepository.instance.assign(member, role: custom);
+                    } else {
+                      await RolesRepository.instance.assign(member, code: selectedRole);
+                    }
                     if (ctx.mounted) Navigator.pop(ctx, true);
                   } catch (e) {
                     if (context.mounted) {
@@ -592,6 +604,13 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       appBar: AppBar(
         title: const Text('Equipo'),
         actions: [
+          // Roles y permisos (0.15.0): el dueño los cambia; el administrador los ve
+          if (canInvite)
+            IconButton(
+              tooltip: 'Roles y permisos',
+              onPressed: () => RolesScreen.open(context, business: widget.business, canEdit: isOwner).then((_) => _loadData()),
+              icon: const Icon(Icons.tune_outlined),
+            ),
           if (canInvite)
             TextButton.icon(
               onPressed: _checkAndShowInviteModal,
@@ -836,8 +855,51 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               ],
             ),
           ),
+          // Horario de acceso (0.15.0, Pro Servicios): solo entra a la app en sus días y horas
+          if (!member.isOwner && (canEdit || member.accessSchedule != null))
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpace.sm, right: AppSpace.sm),
+              child: InkWell(
+                onTap: canEdit ? () => _editAccessSchedule(member) : null,
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+                  child: Row(
+                    children: [
+                      Icon(Icons.schedule_outlined, size: 16, color: c.inkMuted),
+                      const SizedBox(width: AppSpace.sm),
+                      Expanded(
+                        child: Text(
+                          WorkSchedule.decode(member.accessSchedule)?.describe() ?? 'Sin horario de acceso: entra cuando quiera',
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
+                        ),
+                      ),
+                      if (canEdit) Icon(Icons.edit_outlined, size: 16, color: c.inkFaint),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _editAccessSchedule(BusinessMember member) async {
+    if (!ProService.instance.status.value.services) {
+      AppToast.showWarning(context, 'El horario de acceso es de Pro Servicios.');
+      return;
+    }
+    final picked = await ScheduleEditor.show(
+      context,
+      title: 'Horario de acceso',
+      subtitle: '${member.displayName} solo podrá usar la app en estos días y horas.',
+      initial: WorkSchedule.decode(member.accessSchedule),
+      removeLabel: 'Sin horario: entra cuando quiera',
+    );
+    if (picked == null || !mounted) return;
+    await _teamRepo.setAccessSchedule(member, picked.isEmpty ? null : picked);
+    await _loadData();
+    if (mounted) AppToast.showSuccess(context, picked.isEmpty ? 'Quitaste el horario de acceso.' : 'Horario de acceso guardado.');
   }
 }

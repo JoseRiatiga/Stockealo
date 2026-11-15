@@ -28,6 +28,8 @@ import 'package:stockealo/features/sales/models/sale.dart';
 import 'package:stockealo/features/sales/data/promotions_repository.dart';
 import 'package:stockealo/features/sales/models/promotion.dart';
 import 'package:stockealo/features/sales/presentation/screens/sell_screen.dart';
+import 'package:stockealo/features/reports/data/daily_close.dart';
+import 'package:stockealo/features/customers/data/customer_repository.dart';
 
 /// Vender (bloque 4): pago mixto, caja obligatoria, anular sin borrar y cómo se
 /// ve el punto de venta. Con PREVIEW_OUT=<carpeta> guarda imágenes.
@@ -104,6 +106,106 @@ void main() {
         for (final e in qty.entries)
           CartItem(product: (await ProductRepository.instance.getProductById(e.key, businessId))!, quantity: e.value),
       ];
+
+  // 0.15.0: las ventas en espera no se pierden al cerrar la app
+  test('las ventas en espera se guardan en el celular y vuelven al abrir la app', () async {
+    final cart = SellCart.instance;
+    await cart.restore(businessId);
+    final huevos = (await ProductRepository.instance.getProductById('huevos', businessId))!;
+    final aceite = (await ProductRepository.instance.getProductById('aceite', businessId))!;
+    cart.lines
+      ..add(CartItem(product: huevos, quantity: 2))
+      ..add(CartItem(product: aceite, customUnitPrice: 12000));
+    cart.customer = 'Doña Marta';
+    cart.hold();
+    expect(cart.held, hasLength(1));
+    // «Se cierra la app»: la memoria se borra y al volver se carga lo guardado
+    cart.reset();
+    expect(cart.held, isEmpty);
+    await cart.restore(businessId);
+    expect(cart.held, hasLength(1));
+    final h = cart.held.single;
+    expect(h.customer, 'Doña Marta');
+    expect(h.lines.map((l) => '${l.product.id} x${l.quantity} ${l.unitPrice.round()}'), ['huevos x2 18900', 'aceite x1 12000']);
+    // Al retomarla deja de estar en espera, también en lo guardado
+    cart.resume(0);
+    cart.reset();
+    await cart.restore(businessId);
+    expect(cart.held, isEmpty);
+    cart.reset();
+  });
+
+  // 0.15.0: descuento por línea
+  test('descuento de una línea: baja el total, el precio queda y la venta guarda cuánto se descontó', () async {
+    await cash.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Rosa');
+    final cart = SellCart.instance;
+    final huevos = (await ProductRepository.instance.getProductById('huevos', businessId))!;
+    final gaseosa = (await ProductRepository.instance.getProductById('gaseosa', businessId))!;
+    cart.lines
+      ..add(CartItem(product: huevos, quantity: 2))
+      ..add(CartItem(product: gaseosa));
+    cart.setLineDiscount(0, 3800); // 10 % de 37.800
+    expect(cart.lines.first.netSubtotal, 34000);
+    expect(cart.total, 34000 + 5600);
+    expect(cart.manualDiscount, 3800);
+    // No puede pasar lo que vale la línea
+    cart.setLineDiscount(1, 999999);
+    expect(cart.lines[1].lineDiscount, 5600);
+    cart.setLineDiscount(1, 0);
+    final done = await sales.recordMultiProductSale(businessId: businessId, items: List.of(cart.lines), paymentMethod: PaymentMethod.cash);
+    final line = done.firstWhere((s) => s.productId == 'huevos');
+    expect(line.unitPrice, 18900, reason: 'el precio no cambia: la nube calcula el descuento');
+    expect(line.totalAmount, 34000);
+    final row = (await (await appDb.database).query('sales', where: 'id = ?', whereArgs: [line.id])).single;
+    expect(row['discount_amount'], 3800);
+    cart.reset();
+  });
+
+  // 0.15.0: cierre del día por WhatsApp
+  test('el cierre del día dice ventas, ganancia y cuánto entró por cada medio', () async {
+    await initializeDateFormatting('es_CO');
+    await cash.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Rosa');
+    await sales.recordMultiProductSale(businessId: businessId, items: await items({'huevos': 1}), paymentMethod: PaymentMethod.cash);
+    await sales.recordMultiProductSale(businessId: businessId, items: await items({'gaseosa': 2}), paymentMethod: PaymentMethod.nequi);
+    final text = await DailyClose.text(business);
+    expect(text, contains('*Cierre del día · Variedades Rosita*'));
+    expect(text, contains('Ventas: 2'));
+    expect(text, contains('• Efectivo: \$18.900'));
+    expect(text, contains('• Nequi: \$11.200'));
+    expect(text, contains('Ganancia:'));
+  });
+
+  // 0.15.0: devolución parcial
+  test('devolución parcial: efectivo vuelve al stock y baja la caja; fiado baja la deuda; no se devuelve de más', () async {
+    await setCash(true);
+    final session = await cash.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Rosa');
+    final venta = (await sales.recordMultiProductSale(businessId: businessId, items: await items({'gaseosa': 3}), paymentMethod: PaymentMethod.cash)).single;
+    final before = (await ProductRepository.instance.getProductById('gaseosa', businessId))!.stock;
+    final dev = await sales.returnSale(venta, quantity: 1, restock: true, reason: 'Venía abierta');
+    expect(dev.quantity, -1);
+    expect(dev.totalAmount, -5600);
+    expect(dev.returnOf, venta.id);
+    expect((await ProductRepository.instance.getProductById('gaseosa', businessId))!.stock, before + 1);
+    expect(await sales.returnedQuantity(venta.id), 1);
+    // La caja espera solo lo de 2 gaseosas
+    final sum = await cash.summarize(session);
+    expect(sum.expected, 11200);
+    // Dañada: no vuelve al inventario
+    await sales.returnSale(venta, quantity: 1, restock: false);
+    expect((await ProductRepository.instance.getProductById('gaseosa', businessId))!.stock, before + 1);
+    // Queda 1: no deja devolver 2
+    await expectLater(sales.returnSale(venta, quantity: 2, restock: true), throwsStateError);
+    // Fiado: la deuda baja lo devuelto
+    final fiado = (await sales.recordMultiProductSale(
+      businessId: businessId,
+      items: await items({'huevos': 2}),
+      paymentMethod: PaymentMethod.credit,
+      customerName: 'Marta',
+    )).single;
+    await sales.returnSale(fiado, quantity: 1, restock: true);
+    final marta = await CustomerRepository.instance.findByName(businessId, 'Marta');
+    expect(marta!.debtBalance, 18900);
+  });
 
   test('caja obligatoria: con la caja cerrada no se registra ninguna venta', () async {
     await setCash(true);
@@ -214,6 +316,11 @@ void main() {
     expect(await alerts.ordersEnabled(), isTrue);
     expect(await alerts.stockAlertsEnabled(), isTrue);
     expect(await alerts.summaryEnabled(), isTrue);
+    // 0.15.0: recordatorio de cerrar la caja, encendido a las 7:00 p. m.
+    expect(await alerts.cashReminderEnabled(), isTrue);
+    expect(await alerts.cashHour(), 19);
+    await appDb.setSetting(PhoneAlertsService.cashHourKey, '21');
+    expect(await alerts.cashHour(), 21);
     await appDb.setSetting(PhoneAlertsService.ordersKey, '0');
     expect(await alerts.ordersEnabled(), isFalse);
   });

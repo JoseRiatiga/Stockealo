@@ -107,42 +107,53 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 ### Roles y permisos (`docs/plan-roles.md`)
 
-1. Una sola lista de permisos (`permissions.dart`). Cada función nueva registra ahí los suyos.
-2. Roles por defecto: Dueño, Administrador y Cajero. Plantillas para crear roles: Vendedor, Bodega, Solo ver, Encargado y Atiende servicios.
-3. Roles personalizados: gratis 1, Pro y Pro Servicios sin límite. **Solo el dueño** los crea y edita.
-4. Límites con números (Pro).
-5. Autorización de un solo uso, nunca con PIN fijo, y arqueo ciego. Las dos cosas, gratis.
-6. Horario de acceso (Pro Servicios).
-7. Permisos que se cumplen también en Supabase.
+1. HECHO (14 nov). Una sola lista de permisos (`permissions.dart`). Cada función nueva registra ahí los suyos.
+2. HECHO (14 nov). Roles por defecto: Dueño, Administrador y Cajero. Plantillas para crear roles: Vendedor, Bodega, Solo ver, Encargado y Atiende servicios.
+3. HECHO (14 nov), con «Ver como» y la matriz de interruptores. Roles personalizados: gratis 1, Pro y Pro Servicios sin límite. **Solo el dueño** los crea y edita.
+4. HECHO (14 nov). Límites con números (Pro).
+5. HECHO (14 nov). Autorización de un solo uso (solo con internet, decisión del dueño) y arqueo ciego. Las dos cosas, gratis. También: cada acción revisa el permiso del rol.
+6. HECHO (15 nov). Horario de acceso (Pro Servicios): por persona, la app avisa 10 minutos antes y bloquea fuera de turno. Migración access_schedule aplicada con permiso.
+7. HECHO (14 nov), opción A de `docs/plan-permisos-nube.md`: migraciones permissions_in_cloud y limit_cashier_updates_roles aplicadas y probadas con un cajero simulado. «Ver costos»: opción 1 del dueño (15 nov): se oculta en las pantallas y la nube pone el costo de cada venta desde el producto (migración sale_cost_from_product aplicada). Permisos que se cumplen también en Supabase. La revisión con Codex del 14 nov lo confirmó: hoy los límites y permisos se cumplen solo en la app; las ventas y los movimientos de caja se pueden insertar directo en la nube.
 
 ### Planes, ingresos y seguridad
 
-8. Quitar Pro Global: quedan Pro y Pro Servicios.
-9. Elegir el plan por lo que se necesita.
+8. HECHO (15 nov). Quitar Pro Global: quedan Pro y Pro Servicios (no había suscripciones Global).
+9. HECHO (15 nov). Elegir el plan por lo que se necesita («¿Qué necesitas para tu negocio?» en la pantalla de Pro; sin sedes por ahora).
 10. Precio de Pro Servicios, cuando termine la negociación, y encender «Mostrar precios».
-11. Aviso de vencimiento de Pro y renovar en un toque.
-12. Recordatorios de cobro en pausa sin Pro.
-13. MFA del panel admin.
-14. Bloqueo opcional con PIN o huella para abrir la app.
-15. Limpieza de seguridad: contraseña vieja, `crypto` y `legacy-login`.
+11. HECHO (15 nov). Aviso de vencimiento de Pro (7 días antes y hasta 15 después, en Inicio) y renovar en un toque.
+12. HECHO (15 nov). Recordatorios de cobro en pausa sin Pro (vuelven solos al renovar).
+13. MOVIDO a la 0.16.0 (decisión del dueño, 15 nov). MFA del panel admin.
+14. MOVIDO a la 0.16.0 (decisión del dueño, 15 nov). Bloqueo opcional con PIN o huella para abrir la app.
+15. MOVIDO a la 0.16.0 (decisión del dueño, 15 nov). Limpieza de seguridad: contraseña vieja, `crypto` y `legacy-login`.
 
 ### Ventas (movidas desde la 0.13.0)
 
-16. Devolución parcial.
-17. Cálculo del vuelto.
-18. Precio sugerido por margen.
-19. Cierre del día por WhatsApp: a mano en gratis, automático con Pro.
-20. Recordatorio en el celular para cerrar la caja.
+16. HECHO (15 nov). Devolución parcial: cuántas, si vuelven al inventario o llegaron dañadas, y el dinero según cómo pagó (efectivo sale de la caja, fiado baja la deuda). La nube pide «Devolver» y no deja devolver de más.
+17. HECHO (ya estaba: «Recibí» con atajos y el vuelto en grande). Cálculo del vuelto.
+18. HECHO (15 nov). Precio sugerido por margen (20, 30, 40 y 50 % en el formulario del producto).
+19. HECHO (15 nov). Cierre del día por WhatsApp: a mano en Reportes; con Pro, el aviso de la noche lo deja listo.
+20. HECHO (15 nov). Recordatorio en el celular para cerrar la caja (7:00 p. m., se cambia en Ajustes › Avisos).
 
 ### Pendientes que se suman (14 nov)
 
-18. **Descuento por línea en Vender**, además del descuento a toda la venta.
-19. **Las ventas en espera no se pierden al cerrar la app:** hoy viven solo en memoria.
+18. HECHO (15 nov). **Descuento por línea en Vender**, además del descuento a toda la venta.
+19. HECHO (15 nov). **Las ventas en espera no se pierden al cerrar la app:** hoy viven solo en memoria.
 20. **El tiquete con NIT, dirección y despedida propia del negocio.**
 21. **Stocky:** límite mayor para Pro (50 preguntas al día) y las claves de respaldo (Gemini y OpenRouter).
 22. **Seguridad:** el código del correo vence a los 10 minutos (revisar en Supabase).
+23. HECHO (14 nov). **Portada propia en la tienda en línea** (pedido del dueño): «Fotos de productos», «Mi propia foto» o «Sin fotos». Migración store_cover aplicada con permiso.
+24. HECHO (14 nov). **Tallas y colores en la tarjeta de la tienda**, con lo agotado tachado en diagonal y el carrito que agrega directo.
+25. HECHO (14 nov). **Carrito en dos pasos:** el pedido con foto, talla y color; después los datos del comprador.
+26. HECHO (14 nov). **Una foto por color** en los productos, en la tarjeta y en el carrito. Migración variant_color_photos aplicada con permiso.
+27. HECHO (14 nov). **Tienda en línea:** la tarjeta de tienda publicada con el diseño nuevo.
 
 ## 0.16.0 · Tienda y crecimiento (antes 0.15.0)
+
+### Movidos desde la 0.15.0 (15 nov)
+
+- MFA del panel admin (necesita la app de códigos en el celular del dueño).
+- Bloqueo opcional con PIN o huella para abrir la app (librería local_auth y cambio en Android; probar en un celular real).
+- Limpieza de seguridad: contraseña vieja, `crypto` y `legacy-login` (antes, revisar si alguien todavía los usa).
 
 ### Calidad y confianza
 

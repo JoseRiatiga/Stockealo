@@ -28,6 +28,9 @@ import '../widgets/variant_picker.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../data/promotions_repository.dart';
 import '../widgets/deliveries.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../../core/permissions/permission_guard.dart';
+import '../../../team/presentation/widgets/authorization_gate.dart';
 
 /// Vender: el punto de venta. Buscar o escanear (también con lector USB: el código
 /// entra solo al carrito), tocar productos, cobrar con F9 y seguir con la
@@ -147,7 +150,7 @@ class _SellScreenState extends State<SellScreen> {
   bool _cashClosed = false;
   _LastSale? _last;
 
-  bool get _manager => widget.role == 'OWNER' || widget.role == 'ADMIN';
+  bool get _canBelowCost => Permissions.can(widget.role, Perm.sellBelowCost);
   String get _userName => AuthRepository.instance.currentUser?.displayName ?? '';
 
   @override
@@ -156,6 +159,8 @@ class _SellScreenState extends State<SellScreen> {
     // La cuenta es de un negocio: al cambiar de negocio no se arrastra
     final other = [..._cart.lines, for (final h in _cart.held) ...h.lines].any((l) => l.product.businessId != widget.business.id);
     if (other) _cart.reset();
+    // Las ventas en espera de este negocio, guardadas en el celular (0.15.0)
+    if (_cart.businessId != widget.business.id) _cart.restore(widget.business.id);
     _customer.text = _cart.customer;
     _load();
     DataEvents.instance.salesVersion.addListener(_reloadStock);
@@ -288,12 +293,21 @@ class _SellScreenState extends State<SellScreen> {
       AppToast.showWarning(context, 'Recibiste menos del total: faltan ${CurrencyFormatter.format(total - received)}.');
       return;
     }
-    // Vender por debajo del costo: el cajero no puede; el dueño lo autoriza
-    if (_cart.hasLoss) {
-      if (!_manager) {
-        AppToast.showError(context, 'Ese descuento deja pérdida. Solo el dueño o un administrador pueden autorizarlo.');
-        return;
-      }
+    // Lo que el rol no permite o pasa su límite pide autorización (0.15.0)
+    final reasons = await _needsApproval(method, customer, total);
+    if (!mounted) return;
+    String? authId;
+    if (reasons.isNotEmpty) {
+      authId = await AuthorizationGate.allow(
+        context,
+        businessId: widget.business.id,
+        action: 'Venta de ${CurrencyFormatter.format(total)}',
+        reasons: reasons,
+        amount: total,
+      );
+      if (authId == null || !mounted) return;
+    } else if (_cart.hasLoss) {
+      // Quien sí puede vender con pérdida lo confirma
       final ok = await AppDialog.confirm(
         context: context,
         title: 'Venta por debajo del costo',
@@ -318,6 +332,7 @@ class _SellScreenState extends State<SellScreen> {
         customerName: customer.isEmpty ? null : customer,
         discountAmount: discount,
         paymentSplit: method == PaymentMethod.mixed ? _pay.split : null,
+        authRequestId: authId,
       );
       final change = method == PaymentMethod.cash && received != null ? received - total : 0.0;
       // Fiado: lo que queda debiendo, para el tiquete
@@ -351,9 +366,41 @@ class _SellScreenState extends State<SellScreen> {
     }
   }
 
+  /// Por qué esta venta necesita autorización; vacío = puede seguir
+  Future<List<String>> _needsApproval(String method, String customer, double total) async {
+    final reasons = <String>[];
+    if (_cart.manualDiscount > 0) {
+      final base = _cart.subtotal - _cart.promoDiscount;
+      final pct = base <= 0 ? 0.0 : _cart.manualDiscount * 100 / base;
+      final limit = Permissions.myLimit(RoleLimit.discountPct);
+      if (!Permissions.mine(Perm.discount)) {
+        reasons.add('Tu rol no permite dar descuentos.');
+      } else if (limit != null && pct > limit + 0.01) {
+        reasons.add('El descuento es de ${pct.toStringAsFixed(pct % 1 == 0 ? 0 : 1)} % y tu límite es ${limit.round()} %.');
+      }
+    }
+    if (method == PaymentMethod.credit) {
+      final limit = Permissions.myLimit(RoleLimit.creditMax);
+      if (!Permissions.mine(Perm.credit)) {
+        reasons.add('Tu rol no permite fiar.');
+      } else if (limit != null && customer.isNotEmpty) {
+        final current = (await CustomerRepository.instance.findByName(widget.business.id, customer))?.debtBalance ?? 0;
+        if (current + total > limit + 0.5) {
+          reasons.add('$customer quedaría debiendo ${CurrencyFormatter.format(current + total)} y el límite de fiado es '
+              '${CurrencyFormatter.format(limit)}.');
+        }
+      }
+    }
+    if (_cart.hasLoss && !_canBelowCost) {
+      reasons.add('Con ese descuento la venta deja pérdida de ${CurrencyFormatter.format(_cart.loss)}.');
+    }
+    return reasons;
+  }
+
   Future<void> _quote() async {
     if (_cart.isEmpty) return;
-    if (_cart.hasLoss && !_manager) {
+    if (!PermissionGuard.check(context, Perm.quotations)) return;
+    if (_cart.hasLoss && !_canBelowCost) {
       AppToast.showError(context, 'No se puede cotizar por debajo del costo.');
       return;
     }
@@ -391,6 +438,7 @@ class _SellScreenState extends State<SellScreen> {
   }
 
   Future<void> _editDiscount() async {
+    if (!PermissionGuard.check(context, Perm.discount)) return;
     final field = TextEditingController(text: _cart.discount > 0 ? _cart.discount.round().toString() : '');
     final value = await AppSheet.show<double>(
       context: context,
@@ -872,6 +920,17 @@ class _SellScreenState extends State<SellScreen> {
               children: [
                 Text(l.displayName, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600)),
                 Text('${CurrencyFormatter.format(l.unitPrice)} c/u', style: AppText.caption(context)),
+                // Descuento de la línea (0.15.0): se toca para ponerlo o quitarlo
+                InkWell(
+                  onTap: () => _editLineDiscount(i),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      l.lineDiscount > 0 ? 'Descuento −${CurrencyFormatter.format(l.lineDiscount)}' : 'Descuento',
+                      style: AppText.caption(context, weight: FontWeight.w700, color: l.lineDiscount > 0 ? c.accent : c.inkFaint),
+                    ),
+                  ),
+                ),
                 if (l.promotion != null)
                   Text(
                     l.promoDiscount > 0
@@ -907,6 +966,57 @@ class _SellScreenState extends State<SellScreen> {
         ],
       ),
     );
+  }
+
+  /// Descuento de una sola línea: en pesos o con un porcentaje rápido
+  Future<void> _editLineDiscount(int i) async {
+    if (i >= _cart.lines.length) return;
+    final l = _cart.lines[i];
+    final base = (l.subtotal - l.promoDiscount).clamp(0, double.infinity).toDouble();
+    final field = TextEditingController(text: l.lineDiscount > 0 ? l.lineDiscount.round().toString() : '');
+    final value = await AppSheet.show<double>(
+      context: context,
+      title: 'Descuento de esta línea',
+      subtitle: '${l.displayName} · ${CurrencyFormatter.format(base)}',
+      builder: (ctx) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final pct in const [5, 10, 15, 20])
+                ActionChip(
+                  label: Text('$pct %'),
+                  onPressed: () => Navigator.pop(ctx, (base * pct / 100).roundToDouble()),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.md),
+          TextField(
+            controller: field,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(labelText: 'Descuento en pesos', prefixText: '\$ '),
+          ),
+          const SizedBox(height: AppSpace.md),
+          Row(
+            children: [
+              if (l.lineDiscount > 0)
+                TextButton(onPressed: () => Navigator.pop(ctx, 0.0), child: const Text('Quitar descuento')),
+              const Spacer(),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, double.tryParse(field.text.trim()) ?? 0),
+                child: const Text('Aplicar'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    field.dispose();
+    if (value != null && mounted) _cart.setLineDiscount(i, value);
   }
 
   Widget _qtyButton(IconData icon, String tooltip, VoidCallback onTap) => SizedBox(

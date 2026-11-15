@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/permissions/permissions.dart';
 
 /// Los lugares de la app: UNA lista para el menú del computador, el menú del
 /// celular (☰), los títulos del encabezado, el buscador, los accesos rápidos,
@@ -18,8 +19,8 @@ class AppPlace {
   /// Línea de contexto debajo del título en el encabezado
   final String subtitle;
 
-  /// Solo dueño o administrador
-  final bool managersOnly;
+  /// Permiso que necesita (0.15.0); null = lo ve cualquiera
+  final Perm? perm;
 
   /// Solo con Pro Servicios
   final bool needsServices;
@@ -30,7 +31,7 @@ class AppPlace {
     required this.icon,
     required this.group,
     required this.subtitle,
-    this.managersOnly = false,
+    this.perm,
     this.needsServices = false,
   });
 
@@ -80,7 +81,7 @@ class AppPlace {
       icon: Icons.storefront_outlined,
       group: groupMore,
       subtitle: 'Tu catálogo con carrito',
-      managersOnly: true,
+      perm: Perm.store,
     ),
     AppPlace(
       id: reportes,
@@ -88,18 +89,16 @@ class AppPlace {
       icon: Icons.insert_chart_outlined,
       group: groupMore,
       subtitle: 'Ganancias y descargas',
-      managersOnly: true,
+      perm: Perm.reportsSales,
     ),
   ];
 
   static const AppPlace settings =
       AppPlace(id: ajustes, label: 'Ajustes', icon: Icons.settings_outlined, group: '', subtitle: 'Tu negocio, tu equipo y la app');
 
-  static bool _isManager(String role) => role == 'OWNER' || role == 'ADMIN';
-
   /// ¿Esta persona puede ver este lugar?
   bool visibleFor({required String role, required bool services}) =>
-      (!managersOnly || _isManager(role)) && (!needsServices || services);
+      (perm == null || Permissions.can(role, perm!)) && (!needsServices || services);
 
   /// Los lugares del menú que ve esta persona, en orden
   static List<AppPlace> visible({required String role, required bool services}) =>

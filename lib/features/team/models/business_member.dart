@@ -1,10 +1,18 @@
+import '../../../core/permissions/permissions.dart';
+
 class BusinessMember {
   final String id;
   final String businessId;
   final String? userId;
   final String email;
   final String? name;
-  final String role; // 'OWNER' | 'ADMIN' | 'CASHIER'
+  final String role; // 'OWNER' | 'ADMIN' | 'CASHIER' (el de la nube)
+
+  /// Rol propio (0.15.0); null = su rol por defecto
+  final String? roleId;
+
+  /// Horario de acceso (0.15.0, Pro Servicios): JSON de WorkSchedule; null = sin horario
+  final String? accessSchedule;
   final String status; // 'ACTIVE' | 'PENDING'
   final DateTime createdAt;
 
@@ -15,6 +23,8 @@ class BusinessMember {
     required this.email,
     this.name,
     required this.role,
+    this.roleId,
+    this.accessSchedule,
     this.status = 'ACTIVE',
     required this.createdAt,
   });
@@ -23,11 +33,15 @@ class BusinessMember {
   bool get isAdmin => role == 'ADMIN';
   bool get isCashier => role == 'CASHIER';
 
+  /// El rol como lo lee [Permissions]: 'ROLE:<id>' si tiene uno propio
+  String get roleKey => roleId != null && role != 'OWNER' ? Permissions.customRole(roleId!) : role;
+
   // Permisos derivados para control de acceso y seguridad
-  bool get canViewCosts => role == 'OWNER' || role == 'ADMIN';
-  bool get canEditProducts => role == 'OWNER' || role == 'ADMIN';
-  bool get canManageTeam => role == 'OWNER';
-  bool get canAdjustStockDirectly => role == 'OWNER' || role == 'ADMIN';
+  bool can(Perm p) => Permissions.can(roleKey, p);
+  bool get canViewCosts => can(Perm.costs);
+  bool get canEditProducts => can(Perm.productsEdit);
+  bool get canManageTeam => can(Perm.team);
+  bool get canAdjustStockDirectly => can(Perm.stockAdjust);
 
   String get displayName {
     if (name != null && name!.trim().isNotEmpty) {
@@ -37,6 +51,7 @@ class BusinessMember {
   }
 
   String get roleDisplayName {
+    if (Permissions.isCustom(roleKey)) return Permissions.labelOf(roleKey);
     switch (role) {
       case 'OWNER':
         return 'Dueño';
@@ -50,6 +65,9 @@ class BusinessMember {
   }
 
   String get roleDescription {
+    if (Permissions.isCustom(roleKey)) {
+      return 'Rol propio del negocio: ${Permissions.defaultsFor(roleKey).length} permisos.';
+    }
     switch (role) {
       case 'OWNER':
         return 'Control total del negocio y gestión del equipo.';
@@ -83,6 +101,8 @@ class BusinessMember {
       email: map['email'] as String,
       name: (map['name'] as String?) ?? (map['user_name'] as String?),
       role: map['role'] as String,
+      roleId: map['role_id'] as String?,
+      accessSchedule: map['access_schedule'] as String?,
       status: map['status'] as String? ?? 'ACTIVE',
       createdAt: DateTime.parse(map['created_at'] as String),
     );

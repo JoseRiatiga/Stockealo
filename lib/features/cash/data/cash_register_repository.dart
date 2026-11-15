@@ -10,6 +10,7 @@ import '../../team/data/activity_repository.dart';
 import '../../business/models/business.dart';
 import '../models/cash_session.dart';
 import '../../sales/models/payment_method.dart';
+import '../../../core/services/phone_alerts_service.dart';
 
 /// Arqueo de caja por negocio (0.12.0: con movimientos, propinas, cierre por forma
 /// de pago y en la nube).
@@ -85,6 +86,7 @@ class CashRegisterRepository {
       data: {'session_id': session.id},
     );
     DataEvents.instance.cashChanged();
+    PhoneAlertsService.instance.refreshCashReminder();
     return session;
   }
 
@@ -98,6 +100,9 @@ class CashRegisterRepository {
     required String reason,
     required double amount,
     String? note,
+
+    /// Autorización usada (0.15.0): la nube la exige si pasa el límite del rol
+    String? authRequestId,
     DateTime? now,
   }) async {
     if (!session.isOpen) throw StateError('La caja ya está cerrada.');
@@ -116,7 +121,7 @@ class CashRegisterRepository {
     final db = await _dbProvider.database;
     final row = m.toMap();
     await db.insert('cash_movements', row);
-    _cloud.upsertCashMovementToCloud(row);
+    _cloud.upsertCashMovementToCloud({...row, if (authRequestId != null) 'auth_request_id': authRequestId});
     ActivityRepository.instance.log(
       businessId: session.businessId,
       action: 'cash_movement',
@@ -160,9 +165,10 @@ class CashRegisterRepository {
       final parts = PaymentMethod.amounts('${r['method'] ?? 'OTRO'}', (r['total'] as num).toDouble(), r['payment_split'] as String?);
       for (final e in parts.entries) {
         byMethod[e.key] = (byMethod[e.key] ?? 0) + e.value;
-        if (e.key == _cash && e.value > 0) {
+        // Las devoluciones en efectivo (en negativo, 0.15.0) restan, pero no cuentan como venta
+        if (e.key == _cash) {
           cashSales += e.value;
-          cashInvoices.add('${r['invoice']}');
+          if (e.value > 0) cashInvoices.add('${r['invoice']}');
         }
       }
     }
@@ -230,11 +236,13 @@ class CashRegisterRepository {
     );
   }
 
-  /// Cierra el turno. Si el conteo no cuadra con lo esperado, la nota es obligatoria.
+  /// Cierra el turno. Si el conteo no cuadra con lo esperado, la nota es obligatoria,
+  /// salvo en el arqueo ciego ([blind]): quien cuenta no sabe cuánto debía haber.
   Future<CashSession> closeSession({
     required CashSession session,
     required double countedAmount,
     String? notes,
+    bool blind = false,
     Map<int, int> denominations = const {},
     Map<String, dynamic> extra = const {},
     DateTime? now,
@@ -246,7 +254,7 @@ class CashRegisterRepository {
     final summary = await summarize(session.copyWith(closedAt: closedAt));
     final difference = countedAmount - summary.expected;
     final cleanNotes = (notes ?? '').trim();
-    if (difference.abs() >= 1 && cleanNotes.isEmpty) {
+    if (difference.abs() >= 1 && cleanNotes.isEmpty && !blind) {
       throw StateError('La caja no cuadra: escribe una nota que explique la diferencia.');
     }
     final closed = session.copyWith(
@@ -272,6 +280,7 @@ class CashRegisterRepository {
       data: {'session_id': session.id, 'difference': difference},
     );
     DataEvents.instance.cashChanged();
+    PhoneAlertsService.instance.refreshCashReminder();
     return closed;
   }
 

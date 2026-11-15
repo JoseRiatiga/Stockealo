@@ -31,6 +31,9 @@ abstract final class ActivityAction {
   static const memberAdd = 'member_add';
   static const memberRemove = 'member_remove';
   static const roleChange = 'role_change';
+
+  /// Autorización de un solo uso (0.15.0)
+  static const authorize = 'authorize';
 }
 
 

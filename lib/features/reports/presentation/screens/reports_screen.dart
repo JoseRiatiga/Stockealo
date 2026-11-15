@@ -9,6 +9,8 @@ import '../../../business/presentation/active_business_scope.dart';
 import '../../../pro/data/pro_service.dart';
 import '../../data/report_export_service.dart';
 import 'profit_report_screen.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../data/daily_close.dart';
 
 /// Reportes: el dueño elige qué descargar, de qué periodo y si va todo en un solo
 /// Excel (una hoja por parte) o en un archivo por cada parte.
@@ -257,7 +259,7 @@ class ReportsTab extends StatefulWidget {
   const ReportsTab({super.key, required this.userRole});
 
   /// Solo el dueño y los administradores ven reportes (tienen costos y ganancias)
-  static bool allowed(String role) => role == 'OWNER' || role == 'ADMIN';
+  static bool allowed(String role) => Permissions.can(role, Perm.reportsSales);
 
   @override
   State<ReportsTab> createState() => _ReportsTabState();
@@ -300,14 +302,31 @@ class _ReportsTabState extends State<ReportsTab> {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
-                child: SegmentedButton<bool>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: false, icon: Icon(Icons.insights_outlined), label: Text('Ganancias')),
-                    ButtonSegment(value: true, icon: Icon(Icons.table_chart_outlined), label: Text('Descargar Excel')),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SegmentedButton<bool>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(value: false, icon: Icon(Icons.insights_outlined), label: Text('Ganancias')),
+                        ButtonSegment(value: true, icon: Icon(Icons.table_chart_outlined), label: Text('Descargar Excel')),
+                      ],
+                      selected: {_excel},
+                      onSelectionChanged: (v) => setState(() => _excel = v.first),
+                    ),
+                    // Cierre del día por WhatsApp (0.15.0)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          final ok = await DailyClose.send(business);
+                          if (!ok && context.mounted) AppToast.showError(context, 'No se pudo abrir WhatsApp.');
+                        },
+                        icon: const Icon(Icons.chat_outlined, size: 18),
+                        label: const Text('Enviar el cierre del día'),
+                      ),
+                    ),
                   ],
-                  selected: {_excel},
-                  onSelectionChanged: (v) => setState(() => _excel = v.first),
                 ),
               ),
             ),

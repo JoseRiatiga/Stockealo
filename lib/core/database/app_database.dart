@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 20;
+  static const int _schemaVersion = 26;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -578,11 +578,61 @@ class AppDatabase {
     if (oldVersion < 18 && newVersion >= 18) await appointmentsV18(db);
     if (oldVersion < 19 && newVersion >= 19) await workOrdersV19(db);
     if (oldVersion < 20 && newVersion >= 20) await chairRentV20(db);
+    if (oldVersion < 21 && newVersion >= 21) await variantPhotosV21(db);
+    if (oldVersion < 22 && newVersion >= 22) await rolesV22(db);
+    if (oldVersion < 23 && newVersion >= 23) await roleLimitsV23(db);
+    if (oldVersion < 24 && newVersion >= 24) await accessScheduleV24(db);
+    if (oldVersion < 25 && newVersion >= 25) await ticketInfoV25(db);
+    if (oldVersion < 26 && newVersion >= 26) await salesReturnsV26(db);
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
   /// con motivo y quién) y el pago mixto guarda cuánto entró por cada medio.
   /// `sales_ok` son las ventas que cuentan: todos los totales leen de ahí.
+  /// 0.15.0: devolución parcial (la venta negativa dice de cuál venta es)
+  static Future<void> salesReturnsV26(Database db) async {
+    await _addColumnIfMissing(db, 'sales', 'return_of', 'TEXT');
+  }
+
+  /// 0.15.0: datos del tiquete del negocio (NIT, dirección, teléfono y despedida)
+  static Future<void> ticketInfoV25(Database db) async {
+    await _addColumnIfMissing(db, 'businesses', 'ticket_info', 'TEXT');
+  }
+
+  /// 0.15.0: horario de acceso de cada persona del equipo
+  static Future<void> accessScheduleV24(Database db) async {
+    await _addColumnIfMissing(db, 'business_members', 'access_schedule', 'TEXT');
+  }
+
+  /// 0.15.0: límites con números de cada rol
+  static Future<void> roleLimitsV23(Database db) async {
+    await _addColumnIfMissing(db, 'business_roles', 'limits', "TEXT NOT NULL DEFAULT '{}'");
+  }
+
+  /// 0.15.0: roles propios del negocio y el rol propio de cada persona
+  static Future<void> rolesV22(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS business_roles (
+        id TEXT PRIMARY KEY,
+        business_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        base_role TEXT NOT NULL DEFAULT 'CASHIER',
+        builtin TEXT,
+        perms TEXT NOT NULL DEFAULT '[]',
+        template_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_roles_biz ON business_roles(business_id)');
+    await _addColumnIfMissing(db, 'business_members', 'role_id', 'TEXT');
+  }
+
+  /// 0.15.0: una foto por color
+  static Future<void> variantPhotosV21(Database db) async {
+    await _addColumnIfMissing(db, 'product_variants', 'image_url', 'TEXT');
+  }
+
   /// 0.14.0: alquiler de silla
   static Future<void> chairRentV20(Database db) async {
     await _addColumnIfMissing(db, 'staff', 'chair_rent', 'REAL');
@@ -963,6 +1013,12 @@ class AppDatabase {
     await appointmentsV18(db);
     await workOrdersV19(db);
     await chairRentV20(db);
+    await variantPhotosV21(db);
+    await rolesV22(db);
+    await roleLimitsV23(db);
+    await accessScheduleV24(db);
+    await ticketInfoV25(db);
+    await salesReturnsV26(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

@@ -48,6 +48,11 @@ class Sale {
   final String? deliveryNote;
   final DateTime? deliveredAt;
 
+  /// Devolución (0.15.0): la venta de la que se devolvió; la cantidad y el total van en
+  /// negativo, con el mismo medio de pago, así la caja y los reportes se ajustan solos
+  final String? returnOf;
+  bool get isReturn => returnOf != null;
+
   static const toDeliver = 'PENDIENTE';
   static const delivered = 'ENTREGADO';
 
@@ -88,6 +93,7 @@ class Sale {
     this.deliveryStatus,
     this.deliveryNote,
     this.deliveredAt,
+    this.returnOf,
   });
 
   Map<String, dynamic> toMap() {
@@ -123,6 +129,7 @@ class Sale {
       'delivery_status': deliveryStatus,
       'delivery_note': deliveryNote,
       'delivered_at': deliveredAt?.toIso8601String(),
+      'return_of': returnOf,
     };
   }
 
@@ -159,6 +166,7 @@ class Sale {
       deliveryStatus: map['delivery_status'] as String?,
       deliveryNote: map['delivery_note'] as String?,
       deliveredAt: DateTime.tryParse('${map['delivered_at'] ?? ''}'),
+      returnOf: map['return_of'] as String?,
     );
   }
 }

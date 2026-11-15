@@ -18,6 +18,9 @@ import '../../data/cash_register_repository.dart';
 import '../../models/cash_session.dart';
 import '../widgets/open_cash.dart';
 import '../../../sales/presentation/widgets/sale_document.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../../core/permissions/permission_guard.dart';
+import '../../../team/presentation/widgets/authorization_gate.dart';
 
 /// Caja (lugar del menú): abrir el turno con una base, registrar entradas y
 /// salidas, ver lo cobrado por forma de pago y cerrar contando el dinero (también
@@ -30,7 +33,16 @@ class CashRegisterScreen extends StatefulWidget {
   /// Dentro del marco de la app (lugar del menú): sin barra propia
   final bool embedded;
 
-  const CashRegisterScreen({super.key, required this.businessId, required this.userName, this.embedded = false});
+  /// Rol de quien usa la caja: sin «Ver lo esperado en caja» cuenta a ciegas (0.15.0)
+  final String role;
+
+  const CashRegisterScreen({
+    super.key,
+    required this.businessId,
+    required this.userName,
+    this.role = 'OWNER',
+    this.embedded = false,
+  });
 
   @override
   State<CashRegisterScreen> createState() => _CashRegisterScreenState();
@@ -72,6 +84,21 @@ SaleDocument cashTicket(CashSession s, CashSummary sum, [List<String> servicesLi
   );
 }
 
+/// Cierre en arqueo ciego (0.15.0): solo lo contado; lo esperado y la diferencia los ve el dueño
+SaleDocument blindCashTicket(CashSession s) => SaleDocument(
+      title: 'Cierre de caja',
+      number: 'CAJA-${DateFormat('yyMMdd-HHmm').format(s.closedAt ?? DateTime.now())}',
+      date: s.closedAt ?? DateTime.now(),
+      lines: const [],
+      total: s.countedAmount ?? 0,
+      totalLabel: 'Contado',
+      sellerName: s.closedBy ?? s.openedBy,
+      before: [TicketRow('Abrió', '${s.openedBy} · ${DateFormat('h:mm a', 'es_CO').format(s.openedAt)}')],
+      notes: s.notes,
+      closing: 'Cierre del turno · arqueo ciego',
+      stamp: const TicketStamp('ENTREGADA', tone: AppTone.info),
+    );
+
 /// Resultado de contar la caja: justa, faltan o sobran (con su tono)
 ({String text, AppTone tone}) cashResult(double diff) {
   if (diff.abs() < 1) return (text: 'La caja está justa', tone: AppTone.success);
@@ -80,6 +107,9 @@ SaleDocument cashTicket(CashSession s, CashSummary sum, [List<String> servicesLi
 }
 
 class _CashRegisterScreenState extends State<CashRegisterScreen> {
+  /// Arqueo ciego: cuenta la plata sin ver cuánto debería haber; el dueño ve la diferencia
+  bool get _blind => !Permissions.can(widget.role, Perm.cashExpected);
+
   final _repo = CashRegisterRepository.instance;
 
   bool _loading = true;
@@ -176,9 +206,30 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
     final detail = note.text;
     amount.dispose();
     note.dispose();
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
+    // Sin permiso o una salida por encima del límite: pide autorización (0.15.0)
+    final needs = <String>[
+      if (!Permissions.mine(Perm.cashMoves)) 'Tu rol no permite registrar entradas o salidas de dinero.',
+      if (kind == CashMovement.exit &&
+          Permissions.myLimit(RoleLimit.cashOutMax) != null &&
+          (value ?? 0) > Permissions.myLimit(RoleLimit.cashOutMax)! + 0.5)
+        'La salida es de ${CurrencyFormatter.format(value ?? 0)} y tu límite es '
+            '${CurrencyFormatter.format(Permissions.myLimit(RoleLimit.cashOutMax)!)}.',
+    ];
+    String? authId;
+    if (needs.isNotEmpty) {
+      authId = await AuthorizationGate.allow(
+        context,
+        businessId: widget.businessId,
+        action: '${kind == CashMovement.exit ? 'Salida' : 'Entrada'} de caja de ${CurrencyFormatter.format(value ?? 0)}',
+        reasons: needs,
+        amount: value,
+      );
+      if (authId == null || !mounted) return;
+    }
     try {
-      await _repo.addMovement(session: session, kind: kind, reason: reason, amount: value ?? 0, note: detail);
+      await _repo.addMovement(
+          session: session, kind: kind, reason: reason, amount: value ?? 0, note: detail, authRequestId: authId);
       await _load();
     } on StateError catch (e) {
       if (mounted) AppToast.showWarning(context, e.message);
@@ -213,13 +264,22 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
     final session = _open;
     final summary = _summary;
     if (session == null || summary == null) return;
+    // Su propia caja, o la de otra persona si tiene «Cerrar la caja de otros»
+    final mine = session.openedBy.trim().toLowerCase() == widget.userName.trim().toLowerCase();
+    if (!PermissionGuard.check(context, mine ? Perm.cashOwn : Perm.cashOthers)) return;
     final (servicesLines, servicesExtra) = await _servicesDay(session);
     if (!mounted) return;
     final closed = await AppSheet.show<CashSession>(
       context: context,
       title: 'Cerrar caja',
       subtitle: 'Cuenta el efectivo que hay en la caja.',
-      builder: (_) => _CloseForm(session: session, summary: summary, servicesLines: servicesLines, servicesExtra: servicesExtra),
+      builder: (_) => _CloseForm(
+        session: session,
+        summary: summary,
+        servicesLines: servicesLines,
+        servicesExtra: servicesExtra,
+        blind: _blind,
+      ),
     );
     if (closed == null || !mounted) return;
     await _load();
@@ -229,6 +289,21 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
     final businessName = business?.name ?? 'Mi negocio';
     final finalSummary = await _repo.summarize(closed);
     if (!mounted) return;
+    // Arqueo ciego: el tiquete dice lo contado, sin lo esperado ni la diferencia
+    if (_blind) {
+      await TicketViewer.show(
+        context,
+        business: business,
+        businessName: businessName,
+        doc: blindCashTicket(closed),
+        headline: 'Caja cerrada',
+        headlineTone: AppTone.info,
+        subline: 'Contaste ${CurrencyFormatter.format(closed.countedAmount ?? 0)}',
+        text: '$businessName\nCierre de caja\nContado: ${CurrencyFormatter.format(closed.countedAmount ?? 0)}'
+            '${closed.closedBy != null ? '\nCerró: ${closed.closedBy}' : ''}',
+      );
+      return;
+    }
     final result = cashResult(closed.difference ?? 0);
     await TicketViewer.show(
       context,
@@ -366,13 +441,21 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
               ],
             ),
             const SizedBox(height: AppSpace.lg),
-            Text('Debería haber en la caja', style: AppText.body(context, weight: FontWeight.w600, color: c.inkMuted)),
-            Text(CurrencyFormatter.format(s.expected), style: AppText.figure(context)),
-            if (s.tipsToDeliver > 0)
-              Text('De eso, ${CurrencyFormatter.format(s.tipsToDeliver)} son propinas por entregar.',
-                  style: AppText.small(context, weight: FontWeight.w600, color: c.warning)),
-            const SizedBox(height: AppSpace.md),
-            for (final (label, value) in rows) _row(label, value),
+            if (_blind) ...[
+              // Arqueo ciego (0.15.0): sin lo esperado ni el detalle que lo deja calcular
+              Text('Arqueo ciego', style: AppText.title(context)),
+              const SizedBox(height: AppSpace.xs),
+              Text('Al cerrar, cuentas el efectivo sin ver cuánto debería haber. El dueño ve si la caja cuadró.',
+                  style: AppText.small(context, color: c.inkMuted)),
+            ] else ...[
+              Text('Debería haber en la caja', style: AppText.body(context, weight: FontWeight.w600, color: c.inkMuted)),
+              Text(CurrencyFormatter.format(s.expected), style: AppText.figure(context)),
+              if (s.tipsToDeliver > 0)
+                Text('De eso, ${CurrencyFormatter.format(s.tipsToDeliver)} son propinas por entregar.',
+                    style: AppText.small(context, weight: FontWeight.w600, color: c.warning)),
+              const SizedBox(height: AppSpace.md),
+              for (final (label, value) in rows) _row(label, value),
+            ],
             const SizedBox(height: AppSpace.lg),
             Wrap(
               spacing: AppSpace.sm,
@@ -465,7 +548,7 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
                     Text(toBeginningOfSentenceCase(DateFormat("EEEE d MMM, h:mm a", 'es_CO').format(s.closedAt!)),
                         style: AppText.body(context, weight: FontWeight.w600)),
                     Text(
-                      'Esperado ${CurrencyFormatter.format(s.expectedAmount ?? 0)} · Contado ${CurrencyFormatter.format(s.countedAmount ?? 0)}'
+                      '${_blind ? '' : 'Esperado ${CurrencyFormatter.format(s.expectedAmount ?? 0)} · '}Contado ${CurrencyFormatter.format(s.countedAmount ?? 0)}'
                       '${s.closedBy != null ? ' · ${s.closedBy}' : ''}${s.notes != null ? '\n${s.notes}' : ''}',
                       style: AppText.small(context),
                     ),
@@ -473,10 +556,11 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
                 ),
               ),
               const SizedBox(width: AppSpace.sm),
-              () {
-                final r = cashResult(s.difference ?? 0);
-                return StatusPill((s.difference ?? 0).abs() < 1 ? 'Justa' : r.text, tone: r.tone);
-              }(),
+              if (!_blind)
+                () {
+                  final r = cashResult(s.difference ?? 0);
+                  return StatusPill((s.difference ?? 0).abs() < 1 ? 'Justa' : r.text, tone: r.tone);
+                }(),
             ],
           ),
           Divider(height: AppSpace.xl, color: context.colors.line),
@@ -494,7 +578,16 @@ class _CloseForm extends StatefulWidget {
   final List<String> servicesLines;
   final Map<String, dynamic> servicesExtra;
 
-  const _CloseForm({required this.session, required this.summary, required this.servicesLines, required this.servicesExtra});
+  /// Arqueo ciego: sin lo esperado ni el resultado
+  final bool blind;
+
+  const _CloseForm({
+    required this.session,
+    required this.summary,
+    required this.servicesLines,
+    required this.servicesExtra,
+    this.blind = false,
+  });
 
   @override
   State<_CloseForm> createState() => _CloseFormState();
@@ -531,6 +624,7 @@ class _CloseFormState extends State<_CloseForm> {
         session: widget.session,
         countedAmount: counted,
         notes: _notes.text,
+        blind: widget.blind,
         denominations: _byDenomination ? {for (final e in _units.entries) if (e.value > 0) e.key: e.value} : const {},
         extra: widget.servicesExtra,
       );
@@ -553,18 +647,21 @@ class _CloseFormState extends State<_CloseForm> {
     final c = context.colors;
     final expected = widget.summary.expected;
     final counted = _total;
-    final diff = counted == null ? null : counted - expected;
+    final diff = counted == null || widget.blind ? null : counted - expected;
     final result = diff == null ? null : cashResult(diff);
     final t = result == null ? null : ToneColors.of(context, result.tone);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(child: Text('Debería haber', style: AppText.body(context, color: c.inkMuted))),
-            Text(CurrencyFormatter.format(expected), style: AppText.amount(context, size: AppText.sizeTitle)),
-          ],
-        ),
+        if (widget.blind)
+          Text('Cuenta todo el efectivo de la caja y escribe cuánto hay.', style: AppText.body(context, color: c.inkMuted))
+        else
+          Row(
+            children: [
+              Expanded(child: Text('Debería haber', style: AppText.body(context, color: c.inkMuted))),
+              Text(CurrencyFormatter.format(expected), style: AppText.amount(context, size: AppText.sizeTitle)),
+            ],
+          ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           value: _byDenomination,
@@ -614,8 +711,8 @@ class _CloseFormState extends State<_CloseForm> {
                     child: Column(
                       children: [
                         Text(result.text, textAlign: TextAlign.center, style: AppText.display(context, color: t.text)),
-                        if (_byDenomination)
-                          Text('Contaste ${CurrencyFormatter.format(counted!)}', style: AppText.small(context, color: t.text)),
+                        if (_byDenomination && counted != null)
+                          Text('Contaste ${CurrencyFormatter.format(counted)}', style: AppText.small(context, color: t.text)),
                       ],
                     ),
                   ),

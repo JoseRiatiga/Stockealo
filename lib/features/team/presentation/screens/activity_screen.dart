@@ -31,6 +31,7 @@ enum _ActivityFilter {
     ActivityAction.memberAdd,
     ActivityAction.memberRemove,
     ActivityAction.roleChange,
+    ActivityAction.authorize,
   });
 
   final String label;
@@ -86,6 +87,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
         ActivityAction.memberJoin || ActivityAction.memberAdd => (Icons.person_add_alt_1_outlined, (c) => c.accent),
         ActivityAction.memberRemove => (Icons.person_remove_outlined, (c) => c.danger),
         ActivityAction.roleChange => (Icons.manage_accounts_outlined, (c) => c.warning),
+        ActivityAction.authorize => (Icons.verified_user_outlined, (c) => c.warning),
         _ => (Icons.history_outlined, (c) => c.inkMuted),
       };
 

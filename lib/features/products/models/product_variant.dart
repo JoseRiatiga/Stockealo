@@ -11,6 +11,10 @@ class ProductVariant {
   final String? attribute2Value; // ej. 'Rojo', 'Blanco con rojo'
   final String? colorHex; // '#C62828' o 'multi'
   final String? colorHex2; // segundo tono, '#FFFFFF'
+
+  /// Foto de este color (0.15.0); todas las tallas del mismo color la comparten.
+  /// null = se usa la foto principal del producto.
+  final String? imageUrl;
   final String? skuOrBarcode;
   final int stock;
   final double additionalPrice;
@@ -30,6 +34,7 @@ class ProductVariant {
     this.attribute2Value,
     this.colorHex,
     this.colorHex2,
+    this.imageUrl,
     this.skuOrBarcode,
     this.stock = 0,
     this.additionalPrice = 0.0,
@@ -62,6 +67,7 @@ class ProductVariant {
       'attribute2_value': attribute2Value,
       'color_hex': colorHex,
       'color_hex2': colorHex2,
+      'image_url': imageUrl,
       'sku_or_barcode': skuOrBarcode,
       'stock': stock,
       'additional_price': additionalPrice,
@@ -82,6 +88,7 @@ class ProductVariant {
         'attribute2_value': _blankToNull(m['attribute2_value']),
         'color_hex': validHex(m['color_hex'] as String?, allowMulti: true),
         'color_hex2': validHex(m['color_hex2'] as String?),
+        'image_url': (m['image_url'] as String?)?.startsWith('https://') == true ? m['image_url'] : null,
         'sku_or_barcode': _blankToNull(m['sku_or_barcode']),
         'stock': (m['stock'] as num?)?.toInt() ?? 0,
         'additional_price': (m['additional_price'] as num?)?.toDouble() ?? 0.0,
@@ -115,6 +122,7 @@ class ProductVariant {
       attribute2Value: map['attribute2_value'] as String?,
       colorHex: map['color_hex'] as String?,
       colorHex2: map['color_hex2'] as String?,
+      imageUrl: map['image_url'] as String?,
       skuOrBarcode: map['sku_or_barcode'] as String?,
       stock: (map['stock'] as num?)?.toInt() ?? 0,
       additionalPrice: (map['additional_price'] as num?)?.toDouble() ?? 0.0,
@@ -135,6 +143,8 @@ class ProductVariant {
     String? colorHex,
     String? colorHex2,
     bool clearColor = false,
+    String? imageUrl,
+    bool clearImage = false,
     String? skuOrBarcode,
     int? stock,
     double? additionalPrice,
@@ -152,6 +162,7 @@ class ProductVariant {
       attribute2Value: attribute2Value ?? this.attribute2Value,
       colorHex: clearColor ? null : (colorHex ?? this.colorHex),
       colorHex2: clearColor ? null : (colorHex2 ?? this.colorHex2),
+      imageUrl: clearImage ? null : (imageUrl ?? this.imageUrl),
       skuOrBarcode: skuOrBarcode ?? this.skuOrBarcode,
       stock: stock ?? this.stock,
       additionalPrice: additionalPrice ?? this.additionalPrice,

@@ -104,8 +104,8 @@ class _ProUpsellSheetState extends State<ProUpsellSheet> {
       // Con los precios apagados en el panel, la ventana no muestra precio
       if (!ProService.pricingVisible(await pro.settings())) return;
       final plans = await pro.plans(widget.business.currency);
-      // «Desde» se calcula con Pro Negocio y Pro Global, no con Pro Servicios
-      final text = ProUpsellSheet.priceFromText(plans.where((p) => p.kind != 'services').toList());
+      // «Desde» se calcula con Pro, no con Pro Servicios
+      final text = ProUpsellSheet.priceFromText(plans.where((p) => p.kind == 'business').toList());
       if (mounted && text != null) setState(() => _priceFrom = text);
     } catch (_) {
       // Sin conexión la ventana se muestra sin precio

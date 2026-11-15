@@ -8,12 +8,10 @@ import '../../business/data/business_repository.dart';
 import '../../business/models/business.dart';
 import '../models/business_member.dart';
 import 'activity_repository.dart';
+import '../../../core/permissions/permissions.dart';
+import '../../services/models/work_schedule.dart';
 
-String _roleLabel(String role) => switch (role.toUpperCase()) {
-      'OWNER' => 'dueño',
-      'ADMIN' => 'administrador',
-      _ => 'cajero',
-    };
+String _roleLabel(String role) => Permissions.labelOf(role).toLowerCase();
 
 class TeamRepository {
   static final TeamRepository instance = TeamRepository._internal();
@@ -176,6 +174,39 @@ class TeamRepository {
     }
   }
 
+  /// Horario de acceso de una persona (0.15.0); null = sin horario
+  Future<void> setAccessSchedule(BusinessMember member, WorkSchedule? schedule) async {
+    final db = await _dbProvider.database;
+    final value = schedule == null || schedule.isEmpty ? null : schedule.encode();
+    await db.update('business_members', {'access_schedule': value}, where: 'id = ?', whereArgs: [member.id]);
+    final rows = await db.query('business_members', where: 'id = ?', whereArgs: [member.id], limit: 1);
+    if (rows.isNotEmpty) SupabaseService.instance.upsertBusinessMemberToCloud(rows.first);
+    ActivityRepository.instance.log(
+      businessId: member.businessId,
+      action: ActivityAction.roleChange,
+      summary: value == null
+          ? 'Quitó el horario de acceso de ${member.displayName}'
+          : 'Puso horario de acceso a ${member.displayName}: ${schedule!.describe()}',
+      data: {'member_id': member.id},
+    );
+  }
+
+  /// El horario de acceso de quien usa la app en este negocio; null = sin horario.
+  /// El Dueño nunca tiene horario.
+  Future<WorkSchedule?> myAccessSchedule({required String businessId, required String userId, required String userEmail}) async {
+    final db = await _dbProvider.database;
+    final rows = await db.query(
+      'business_members',
+      columns: ['role', 'access_schedule'],
+      where: 'business_id = ? AND (user_id = ? OR LOWER(email) = ?)',
+      whereArgs: [businessId, userId, userEmail.trim().toLowerCase()],
+      limit: 1,
+    );
+    if (rows.isEmpty || rows.first['role'] == 'OWNER') return null;
+    final schedule = WorkSchedule.decode(rows.first['access_schedule'] as String?);
+    return schedule == null || schedule.isEmpty ? null : schedule;
+  }
+
   /// Elimina un miembro del equipo de la empresa
   Future<void> removeMember(String memberId) async {
     final db = await _dbProvider.database;
@@ -217,7 +248,14 @@ class TeamRepository {
     );
 
     if (memberQuery.isNotEmpty) {
-      return memberQuery.first['role'] as String;
+      final m = memberQuery.first;
+      // Rol propio (0.15.0): si existe, manda; si se borró, queda su rol de siempre
+      final roleId = m['role_id'] as String?;
+      if (roleId != null && m['role'] != 'OWNER') {
+        final exists = await db.query('business_roles', columns: ['id'], where: 'id = ?', whereArgs: [roleId], limit: 1);
+        if (exists.isNotEmpty) return Permissions.customRole(roleId);
+      }
+      return m['role'] as String;
     }
 
     // 2. Si no tiene registro explícito localmente, consultar Supabase si está disponible

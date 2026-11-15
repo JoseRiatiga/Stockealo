@@ -17,6 +17,8 @@ import '../../../sales/presentation/widgets/quotations_list_modal.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
 import '../../data/dashboard_repository.dart';
 import '../../../sales/presentation/screens/promotions_screen.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../team/presentation/screens/roles_screen.dart';
 
 /// «Accesos rápidos» de Inicio (volvieron en la 0.12.1, a pedido del dueño):
 /// llevan a una función en un toque. Salen de `kAppFunctions`, la misma lista
@@ -48,7 +50,6 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
   final _repo = DashboardRepository.instance;
   List<String> _saved = const [];
 
-  bool get _managers => widget.role == 'OWNER' || widget.role == 'ADMIN';
 
   @override
   void initState() {
@@ -94,8 +95,10 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
         await ProfitReportScreen.open(context, biz);
       case 'team':
         await Navigator.push(context, MaterialPageRoute(builder: (_) => EmployeesScreen(business: biz)));
+      case 'roles':
+        await RolesScreen.open(context, business: biz, canEdit: widget.role == Permissions.owner);
       case 'modules':
-        await ModulesScreen.open(context, business: biz, canEdit: _managers);
+        await ModulesScreen.open(context, business: biz, canEdit: Permissions.can(widget.role, Perm.modules));
       case 'pro':
         await ProScreen.open(context, biz);
       default:

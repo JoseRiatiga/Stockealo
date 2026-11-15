@@ -17,6 +17,9 @@ import '../../features/suppliers/models/supplier.dart';
 import '../database/app_database.dart';
 import '../utils/currency_formatter.dart';
 import 'data_events.dart';
+import '../../features/pro/data/pro_service.dart';
+import '../../features/cash/data/cash_register_repository.dart';
+import '../../features/reports/data/daily_close.dart';
 
 /// Avisos en la barra del celular, aunque la app esté cerrada:
 /// • stock bajo: cuando un producto llega a su mínimo después de una venta
@@ -37,6 +40,17 @@ class PhoneAlertsService {
   static const summaryKey = 'alerts_summary';
   static const summaryHourKey = 'alerts_summary_hour';
   static const ordersKey = 'alerts_store_orders';
+
+  /// Recordatorio para cerrar la caja (0.15.0): encendido por defecto, a las 7:00 p. m.
+  static const cashKey = 'alerts_cash_close';
+  static const cashHourKey = 'alerts_cash_close_hour';
+  static const defaultCashHour = 19;
+  static const _cashId = 2;
+  static const _cashChannel = AndroidNotificationDetails(
+    'cash_close',
+    'Cerrar la caja',
+    channelDescription: 'Si la caja sigue abierta a la hora de cierre',
+  );
 
   /// Ya se mostró la pantalla «Activa los avisos» al abrir la app
   static const promptKey = 'alerts_prompt_shown';
@@ -110,6 +124,7 @@ class PhoneAlertsService {
   void _onSalesChanged() {
     checkLowStock();
     refreshDailySummary();
+    refreshCashReminder();
     refreshDebtReminders();
   }
 
@@ -214,6 +229,51 @@ class PhoneAlertsService {
     }
     await refreshVisitReminders();
     return true;
+  }
+
+  Future<bool> cashReminderEnabled() => _flag(cashKey);
+  Future<int> cashHour() async =>
+      int.tryParse(await AppDatabase.instance.getSetting(cashHourKey) ?? '') ?? defaultCashHour;
+
+  Future<bool> setCashReminder(bool value) async {
+    if (value && !await ensurePermission()) return false;
+    await AppDatabase.instance.setSetting(cashKey, value ? '1' : '0');
+    await refreshCashReminder();
+    return true;
+  }
+
+  Future<void> setCashHour(int hour) async {
+    await AppDatabase.instance.setSetting(cashHourKey, '$hour');
+    await refreshCashReminder();
+  }
+
+  /// Programa el aviso «Cierra la caja» si la caja del negocio activo está abierta: hoy a
+  /// la hora de cierre o, si ya pasó, mañana. Se llama al abrir la app, al abrir o cerrar
+  /// la caja y al cambiar el ajuste.
+  Future<void> refreshCashReminder({DateTime? now}) async {
+    if (!_ready) return;
+    try {
+      await _plugin.cancel(_cashId);
+      if (!await cashReminderEnabled()) return;
+      final business = _business;
+      if (business == null || !business.cashRegisterEnabled) return;
+      final open = await CashRegisterRepository.instance.getOpenSession(business.id);
+      if (open == null) return;
+      final at = now ?? DateTime.now();
+      final hour = await cashHour();
+      var when = DateTime(at.year, at.month, at.day, hour);
+      if (!when.isAfter(at)) when = when.add(const Duration(days: 1));
+      await _plugin.zonedSchedule(
+        _cashId,
+        'Cierra la caja · ${business.name}',
+        'La caja sigue abierta. Ciérrala para cuadrar el día.',
+        tz.TZDateTime.from(when.toUtc(), tz.UTC),
+        const NotificationDetails(android: _cashChannel),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
+    } catch (e) {
+      debugPrint('Recordatorio de cerrar la caja: $e');
+    }
   }
 
   Future<bool> setSummary(bool value) async {
@@ -347,13 +407,16 @@ class PhoneAlertsService {
         body = 'Toca para ver cómo te fue hoy.';
       }
 
+      final pro = await ProService.lastKnown(business.id);
       await _plugin.zonedSchedule(
         _summaryId,
         title,
-        body,
+        pro?.active == true ? '$body Toca para enviar el cierre por WhatsApp.' : body,
         tz.TZDateTime.from(when.toUtc(), tz.UTC),
         const NotificationDetails(android: _summaryChannel),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        // Con Pro, tocar el aviso abre WhatsApp con el cierre del día (0.15.0)
+        payload: pro?.active == true ? jsonEncode({'type': 'daily_close', 'businessId': business.id}) : null,
       );
     } catch (e) {
       debugPrint('Resumen del día: $e');
@@ -473,6 +536,9 @@ class PhoneAlertsService {
     }
     // Sin deuda no hay nada que cobrar; el recordatorio queda guardado por si vuelve a fiar
     if (!customer.hasDebt) return;
+    // Sin Pro el recordatorio queda en pausa (guardado); vuelve solo al renovar (0.15.0)
+    final pro = await ProService.lastKnown(schedule.businessId);
+    if (pro != null && !pro.active) return;
 
     final db = await AppDatabase.instance.database;
     final rows = await db.query('businesses', columns: ['currency'], where: 'id = ?', whereArgs: [schedule.businessId]);
@@ -499,6 +565,12 @@ class PhoneAlertsService {
       final raw = response.payload;
       if (raw == null || raw.isEmpty) return;
       final data = jsonDecode(raw) as Map<String, dynamic>;
+      if (data['type'] == 'daily_close') {
+        final db = await AppDatabase.instance.database;
+        final rows = await db.query('businesses', where: 'id = ?', whereArgs: [data['businessId']], limit: 1);
+        if (rows.isNotEmpty) await DailyClose.send(Business.fromMap(rows.first));
+        return;
+      }
       if (data['type'] != 'debt') return;
       final customer = await CustomerRepository.instance.getCustomerById(data['customerId'] as String);
       if (customer == null || !customer.hasDebt) return;

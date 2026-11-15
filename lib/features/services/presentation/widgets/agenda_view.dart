@@ -11,6 +11,8 @@ import '../../data/appointments_repository.dart';
 import '../../data/services_repository.dart';
 import '../../models/appointment.dart';
 import '../../models/service_models.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../../core/permissions/permission_guard.dart';
 
 /// Servicios › Agenda (0.14.0): las citas del día por hora. Se agendan aquí o llegan
 /// como reserva en línea; cuando el cliente llega, la cita pasa al tablero.
@@ -343,6 +345,7 @@ class _AppointmentEditorState extends State<AppointmentEditor> {
   }
 
   Future<void> _save() async {
+    if (!PermissionGuard.check(context, Perm.appointments)) return;
     final name = _name.text.trim();
     if (name.isEmpty) {
       AppToast.showWarning(context, 'Escribe el nombre del cliente.');

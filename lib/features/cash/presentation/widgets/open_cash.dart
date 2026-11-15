@@ -9,6 +9,8 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
 import '../../data/cash_register_repository.dart';
 import '../../models/cash_session.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../../core/permissions/permission_guard.dart';
 
 /// Abrir la caja: la base con atajos ($ 50.000, $ 100.000, «Igual que ayer») y el
 /// aviso si no coincide con lo que se contó al cerrar. Es LA forma de abrir la caja:
@@ -63,6 +65,7 @@ class _OpenCashFormState extends State<OpenCashForm> {
   void _set(double v) => _base.text = NumberFormat.decimalPattern('es_CO').format(v.round());
 
   Future<void> _open() async {
+    if (!PermissionGuard.check(context, Perm.cashOwn)) return;
     setState(() => _saving = true);
     try {
       final s = await _repo.openSession(businessId: widget.businessId, openingAmount: _amount, openedBy: widget.userName);

@@ -28,6 +28,10 @@ import '../../../../core/services/sync_queue.dart';
 import '../widgets/deliveries.dart';
 import '../../../store/data/store_orders_repository.dart';
 import '../../../../core/design/status_pill.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../team/presentation/widgets/authorization_gate.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/design/filter_tabs.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   final String? businessId;
@@ -64,8 +68,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
   String? _userRole;
 
   String get _effectiveRole => widget.userRole ?? _userRole ?? 'OWNER';
-  bool get canViewCosts => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
-  bool get canCancelSale => _effectiveRole == 'OWNER' || _effectiveRole == 'ADMIN';
+  bool get canViewCosts => Permissions.can(_effectiveRole, Perm.costs);
+  bool get canCancelSale => Permissions.can(_effectiveRole, Perm.voidSale);
 
   // Filtros y paginación
   String _selectedDateFilter = 'all'; // 'all', 'today', '7days', 'month', 'custom'
@@ -191,7 +195,101 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
   }
 
   /// Anular sin borrar: se pide el motivo y la venta queda en el historial como «Anulada»
+  /// Devolución parcial (0.15.0): cuántas, si vuelven al inventario y el motivo
+  Future<void> _returnSale(Sale sale) async {
+    final left = sale.quantity - await _salesRepo.returnedQuantity(sale.id);
+    if (!mounted) return;
+    if (left <= 0) {
+      AppToast.showInfo(context, 'Ya se devolvió todo lo de esta venta.');
+      return;
+    }
+    var qty = 1;
+    var restock = true;
+    final reason = TextEditingController();
+    final ok = await AppSheet.show<bool>(
+      context: context,
+      title: 'Devolver',
+      subtitle: '${sale.productName} · se vendieron ${sale.quantity}${left < sale.quantity ? ', quedan $left por devolver' : ''}',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final amount = sale.totalAmount / sale.quantity * qty;
+          final money = CurrencyFormatter.format(amount);
+          final how = switch (sale.paymentMethod) {
+            PaymentMethod.cash => 'Le devuelves $money en efectivo: sale de la caja.',
+            PaymentMethod.credit => 'Su deuda baja $money.',
+            _ => 'Devuélvele $money por ${PaymentMethod.label(sale.paymentMethod)}.',
+          };
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: Text('¿Cuántas?', style: AppText.body(ctx, weight: FontWeight.w600))),
+                  IconButton.outlined(
+                    tooltip: 'Una menos',
+                    onPressed: qty > 1 ? () => setLocal(() => qty--) : null,
+                    icon: const Icon(Icons.remove_outlined, size: 18),
+                  ),
+                  SizedBox(width: 36, child: Text('$qty', textAlign: TextAlign.center, style: AppText.title(ctx))),
+                  IconButton.outlined(
+                    tooltip: 'Una más',
+                    onPressed: qty < left ? () => setLocal(() => qty++) : null,
+                    icon: const Icon(Icons.add_outlined, size: 18),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.md),
+              FilterTabs<bool>(
+                wrap: true,
+                options: const {true: 'Vuelve al inventario', false: 'Llegó dañado'},
+                value: restock,
+                onChanged: (v) => setLocal(() => restock = v),
+              ),
+              const SizedBox(height: AppSpace.md),
+              TextField(
+                controller: reason,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Motivo (opcional)', hintText: 'Ej.: talla equivocada'),
+              ),
+              const SizedBox(height: AppSpace.md),
+              Text(how, style: AppText.body(ctx, weight: FontWeight.w600)),
+              const SizedBox(height: AppSpace.md),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Devolver $qty · $money')),
+            ],
+          );
+        },
+      ),
+    );
+    final why = reason.text;
+    reason.dispose();
+    if (ok != true || !mounted) return;
+    try {
+      await _salesRepo.returnSale(sale, quantity: qty, restock: restock, reason: why);
+      if (!mounted) return;
+      AppToast.showSuccess(context, 'Devolución registrada.');
+      await _loadSales();
+    } on StateError catch (e) {
+      if (mounted) AppToast.showWarning(context, e.message);
+    } catch (e) {
+      if (mounted) AppToast.showError(context, '$e');
+    }
+  }
+
   Future<void> _cancelSale(Sale sale) async {
+    // Anular solo ventas recientes (límite del rol, 0.15.0)
+    final hours = Permissions.myLimit(RoleLimit.voidHours);
+    final age = DateTime.now().difference(sale.date).inMinutes / 60;
+    String? voidAuth;
+    if (hours != null && age > hours) {
+      voidAuth = await AuthorizationGate.allow(
+        context,
+        businessId: sale.businessId,
+        action: 'Anular una venta de ${CurrencyFormatter.format(sale.totalAmount)}',
+        reasons: ['La venta es de hace ${age.floor()} horas y tu rol solo anula las de las últimas ${hours.round()} horas.'],
+        amount: sale.totalAmount,
+      );
+      if (voidAuth == null || !mounted) return;
+    }
     const reasons = ['Se equivocó de producto', 'El cliente devolvió', 'Cobro repetido', 'Prueba'];
     final other = TextEditingController();
     String? picked;
@@ -264,7 +362,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
       if (choice == null) return;
       onlyThis = choice;
     }
-    await _salesRepo.voidSale(sale, reason: reason, onlyThisLine: onlyThis);
+    await _salesRepo.voidSale(sale, reason: reason, onlyThisLine: onlyThis, voidAuthRequestId: voidAuth);
     await _loadSales();
     if (mounted) AppToast.showSuccess(context, 'Venta anulada. El stock volvió al inventario.');
   }
@@ -494,6 +592,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
         sale: sale,
         showProfit: canViewCosts,
         onCancel: canCancelSale ? () => _cancelSale(sale) : null,
+        onReturn: Permissions.can(_effectiveRole, Perm.refund) ? () => _returnSale(sale) : null,
         pendingUpload: _pendingIds.contains(sale.id),
       );
 

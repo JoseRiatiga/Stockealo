@@ -159,7 +159,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
   }
 }
 
-/// Buscar un negocio y darle Pro Negocio por unos días o permanente
+/// Buscar un negocio y darle Pro por unos días o permanente
 class _GrantDialog extends StatefulWidget {
   const _GrantDialog();
 
@@ -172,7 +172,7 @@ class _GrantDialogState extends State<_GrantDialog> {
   AdminBusiness? _selected;
   int? _days = 30;
 
-  /// 'business' (Pro Negocio) o 'services' (Pro Servicios: Pro + módulo Servicios)
+  /// 'business' (Pro) o 'services' (Pro Servicios: Pro + módulo Servicios)
   String _kind = 'business';
   bool _searching = false;
   bool _searched = false;
@@ -253,7 +253,7 @@ class _GrantDialogState extends State<_GrantDialog> {
                 style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted)),
             const SizedBox(height: AppSpace.md),
             FilterTabs<String>(
-              options: const {'business': 'Pro Negocio', 'services': 'Pro Servicios'},
+              options: const {'business': 'Pro', 'services': 'Pro Servicios'},
               value: _kind,
               onChanged: (v) => setState(() => _kind = v),
             ),

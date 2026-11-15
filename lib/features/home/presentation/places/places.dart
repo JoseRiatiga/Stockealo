@@ -7,6 +7,7 @@ import '../../../business/presentation/screens/modules_screen.dart';
 import '../../../cash/presentation/screens/cash_register_screen.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../suppliers/presentation/screens/suppliers_screen.dart';
+import '../../../../core/permissions/permissions.dart';
 
 /// Lugar «Caja»: abrir, movimientos y cierre. Si el negocio no usa caja, explica
 /// para qué sirve y lleva a Módulos para encenderla.
@@ -25,11 +26,12 @@ class CashPlace extends StatelessWidget {
         key: ValueKey('cash-place-${biz.id}'),
         businessId: biz.id,
         userName: AuthRepository.instance.currentUser?.displayName ?? '',
+        role: role,
         embedded: true,
       );
     }
     final c = context.colors;
-    final canEdit = role == 'OWNER' || role == 'ADMIN';
+    final canEdit = Permissions.can(role, Perm.modules);
     return ColoredBox(
       color: c.paper,
       child: Center(
@@ -78,7 +80,7 @@ class PeoplePlace extends StatelessWidget {
   Widget build(BuildContext context) {
     final biz = business;
     if (biz == null) return const SizedBox.shrink();
-    final managers = role == 'OWNER' || role == 'ADMIN';
+    final managers = Permissions.can(role, Perm.suppliers);
     final customers = CustomersScreen(key: ValueKey('people-c-${biz.id}'), businessId: biz.id, embedded: true);
     if (!managers) return customers;
     final c = context.colors;

@@ -177,6 +177,8 @@ class SalesRepository {
 
   /// Registra una venta multi-producto (carrito) con descuento mayorista y factura unificada
   Future<List<Sale>> recordMultiProductSale({
+    /// Autorización usada (0.15.0): la nube la exige si la venta pasa el límite del rol
+    String? authRequestId,
     required String businessId,
     required List<CartItem> items,
     required String paymentMethod,
@@ -352,7 +354,7 @@ class SalesRepository {
           'payment_status': paymentMethod == 'FIADO' ? 'PENDIENTE' : 'PAGADO',
           'notes': notes,
           'invoice_number': invoiceNumber,
-          'discount_amount': itemDiscount + (promo == null ? 0 : item.promoDiscount),
+          'discount_amount': itemDiscount + item.lineDiscount + (promo == null ? 0 : item.promoDiscount),
           'variant_id': item.variant?.id,
           'variant_name': item.variant?.label,
           'payment_split': itemSplit,
@@ -408,9 +410,9 @@ class SalesRepository {
     });
 
     // Sincronización a la nube fuera de la transacción: cliente, ventas y stock final
-    await _syncCustomer(db, customerId, customerIsNew, finalTotal);
+    await _syncCustomer(db, customerId, customerIsNew, finalTotal, authRequestId: authRequestId);
     for (final sale in createdSales) {
-      SupabaseService.instance.insertSaleToCloud(sale.toMap());
+      SupabaseService.instance.insertSaleToCloud({...sale.toMap(), if (authRequestId != null) 'auth_request_id': authRequestId});
     }
     stockDeltas.forEach(SupabaseService.instance.adjustProductStockInCloud);
     variantDeltas.forEach(SupabaseService.instance.adjustVariantStockInCloud);
@@ -436,6 +438,8 @@ class SalesRepository {
   /// hizo en la nota. El descuento se reparte en proporción al precio.
   /// La propina no es venta del negocio: se guarda en la orden para el empleado.
   Future<List<Sale>> recordServiceSale({
+    /// Autorización usada (0.15.0): la nube la exige si el fiado pasa el límite del rol
+    String? authRequestId,
     required WorkOrder order,
     required String paymentMethod, // 'EFECTIVO' | 'TRANSFERENCIA' | 'FIADO'
     String? customerName,
@@ -568,9 +572,10 @@ class SalesRepository {
       }
     });
 
-    await _syncCustomer(db, customerId, customerIsNew, finalTotal);
+    await _syncCustomer(db, customerId, customerIsNew, finalTotal, authRequestId: authRequestId);
     for (final sale in created) {
-      SupabaseService.instance.insertSaleToCloud({...sale.toMap(), 'notes': null});
+      SupabaseService.instance.insertSaleToCloud(
+          {...sale.toMap(), 'notes': null, if (authRequestId != null) 'auth_request_id': authRequestId});
     }
     await CommissionsRepository.instance.recordForOrder(order: order, charged: charged, tip: tipAmount, now: at);
     final what = lines.length == 1 ? lines.first.name : '${lines.length} servicios';
@@ -588,10 +593,10 @@ class SalesRepository {
 
   /// Lleva a la nube el fiado: un cliente nuevo se crea con su deuda; a uno
   /// existente se le suma la diferencia, para no pisar abonos de otros dispositivos.
-  Future<void> _syncCustomer(Database db, String? customerId, bool isNew, double amount) async {
+  Future<void> _syncCustomer(Database db, String? customerId, bool isNew, double amount, {String? authRequestId}) async {
     if (customerId == null) return;
     if (!isNew) {
-      await SupabaseService.instance.adjustCustomerDebtInCloud(customerId, amount);
+      await SupabaseService.instance.adjustCustomerDebtInCloud(customerId, amount, authRequestId: authRequestId);
       return;
     }
     final rows = await db.query('customers', where: 'id = ?', whereArgs: [customerId], limit: 1);
@@ -815,10 +820,11 @@ class SalesRepository {
       productName: map['product_name'] as String,
       productPhotoPath: photoPath,
       quantity: (map['quantity'] as num).toInt(),
-      unitPrice: (map['quantity'] as num).toInt() > 0
+      // Una devolución lleva la cantidad en negativo: el precio por unidad es el mismo
+      unitPrice: (map['quantity'] as num).toInt() != 0
           ? ((map['total'] as num).toDouble()) / ((map['quantity'] as num).toInt())
           : 0.0,
-      unitCost: (map['quantity'] as num).toInt() > 0
+      unitCost: (map['quantity'] as num).toInt() != 0
           ? ((map['total_cost'] as num).toDouble()) / ((map['quantity'] as num).toInt())
           : 0.0,
       totalAmount: (map['total'] as num).toDouble(),
@@ -846,8 +852,128 @@ class SalesRepository {
       deliveryStatus: map['delivery_status'] as String?,
       deliveryNote: map['delivery_note'] as String?,
       deliveredAt: DateTime.tryParse('${map['delivered_at'] ?? ''}'),
+      returnOf: map['return_of'] as String?,
     );
   }
+
+  /// Cuántas unidades ya se devolvieron de una línea de venta (0.15.0)
+  Future<int> returnedQuantity(String saleId) async {
+    final db = await _dbProvider.database;
+    final rows = await db.rawQuery(
+      'SELECT COALESCE(SUM(-quantity), 0) AS q FROM sales WHERE return_of = ? AND voided_at IS NULL',
+      [saleId],
+    );
+    return (rows.first['q'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Devolución parcial (0.15.0, decisiones del dueño del 15 nov): una venta en negativo
+  /// con el mismo medio de pago, así la caja, los reportes y los totales por medio se
+  /// ajustan solos (efectivo: la caja espera menos; fiado: baja la deuda). Si [restock],
+  /// las unidades vuelven al inventario; si no (llegó dañado), queda anotado como baja.
+  Future<Sale> returnSale(Sale line, {required int quantity, required bool restock, String? reason, DateTime? now}) async {
+    if (line.isVoided || line.isReturn || line.isService) throw StateError('Esa venta no se puede devolver.');
+    final left = line.quantity - await returnedQuantity(line.id);
+    if (quantity < 1 || quantity > left) throw StateError('Solo quedan $left por devolver.');
+    final db = await _dbProvider.database;
+    final at = now ?? DateTime.now();
+    final user = AuthRepository.instance.currentUser;
+    final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
+    final amount = _round(line.totalAmount / line.quantity * quantity);
+    final cost = _round(line.unitCost * quantity);
+    final cleanReason = (reason ?? '').trim();
+    final id = const Uuid().v4();
+    final original = (await db.query('sales', where: 'id = ?', whereArgs: [line.id], limit: 1)).first;
+    final customerId = original['customer_id'] as String?;
+
+    await db.transaction((txn) async {
+      await txn.insert('sales', {
+        'id': id,
+        'business_id': line.businessId,
+        'product_id': line.productId,
+        'product_name': line.productName,
+        'quantity': -quantity,
+        'customer_id': customerId,
+        'customer_name': line.customerName,
+        'seller_name': by,
+        'date': at.toIso8601String(),
+        'total': -amount,
+        'total_cost': -cost,
+        'net_profit': -(amount - cost),
+        'payment_method': line.paymentMethod,
+        'payment_status': 'PAGADO',
+        'notes': 'Devolución${cleanReason.isEmpty ? '' : ': $cleanReason'}${restock ? '' : ' (no volvió al inventario)'}',
+        'invoice_number': line.invoiceNumber,
+        'variant_id': line.variantId,
+        'variant_name': line.variantName,
+        'return_of': line.id,
+        'created_at': at.toIso8601String(),
+        'is_synced': 0,
+      });
+      if (restock && line.productId.isNotEmpty) {
+        await txn.rawUpdate('UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
+            [quantity, line.productId, line.businessId]);
+        if (line.variantId != null) {
+          await txn.rawUpdate('UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?',
+              [quantity, at.toIso8601String(), line.variantId]);
+        }
+        final p = await txn.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [line.productId], limit: 1);
+        await txn.insert('stock_movements', {
+          'id': const Uuid().v4(),
+          'business_id': line.businessId,
+          'product_id': line.productId,
+          'type': 'AJUSTE',
+          'quantity': quantity,
+          'resulting_stock': p.isEmpty ? 0 : p.first['stock'] as int,
+          'reason': 'Devolución ${line.invoiceNumber ?? ''}'.trim(),
+          'date': at.toIso8601String(),
+        });
+      }
+      // Fiado: lo devuelto baja la deuda
+      if (line.paymentMethod == PaymentMethod.credit && customerId != null) {
+        await txn.rawUpdate('UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE id = ?', [amount, customerId]);
+      }
+    });
+
+    final sale = Sale(
+      id: id,
+      businessId: line.businessId,
+      productId: line.productId,
+      productName: line.productName,
+      quantity: -quantity,
+      unitPrice: line.unitPrice,
+      unitCost: line.unitCost,
+      totalAmount: -amount,
+      netProfit: -(amount - cost),
+      paymentMethod: line.paymentMethod,
+      customerName: line.customerName,
+      sellerName: by,
+      date: at,
+      variantId: line.variantId,
+      variantName: line.variantName,
+      invoiceNumber: line.invoiceNumber,
+      returnOf: line.id,
+    );
+    final cloud = SupabaseService.instance;
+    await cloud.insertSaleToCloud({...sale.toMap(), 'customer_id': customerId, 'notes': null});
+    if (restock && line.productId.isNotEmpty) {
+      await cloud.adjustProductStockInCloud(line.productId, quantity);
+      if (line.variantId != null) await cloud.adjustVariantStockInCloud(line.variantId!, quantity);
+    }
+    if (line.paymentMethod == PaymentMethod.credit && customerId != null) {
+      await cloud.adjustCustomerDebtInCloud(customerId, -amount);
+    }
+    ActivityRepository.instance.log(
+      businessId: line.businessId,
+      action: ActivityAction.saleCancel,
+      summary: 'Devolvió $quantity × ${line.productName} por ${CurrencyFormatter.format(amount)}'
+          '${restock ? '' : ' (no volvió al inventario)'}${cleanReason.isEmpty ? '' : ' ($cleanReason)'}',
+      data: {'sale_id': line.id, 'return_id': id},
+    );
+    DataEvents.instance.salesChanged();
+    return sale;
+  }
+
+  static double _round(double v) => (v * 100).roundToDouble() / 100;
 
   /// Obtiene el resumen de ventas del día actual de la empresa
   Future<Map<String, dynamic>> getTodaySummary(String businessId) {
@@ -902,7 +1028,7 @@ class SalesRepository {
   ///
   /// [onlyThisLine] (0.14.0): anula solo esa línea (por ejemplo, un servicio cobrado por
   /// error) y deja cobrado lo demás de la venta, incluida la propina.
-  Future<void> voidSale(Sale sale, {String? reason, bool onlyThisLine = false}) async {
+  Future<void> voidSale(Sale sale, {String? reason, bool onlyThisLine = false, String? voidAuthRequestId}) async {
     final db = await _dbProvider.database;
     final user = AuthRepository.instance.currentUser;
     final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
@@ -996,7 +1122,12 @@ class SalesRepository {
     final cloud = SupabaseService.instance;
     final updated = await db.query('sales', where: 'id IN (${List.filled(lines.length, '?').join(',')})', whereArgs: [for (final l in lines) l.id]);
     for (final r in updated) {
-      await cloud.insertSaleToCloud({...saleFromRow(r).toMap(), 'notes': r['notes'], 'customer_id': r['customer_id']});
+      await cloud.insertSaleToCloud({
+        ...saleFromRow(r).toMap(),
+        'notes': r['notes'],
+        'customer_id': r['customer_id'],
+        if (voidAuthRequestId != null) 'void_auth_request_id': voidAuthRequestId,
+      });
     }
     for (final e in stock.entries) {
       await cloud.adjustProductStockInCloud(e.key, e.value);

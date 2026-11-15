@@ -188,7 +188,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
         const SizedBox(height: AppSpace.md),
         _label(c, 'Plan'),
         FilterTabs<String>(
-          options: const {'business': 'Pro Negocio', 'services': 'Pro Servicios'},
+          options: const {'business': 'Pro', 'services': 'Pro Servicios'},
           value: _kind,
           onChanged: (v) => setState(() => _kind = v),
         ),

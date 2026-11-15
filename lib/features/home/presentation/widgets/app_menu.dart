@@ -5,6 +5,7 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../business/models/business.dart';
 import '../../../business/presentation/business_identity.dart';
 import '../../navigation/app_places.dart';
+import '../../../../core/permissions/permissions.dart';
 
 /// Contador de un lugar del menú («Stock 7», «Clientes y proveedores 2»)
 typedef MenuBadge = ({int count, AppTone tone});
@@ -49,11 +50,7 @@ class AppMenu extends StatefulWidget {
 class _AppMenuState extends State<AppMenu> {
   bool _collapsed = false;
 
-  String get _roleLabel => switch (widget.userRole) {
-        'OWNER' => 'Dueño',
-        'ADMIN' => 'Administrador',
-        _ => 'Cajero',
-      };
+  String get _roleLabel => Permissions.labelOf(widget.userRole);
 
   @override
   Widget build(BuildContext context) {

@@ -26,6 +26,9 @@ class OnlineStoreConfig {
   /// La portada muestra fotos de los productos (plantilla Moda)
   final bool heroPhotos;
 
+  /// Foto de portada propia (0.15.0): su logo grande, un banner o una foto del local
+  final String? heroImageUrl;
+
   const OnlineStoreConfig({
     required this.slug,
     required this.enabled,
@@ -35,6 +38,7 @@ class OnlineStoreConfig {
     this.template = StoreTemplate.classic,
     this.heroTitle,
     this.heroPhotos = true,
+    this.heroImageUrl,
   });
 
   factory OnlineStoreConfig.fromJson(Map<String, dynamic> j) => OnlineStoreConfig(
@@ -46,6 +50,7 @@ class OnlineStoreConfig {
         template: StoreTemplate.of(j['template'] as String?),
         heroTitle: j['hero_title'] as String?,
         heroPhotos: j['hero_photos'] != false,
+        heroImageUrl: j['hero_image_url'] as String?,
       );
 
   String get url => '$storeBaseUrl/$slug';
@@ -80,6 +85,9 @@ class StoreVariant {
   /// Quedan 3 o menos: «Quedan pocas, pide pronto»
   final bool few;
 
+  /// Foto de este color (0.15.0); null = la del producto
+  final String? imageUrl;
+
   const StoreVariant({
     required this.id,
     this.size,
@@ -89,6 +97,7 @@ class StoreVariant {
     this.stock,
     this.soldOut = false,
     this.few = false,
+    this.imageUrl,
   });
 
   String get label => [if (size != null) size!, if (color != null) color!].join(' · ');
@@ -107,6 +116,7 @@ class StoreVariant {
         stock: (j['stock'] as num?)?.toInt(),
         soldOut: j['sold_out'] == true,
         few: j['few'] == true,
+        imageUrl: (j['image'] as String?)?.startsWith('https://') == true ? j['image'] as String : null,
       );
 }
 
@@ -231,6 +241,9 @@ class PublicStore {
   /// La portada muestra fotos de los productos
   final bool heroPhotos;
 
+  /// Foto de portada propia del negocio (0.15.0); null = la portada de siempre
+  final String? heroImageUrl;
+
   const PublicStore({
     required this.slug,
     required this.whatsapp,
@@ -243,6 +256,7 @@ class PublicStore {
     this.template = StoreTemplate.classic,
     this.heroTitle,
     this.heroPhotos = true,
+    this.heroImageUrl,
   });
 
   factory PublicStore.fromJson(Map<String, dynamic> j) {
@@ -258,6 +272,7 @@ class PublicStore {
       template: StoreTemplate.of(j['template'] as String?),
       heroTitle: j['hero_title'] as String?,
       heroPhotos: j['hero_photos'] != false,
+      heroImageUrl: (j['hero_image_url'] as String?)?.startsWith('https://') == true ? j['hero_image_url'] as String : null,
       products: [
         for (final p in (j['products'] as List? ?? const [])) StoreProduct.fromJson(Map<String, dynamic>.from(p as Map)),
       ],
@@ -334,6 +349,7 @@ class OnlineStoreService {
     String template = StoreTemplate.classic,
     String? heroTitle,
     bool heroPhotos = true,
+    String? heroImageUrl,
   }) async {
     final client = _client;
     if (client == null || client.auth.currentSession == null) {
@@ -350,6 +366,7 @@ class OnlineStoreService {
     // De la versión más nueva a la más vieja: si la nube no tiene una función (PGRST202),
     // se prueba la anterior y se guarda lo que se pueda
     final tries = [
+      {...params, 'p_template': template, 'p_hero_title': heroTitle, 'p_hero_photos': heroPhotos, 'p_hero_image_url': heroImageUrl},
       {...params, 'p_template': template, 'p_hero_title': heroTitle, 'p_hero_photos': heroPhotos},
       {...params, 'p_template': template, 'p_hero_title': heroTitle},
       params,

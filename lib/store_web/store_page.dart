@@ -253,6 +253,13 @@ class _StorePageState extends State<StorePage> {
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _classicHeader(c, store, side)),
+          if (store.heroImageUrl != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(side, AppSpace.lg, side, 0),
+                child: _coverImage(c, store, height: width > 700 ? 220 : 140),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(side, AppSpace.lg, side, 0),
@@ -317,6 +324,21 @@ class _StorePageState extends State<StorePage> {
                 label: const Text('Reservar cita'),
               ),
           ],
+        ),
+      );
+
+  /// Foto de portada propia del negocio, ancha y baja
+  Widget _coverImage(StockealoColors c, PublicStore store, {required double height}) => ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: SizedBox(
+          height: height,
+          width: double.infinity,
+          child: Image.network(
+            store.heroImageUrl!,
+            fit: BoxFit.cover,
+            semanticLabel: 'Portada de ${store.businessName}',
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
         ),
       );
 
@@ -394,7 +416,7 @@ class _StorePageState extends State<StorePage> {
     );
 
     // Portada baja (0.13.3): título y fotos pequeñas; los productos quedan a la vista sin bajar
-    final photos = wide && store.heroPhotos ? store.products.where((p) => p.imageUrl != null).take(3).toList() : const <StoreProduct>[];
+    final photos = wide && store.heroPhotos && store.heroImageUrl == null ? store.products.where((p) => p.imageUrl != null).take(3).toList() : const <StoreProduct>[];
     final hero = Padding(
       padding: EdgeInsets.symmetric(horizontal: side),
       child: Container(
@@ -404,7 +426,16 @@ class _StorePageState extends State<StorePage> {
           borderRadius: BorderRadius.circular(AppRadius.card),
           border: Border.all(color: c.line),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Portada propia (0.15.0): ancha y baja, encima del título
+            if (store.heroImageUrl != null) ...[
+              _coverImage(c, store, height: wide ? 200 : 130),
+              const SizedBox(height: AppSpace.md),
+            ],
+            Row(
           children: [
             Expanded(
               child: Column(
@@ -439,6 +470,8 @@ class _StorePageState extends State<StorePage> {
                 ),
               ),
             ],
+          ],
+        ),
           ],
         ),
       ),

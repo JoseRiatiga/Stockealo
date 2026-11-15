@@ -17,6 +17,9 @@ import '../../../pro/data/pro_service.dart';
 import '../../../pro/presentation/widgets/pro_upsell_sheet.dart';
 import '../../data/online_store_service.dart';
 import '../../../../core/design/status_pill.dart';
+import '../../../products/data/product_image_service.dart';
+import '../../../../core/design/filter_tabs.dart';
+import 'package:image_picker/image_picker.dart';
 
 /// Tienda en línea (lugar del menú): publica el catálogo en stockealo.online/tienda/<slug> con
 /// carrito; los pedidos llegan por WhatsApp (Stockealo Pro).
@@ -49,6 +52,14 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
   bool _enabled = true;
   bool _showStock = false;
   bool _heroPhotos = true;
+
+  /// Portada (0.15.0): fotos de productos (solo Moda), foto propia o sin foto
+  String _cover = _coverProducts;
+  String? _coverUrl;
+  bool _uploadingCover = false;
+  static const _coverProducts = 'PRODUCTOS';
+  static const _coverOwn = 'PROPIA';
+  static const _coverNone = 'NINGUNA';
   bool _pro = false;
   bool _cloudSync = true;
   bool _loading = true;
@@ -97,6 +108,10 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         _showStock = saved?.showStock ?? false;
         _heroPhotos = saved?.heroPhotos ?? true;
         _template = saved?.template ?? StoreTemplate.classic;
+        _coverUrl = saved?.heroImageUrl;
+        _cover = _coverUrl != null
+            ? _coverOwn
+            : (_template == StoreTemplate.fashion && _heroPhotos ? _coverProducts : _coverNone);
         _heroController.text = saved?.heroTitle ?? '';
       });
     } catch (e) {
@@ -142,8 +157,13 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
       );
       if (result != ProUpsellResult.pro || !mounted) return;
     }
+    if (_cover == _coverOwn && _coverUrl == null) {
+      AppToast.show(context, message: 'Sube tu foto de portada o elige otra opción.', type: ToastType.warning);
+      return;
+    }
     setState(() => _saving = true);
     try {
+      final hadCover = _saved?.heroImageUrl != null;
       final saved = await _service.save(
         businessId: widget.business.id,
         slug: slug,
@@ -151,10 +171,16 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         whatsapp: phone,
         welcome: _welcomeController.text,
         showStock: _showStock,
-        heroPhotos: _heroPhotos,
+        heroPhotos: _template == StoreTemplate.fashion ? _cover == _coverProducts : _heroPhotos,
+        heroImageUrl: _cover == _coverOwn ? _coverUrl : null,
         template: _template,
         heroTitle: _heroController.text.trim().isEmpty ? null : _heroController.text.trim(),
       );
+      // Se quitó la foto propia: el archivo ya no se usa y se borra (regla de archivos sin uso)
+      if (hadCover && saved.heroImageUrl == null) {
+        await SupabaseService.instance.removeStorageFiles('product-images', widget.business.id, prefix: _coverFile);
+        _coverUrl = null;
+      }
       if (!mounted) return;
       setState(() => _saved = saved);
       AppToast.show(context,
@@ -164,6 +190,90 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Nombre del archivo de la portada en la nube (uno por negocio: al cambiarla se reemplaza)
+  static const _coverFile = 'store-cover';
+
+  Future<void> _pickCover() async {
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 2000, imageQuality: 85);
+    if (file == null || !mounted) return;
+    setState(() => _uploadingCover = true);
+    try {
+      final url = await ProductImageService.instance.uploadBytes(
+        businessId: widget.business.id,
+        productId: _coverFile,
+        bytes: await file.readAsBytes(),
+        mimeType: file.mimeType,
+      );
+      if (mounted) {
+        setState(() {
+          _coverUrl = url;
+          _cover = _coverOwn;
+        });
+        AppToast.show(context, message: 'Foto lista. Toca Guardar para publicarla.', type: ToastType.success);
+      }
+    } catch (e) {
+      if (mounted) AppToast.show(context, message: '$e', type: ToastType.error);
+    } finally {
+      if (mounted) setState(() => _uploadingCover = false);
+    }
+  }
+
+  /// Portada: fotos de productos (Moda), foto propia o sin foto
+  Widget _coverPicker(StockealoColors c) {
+    final fashion = _template == StoreTemplate.fashion;
+    final options = {
+      if (fashion) _coverProducts: 'Fotos de productos',
+      _coverOwn: 'Mi propia foto',
+      _coverNone: fashion ? 'Sin fotos' : 'Solo el color',
+    };
+    final value = options.containsKey(_cover) ? _cover : _coverNone;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionLabel('PORTADA', padding: EdgeInsets.only(top: AppSpace.md, bottom: AppSpace.sm)),
+        FilterTabs<String>(
+          wrap: true,
+          options: options,
+          value: value,
+          onChanged: (v) => setState(() => _cover = v),
+        ),
+        const SizedBox(height: AppSpace.sm),
+        Text(
+          switch (value) {
+            _coverProducts => 'Fotos pequeñas de tus productos junto al título.',
+            _coverOwn => 'Tu logo en grande, un banner o una foto del local. Se ve ancha y baja, para que los productos queden a la vista.',
+            _ => fashion ? 'Solo el título y el mensaje de bienvenida.' : 'La franja con el color de tu negocio y tu logo.',
+          },
+          style: AppText.caption(context),
+        ),
+        if (value == _coverOwn) ...[
+          const SizedBox(height: AppSpace.sm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            child: AspectRatio(
+              aspectRatio: 3,
+              child: _coverUrl == null
+                  ? ColoredBox(
+                      color: c.surfaceMuted,
+                      child: Center(child: Icon(Icons.image_outlined, color: c.inkFaint, size: 32)),
+                    )
+                  : Image.network(_coverUrl!, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => ColoredBox(color: c.surfaceMuted)),
+            ),
+          ),
+          const SizedBox(height: AppSpace.sm),
+          OutlinedButton.icon(
+            onPressed: _uploadingCover ? null : _pickCover,
+            icon: _uploadingCover
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.upload_outlined, size: 18),
+            label: Text(_coverUrl == null ? 'Subir foto' : 'Cambiar foto'),
+          ),
+        ],
+      ],
+    );
   }
 
   Future<void> _copyLink(String url) async {
@@ -424,14 +534,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                 hintText: 'Ej.: Domicilios gratis en el barrio',
               ),
             ),
-            if (_template == StoreTemplate.fashion)
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('Mostrar fotos en la portada', style: AppText.body(context)),
-                subtitle: Text('Fotos pequeñas de tus productos junto al título', style: AppText.small(context)),
-                value: _heroPhotos,
-                onChanged: (v) => setState(() => _heroPhotos = v),
-              ),
+            _coverPicker(c),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text('Mostrar unidades disponibles', style: AppText.body(context)),

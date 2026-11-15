@@ -208,4 +208,43 @@ void main() {
     expect(tester.takeException(), isNull);
     await _save(tester, key, 'tienda_carrito_celular');
   });
+
+  // 0.15.0: portada propia del negocio
+  for (final template in [StoreTemplate.classic, StoreTemplate.fashion]) {
+    for (final size in const [Size(1080, 2400), Size(3600, 2400)]) {
+      testWidgets('portada propia en $template a ${size.width ~/ 3} px', (tester) async {
+        final base = template == StoreTemplate.fashion ? _moda : _store;
+        final store = PublicStore(
+          slug: base.slug,
+          whatsapp: base.whatsapp,
+          welcome: base.welcome,
+          businessName: base.businessName,
+          currency: base.currency,
+          template: template,
+          heroTitle: base.heroTitle,
+          heroImageUrl: 'https://x.supabase.co/storage/v1/object/public/product-images/b/store-cover.jpg',
+          products: base.products,
+        );
+        await _pump(tester, store, size: size);
+        expect(
+          find.byWidgetPredicate((w) => w is Image && w.semanticLabel == 'Portada de ${base.businessName}'),
+          findsOneWidget,
+        );
+        expect(find.text(base.products.first.name), findsWidgets, reason: 'los productos siguen a la vista');
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  test('la portada propia solo se acepta si es https', () {
+    Map<String, dynamic> json(String? url) => {
+          'slug': 's',
+          'business': {'name': 'N'},
+          'products': const [],
+          'hero_image_url': url,
+        };
+    expect(PublicStore.fromJson(json('https://a.co/p.jpg')).heroImageUrl, 'https://a.co/p.jpg');
+    expect(PublicStore.fromJson(json('javascript:alert(1)')).heroImageUrl, isNull);
+    expect(PublicStore.fromJson(json(null)).heroImageUrl, isNull);
+  });
 }

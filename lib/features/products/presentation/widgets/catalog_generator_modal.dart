@@ -76,7 +76,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
 
   /// La tienda: el catálogo lleva su QR e Instagram su link y hashtags (0.16.0)
   OnlineStoreConfig? _store;
-  String? get _storeUrl => _store?.enabled == true ? _store!.url : null;
+  String? get _storeUrl => _store?.enabled == true ? _store!.qrUrl : null;
 
   @override
   void initState() {

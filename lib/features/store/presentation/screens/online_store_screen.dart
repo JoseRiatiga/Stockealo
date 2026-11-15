@@ -28,6 +28,7 @@ import '../../../../core/design/app_time_picker.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../products/data/product_templates.dart';
 import '../widgets/store_qr_sheet.dart';
+import 'store_stats_screen.dart';
 
 /// Tienda en línea (lugar del menú): publica el catálogo en stockealo.online/tienda/<slug> con
 /// carrito; los pedidos llegan por WhatsApp (Stockealo Pro).
@@ -811,6 +812,12 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                   tooltip: 'Copiar el enlace',
                   onPressed: () => _copyLink(store.url),
                   icon: const Icon(Icons.copy_outlined, size: 18),
+                ),
+                // Estadísticas (0.16.0, fase 4)
+                OutlinedButton.icon(
+                  onPressed: () => StoreStatsScreen.open(context, widget.business),
+                  icon: const Icon(Icons.insights_outlined, size: 18),
+                  label: const Text('Estadísticas'),
                 ),
                 // QR para el mostrador (0.16.0, fase 3)
                 OutlinedButton.icon(

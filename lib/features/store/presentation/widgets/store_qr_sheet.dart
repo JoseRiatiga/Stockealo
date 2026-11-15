@@ -31,7 +31,7 @@ class StoreQrSheet {
           Center(
             child: RepaintBoundary(
               key: key,
-              child: StoreQrCard(businessName: business.name, url: store.url),
+              child: StoreQrCard(businessName: business.name, url: store.url, qrData: store.qrUrl),
             ),
           ),
           const SizedBox(height: AppSpace.lg),
@@ -52,7 +52,7 @@ class StoreQrSheet {
             label: const Text('Cartel para imprimir (PDF)'),
             onPressed: () async {
               try {
-                final bytes = await posterPdf(businessName: business.name, url: store.url);
+                final bytes = await posterPdf(businessName: business.name, url: store.url, qrData: store.qrUrl);
                 await Share.shareXFiles(
                   [XFile.fromData(bytes, mimeType: 'application/pdf', name: 'Cartel_QR_${business.name.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_')}.pdf')],
                 );
@@ -67,7 +67,7 @@ class StoreQrSheet {
   }
 
   /// Cartel de media carta: «Escanea y pide aquí», el QR grande y la dirección
-  static Future<Uint8List> posterPdf({required String businessName, required String url}) async {
+  static Future<Uint8List> posterPdf({required String businessName, required String url, String? qrData}) async {
     final doc = pw.Document(title: 'QR · $businessName');
     doc.addPage(
       pw.Page(
@@ -80,7 +80,7 @@ class StoreQrSheet {
             pw.SizedBox(height: 10),
             pw.Text('Escanea y pide aquí', style: const pw.TextStyle(fontSize: PdfPt.subtitle)),
             pw.SizedBox(height: 18),
-            pw.BarcodeWidget(barcode: pw.Barcode.qrCode(), data: url, width: 230, height: 230),
+            pw.BarcodeWidget(barcode: pw.Barcode.qrCode(), data: qrData ?? url, width: 230, height: 230),
             pw.SizedBox(height: 16),
             pw.Text(url.replaceFirst('https://', ''), style: const pw.TextStyle(fontSize: PdfPt.body)),
             pw.SizedBox(height: 4),
@@ -97,8 +97,11 @@ class StoreQrSheet {
 class StoreQrCard extends StatelessWidget {
   final String businessName;
   final String url;
+
+  /// Lo que lleva el QR (la dirección con ?src=qr); null = [url]
+  final String? qrData;
   final double size;
-  const StoreQrCard({super.key, required this.businessName, required this.url, this.size = 220});
+  const StoreQrCard({super.key, required this.businessName, required this.url, this.qrData, this.size = 220});
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +116,7 @@ class StoreQrCard extends StatelessWidget {
           const SizedBox(height: AppSpace.xs),
           Text('Escanea y pide aquí', style: AppText.body(context, color: Colors.black)),
           const SizedBox(height: AppSpace.md),
-          BarcodeWidget(barcode: Barcode.qrCode(), data: url, width: size, height: size, color: Colors.black, backgroundColor: Colors.white),
+          BarcodeWidget(barcode: Barcode.qrCode(), data: qrData ?? url, width: size, height: size, color: Colors.black, backgroundColor: Colors.white),
           const SizedBox(height: AppSpace.sm),
           Text(url.replaceFirst('https://', ''), style: AppText.small(context, color: Colors.black)),
         ],

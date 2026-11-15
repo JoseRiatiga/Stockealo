@@ -14,14 +14,21 @@ void main() async {
   // Fechas en español (las pantallas usan DateFormat con 'es_CO')
   await initializeDateFormatting('es_CO', null);
   await SupabaseService.instance.initialize();
-  // Dirección limpia: /tienda/<slug>, sin ?t= (0.16.0)
-  final slug = slugFromUri(Uri.base);
+  // Se lee la dirección completa ANTES de limpiarla: el producto compartido (?p=) y de
+  // dónde llegó (?src=qr) se perderían al dejar solo /tienda/<slug> (0.16.0)
+  final uri = Uri.base;
+  final slug = slugFromUri(uri);
+  final shared = sharedProductFromUri(uri);
+  final source = sourceFromUri(uri);
   if (slug != null) showCleanStoreUrl(slug);
-  runApp(const StoreApp());
+  runApp(StoreApp(slug: slug, sharedProductId: shared, source: source));
 }
 
 class StoreApp extends StatelessWidget {
-  const StoreApp({super.key});
+  final String? slug;
+  final String? sharedProductId;
+  final String? source;
+  const StoreApp({super.key, this.slug, this.sharedProductId, this.source});
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +36,7 @@ class StoreApp extends StatelessWidget {
       title: 'Tienda',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: StorePage(slug: slugFromUri(Uri.base), sharedProductId: sharedProductFromUri(Uri.base)),
+      home: StorePage(slug: slug, sharedProductId: sharedProductId, source: source),
     );
   }
 }

@@ -62,6 +62,81 @@ class OnlineStoreConfig {
 
   /// Link que abre la tienda con ese producto primero y resaltado (0.16.0, fase 3)
   String productUrl(String productId) => '$url?p=$productId';
+
+  /// Dirección del QR del mostrador: con ?src=qr para contar esas visitas (fase 4)
+  String get qrUrl => '$url?src=qr';
+}
+
+/// Estadísticas de la tienda (0.16.0, fase 4)
+class StoreStatsDay {
+  final DateTime day;
+  final int visits;
+  final int adds;
+  final int orders;
+  final double total;
+  const StoreStatsDay({required this.day, this.visits = 0, this.adds = 0, this.orders = 0, this.total = 0});
+}
+
+class StoreStatsItem {
+  final String productId;
+  final String name;
+  final double quantity;
+  final double total;
+  const StoreStatsItem({required this.productId, required this.name, this.quantity = 0, this.total = 0});
+}
+
+class StoreStats {
+  final List<StoreStatsDay> days;
+  final List<StoreStatsItem> topOrdered;
+
+  /// Lo más agregado al carrito ([StoreStatsItem.quantity] = veces)
+  final List<StoreStatsItem> topAdded;
+  final int fromShared;
+  final int fromQr;
+
+  const StoreStats({this.days = const [], this.topOrdered = const [], this.topAdded = const [], this.fromShared = 0, this.fromQr = 0});
+
+  int get visits => days.fold(0, (s, d) => s + d.visits);
+  int get adds => days.fold(0, (s, d) => s + d.adds);
+  int get orders => days.fold(0, (s, d) => s + d.orders);
+  double get total => days.fold(0.0, (s, d) => s + d.total);
+
+  /// Visitas que terminan en pedido, de 0 a 1 (null sin visitas)
+  double? get conversion => visits == 0 ? null : orders / visits;
+
+  /// Cuántos pedidos tuvo un producto (para «se agrega mucho y se pide poco»)
+  double orderedOf(String productId) => topOrdered.where((i) => i.productId == productId).firstOrNull?.quantity ?? 0;
+
+  /// La nube puede mandar los números como número o como texto
+  static double _n(Object? v) => v is num ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0;
+
+  factory StoreStats.fromJson(Map<String, dynamic> j) => StoreStats(
+        days: [
+          for (final d in (j['days'] as List? ?? const []))
+            StoreStatsDay(
+              day: DateTime.tryParse('${(d as Map)['day']}') ?? DateTime.now(),
+              visits: _n(d['visits']).round(),
+              adds: _n(d['adds']).round(),
+              orders: _n(d['orders']).round(),
+              total: _n(d['total']),
+            ),
+        ],
+        topOrdered: [
+          for (final t in (j['top_ordered'] as List? ?? const []))
+            StoreStatsItem(
+              productId: '${(t as Map)['product_id'] ?? ''}',
+              name: '${t['name'] ?? 'Producto'}',
+              quantity: _n(t['qty']),
+              total: _n(t['total']),
+            ),
+        ],
+        topAdded: [
+          for (final t in (j['top_added'] as List? ?? const []))
+            StoreStatsItem(productId: '${(t as Map)['product_id'] ?? ''}', name: '${t['name'] ?? 'Producto'}', quantity: _n(t['adds'])),
+        ],
+        fromShared: _n(j['shared']).round(),
+        fromQr: _n(j['qr']).round(),
+      );
 }
 
 /// Las plantillas de la tienda
@@ -674,6 +749,32 @@ class OnlineStoreService {
       return StoreLook.fromJson(data);
     } on PostgrestException catch (e) {
       if (e.code == 'PGRST202') throw const OnlineStoreException('Actualiza la nube para guardar el diseño de la tienda.');
+      throw OnlineStoreException(errorMessage(e.message));
+    }
+  }
+
+  /// Cuenta una visita, un producto agregado o de dónde llegó (fase 4). No guarda
+  /// nada de quién visita y si falla no pasa nada.
+  Future<void> track(String slug, String kind, {String? productId}) async {
+    try {
+      await _client?.rpc('track_store_event', params: {'p_slug': slug, 'p_kind': kind, 'p_product_id': productId});
+    } catch (e) {
+      debugPrint('No se pudo contar $kind: $e');
+    }
+  }
+
+  /// Números de la tienda entre [from] y [to] (incluidos)
+  Future<StoreStats> stats(String businessId, {required DateTime from, required DateTime to}) async {
+    final client = _client;
+    if (client == null || client.auth.currentSession == null) {
+      throw const OnlineStoreException('Necesitas iniciar sesión y tener internet.');
+    }
+    String day(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    try {
+      final data = await client.rpc('get_store_stats', params: {'p_business_id': businessId, 'p_from': day(from), 'p_to': day(to)});
+      return StoreStats.fromJson(Map<String, dynamic>.from(data as Map));
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST202') throw const OnlineStoreException('Actualiza la nube para ver las estadísticas.');
       throw OnlineStoreException(errorMessage(e.message));
     }
   }

@@ -408,7 +408,7 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
                     Container(
                       padding: const EdgeInsets.all(3),
                       color: Colors.white,
-                      child: BarcodeWidget(barcode: Barcode.qrCode(), data: _storeUrl!, width: 44, height: 44, color: Colors.black),
+                      child: BarcodeWidget(barcode: Barcode.qrCode(), data: widget.store!.qrUrl, width: 44, height: 44, color: Colors.black),
                     ),
                     const SizedBox(width: AppSpace.sm),
                   ] else ...[

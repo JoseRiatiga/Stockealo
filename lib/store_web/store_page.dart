@@ -16,6 +16,7 @@ import '../features/sales/presentation/widgets/sale_document.dart';
 import '../features/store/data/online_store_service.dart';
 import '../features/store/data/booking_service.dart';
 import 'booking_panel.dart';
+import 'clean_url_stub.dart' if (dart.library.js_interop) 'clean_url_web.dart';
 
 /// Nombre de la tienda en la dirección: /tienda/<slug> o /tienda/?t=<slug>
 /// (el 404 del sitio convierte la primera en la segunda)
@@ -26,6 +27,12 @@ String? slugFromUri(Uri uri) {
   final i = segments.indexOf('tienda');
   if (i >= 0 && i + 1 < segments.length) return segments[i + 1].toLowerCase();
   return null;
+}
+
+/// De dónde llegó la visita (?src=qr, fase 4)
+String? sourceFromUri(Uri uri) {
+  final s = uri.queryParameters['src']?.trim().toLowerCase();
+  return s == null || s.isEmpty ? null : s;
 }
 
 /// Producto compartido (?p=<id>, 0.16.0): sale primero y resaltado
@@ -88,7 +95,22 @@ class StorePage extends StatefulWidget {
   /// Producto que le compartieron al cliente (0.16.0): va primero con «Te compartieron este producto»
   final String? sharedProductId;
 
-  const StorePage({super.key, required this.slug, this.loader, this.maintenanceLoader, this.sharedProductId});
+  /// De dónde llegó (?src=qr) (fase 4)
+  final String? source;
+
+  /// Cuenta visitas y productos agregados (fase 4). Por defecto, la nube cuando la tienda
+  /// viene del servidor; las pruebas y la vista previa no cuentan.
+  final void Function(String slug, String kind, String? productId)? tracker;
+
+  const StorePage({
+    super.key,
+    required this.slug,
+    this.loader,
+    this.maintenanceLoader,
+    this.sharedProductId,
+    this.source,
+    this.tracker,
+  });
 
   static Future<MaintenanceState> _serverMaintenance() async {
     try {
@@ -185,6 +207,7 @@ class _StorePageState extends State<StorePage> {
       final store = await (widget.loader ?? OnlineStoreService.instance.getPublic)(slug);
       final maintenance = await maintenanceFuture;
       if (store != null && widget.loader == null) _loadBooking(slug);
+      if (store != null) _countVisit(store);
       if (mounted) {
         setState(() {
           // El producto compartido va primero, como un destacado más
@@ -200,6 +223,28 @@ class _StorePageState extends State<StorePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Estadísticas (fase 4): la visita una vez, de dónde llegó, y cada producto agregado
+  /// una vez por visita
+  final Set<String> _counted = {};
+
+  void Function(String, String, String?)? get _track =>
+      widget.tracker ?? (widget.loader == null ? (s, k, p) => OnlineStoreService.instance.track(s, k, productId: p) : null);
+
+  void _countVisit(PublicStore store) {
+    final track = _track;
+    if (track == null || !firstTimeThisVisit('visit_${store.slug}')) return;
+    track(store.slug, 'VISIT', null);
+    if (widget.source == 'qr') track(store.slug, 'QR', null);
+    if (widget.sharedProductId != null) track(store.slug, 'SHARED', widget.sharedProductId);
+  }
+
+  void _countAdd(StoreProduct p) {
+    final store = _store;
+    final track = _track;
+    if (store == null || track == null || !_counted.add(p.id) || !firstTimeThisVisit('add_${store.slug}_${p.id}')) return;
+    track(store.slug, 'ADD', p.id);
   }
 
   List<CartLine> get _lines => _cart.values.toList();
@@ -227,6 +272,7 @@ class _StorePageState extends State<StorePage> {
     final key = CartLine.keyOf(p, variant);
     final current = _cart[key]?.quantity ?? 0;
     _setLine(CartLine(p, current, variant), current + 1);
+    _countAdd(p);
   }
 
   /// Elegir talla y color: a la derecha en el computador, desde abajo en el celular

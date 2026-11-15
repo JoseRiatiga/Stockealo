@@ -627,6 +627,31 @@ class SupabaseService {
       // 1.2 Descargar Miembros de equipo
       int membersCount = 0;
       try {
+        // Roles del negocio (0.15.0): antes que los miembros, que pueden tener uno propio
+        try {
+          // Solo se agregan o actualizan: un rol creado sin conexión que aún no sube no se pierde
+          final List<dynamic> cloudRoles = await client!.from('business_roles').select();
+          for (final r in cloudRoles) {
+            final row = Map<String, dynamic>.from(r as Map);
+            await db.insert(
+              'business_roles',
+              {
+                'id': row['id'],
+                'business_id': row['business_id'],
+                'name': row['name'],
+                'base_role': row['base_role'] ?? 'CASHIER',
+                'builtin': row['builtin'],
+                'perms': jsonEncode(row['perms'] ?? const []),
+                'template_id': row['template_id'],
+                'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+                'updated_at': row['updated_at'] ?? DateTime.now().toIso8601String(),
+              },
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+        } catch (e) {
+          debugPrint('No se pudieron bajar los roles del negocio: $e');
+        }
         final List<dynamic> cloudMembers = await client!.from('business_members').select();
         for (final m in cloudMembers) {
           final rawUserId = m['user_id'] as String?;
@@ -666,6 +691,7 @@ class SupabaseService {
               'email': memberEmail,
               'name': memberName,
               'role': memberRole,
+              'role_id': m['role_id'],
               'status': 'ACTIVE',
               'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
             },
@@ -1280,10 +1306,19 @@ class SupabaseService {
                   (userEmail.isNotEmpty ? userEmail.split('@').first : 'Colaborador'))
               .toString(),
           'role': p['role'] ?? 'CASHIER',
+          // Rol propio (0.15.0); null = su rol por defecto
+          'role_id': p['role_id'],
           'created_at': p['created_at'] ?? DateTime.now().toIso8601String(),
         };
         try {
-          await db.from('business_members').upsert(row, onConflict: 'id');
+          try {
+            await db.from('business_members').upsert(row, onConflict: 'id');
+          } on PostgrestException catch (e) {
+            // La nube todavía no tiene la columna del rol propio: se guarda lo demás
+            if (!e.message.contains('role_id') && e.code != '42703' && e.code != 'PGRST204') rethrow;
+            row.remove('role_id');
+            await db.from('business_members').upsert(row, onConflict: 'id');
+          }
         } on PostgrestException catch (e) {
           // El dueño de un negocio que aún no existe en la nube (creado sin conexión o
           // cuya creación se perdió): crearlo con su dueño en el servidor y reintentar
@@ -1298,6 +1333,10 @@ class SupabaseService {
         }
       case 'delete_member':
         await db.from('business_members').delete().eq('id', p['id'] as String);
+      case 'upsert_business_role':
+        await db.from('business_roles').upsert(p, onConflict: 'id');
+      case 'delete_business_role':
+        await db.from('business_roles').delete().eq('id', p['id'] as String);
       case 'insert_activity':
         // Quién la hizo lo pone el servidor con la sesión (actor_email por defecto)
         try {
@@ -1856,6 +1895,10 @@ class SupabaseService {
 
   /// Elimina un miembro de equipo de Supabase
   Future<void> deleteBusinessMemberFromCloud(String memberId) => _write('delete_member', {'id': memberId});
+
+  /// Roles del negocio (0.15.0): ajustes del Administrador y del Cajero, y roles propios
+  Future<void> upsertBusinessRoleToCloud(Map<String, dynamic> row) => _write('upsert_business_role', row);
+  Future<void> deleteBusinessRoleFromCloud(String roleId) => _write('delete_business_role', {'id': roleId});
 
   /// Sube una anotación del registro de actividad (ver ActivityRepository)
   Future<void> insertActivityToCloud(Map<String, dynamic> row) => _write('insert_activity', row);

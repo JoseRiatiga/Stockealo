@@ -144,15 +144,81 @@ class Permissions {
     Perm.allCommissions: {Perm.myCommissions},
   };
 
-  /// Los permisos de un rol por defecto (Dueño, Administrador o Cajero)
-  static Set<Perm> defaultsFor(String? role) => switch ((role ?? cashier).toUpperCase()) {
+  /// Lo que trae de fábrica cada rol por defecto (sin los ajustes del negocio)
+  static Set<Perm> factoryDefaults(String role) => switch (role.toUpperCase()) {
         owner => Perm.values.toSet(),
         admin => Perm.values.where((p) => !_notAdmin.contains(p)).toSet(),
         _ => _cashierPerms,
       };
 
+  // ---------------------------------------------------------------------------
+  // Roles del negocio activo (0.15.0, etapa 2): los ajustes del Administrador y del
+  // Cajero, y los roles propios. Los carga RolesRepository.apply al abrir el negocio.
+  // ---------------------------------------------------------------------------
+
+  /// Un rol propio se lee como 'ROLE:<id>'
+  static const customPrefix = 'ROLE:';
+  static String customRole(String id) => '$customPrefix$id';
+  static bool isCustom(String? role) => role?.startsWith(customPrefix) ?? false;
+  static String? customId(String? role) => isCustom(role) ? role!.substring(customPrefix.length) : null;
+
+  static final Map<String, Set<Perm>> _builtins = {};
+  static final Map<String, ({String name, Set<Perm> perms})> _custom = {};
+
+  /// Pone los roles del negocio activo (reemplaza los del negocio anterior)
+  static void applyBusiness({
+    Map<String, Set<Perm>> builtins = const {},
+    Map<String, ({String name, Set<Perm> perms})> custom = const {},
+  }) {
+    _builtins
+      ..clear()
+      ..addAll({
+        for (final e in builtins.entries)
+          if (e.key == admin || e.key == cashier) e.key: e.value,
+      });
+    _custom
+      ..clear()
+      ..addAll(custom);
+  }
+
+  /// Los permisos de un rol: el Dueño todo; el Administrador y el Cajero los suyos
+  /// (con los ajustes del negocio); un rol propio los que le dio el dueño. Un rol que
+  /// no se conoce nunca gana nada: queda como el Cajero de fábrica.
+  static Set<Perm> defaultsFor(String? role) {
+    final r = role ?? cashier;
+    if (isCustom(r)) return _custom[customId(r)]?.perms ?? _cashierPerms;
+    final up = r.toUpperCase();
+    if (up == owner) return Perm.values.toSet();
+    if (up == admin) return _builtins[admin] ?? factoryDefaults(admin);
+    if (up == cashier) return _builtins[cashier] ?? _cashierPerms;
+    return _cashierPerms;
+  }
+
   /// ¿Puede este rol hacer esto?
   static bool can(String? role, Perm perm) => defaultsFor(role).contains(perm);
+
+  /// El nombre del rol para mostrar
+  static String labelOf(String? role) {
+    if (isCustom(role)) return _custom[customId(role)]?.name ?? 'Rol propio';
+    return switch ((role ?? cashier).toUpperCase()) {
+      owner => 'Dueño',
+      admin => 'Administrador',
+      _ => 'Cajero',
+    };
+  }
+
+  /// En qué rol de la nube se apoya un rol propio: si todo lo que tiene lo puede un
+  /// Cajero, en el Cajero; si no, en el Administrador (para que la nube lo deje trabajar)
+  static String baseFor(Set<Perm> perms) => perms.every(_cashierPerms.contains) ? cashier : admin;
+
+  /// Apagar un permiso apaga también los que lo necesitan (al revés de [withDependencies])
+  static Set<Perm> dependentsOf(Perm perm) => {
+        for (final p in Perm.values)
+          if (p != perm && withDependencies({p}).contains(perm)) p,
+      };
+
+  /// «Ver como» (0.15.0): el dueño ve la app como la vería ese rol. null = su propio rol
+  static final viewAs = ValueNotifier<String?>(null);
 
   /// Enciende también los permisos de los que depende (en cadena)
   static Set<Perm> withDependencies(Set<Perm> perms) {

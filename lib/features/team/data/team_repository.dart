@@ -8,12 +8,9 @@ import '../../business/data/business_repository.dart';
 import '../../business/models/business.dart';
 import '../models/business_member.dart';
 import 'activity_repository.dart';
+import '../../../core/permissions/permissions.dart';
 
-String _roleLabel(String role) => switch (role.toUpperCase()) {
-      'OWNER' => 'dueño',
-      'ADMIN' => 'administrador',
-      _ => 'cajero',
-    };
+String _roleLabel(String role) => Permissions.labelOf(role).toLowerCase();
 
 class TeamRepository {
   static final TeamRepository instance = TeamRepository._internal();
@@ -217,7 +214,14 @@ class TeamRepository {
     );
 
     if (memberQuery.isNotEmpty) {
-      return memberQuery.first['role'] as String;
+      final m = memberQuery.first;
+      // Rol propio (0.15.0): si existe, manda; si se borró, queda su rol de siempre
+      final roleId = m['role_id'] as String?;
+      if (roleId != null && m['role'] != 'OWNER') {
+        final exists = await db.query('business_roles', columns: ['id'], where: 'id = ?', whereArgs: [roleId], limit: 1);
+        if (exists.isNotEmpty) return Permissions.customRole(roleId);
+      }
+      return m['role'] as String;
     }
 
     // 2. Si no tiene registro explícito localmente, consultar Supabase si está disponible

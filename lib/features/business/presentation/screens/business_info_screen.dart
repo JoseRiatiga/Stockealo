@@ -155,11 +155,7 @@ actions: [
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
-  String get _roleLabel => switch (_userRole.toUpperCase()) {
-        'OWNER' => 'Dueño',
-        'ADMIN' => 'Administrador',
-        _ => 'Cajero',
-      };
+  String get _roleLabel => Permissions.labelOf(_userRole);
 
   IconData get _roleIcon => switch (_userRole.toUpperCase()) {
         'OWNER' => Icons.workspace_premium_outlined,

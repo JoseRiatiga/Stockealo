@@ -42,6 +42,8 @@ import '../../../store/data/store_orders_repository.dart';
 import 'package:intl/intl.dart';
 import '../../../services/data/appointments_repository.dart';
 import '../../../services/models/service_template.dart';
+import '../../../team/data/roles_repository.dart';
+import '../../../../core/permissions/permissions.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -68,7 +70,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   Business? _activeBusiness;
   String _userName = 'Comerciante';
-  String _userRole = 'OWNER';
+  /// El rol de la persona en el negocio activo
+  String _realRole = 'OWNER';
+
+  /// El rol con el que se ve la app: el propio o el de «Ver como» (0.15.0)
+  String get _userRole => Permissions.viewAs.value ?? _realRole;
 
   late final AppLifecycleListener _lifecycle;
 
@@ -84,6 +90,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   void initState() {
     super.initState();
     AppPlace.request.addListener(_onPlaceRequest);
+    Permissions.viewAs.addListener(_onViewAs);
     _loadNavigationContext();
     _checkAppUpdateSilently();
     // Copia diaria de los datos en el celular; sin esperar y sin estorbar si falla.
@@ -220,9 +227,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     await alerts.refreshVisitReminders();
   }
 
+  /// Empieza o termina «Ver como»: se redibuja todo con ese rol
+  void _onViewAs() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
   @override
   void dispose() {
     AppPlace.request.removeListener(_onPlaceRequest);
+    Permissions.viewAs.removeListener(_onViewAs);
     _lifecycle.dispose();
     _webUpdateTimer?.cancel();
     _ordersTimer?.cancel();
@@ -239,6 +253,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
       final biz = await _businessRepo.getActiveBusiness(widget.userId, user.email);
       String role = 'OWNER';
       if (biz != null) {
+        // Roles del negocio (0.15.0): antes de leer el de la persona
+        await RolesRepository.instance.apply(biz.id);
         role = await _teamRepo.getUserRoleInBusiness(
           businessId: biz.id,
           userId: user.id,
@@ -259,7 +275,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
       if (mounted) {
         setState(() {
           _activeBusiness = biz;
-          _userRole = role;
+          _realRole = role;
+          // Al cambiar de negocio se sale de «Ver como»
+          Permissions.viewAs.value = null;
         });
       }
     }
@@ -492,6 +510,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                   bottom: (isWide ? AppSpace.xl : AppSpace.lg) + MediaQuery.of(context).padding.bottom,
                   child: const Align(alignment: Alignment.bottomLeft, child: SyncBanner()),
                 ),
+                // «Ver como» (0.15.0): franja arriba con «Salir»
+                if (Permissions.viewAs.value != null)
+                  Positioned(
+                    top: AppSpace.sm,
+                    left: 0,
+                    right: 0,
+                    child: Center(child: _ViewAsBanner(role: Permissions.viewAs.value!)),
+                  ),
                 // Stocky abajo a la derecha (no en Ajustes ni Reportes)
                 if (showStocky)
                   Positioned(
@@ -526,3 +552,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     );
   }
 }
+
+/// Franja de «Ver como»: recuerda con qué rol se está viendo la app y deja salir
+class _ViewAsBanner extends StatelessWidget {
+  final String role;
+  const _ViewAsBanner({required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Material(
+      color: c.ink,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpace.md, 4, 4, 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.visibility_outlined, size: 16, color: c.surface),
+            const SizedBox(width: AppSpace.sm),
+            Flexible(
+              child: Text('Estás viendo la app como ${Permissions.labelOf(role)}',
+                  overflow: TextOverflow.ellipsis, style: AppText.small(context, weight: FontWeight.w600, color: c.surface)),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: c.surface, visualDensity: VisualDensity.compact),
+              onPressed: () => Permissions.viewAs.value = null,
+              child: const Text('Salir'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

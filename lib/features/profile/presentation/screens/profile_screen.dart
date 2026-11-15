@@ -747,11 +747,7 @@ actions: [
     _refresh.value++;
   }
 
-  String get _roleLabel => switch (_currentBusinessRole.toUpperCase()) {
-        'OWNER' => 'Dueño',
-        'ADMIN' => 'Admin',
-        _ => 'Cajero',
-      };
+  String get _roleLabel => Permissions.labelOf(_currentBusinessRole);
 
   @override
   Widget build(BuildContext context) {

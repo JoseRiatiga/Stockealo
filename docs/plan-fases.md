@@ -128,7 +128,7 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 ### Ventas (movidas desde la 0.13.0)
 
-16. Devolución parcial.
+16. HECHO (15 nov). Devolución parcial: cuántas, si vuelven al inventario o llegaron dañadas, y el dinero según cómo pagó (efectivo sale de la caja, fiado baja la deuda). La nube pide «Devolver» y no deja devolver de más.
 17. HECHO (ya estaba: «Recibí» con atajos y el vuelto en grande). Cálculo del vuelto.
 18. HECHO (15 nov). Precio sugerido por margen (20, 30, 40 y 50 % en el formulario del producto).
 19. HECHO (15 nov). Cierre del día por WhatsApp: a mano en Reportes; con Pro, el aviso de la noche lo deja listo.

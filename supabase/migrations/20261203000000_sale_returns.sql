@@ -144,3 +144,44 @@ as $$
       or public.has_permission(p_business_id, 'productsEdit')
   end;
 $$;
+
+-- Una devolución fiada baja la deuda: también con «Devolver»
+create or replace function public.adjust_customer_debt(p_customer_id text, p_delta numeric, p_auth_request_id uuid default null)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_business text;
+  v_balance numeric;
+  v_limit numeric;
+  v_authorized boolean;
+begin
+  select c.business_id, c.debt_balance into v_business, v_balance from public.customers c where c.id = p_customer_id;
+  if v_business is null then
+    return;
+  end if;
+  if public.my_business_role(v_business) is null then
+    raise exception 'not_member';
+  end if;
+  if auth.uid() is not null then
+    v_authorized := p_auth_request_id is not null and public._auth_ok(p_auth_request_id, v_business);
+    if p_delta > 0 then
+      if not public.has_permission(v_business, 'credit') and not v_authorized then
+        raise exception 'needs_authorization';
+      end if;
+      v_limit := public.my_limit(v_business, 'creditMax');
+      if v_limit is not null and coalesce(v_balance, 0) + p_delta > v_limit + 0.5 and not v_authorized then
+        raise exception 'needs_authorization';
+      end if;
+    elsif p_delta < 0 then
+      if not (public.has_permission(v_business, 'collectDebts') or public.has_permission(v_business, 'voidSale')
+              or public.has_permission(v_business, 'refund')) then
+        raise exception 'perm_denied:collectDebts';
+      end if;
+    end if;
+  end if;
+  update public.customers set debt_balance = greatest(0, debt_balance + p_delta) where id = p_customer_id;
+end;
+$$;

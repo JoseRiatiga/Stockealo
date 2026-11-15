@@ -49,6 +49,7 @@ import '../../../team/presentation/widgets/authorization_gate.dart';
 import '../../../team/data/authorization_service.dart';
 import '../../../services/models/work_schedule.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/security/app_lock_gate.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -496,6 +497,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   @override
   Widget build(BuildContext context) {
+    // Bloqueo con PIN o huella (0.16.0, fase 6): tapa la app sin cerrarla
+    return AppLockGate(
+      title: _activeBusiness?.name,
+      onUsePassword: () async => widget.onLogout(),
+      child: _content(context),
+    );
+  }
+
+  Widget _content(BuildContext context) {
     // Fuera de su horario de acceso: la app se bloquea hasta su próximo turno
     if (_outOfHours) {
       return _OutOfHours(schedule: _accessSchedule!, businessName: _activeBusiness?.name, onLogout: widget.onLogout);

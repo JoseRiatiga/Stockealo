@@ -43,6 +43,8 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/services/sync_queue.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../data/personal_data_export.dart';
+import 'package:flutter/services.dart';
+import '../../../../core/security/app_lock.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -65,6 +67,12 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
   late TextEditingController _phoneController;
 
   AppUser? _user;
+
+  // Bloqueo con PIN o huella (0.16.0, fase 6)
+  bool _lockOn = false;
+  bool _bioOn = false;
+  bool _bioAvailable = false;
+  int _lockAfter = AppLock.defaultAfter;
   Business? _activeBusiness;
   String _currentBusinessRole = 'OWNER';
   String? _avatarPath;
@@ -96,6 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
   @override
   void initState() {
     super.initState();
+    _loadLock();
     _user = _authRepo.currentUser;
     _nameController = TextEditingController(text: _user?.name ?? '');
     _phoneController = TextEditingController(text: _user?.phone ?? '');
@@ -930,6 +939,38 @@ actions: [
                         subtitle: 'Tu clave de acceso',
                         onTap: _user == null ? null : () => ChangePasswordDialog.show(context, userId: _user!.id),
                       ),
+                      // Bloqueo con PIN o huella (0.16.0, fase 6)
+                      SettingsRow(
+                        icon: Icons.pin_outlined,
+                        title: 'Bloquear la app',
+                        subtitle: _lockOn ? 'Pide tu PIN al abrirla' : 'Pide PIN o huella al abrirla',
+                        trailing: Switch(value: _lockOn, onChanged: _toggleLock),
+                        onTap: () => _toggleLock(!_lockOn),
+                      ),
+                      if (_lockOn && _bioAvailable)
+                        SettingsRow(
+                          icon: Icons.fingerprint,
+                          title: 'Usar huella o rostro',
+                          subtitle: 'Además del PIN',
+                          trailing: Switch(
+                            value: _bioOn,
+                            onChanged: (v) async {
+                              await AppLock.instance.setBio(v);
+                              if (mounted) setState(() => _bioOn = v);
+                            },
+                          ),
+                          onTap: () async {
+                            await AppLock.instance.setBio(!_bioOn);
+                            if (mounted) setState(() => _bioOn = !_bioOn);
+                          },
+                        ),
+                      if (_lockOn)
+                        SettingsRow(
+                          icon: Icons.timer_outlined,
+                          title: 'Bloquear después de',
+                          subtitle: _afterLabel(_lockAfter),
+                          onTap: _pickAfter,
+                        ),
                       // Ley 1581 (0.16.0, fase 5): un Excel con todo lo de tus negocios
                       SettingsRow(
                         icon: Icons.download_outlined,
@@ -1342,6 +1383,112 @@ actions: [
           ),
       ];
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bloqueo con PIN o huella (0.16.0, fase 6)
+  // ---------------------------------------------------------------------------
+
+  Future<String?> _askPin(String title, {String? subtitle}) async {
+    final ctrl = TextEditingController();
+    String? error;
+    final pin = await AppSheet.show<String>(
+      context: context,
+      title: title,
+      subtitle: subtitle,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(labelText: 'PIN de 4 a 6 números', errorText: error, counterText: ''),
+            ),
+            const SizedBox(height: AppSpace.md),
+            FilledButton(
+              onPressed: () {
+                if (!AppLock.validPin(ctrl.text)) {
+                  setLocal(() => error = 'Escribe de 4 a 6 números.');
+                  return;
+                }
+                Navigator.pop(ctx, ctrl.text);
+              },
+              child: const Text('Seguir'),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+    return pin;
+  }
+
+  Future<void> _toggleLock(bool on) async {
+    final lock = AppLock.instance;
+    if (!on) {
+      await lock.disable();
+      if (mounted) setState(() => _lockOn = false);
+      return;
+    }
+    final first = await _askPin('Crea tu PIN', subtitle: 'Lo pediremos al abrir la app. Si lo olvidas, entras con tu contraseña.');
+    if (first == null || !mounted) return;
+    final again = await _askPin('Repite tu PIN');
+    if (again == null || !mounted) return;
+    if (again != first) {
+      AppToast.show(context, message: 'Los PIN no coinciden. Inténtalo otra vez.', type: ToastType.warning);
+      return;
+    }
+    await lock.enable(first);
+    final bio = await lock.bioAvailable();
+    if (!mounted) return;
+    setState(() {
+      _lockOn = true;
+      _bioAvailable = bio;
+    });
+    AppToast.show(context, message: 'Listo: la app pedirá tu PIN.', type: ToastType.success);
+  }
+
+  Future<void> _loadLock() async {
+    final lock = AppLock.instance;
+    final on = await lock.isOn(), bio = await lock.bioOn(), after = await lock.afterMinutes(), avail = await lock.bioAvailable();
+    if (mounted) {
+      setState(() {
+        _lockOn = on;
+        _bioOn = bio;
+        _lockAfter = after;
+        _bioAvailable = avail;
+      });
+    }
+  }
+
+  String _afterLabel(int m) => m == 0 ? 'Apenas salgo' : '$m ${m == 1 ? 'minuto' : 'minutos'} fuera';
+
+  Future<void> _pickAfter() async {
+    final picked = await AppSheet.show<int>(
+      context: context,
+      title: 'Bloquear después de',
+      builder: (ctx) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final m in AppLock.afterOptions)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(_afterLabel(m)),
+              trailing: m == _lockAfter ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.pop(ctx, m),
+            ),
+        ],
+      ),
+    );
+    if (picked == null) return;
+    await AppLock.instance.setAfter(picked);
+    if (mounted) setState(() => _lockAfter = picked);
   }
 
   Future<void> _downloadMyData() async {

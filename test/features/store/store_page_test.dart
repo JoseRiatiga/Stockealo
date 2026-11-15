@@ -120,13 +120,27 @@ void main() {
     await tester.tap(find.textContaining('Ver pedido'));
     await tester.pumpAndSettle();
     expect(find.text('Tu pedido'), findsOneWidget);
+    // 0.15.0: paso 1, el pedido; los datos van en el paso 2
+    expect(find.text('Paso 1 de 2 · revisa lo que pides'), findsOneWidget);
+    expect(find.text('3 productos'), findsOneWidget);
+    expect(find.text('\$5.000 c/u'), findsOneWidget, reason: '2 arroces');
+    expect(find.widgetWithText(TextField, 'Tu nombre'), findsNothing);
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tus datos'), findsOneWidget);
     // Sin nombre no deja pedir
-    await tester.tap(find.text('Hacer el pedido'));
+    await tester.tap(find.textContaining('Hacer el pedido ·'));
     await tester.pumpAndSettle();
     expect(find.text('Escribe tu nombre para que la tienda sepa quién pide'), findsOneWidget);
     expect(find.text('POR CONFIRMAR'), findsNothing);
+    // «Editar» vuelve al pedido sin perder nada
+    await tester.tap(find.text('Editar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Paso 1 de 2 · revisa lo que pides'), findsOneWidget);
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'Tu nombre'), 'Ana');
-    await tester.tap(find.text('Hacer el pedido'));
+    await tester.tap(find.textContaining('Hacer el pedido ·'));
     await tester.pumpAndSettle();
     // Sale el tiquete «Por confirmar» con el botón de WhatsApp
     expect(find.text('POR CONFIRMAR'), findsOneWidget);
@@ -215,7 +229,13 @@ void main() {
     await tester.tap(find.textContaining('Ver pedido'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Tu pedido'), findsOneWidget);
-    expect(find.text('Hacer el pedido'), findsOneWidget);
+    expect(find.text('Continuar'), findsOneWidget);
+    expect(find.text('Talla S'), findsOneWidget, reason: 'la talla se ve en el pedido');
+    await _save(tester, key, 'tienda_carrito_paso1_celular');
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Hacer el pedido ·'), findsOneWidget);
+    await _save(tester, key, 'tienda_carrito_paso2_celular');
     expect(tester.takeException(), isNull);
     await _save(tester, key, 'tienda_carrito_celular');
   });

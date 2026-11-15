@@ -1383,8 +1383,9 @@ class _CrossedPainter extends BoxPainter {
   }
 }
 
-/// El pedido: cantidades, nombre, nota y enviar. Al enviar sale el tiquete «Por
-/// confirmar» (el pedido todavía no es una venta) con «Enviar pedido por WhatsApp».
+/// El pedido en dos pasos (0.15.0): primero lo que se pide, con la foto, la talla y el
+/// color de cada producto; después los datos del comprador. Al enviar sale el tiquete
+/// «Por confirmar» (el pedido todavía no es una venta) con «Enviar pedido por WhatsApp».
 class _CartForm extends StatefulWidget {
   final PublicStore store;
   final List<CartLine> Function() lines;
@@ -1417,6 +1418,9 @@ class _CartFormState extends State<_CartForm> {
   /// Código del pedido guardado (T-0001)
   String? _code;
   bool _sending = false;
+
+  /// 1 = el pedido; 2 = los datos del comprador
+  int _step = 1;
 
   @override
   void dispose() {
@@ -1490,75 +1494,100 @@ class _CartFormState extends State<_CartForm> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final lines = widget.lines();
+    // Si se vació el pedido estando en los datos, vuelve al primer paso
+    if (lines.isEmpty) _step = 1;
     final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final count = lines.fold<int>(0, (s, l) => s + l.quantity);
     String money(num v) => CurrencyFormatter.formatIn(v, widget.store.currency);
-    final footer = <Widget>[
-      Row(
+    final products = '$count ${count == 1 ? 'producto' : 'productos'}';
+
+    Widget stepLabel(String text) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSpace.sm),
+          child: Text(text, style: AppText.caption(context)),
+        );
+
+    late final Widget body;
+    late final List<Widget> footer;
+    if (_step == 1) {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: Text('Total', style: AppText.title(context))),
-          Text(money(total), style: AppText.amount(context, size: AppText.sizeHeading)),
+          stepLabel('Paso 1 de 2 · revisa lo que pides'),
+          if (lines.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpace.xl),
+              child: Text('Tu pedido está vacío.', textAlign: TextAlign.center, style: AppText.body(context, color: c.inkMuted)),
+            ),
+          for (final l in lines)
+            _CartItem(
+              line: l,
+              money: money,
+              onMinus: () => setState(() => widget.onChanged(l, l.quantity - 1)),
+              onPlus: l.stock == null || l.quantity < l.stock! ? () => setState(() => widget.onChanged(l, l.quantity + 1)) : null,
+            ),
         ],
-      ),
-      const SizedBox(height: AppSpace.md),
-      FilledButton.icon(
-        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-        onPressed: () {
-          if (_name.text.trim().isEmpty) {
-            setState(() => _nameMissing = true);
-            return;
-          }
-          _showTicket(lines);
-        },
-        icon: const Icon(Icons.receipt_long_outlined),
-        label: Text(_sending ? 'Guardando tu pedido…' : 'Hacer el pedido'),
-      ),
-      const SizedBox(height: AppSpace.sm),
-      Text(
-        'Te mostramos tu tiquete y lo envías por WhatsApp. La tienda te confirma el precio final y la entrega.',
-        textAlign: TextAlign.center,
-        style: AppText.caption(context),
-      ),
-    ];
-    final body = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (lines.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpace.xl),
-            child: Text('Tu pedido está vacío.', textAlign: TextAlign.center, style: AppText.body(context, color: c.inkMuted)),
+      );
+      footer = [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text('Total', style: AppText.title(context)),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(child: Text(products, style: AppText.caption(context))),
+            Text(money(total), style: AppText.amount(context, size: AppText.sizeHeading)),
+          ],
+        ),
+        const SizedBox(height: AppSpace.md),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          onPressed: () => setState(() => _step = 2),
+          icon: const Icon(Icons.arrow_forward_outlined),
+          label: const Text('Continuar'),
+        ),
+        const SizedBox(height: AppSpace.xs),
+        TextButton.icon(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_outlined, size: 18),
+          label: const Text('Seguir comprando'),
+        ),
+      ];
+    } else {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                tooltip: 'Volver al pedido',
+                onPressed: () => setState(() => _step = 1),
+                icon: const Icon(Icons.arrow_back_outlined),
+              ),
+              Expanded(child: Text('Tus datos', style: AppText.title(context))),
+            ],
           ),
-        for (final l in lines)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+          stepLabel('Paso 2 de 2 · para que la tienda te confirme'),
+          // Resumen: las fotos, cuántos productos, el total y «Editar»
+          Container(
+            padding: const EdgeInsets.all(AppSpace.sm + 2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: c.line),
+            ),
             child: Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(l.name, style: AppText.body(context, weight: FontWeight.w600)),
-                      Text(money(l.subtotal), style: AppText.small(context)),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Quitar uno',
-                  onPressed: () => setState(() => widget.onChanged(l, l.quantity - 1)),
-                  icon: Icon(l.quantity == 1 ? Icons.delete_outline : Icons.remove_outlined, size: 20),
-                ),
-                Text('${l.quantity}', style: AppText.body(context, weight: FontWeight.w700)),
-                IconButton(
-                  tooltip: 'Agregar uno',
-                  onPressed: l.stock == null || l.quantity < l.stock! ? () => setState(() => widget.onChanged(l, l.quantity + 1)) : null,
-                  icon: const Icon(Icons.add_outlined, size: 20),
-                ),
+                _ThumbStack(products: [for (final l in lines) l.product]),
+                const SizedBox(width: AppSpace.sm),
+                Expanded(child: Text(products, style: AppText.small(context))),
+                Text(money(total), style: AppText.body(context, weight: FontWeight.w700)),
+                TextButton(onPressed: () => setState(() => _step = 1), child: const Text('Editar')),
               ],
             ),
           ),
-        if (lines.isNotEmpty) ...[
-          Divider(height: AppSpace.xl, color: c.line),
+          const SizedBox(height: AppSpace.lg),
           TextField(
             controller: _name,
+            autofocus: true,
             textCapitalization: TextCapitalization.words,
             onChanged: (_) {
               if (_nameMissing) setState(() => _nameMissing = false);
@@ -1582,11 +1611,39 @@ class _CartFormState extends State<_CartForm> {
             minLines: 1,
             decoration: const InputDecoration(labelText: 'Nota (opcional)', hintText: 'Ej.: dirección de entrega, forma de pago'),
           ),
-          if (!widget.pinnedFooter) ...[const SizedBox(height: AppSpace.lg), ...footer],
         ],
-      ],
-    );
-    if (!widget.pinnedFooter) return body;
+      );
+      footer = [
+        FilledButton.icon(
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          onPressed: () {
+            if (_name.text.trim().isEmpty) {
+              setState(() => _nameMissing = true);
+              return;
+            }
+            _showTicket(lines);
+          },
+          icon: const Icon(Icons.receipt_long_outlined),
+          label: Text(_sending ? 'Guardando tu pedido…' : 'Hacer el pedido · ${money(total)}'),
+        ),
+        const SizedBox(height: AppSpace.sm),
+        Text(
+          'Te mostramos tu tiquete y lo envías por WhatsApp. La tienda te confirma el precio final y la entrega.',
+          textAlign: TextAlign.center,
+          style: AppText.caption(context),
+        ),
+      ];
+    }
+
+    if (!widget.pinnedFooter) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          body,
+          if (lines.isNotEmpty) ...[const SizedBox(height: AppSpace.lg), ...footer],
+        ],
+      );
+    }
     return Column(
       children: [
         Expanded(
@@ -1604,6 +1661,183 @@ class _CartFormState extends State<_CartForm> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Un producto del pedido: foto, nombre, talla y color, cantidad y precio
+class _CartItem extends StatelessWidget {
+  final CartLine line;
+  final String Function(num) money;
+  final VoidCallback onMinus;
+  final VoidCallback? onPlus;
+
+  const _CartItem({required this.line, required this.money, required this.onMinus, required this.onPlus});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final l = line;
+    final v = l.variant;
+    final hasSwatch = ColorSwatchDot.hasSwatch(v?.hex);
+    Widget tag(Widget child) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.control - 2),
+            border: Border.all(color: c.lineStrong),
+          ),
+          child: child,
+        );
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.md),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.line))),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CartThumb(product: l.product, size: 64),
+          const SizedBox(width: AppSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l.product.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600)),
+                if (v != null && (v.size != null || v.color != null || hasSwatch)) ...[
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [
+                      if (v.size != null) tag(Text('Talla ${v.size}', style: AppText.caption(context, color: c.inkMuted))),
+                      if (v.color != null || hasSwatch)
+                        tag(Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (hasSwatch) ...[ColorSwatchDot(hex: v.hex, size: 10), const SizedBox(width: 4)],
+                            Text(v.color ?? 'Color', style: AppText.caption(context, color: c.inkMuted)),
+                          ],
+                        )),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: AppSpace.sm),
+                Row(
+                  children: [
+                    _QtyButton(
+                      tooltip: l.quantity == 1 ? 'Quitar del pedido' : 'Quitar uno',
+                      icon: l.quantity == 1 ? Icons.delete_outline : Icons.remove_outlined,
+                      onTap: onMinus,
+                    ),
+                    SizedBox(
+                      width: 28,
+                      child: Text('${l.quantity}', textAlign: TextAlign.center, style: AppText.body(context, weight: FontWeight.w700)),
+                    ),
+                    _QtyButton(tooltip: 'Agregar uno', icon: Icons.add_outlined, onTap: onPlus),
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(money(l.subtotal), style: AppText.body(context, weight: FontWeight.w700)),
+                        if (l.quantity > 1) Text('${money(l.unitPrice)} c/u', style: AppText.caption(context)),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Botón pequeño con borde para sumar o restar
+class _QtyButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _QtyButton({required this.tooltip, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            border: Border.all(color: c.lineStrong),
+          ),
+          child: Icon(icon, size: 16, color: onTap == null ? c.inkFaint : c.ink),
+        ),
+      ),
+    );
+  }
+}
+
+/// La foto del producto en el pedido (o un ícono si no tiene)
+class _CartThumb extends StatelessWidget {
+  final StoreProduct product;
+  final double size;
+
+  const _CartThumb({required this.product, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final icon = Icon(Icons.checkroom_outlined, size: size * 0.45, color: c.inkFaint);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.control + 2),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: ColoredBox(
+          color: c.surfaceMuted,
+          child: product.imageUrl != null
+              ? Image.network(product.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: icon))
+              : Center(child: icon),
+        ),
+      ),
+    );
+  }
+}
+
+/// Las fotos del pedido encimadas (hasta 3), para el resumen del paso 2
+class _ThumbStack extends StatelessWidget {
+  final List<StoreProduct> products;
+
+  const _ThumbStack({required this.products});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final shown = products.take(3).toList();
+    const size = 36.0;
+    const step = 26.0;
+    return SizedBox(
+      width: size + step * (shown.length - 1),
+      height: size,
+      child: Stack(
+        children: [
+          for (var i = 0; i < shown.length; i++)
+            Positioned(
+              left: step * i,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadius.control + 4),
+                  border: Border.all(color: c.surface, width: 2),
+                ),
+                child: _CartThumb(product: shown[i], size: size - 4),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -19,6 +19,7 @@ import '../../models/cash_session.dart';
 import '../widgets/open_cash.dart';
 import '../../../sales/presentation/widgets/sale_document.dart';
 import '../../../../core/permissions/permissions.dart';
+import '../../../../core/permissions/permission_guard.dart';
 
 /// Caja (lugar del menú): abrir el turno con una base, registrar entradas y
 /// salidas, ver lo cobrado por forma de pago y cerrar contando el dinero (también
@@ -156,6 +157,7 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
   Future<void> _movement(String kind) async {
     final session = _open;
     if (session == null) return;
+    if (!PermissionGuard.check(context, Perm.cashMoves)) return;
     final reasons = kind == CashMovement.exit ? CashMovement.exitReasons : CashMovement.entryReasons;
     var reason = reasons.first;
     final amount = TextEditingController();
@@ -241,6 +243,9 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
     final session = _open;
     final summary = _summary;
     if (session == null || summary == null) return;
+    // Su propia caja, o la de otra persona si tiene «Cerrar la caja de otros»
+    final mine = session.openedBy.trim().toLowerCase() == widget.userName.trim().toLowerCase();
+    if (!PermissionGuard.check(context, mine ? Perm.cashOwn : Perm.cashOthers)) return;
     final (servicesLines, servicesExtra) = await _servicesDay(session);
     if (!mounted) return;
     final closed = await AppSheet.show<CashSession>(

@@ -372,7 +372,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
         product: product,
         layout: _layout,
         showMargin: canViewCosts,
-        canAdjustStock: canEditProducts,
+        canAdjustStock: canEditProducts && Permissions.mine(Perm.stockAdjust),
         onTap: () => _openProduct(product),
         onAdjustStock: canEditProducts ? () => QuickStockDialog.show(context, product: product, onSaved: _loadData) : null,
       );

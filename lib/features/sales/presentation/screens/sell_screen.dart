@@ -29,6 +29,7 @@ import '../../../../core/codes/code_reader.dart';
 import '../../data/promotions_repository.dart';
 import '../widgets/deliveries.dart';
 import '../../../../core/permissions/permissions.dart';
+import '../../../../core/permissions/permission_guard.dart';
 
 /// Vender: el punto de venta. Buscar o escanear (también con lector USB: el código
 /// entra solo al carrito), tocar productos, cobrar con F9 y seguir con la
@@ -274,6 +275,8 @@ class _SellScreenState extends State<SellScreen> {
     final method = _pay.method;
     final customer = _customer.text.trim();
 
+    if (method == PaymentMethod.credit && !PermissionGuard.check(context, Perm.credit)) return;
+    if (_cart.discount > 0 && !PermissionGuard.check(context, Perm.discount)) return;
     if (method == PaymentMethod.credit && customer.isEmpty) {
       AppToast.showWarning(context, 'Para fiar escribe a quién le fías.');
       return;
@@ -354,6 +357,7 @@ class _SellScreenState extends State<SellScreen> {
 
   Future<void> _quote() async {
     if (_cart.isEmpty) return;
+    if (!PermissionGuard.check(context, Perm.quotations)) return;
     if (_cart.hasLoss && !_canBelowCost) {
       AppToast.showError(context, 'No se puede cotizar por debajo del costo.');
       return;
@@ -392,6 +396,7 @@ class _SellScreenState extends State<SellScreen> {
   }
 
   Future<void> _editDiscount() async {
+    if (!PermissionGuard.check(context, Perm.discount)) return;
     final field = TextEditingController(text: _cart.discount > 0 ? _cart.discount.round().toString() : '');
     final value = await AppSheet.show<double>(
       context: context,

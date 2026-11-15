@@ -17,6 +17,8 @@ import '../../../products/data/product_repository.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../customers/data/customer_repository.dart';
 import '../../../sales/models/payment_method.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../../core/permissions/permission_guard.dart';
 
 /// Cobrar un trabajo listo: efectivo, Nequi, transferencia o fiado, con descuento y
 /// propina. Cada servicio queda como una línea de venta; después se entrega.
@@ -99,6 +101,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
   double get _total => _sub - _disc + _productsTotal;
 
   Future<void> _pay() async {
+    if (!PermissionGuard.check(context, Perm.servicesCharge)) return;
     if (_method == 'FIADO' && _customer.text.trim().isEmpty) {
       AppToast.showWarning(context, 'Para fiar escribe el nombre del cliente.');
       return;

@@ -276,6 +276,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         setState(() {
           _activeBusiness = biz;
           _realRole = role;
+          Permissions.current = role;
           // Al cambiar de negocio se sale de «Ver como»
           Permissions.viewAs.value = null;
         });

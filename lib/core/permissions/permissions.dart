@@ -220,6 +220,12 @@ class Permissions {
   /// «Ver como» (0.15.0): el dueño ve la app como la vería ese rol. null = su propio rol
   static final viewAs = ValueNotifier<String?>(null);
 
+  /// El rol de la persona en el negocio activo (lo pone el menú principal)
+  static String current = owner;
+
+  /// ¿El rol activo puede hacer esto? Tiene en cuenta «Ver como»
+  static bool mine(Perm perm) => can(viewAs.value ?? current, perm);
+
   /// Enciende también los permisos de los que depende (en cadena)
   static Set<Perm> withDependencies(Set<Perm> perms) {
     final out = {...perms};

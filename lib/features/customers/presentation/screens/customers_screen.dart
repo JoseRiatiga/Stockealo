@@ -21,6 +21,8 @@ import '../widgets/debt_reminder_schedule_sheet.dart';
 import '../../../../core/design/stat_card.dart';
 import '../../../../core/design/filter_tabs.dart';
 import '../../../../core/design/status_pill.dart';
+import '../../../../core/permissions/permissions.dart';
+import '../../../../core/permissions/permission_guard.dart';
 
 class CustomersScreen extends StatefulWidget {
   final String businessId;
@@ -102,6 +104,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   int get _debtorsCount => _customers.where((c) => c.hasDebt).length;
 
   Future<void> _openCreateCustomerDialog() async {
+    if (!PermissionGuard.check(context, Perm.customersEdit)) return;
     final saved = await NewCustomerSheet.show(context, businessId: widget.businessId);
     if (saved == true) _loadCustomers();
   }
@@ -511,6 +514,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   ),
                   FilledButton.icon(
                     onPressed: () {
+                      if (!PermissionGuard.check(context, Perm.collectDebts)) return;
                       RecordPaymentModal.show(
                         context,
                         customer: customer,

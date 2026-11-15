@@ -19,6 +19,7 @@ import '../../../home/navigation/app_places.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/permissions/permissions.dart';
+import '../../../../core/permissions/permission_guard.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -84,6 +85,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _showAdjustStockDialog() async {
+    if (!PermissionGuard.check(context, Perm.stockAdjust)) return;
     final c = context.colors;
     final variants = _product.variants;
     final totalController = TextEditingController(text: _product.stock.toString());

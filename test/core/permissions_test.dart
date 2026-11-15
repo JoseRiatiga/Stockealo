@@ -53,4 +53,20 @@ void main() {
     }
     expect(Permissions.templates.map((t) => t.id).toSet().length, Permissions.templates.length);
   });
+
+  test('el rol activo y «Ver como» deciden lo que se permite en cada acción', () {
+    addTearDown(() {
+      Permissions.current = Permissions.owner;
+      Permissions.viewAs.value = null;
+    });
+    Permissions.current = Permissions.cashier;
+    expect(Permissions.mine(Perm.costs), isFalse);
+    expect(Permissions.mine(Perm.sell), isTrue);
+    // El dueño mirando como Cajero tampoco ve costos
+    Permissions.current = Permissions.owner;
+    Permissions.viewAs.value = Permissions.cashier;
+    expect(Permissions.mine(Perm.costs), isFalse);
+    Permissions.viewAs.value = null;
+    expect(Permissions.mine(Perm.costs), isTrue);
+  });
 }

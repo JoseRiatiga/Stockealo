@@ -110,10 +110,10 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 1. HECHO (14 nov). Una sola lista de permisos (`permissions.dart`). Cada función nueva registra ahí los suyos.
 2. HECHO (14 nov). Roles por defecto: Dueño, Administrador y Cajero. Plantillas para crear roles: Vendedor, Bodega, Solo ver, Encargado y Atiende servicios.
 3. HECHO (14 nov), con «Ver como» y la matriz de interruptores. Roles personalizados: gratis 1, Pro y Pro Servicios sin límite. **Solo el dueño** los crea y edita.
-4. Límites con números (Pro).
-5. Autorización de un solo uso, nunca con PIN fijo, y arqueo ciego. Las dos cosas, gratis.
+4. HECHO (14 nov). Límites con números (Pro).
+5. HECHO (14 nov). Autorización de un solo uso (solo con internet, decisión del dueño) y arqueo ciego. Las dos cosas, gratis. También: cada acción revisa el permiso del rol.
 6. Horario de acceso (Pro Servicios).
-7. Permisos que se cumplen también en Supabase.
+7. **ANTES DE PUBLICAR la 0.15.0.** Permisos que se cumplen también en Supabase. La revisión con Codex del 14 nov lo confirmó: hoy los límites y permisos se cumplen solo en la app; las ventas y los movimientos de caja se pueden insertar directo en la nube.
 
 ### Planes, ingresos y seguridad
 

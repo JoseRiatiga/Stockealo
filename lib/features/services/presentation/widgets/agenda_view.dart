@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/clock_text.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -377,7 +378,7 @@ class _AppointmentEditorState extends State<AppointmentEditor> {
       final ok = await AppDialog.confirm(
         context: context,
         title: 'Se cruza con otra cita',
-        message: '${clash.customerName} tiene cita a las ${DateFormat('h:mm a', 'es_CO').format(clash.startsAt)} con la misma persona. ¿La agendas igual?',
+        message: '${clash.customerName} tiene cita a las ${clockText(clash.startsAt)} con la misma persona. ¿La agendas igual?',
         confirmText: 'Agendar igual',
       );
       if (!ok) return;
@@ -449,7 +450,7 @@ class _AppointmentEditorState extends State<AppointmentEditor> {
               child: OutlinedButton.icon(
                 onPressed: _pickTime,
                 icon: const Icon(Icons.schedule_outlined, size: 18),
-                label: Text(DateFormat('h:mm a', 'es_CO').format(_start)),
+                label: Text(clockText(_start)),
               ),
             ),
           ],

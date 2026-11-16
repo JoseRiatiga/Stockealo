@@ -119,16 +119,20 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
   Future<void> _showCreateBusinessDialog() async {
     final data = await CreateBusinessSheet.show(context);
     if (data == null || !mounted) return;
-    final newBiz = await _businessRepo.createBusiness(
-      name: data.name,
-      userId: widget.userId,
-      currency: data.currency,
-      country: data.country,
-      icon: data.icon,
-      color: data.color,
-    );
-    _businessRepo.setActiveBusiness(newBiz);
-    if (mounted) Navigator.pop(context, true);
+    try {
+      final newBiz = await _businessRepo.createBusiness(
+        name: data.name,
+        userId: widget.userId,
+        currency: data.currency,
+        country: data.country,
+        icon: data.icon,
+        color: data.color,
+      );
+      _businessRepo.setActiveBusiness(newBiz);
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) AppToast.showError(context, 'No se pudo crear el negocio: $e');
+    }
   }
 
   Future<void> _confirmLeaveBusiness(Business biz) async {

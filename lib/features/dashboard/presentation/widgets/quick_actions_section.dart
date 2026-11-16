@@ -140,14 +140,17 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
             return SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: fits ? const NeverScrollableScrollPhysics() : null,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < tiles.length; i++) ...[
-                    if (i > 0) const SizedBox(width: gap),
-                    SizedBox(width: w, child: tiles[i]),
+              // Todos del mismo alto, tengan el nombre en una o dos líneas (0.16.3)
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < tiles.length; i++) ...[
+                      if (i > 0) const SizedBox(width: gap),
+                      SizedBox(width: w, child: tiles[i]),
+                    ],
                   ],
-                ],
+                ),
               ),
             );
           }),

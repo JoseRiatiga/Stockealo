@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/clock_text.dart';
+import '../../../../core/design/qty_stepper.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -62,7 +64,7 @@ SaleDocument cashTicket(CashSession s, CashSummary sum, [List<String> servicesLi
     totalLabel: 'Contado',
     sellerName: s.closedBy ?? s.openedBy,
     before: [
-      TicketRow('Abrió', '${s.openedBy} · ${DateFormat('h:mm a', 'es_CO').format(s.openedAt)}'),
+      TicketRow('Abrió', '${s.openedBy} · ${clockText(s.openedAt)}'),
       TicketRow('Base', money(sum.openingAmount)),
       for (final e in sum.byMethod.entries) TicketRow(CashRegisterRepository.methodLabel(e.key), money(e.value)),
       if (sum.tipsIn > 0) TicketRow('Propinas en efectivo', money(sum.tipsIn)),
@@ -93,7 +95,7 @@ SaleDocument blindCashTicket(CashSession s) => SaleDocument(
       total: s.countedAmount ?? 0,
       totalLabel: 'Contado',
       sellerName: s.closedBy ?? s.openedBy,
-      before: [TicketRow('Abrió', '${s.openedBy} · ${DateFormat('h:mm a', 'es_CO').format(s.openedAt)}')],
+      before: [TicketRow('Abrió', '${s.openedBy} · ${clockText(s.openedAt)}')],
       notes: s.notes,
       closing: 'Cierre del turno · arqueo ciego',
       stamp: const TicketStamp('ENTREGADA', tone: AppTone.info),
@@ -104,6 +106,15 @@ SaleDocument blindCashTicket(CashSession s) => SaleDocument(
   if (diff.abs() < 1) return (text: 'La caja está justa', tone: AppTone.success);
   if (diff < 0) return (text: 'Faltan ${CurrencyFormatter.format(-diff)}', tone: AppTone.danger);
   return (text: 'Sobran ${CurrencyFormatter.format(diff)}', tone: AppTone.warning);
+}
+
+/// Diferencia del conteo contra lo esperado; null mientras no hay resultado que
+/// mostrar: arqueo ciego, nada escrito o, contando por billetes, todavía en $0
+/// (antes salía «Faltan» apenas se activaba el conteo)
+double? countDiff({required double? counted, required double expected, required bool byDenomination, required bool blind}) {
+  if (blind || counted == null) return null;
+  if (byDenomination && counted <= 0) return null;
+  return counted - expected;
 }
 
 class _CashRegisterScreenState extends State<CashRegisterScreen> {
@@ -153,7 +164,7 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
     return clean.isEmpty ? null : double.parse(clean);
   }
 
-  String _hour(DateTime d) => DateFormat('h:mm a', 'es_CO').format(d);
+  String _hour(DateTime d) => clockText(d);
 
   Future<void> _movement(String kind) async {
     final session = _open;
@@ -647,7 +658,7 @@ class _CloseFormState extends State<_CloseForm> {
     final c = context.colors;
     final expected = widget.summary.expected;
     final counted = _total;
-    final diff = counted == null || widget.blind ? null : counted - expected;
+    final diff = countDiff(counted: counted, expected: expected, byDenomination: _byDenomination, blind: widget.blind);
     final result = diff == null ? null : cashResult(diff);
     final t = result == null ? null : ToneColors.of(context, result.tone);
     return Column(
@@ -670,21 +681,19 @@ class _CloseFormState extends State<_CloseForm> {
         ),
         if (_byDenomination)
           for (final d in kCopDenominations)
-            Row(
-              children: [
-                Expanded(child: Text(CurrencyFormatter.format(d), style: AppText.body(context))),
-                IconButton(
-                  tooltip: 'Quitar uno',
-                  onPressed: (_units[d] ?? 0) == 0 ? null : () => setState(() => _units[d] = (_units[d] ?? 0) - 1),
-                  icon: const Icon(Icons.remove_circle_outline),
-                ),
-                SizedBox(width: 32, child: Text('${_units[d] ?? 0}', textAlign: TextAlign.center, style: AppText.body(context, weight: FontWeight.w700))),
-                IconButton(
-                  tooltip: 'Agregar uno',
-                  onPressed: () => setState(() => _units[d] = (_units[d] ?? 0) + 1),
-                  icon: const Icon(Icons.add_circle_outline),
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  Expanded(child: Text(CurrencyFormatter.format(d), style: AppText.body(context))),
+                  QtyStepper(
+                    value: _units[d] ?? 0,
+                    label: CurrencyFormatter.format(d),
+                    onRemove: (_units[d] ?? 0) == 0 ? null : () => setState(() => _units[d] = (_units[d] ?? 0) - 1),
+                    onAdd: () => setState(() => _units[d] = (_units[d] ?? 0) + 1),
+                  ),
+                ],
+              ),
             )
         else
           TextField(
@@ -697,20 +706,29 @@ class _CloseFormState extends State<_CloseForm> {
             decoration: const InputDecoration(labelText: 'Efectivo contado', prefixText: '\$ '),
           ),
         const SizedBox(height: AppSpace.md),
-        // El resultado, en grande
+        // El resultado: una franja baja a todo el ancho (0.16.3). Mientras se cuenta por
+        // billetes y no hay resultado, se ve lo que llevas en gris
         AnimatedSwitcher(
           duration: AppMotion.of(context, AppMotion.quick),
           child: result == null
-              ? const SizedBox(key: ValueKey('none'), height: 0)
+              ? (_byDenomination
+                  ? SizedBox(
+                      key: const ValueKey('counting'),
+                      width: double.infinity,
+                      child: Text('Llevas ${CurrencyFormatter.format(counted ?? 0)}',
+                          style: AppText.body(context, color: c.inkMuted)),
+                    )
+                  : const SizedBox(key: ValueKey('none'), height: 0))
               : Container(
                   key: ValueKey(result.text),
-                  padding: const EdgeInsets.all(AppSpace.lg),
-                  decoration: BoxDecoration(color: t!.soft, borderRadius: BorderRadius.circular(AppRadius.card)),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.md),
+                  decoration: BoxDecoration(color: t!.soft, borderRadius: BorderRadius.circular(AppRadius.control)),
                   child: Semantics(
                     liveRegion: true,
-                    child: Column(
+                    child: Row(
                       children: [
-                        Text(result.text, textAlign: TextAlign.center, style: AppText.display(context, color: t.text)),
+                        Expanded(child: Text(result.text, style: AppText.title(context, color: t.text))),
                         if (_byDenomination && counted != null)
                           Text('Contaste ${CurrencyFormatter.format(counted)}', style: AppText.small(context, color: t.text)),
                       ],

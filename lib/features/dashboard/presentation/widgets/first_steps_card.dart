@@ -90,7 +90,10 @@ class _FirstStepsCardState extends State<FirstStepsCard> {
     }
     final steps = [
       FirstStep('Crea tu primer producto', done: products > 0, go: () => AppPlace.go(AppPlace.productos)),
-      FirstStep('Abre la caja', done: cash > 0, go: () => AppPlace.go(AppPlace.caja)),
+      // Un negocio nuevo trae la caja apagada: primero hay que activarla (0.16.3)
+      b.cashRegisterEnabled
+          ? FirstStep('Abre la caja', done: cash > 0, go: () => AppPlace.go(AppPlace.caja))
+          : FirstStep('Activa la caja', done: false, go: () => AppPlace.go(AppPlace.caja)),
       FirstStep('Haz tu primera venta', done: sales > 0, go: () => AppPlace.go(AppPlace.vender)),
       FirstStep(
         'Invita a alguien de tu equipo',

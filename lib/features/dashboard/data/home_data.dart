@@ -136,7 +136,7 @@ class HomeRepository {
   static const overdueDays = 30;
 
   /// Una venta = un número de factura (cada producto vendido es una fila)
-  static const _saleKey = 'COALESCE(invoice_number, id)';
+  static const _saleKey = SalesRepository.saleKey;
 
   static String _day(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';

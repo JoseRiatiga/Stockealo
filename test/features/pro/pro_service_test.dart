@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockealo/features/pro/data/pro_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
   test('cada error del servidor tiene su mensaje', () {
@@ -11,6 +12,12 @@ void main() {
     expect(ProService.redeemErrorMessage('otra cosa'), contains('Inténtalo de nuevo'));
     // El negocio no existe en la nube: no decir "Solo el dueño" a quien sí es el dueño
     expect(ProService.redeemErrorMessage('not_member'), ProService.notInCloudMessage);
+  });
+
+  test('«not_member» de un negocio que aún sube no es un error del estado Pro', () {
+    expect(ProService.isNotMember(const PostgrestException(message: 'not_member', code: 'P0001')), isTrue);
+    expect(ProService.isNotMember(const PostgrestException(message: 'otra cosa')), isFalse);
+    expect(ProService.isNotMember(StateError('not_member')), isFalse);
   });
 
   test('el código se limpia y recupera los guiones si no los escribieron', () {

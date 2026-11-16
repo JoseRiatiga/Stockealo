@@ -151,6 +151,9 @@ void main() {
     await pump(tester, FirstStepsCard(business: business, storePublished: false, now: now));
     expect(find.text('Primeros pasos · 1 de 5'), findsOneWidget);
     expect(find.text('Haz tu primera venta'), findsOneWidget);
+    // 0.16.3: la caja viene apagada, así que el paso es activarla
+    expect(find.text('Activa la caja'), findsOneWidget);
+    expect(find.text('Abre la caja'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Ya sé usarla'));
     for (var i = 0; i < 5; i++) {
@@ -159,6 +162,13 @@ void main() {
     }
     expect(find.textContaining('Primeros pasos'), findsNothing);
     expect(await tester.runAsync(() => appDb.getSetting(FirstStepsCard.hiddenKey(businessId))), '1');
+  });
+
+  testWidgets('primeros pasos con la caja encendida pide abrirla', (tester) async {
+    final withCash = business.copyWith(cashRegisterEnabled: true);
+    await pump(tester, FirstStepsCard(business: withCash, storePublished: false, now: now));
+    expect(find.text('Abre la caja'), findsOneWidget);
+    expect(find.text('Activa la caja'), findsNothing);
   });
 
   testWidgets('primeros pasos no sale en un negocio de hace más de 60 días', (tester) async {

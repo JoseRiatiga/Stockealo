@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/clock_text.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -157,7 +158,7 @@ class _OpenCashFormState extends State<OpenCashForm> {
         ),
         const SizedBox(height: AppSpace.sm),
         Text(
-          'Abre: ${widget.userName.isEmpty ? 'tú' : widget.userName} · ${DateFormat('h:mm a', 'es_CO').format(DateTime.now())}. '
+          'Abre: ${widget.userName.isEmpty ? 'tú' : widget.userName} · ${clockText(DateTime.now())}. '
           'Queda en la actividad del equipo.',
           textAlign: TextAlign.center,
           style: AppText.caption(context),

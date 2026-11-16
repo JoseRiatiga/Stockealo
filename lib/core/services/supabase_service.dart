@@ -1111,8 +1111,8 @@ class SupabaseService {
   final Set<Future<void>> _pendingWrites = {};
 
   /// Espera a que terminen las escrituras lanzadas sin esperar. Las pruebas lo usan
-  /// antes de cerrar o borrar la base local, que esas escrituras todavía leen.
-  @visibleForTesting
+  /// antes de cerrar o borrar la base local, que esas escrituras todavía leen, y el
+  /// estado Pro, para no preguntar por un negocio que todavía no llega a la nube.
   Future<void> waitForPendingWrites() => Future.wait(_pendingWrites.toList());
 
   Future<void> _write(String operation, Map<String, dynamic> payload) {

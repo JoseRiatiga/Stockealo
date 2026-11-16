@@ -21,6 +21,16 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.16.3',
+      title: 'Arreglos y detalles',
+      items: [
+        'Reportes cuenta bien las ventas: una venta con varios productos es una sola.',
+        'En el celular, Stocky ya no tapa el botón de cobrar ni «Publicar mi tienda».',
+        'Contar la caja por billetes es más claro y no dice «Faltan» antes de contar.',
+        'El nombre del negocio y los textos ya no se cortan, y la hora sale igual en toda la app.',
+      ],
+    ),
+    (
       version: '0.16.2',
       title: 'Detalles de la tienda',
       items: [

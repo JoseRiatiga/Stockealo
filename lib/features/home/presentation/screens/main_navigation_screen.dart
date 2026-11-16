@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/widgets/tooltip_cleaner.dart';
 import 'package:flutter/foundation.dart';
 import '../../../../core/services/web_update_service.dart';
 import '../../../pro/data/pro_service.dart';
@@ -28,6 +29,7 @@ import '../widgets/app_menu.dart';
 import '../places/places.dart';
 import '../../navigation/app_places.dart';
 import '../../../sales/presentation/screens/sell_screen.dart';
+import '../../../sales/data/sell_cart.dart';
 import '../../../store/presentation/screens/online_store_screen.dart';
 import '../widgets/app_header_bar.dart';
 import '../widgets/where_things_moved_sheet.dart';
@@ -429,6 +431,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   }
 
   void _navigateToTab(int index) {
+    // Al cambiar de lugar no queda ninguna ayuda del mouse pegada (0.16.3)
+    TooltipCleaner.clear();
     setState(() {
       _currentIndex = index;
       _opened.add(index);
@@ -542,7 +546,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
             business: _activeBusiness,
             alertCount: NotificationService.instance.unreadCount,
             menuBadge: StoreOrdersRepository.instance.unseen.value,
-            onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+            onMenuTap: () {
+              TooltipCleaner.clear();
+              _scaffoldKey.currentState?.openDrawer();
+            },
             onSearchTap: _openSearch,
             onNotificationsTap: _openNotifications,
             onNewSale: _newSale,
@@ -600,12 +607,22 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                     right: 0,
                     child: Center(child: _ViewAsBanner(role: Permissions.viewAs.value!)),
                   ),
-                // Stocky abajo a la derecha (no en Ajustes ni Reportes)
+                // Stocky abajo a la derecha (no en Ajustes ni Reportes). En Vender se
+                // esconde mientras haya productos en el carrito: no tapa «Cobrar» (0.16.3)
                 if (showStocky)
                   Positioned(
                     right: isWide ? AppSpace.xl : AppSpace.lg,
                     bottom: (isWide ? AppSpace.xl : AppSpace.lg) + MediaQuery.of(context).padding.bottom,
-                    child: StockyFloatingButton(businessId: _activeBusiness?.id, onNavigateToTab: _navigateToTab),
+                    child: ListenableBuilder(
+                      listenable: SellCart.instance,
+                      builder: (context, _) => _currentIndex == AppPlace.vender && SellCart.instance.lines.isNotEmpty
+                          ? const SizedBox.shrink()
+                          : StockyFloatingButton(
+                              businessId: _activeBusiness?.id,
+                              onNavigateToTab: _navigateToTab,
+                              compact: !isWide,
+                            ),
+                    ),
                   ),
               ],
             );

@@ -152,12 +152,13 @@ class _SupplierToggleFieldState extends State<SupplierToggleField> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Container(
-      decoration: BoxDecoration(
-        color: c.surface,
+    return Material(
+      color: c.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.control),
-        border: Border.all(color: c.line),
+        side: BorderSide(color: c.line),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           SwitchListTile(

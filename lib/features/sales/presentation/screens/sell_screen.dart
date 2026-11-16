@@ -2,10 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/qty_stepper.dart';
 import '../../../../core/design/status_pill.dart';
+import '../../../../core/utils/clock_text.dart';
 import '../../../../core/services/data_events.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -510,7 +511,7 @@ class _SellScreenState extends State<SellScreen> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.control), side: BorderSide(color: ctx.colors.line)),
                   title: Text(
-                    _cart.held[i].customer.isEmpty ? 'Venta de las ${DateFormat('h:mm a', 'es_CO').format(_cart.held[i].at)}' : _cart.held[i].customer,
+                    _cart.held[i].customer.isEmpty ? 'Venta de las ${clockText(_cart.held[i].at)}' : _cart.held[i].customer,
                     style: AppText.body(ctx, weight: FontWeight.w600),
                   ),
                   subtitle: Text('${_cart.held[i].units} productos', style: AppText.small(ctx)),
@@ -945,20 +946,11 @@ class _SellScreenState extends State<SellScreen> {
             ),
           ),
           const SizedBox(width: AppSpace.sm),
-          Container(
-            decoration: BoxDecoration(border: Border.all(color: c.line), borderRadius: BorderRadius.circular(AppRadius.tile)),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _qtyButton(l.quantity == 1 ? Icons.delete_outline : Icons.remove_outlined, l.quantity == 1 ? 'Quitar' : 'Quitar uno',
-                    () => set(l.quantity - 1)),
-                SizedBox(
-                  width: 26,
-                  child: Text('${l.quantity}', textAlign: TextAlign.center, style: AppText.body(context, weight: FontWeight.w700)),
-                ),
-                _qtyButton(Icons.add_outlined, 'Agregar uno', () => set(l.quantity + 1)),
-              ],
-            ),
+          QtyStepper(
+            value: l.quantity,
+            removeDeletes: l.quantity == 1,
+            onRemove: () => set(l.quantity - 1),
+            onAdd: () => set(l.quantity + 1),
           ),
           const SizedBox(width: AppSpace.sm),
           SizedBox(
@@ -1021,18 +1013,6 @@ class _SellScreenState extends State<SellScreen> {
     field.dispose();
     if (value != null && mounted) _cart.setLineDiscount(i, value);
   }
-
-  Widget _qtyButton(IconData icon, String tooltip, VoidCallback onTap) => SizedBox(
-        width: 34,
-        height: 34,
-        child: IconButton(
-          tooltip: tooltip,
-          padding: EdgeInsets.zero,
-          iconSize: 17,
-          onPressed: onTap,
-          icon: Icon(icon),
-        ),
-      );
 
   Widget _checkout({BuildContext? sheet}) {
     final c = context.colors;
@@ -1355,7 +1335,7 @@ class _SellScreenState extends State<SellScreen> {
 /// Etiqueta de stock: «62 u.», «Quedan 5» o «Sin stock»
 StatusPill _stockPill(Product p) {
   if (p.stock <= 0) return const StatusPill('Sin stock', tone: AppTone.danger, compact: true);
-  if (p.stock <= p.minStock) return StatusPill('Quedan ${p.stock}', tone: AppTone.warning, compact: true);
+  if (p.stock <= p.minStock) return StatusPill('Quedan ${p.stock}', dotTone: AppTone.warning, compact: true);
   return StatusPill('${p.stock} u.', tone: AppTone.neutral, compact: true);
 }
 

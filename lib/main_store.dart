@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/widgets/tooltip_cleaner.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/services/supabase_service.dart';
@@ -41,6 +42,8 @@ class StoreApp extends StatelessWidget {
           supportedLocales: AppLocale.supported,
           localizationsDelegates: AppLocale.delegates,
       title: 'Tienda',
+      // Las ayudas del mouse no se quedan pegadas al abrir otra cosa (0.16.3)
+      navigatorObservers: [TooltipCleaner()],
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: StorePage(slug: slug, sharedProductId: sharedProductId, source: source),

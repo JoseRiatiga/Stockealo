@@ -765,26 +765,36 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
           }),
           if ((lowStock > 0 || outOfStock > 0) && !_stockMode) ...[
             const SizedBox(height: AppSpace.md),
+            // Fila blanca con el puntito de aviso (0.16.3): más sobria que la franja amarilla
             Material(
-              color: c.warningSoft,
-              borderRadius: BorderRadius.circular(AppRadius.control),
-              child: InkWell(
+              color: c.surface,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.control),
+                side: BorderSide(color: c.line),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
                 // Lo que falta vive en Stock (si no hay marco, se filtra aquí mismo)
                 onTap: widget.onOpenStock ?? _showToRestock,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 10),
                   child: Row(
                     children: [
-                      Icon(Icons.local_shipping_outlined, size: 18, color: c.warning),
+                      Icon(Icons.local_shipping_outlined, size: 18, color: c.inkMuted),
+                      const SizedBox(width: AppSpace.sm),
+                      Container(width: 7, height: 7, decoration: BoxDecoration(color: c.warning, shape: BoxShape.circle)),
                       const SizedBox(width: AppSpace.sm),
                       Expanded(
                         child: Text(
-                          '${lowStock + outOfStock} por reponer · ${widget.onOpenStock != null ? 'Ver en Stock' : 'Ver cuáles'}',
-                          style: AppText.small(context, weight: FontWeight.w600, color: c.warning),
+                          '${lowStock + outOfStock} por reponer',
+                          style: AppText.small(context, weight: FontWeight.w600, color: c.ink),
                         ),
                       ),
-                      Icon(Icons.chevron_right_outlined, size: 20, color: c.warning),
+                      Text(
+                        widget.onOpenStock != null ? 'Ver en Stock' : 'Ver cuáles',
+                        style: AppText.small(context, weight: FontWeight.w600, color: c.accent),
+                      ),
+                      Icon(Icons.chevron_right_outlined, size: 20, color: c.accent),
                     ],
                   ),
                 ),

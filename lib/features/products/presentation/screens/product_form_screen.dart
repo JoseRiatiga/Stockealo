@@ -93,6 +93,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   /// Controla vencimiento por lote (0.16.0, fase 2b)
   bool _tracksExpiry = false;
+
+  /// Plantilla del negocio: decide si un producto nuevo viene con lote encendido
+  ProductTemplate? _template;
+
+  /// La persona movió el interruptor de lote: ya no se cambia solo con la categoría
+  bool _expiryTouched = false;
+
+  /// Producto nuevo: lote encendido según la plantilla y la categoría (0.16.3)
+  void _applyExpiryDefault() {
+    if (widget.productToEdit != null || _expiryTouched || _template == null) return;
+    _tracksExpiry = _template!.expiryByDefault(_selectedCategory);
+  }
   final _variants = VariantEditorController();
 
   // Proveedor principal (opcional)
@@ -122,10 +134,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _minStockController = TextEditingController(text: p?.minStock.toString() ?? '5');
     _photoPath = p?.photoPath;
     _tracksExpiry = p?.tracksExpiry ?? false;
-    // Producto nuevo en una droguería o tienda de barrio: viene encendido
+    // Producto nuevo en una droguería (siempre) o en lo perecedero de una tienda de barrio
     if (p == null) {
       ProductTemplate.applied(widget.businessId).then((t) {
-        if (mounted && (t == ProductTemplate.drogueria || t == ProductTemplate.barrio)) setState(() => _tracksExpiry = true);
+        if (!mounted) return;
+        setState(() {
+          _template = t;
+          _applyExpiryDefault();
+        });
       });
     }
     if (p != null) {
@@ -213,6 +229,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       } else {
         _selectedCategory = null;
       }
+      _applyExpiryDefault();
     });
   }
 
@@ -331,7 +348,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       await _loadCategories();
     }
     if (!mounted) return;
-    setState(() => _selectedCategory = same.isNotEmpty ? same.first.name : result);
+    setState(() {
+      _selectedCategory = same.isNotEmpty ? same.first.name : result;
+      _applyExpiryDefault();
+    });
   }
 
   Future<void> _openManageCategoriesModal() async {
@@ -610,6 +630,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                     if (val != null) {
                                       setState(() {
                                         _selectedCategory = val;
+                                        _applyExpiryDefault();
                                       });
                                     }
                                   },
@@ -699,26 +720,39 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ),
                     ],
                   ),
-                  // Precio sugerido por margen (0.15.0): con el costo, un toque pone el precio
-                  if (purchasePrice > 0) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text('Precio para ganar', style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.inkMuted)),
-                        for (final m in Pricing.margins)
-                          ActionChip(
-                            visualDensity: VisualDensity.compact,
-                            label: Text('$m % · ${CurrencyFormatter.format(Pricing.priceForMargin(purchasePrice, m))}',
-                                style: const TextStyle(fontSize: AppText.sizeCaption)),
-                            onPressed: () => setState(() =>
-                                _salePriceController.text = Pricing.priceForMargin(purchasePrice, m).round().toString()),
+                  // Precio sugerido por margen (0.15.0): con el costo, un toque pone el precio.
+                  // Siempre ocupa una fila del mismo alto, para que lo de abajo no salte (0.16.3)
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 36,
+                    child: purchasePrice > 0
+                        ? ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              Center(
+                                child: Text('Precio para ganar', style: AppText.caption(context, color: context.colors.inkMuted)),
+                              ),
+                              for (final m in Pricing.margins)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 6),
+                                  child: Center(
+                                    child: ActionChip(
+                                      visualDensity: VisualDensity.compact,
+                                      label: Text('$m % · ${CurrencyFormatter.format(Pricing.priceForMargin(purchasePrice, m))}',
+                                          style: AppText.caption(context)),
+                                      onPressed: () => setState(() =>
+                                          _salePriceController.text = Pricing.priceForMargin(purchasePrice, m).round().toString()),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
+                        : Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text('Escribe el costo para ver precios sugeridos',
+                                style: AppText.caption(context, color: context.colors.inkFaint)),
                           ),
-                      ],
-                    ),
-                  ],
+                  ),
                   const SizedBox(height: 12),
                   // Oferta en la tienda en línea: el precio de antes se ve tachado
                   TextFormField(
@@ -738,55 +772,36 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Tarjeta dinámica de Ganancia y Margen %
-                  if (salePrice > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  // Ganancia y margen: sin precio de venta se ve en gris con «—» (mismo alto)
+                  Builder(builder: (context) {
+                    final c = context.colors;
+                    final ready = salePrice > 0;
+                    final good = margin >= 0;
+                    final strong = !ready ? c.inkMuted : (good ? c.success : c.danger);
+                    final style = AppText.small(context, weight: FontWeight.w700, color: strong);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: 10),
                       decoration: BoxDecoration(
-                        color: margin >= 0
-                            ? (context.colors.successSoft)
-                            : (context.colors.dangerSoft),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: margin >= 0
-                              ? (context.colors.successSoft)
-                              : (context.colors.dangerSoft),
-                        ),
+                        color: !ready ? c.surfaceMuted : (good ? c.successSoft : c.dangerSoft),
+                        borderRadius: BorderRadius.circular(AppRadius.control),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Icon(
-                                margin >= 0 ? Icons.trending_up_outlined : Icons.trending_down_outlined,
-                                size: 18,
-                                color: margin >= 0 ? context.colors.accent : context.colors.danger,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Ganancia unitaria: ${CurrencyFormatter.format(profit)}',
-                                style: TextStyle(
-                                  fontSize: AppText.sizeSmall,
-                                  fontWeight: FontWeight.bold,
-                                  color: margin >= 0
-                                      ? (context.colors.success)
-                                      : (context.colors.danger),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            'Margen: ${margin.toStringAsFixed(1)}%',
-                            style: TextStyle(
-                              fontSize: AppText.sizeSmall,
-                              fontWeight: FontWeight.bold,
-                              color: margin >= 0 ? context.colors.accent : context.colors.danger,
+                          Icon(good ? Icons.trending_up_outlined : Icons.trending_down_outlined, size: 18, color: strong),
+                          const SizedBox(width: AppSpace.sm),
+                          Expanded(
+                            child: Text(
+                              'Ganancia unitaria: ${ready ? CurrencyFormatter.format(profit) : '—'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: style,
                             ),
                           ),
+                          Text('Margen: ${ready ? '${margin.toStringAsFixed(1)}%' : '—'}', style: style),
                         ],
                       ),
-                    ),
+                    );
+                  }),
                   const SizedBox(height: 16),
 
                   // Lotes con vencimiento (0.16.0, fase 2b)
@@ -801,7 +816,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.inkMuted),
                     ),
                     value: _tracksExpiry && !_hasVariants,
-                    onChanged: _hasVariants ? null : (v) => setState(() => _tracksExpiry = v),
+                    onChanged: _hasVariants
+                        ? null
+                        : (v) => setState(() {
+                              _tracksExpiry = v;
+                              _expiryTouched = true;
+                            }),
                   ),
                   if (widget.productToEdit != null && _tracksExpiry && !_hasVariants && widget.productToEdit!.tracksExpiry) ...[
                     const SizedBox(height: AppSpace.sm),
@@ -810,15 +830,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   const SizedBox(height: 16),
 
                   // 5. Stock y Variantes (tallas y colores)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
+                  Material(
+                    color: context.colors.surface,
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.card),
-                      border: Border.all(
+                      side: BorderSide(
                         color: _hasVariants ? context.colors.accent : context.colors.line,
                         width: _hasVariants ? 1.5 : 1,
                       ),
                     ),
+                    clipBehavior: Clip.antiAlias,
                     child: SwitchListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                       title: Row(

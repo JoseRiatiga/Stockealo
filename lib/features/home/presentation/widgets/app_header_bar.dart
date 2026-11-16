@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/clock_text.dart';
 
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/services/data_events.dart';
@@ -90,7 +91,7 @@ class AppHeaderBar extends StatelessWidget {
                         child: Icon(Icons.menu_outlined, size: 20, color: c.ink),
                       ),
                     ),
-                    const SizedBox(width: AppSpace.sm + 2),
+                    const SizedBox(width: AppSpace.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,20 +104,31 @@ class AppHeaderBar extends StatelessWidget {
                     ),
                     IconButton(
                       tooltip: 'Buscar (producto, cliente o función)',
+                      visualDensity: VisualDensity.compact,
                       onPressed: onSearchTap,
                       icon: Icon(Icons.search_outlined, size: 20, color: c.inkMuted),
                     ),
-                    // La nube (0.16.0): en el celular, solo el ícono con su color
-                    const SyncPill(iconOnly: true),
+                    // Sin segunda fila, la nube se queda aquí
+                    if (cash == null && newSale == null) const SyncPill(iconOnly: true),
                     bell,
-                    const ThemeModeButton(size: 20),
                   ],
                 ),
+                // 0.16.3: la nube baja a la fila de la caja y el botón de tema vive en el
+                // menú lateral, para que el nombre del negocio y el subtítulo se lean enteros
                 if (cash != null || newSale != null) ...[
                   const SizedBox(height: AppSpace.sm),
                   Row(
                     children: [
-                      if (cash != null) Expanded(child: Align(alignment: Alignment.centerLeft, child: cash)) else const Spacer(),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            if (cash != null) Flexible(child: cash),
+                            const SizedBox(width: AppSpace.xs),
+                            // La nube (0.16.0): en el celular, solo el ícono con su color
+                            const SyncPill(iconOnly: true),
+                          ],
+                        ),
+                      ),
                       if (newSale != null) ...[const SizedBox(width: AppSpace.sm), newSale],
                     ],
                   ),
@@ -134,8 +146,8 @@ class AppHeaderBar extends StatelessWidget {
       decoration: BoxDecoration(color: c.paper, border: Border(bottom: BorderSide(color: c.line))),
       child: Row(
         children: [
+          // El nombre tiene prioridad; el buscador toma lo que sobre (0.16.3)
           Expanded(
-            flex: 2,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,7 +163,7 @@ class AppHeaderBar extends StatelessWidget {
           ),
           const SizedBox(width: AppSpace.lg),
           if (cash != null) ...[cash, const SizedBox(width: AppSpace.md - 2)],
-          Flexible(flex: 2, child: _SearchBox(onTap: onSearchTap)),
+          Flexible(child: _SearchBox(onTap: onSearchTap)),
           const SizedBox(width: AppSpace.md - 2),
           const SyncPill(),
           const SizedBox(width: AppSpace.sm),
@@ -176,7 +188,7 @@ class _SearchBox extends StatelessWidget {
     final c = context.colors;
     final radius = BorderRadius.circular(AppRadius.control);
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 340),
+      constraints: const BoxConstraints(minWidth: 160, maxWidth: 340),
       child: Semantics(
         button: true,
         label: 'Buscar producto, cliente o función. Atajo Control K',
@@ -195,9 +207,16 @@ class _SearchBox extends StatelessWidget {
                   children: [
                     Icon(Icons.search_outlined, size: 18, color: c.inkMuted),
                     const SizedBox(width: AppSpace.sm),
+                    // Angosto, dice solo «Buscar» en vez de cortar la frase
                     Expanded(
-                      child: Text('Busca producto, cliente o función',
-                          maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.body(context, color: c.inkFaint)),
+                      child: LayoutBuilder(
+                        builder: (context, box) => Text(
+                          box.maxWidth >= 230 ? 'Busca producto, cliente o función' : 'Buscar',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.body(context, color: c.inkFaint),
+                        ),
+                      ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -272,7 +291,7 @@ class _CashPillState extends State<CashPill> {
   Widget build(BuildContext context) {
     if (!_loaded || !widget.business.cashRegisterEnabled) return const SizedBox.shrink();
     final open = _open;
-    final label = open == null ? 'Caja cerrada' : 'Caja abierta desde ${TimeOfDay.fromDateTime(open.openedAt).format(context)}';
+    final label = open == null ? 'Caja cerrada' : 'Caja abierta desde ${clockText(open.openedAt)}';
     return Semantics(
       button: widget.onTap != null,
       label: label,

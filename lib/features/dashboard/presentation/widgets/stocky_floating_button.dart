@@ -93,10 +93,19 @@ class StockyFloatingButton extends StatefulWidget {
   final String? businessId;
   final ValueChanged<int>? onNavigateToTab;
 
+  /// En el celular (0.16.3): solo el círculo con Stocky, sin el texto, para no tapar
+  /// los botones de abajo
+  final bool compact;
+
+  /// Espacio que deja libre al final una pantalla larga para que lo último se pueda
+  /// subir por encima de Stocky
+  static const clearance = 88.0;
+
   const StockyFloatingButton({
     super.key,
     this.businessId,
     this.onNavigateToTab,
+    this.compact = false,
   });
 
   @override
@@ -429,15 +438,17 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
                 onTap: _handleButtonTap,
                 child: Padding(
                   // Texto a la izquierda y Stocky a la derecha, pegado al borde de la pantalla
-                  padding: const EdgeInsets.fromLTRB(AppSpace.lg, 4, 4, 4),
+                  padding: widget.compact ? const EdgeInsets.all(4) : const EdgeInsets.fromLTRB(AppSpace.lg, 4, 4, 4),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'Pregúntale a Stocky',
-                        style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w600, color: c.ink),
-                      ),
-                      const SizedBox(width: AppSpace.sm),
+                      if (!widget.compact) ...[
+                        Text(
+                          'Pregúntale a Stocky',
+                          style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w600, color: c.ink),
+                        ),
+                        const SizedBox(width: AppSpace.sm),
+                      ],
                       Container(
                         width: 38,
                         height: 38,

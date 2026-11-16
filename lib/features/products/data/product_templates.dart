@@ -136,6 +136,18 @@ class ProductTemplate {
 
   static ProductTemplate? of(String? code) => all.where((t) => t.code == code).firstOrNull;
 
+  /// Categorías de la tienda de barrio que se vencen pronto (0.16.3)
+  static const perishables = ['Lácteos y huevos', 'Panadería', 'Carnes frías'];
+
+  /// Si un producto nuevo viene con «Controla vencimiento por lote» encendido: en la
+  /// droguería siempre; en la tienda de barrio solo en lo perecedero (no en bebidas ni aseo)
+  bool expiryByDefault(String? category) {
+    if (this == drogueria) return true;
+    if (this != barrio || category == null) return false;
+    final c = category.trim().toLowerCase();
+    return perishables.any((p) => p.toLowerCase() == c);
+  }
+
   /// La que le queda según «¿Para qué usarás Stockealo?»; null = ninguna en especial
   static ProductTemplate? suggestedFor(String? businessKind) => switch (businessKind) {
         'licores' || 'vinos' || 'cerveza' || 'bar' => licorera,

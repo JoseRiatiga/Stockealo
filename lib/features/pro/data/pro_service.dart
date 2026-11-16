@@ -134,6 +134,9 @@ class ProService {
     }
     final client = _client;
     if (client == null) return status.value;
+    // Un negocio recién creado sube a la nube sin esperar: se pregunta cuando ya llegó
+    // (si no, la nube responde «not_member»). Sin conexión no se espera más de 10 s.
+    await SupabaseService.instance.waitForPendingWrites().timeout(const Duration(seconds: 10), onTimeout: () {});
     await SupabaseService.instance.ensureFreshSession();
     try {
       final data = await client.rpc('pro_status', params: {'p_business_id': businessId});
@@ -149,10 +152,15 @@ class ProService {
       await _remember(businessId, result);
       return result;
     } catch (e) {
-      debugPrint('Estado Pro no disponible: $e');
+      // Todavía no es miembro en la nube (el negocio sigue subiendo): sin Pro por ahora
+      if (!isNotMember(e)) debugPrint('Estado Pro no disponible: $e');
       return status.value;
     }
   }
+
+  /// La nube dice que la persona no es miembro del negocio (aún no subió)
+  @visibleForTesting
+  static bool isNotMember(Object e) => e is PostgrestException && e.message.contains('not_member');
 
   static String _key(String businessId) => 'pro_last_$businessId';
 

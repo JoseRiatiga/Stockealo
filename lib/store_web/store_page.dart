@@ -1769,7 +1769,7 @@ class _ProductCardState extends State<_ProductCard> {
     );
   }
 
-  Widget _placeholder(StockealoColors c) => Center(child: Icon(Icons.checkroom_outlined, size: 36, color: c.inkFaint));
+  Widget _placeholder(StockealoColors c) => Center(child: NoPhotoIcon(size: 36, color: c.inkFaint));
 }
 
 /// Una talla en la tarjeta: la elegida llena y con borde grueso; la agotada tachada
@@ -2488,7 +2488,7 @@ class _CartThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final url = imageUrl ?? product.imageUrl;
-    final icon = Icon(Icons.checkroom_outlined, size: size * 0.45, color: c.inkFaint);
+    final icon = NoPhotoIcon(size: size * 0.45, color: c.inkFaint);
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.control + 2),
       child: SizedBox(
@@ -2940,4 +2940,18 @@ class _RowAdd extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Dibujo de un producto sin foto en la tienda (0.16.3): una caja, que sirve para
+/// cualquier negocio (antes era una percha, que solo le quedaba a la ropa)
+class NoPhotoIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const NoPhotoIcon({super.key, required this.size, required this.color});
+
+  static const icon = Icons.inventory_2_outlined;
+
+  @override
+  Widget build(BuildContext context) => Icon(icon, size: size, color: color);
 }

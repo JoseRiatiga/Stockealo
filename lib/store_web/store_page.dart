@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -305,10 +306,8 @@ class _StorePageState extends State<StorePage> {
     }
     final notice = _maintenance.affects('stores') && (_maintenance.notice || _maintenance.active);
     final shared = widget.sharedProductId == null ? null : store.products.where((p) => p.id == widget.sharedProductId).firstOrNull;
-    if (store.look.adult && !_adultOk) {
-      return Theme(data: theme, child: Builder(builder: (context) => _adultGate(context, store)));
-    }
-    return Theme(
+    final gated = store.look.adult && !_adultOk;
+    final page = Theme(
       data: theme,
       child: Builder(
         builder: (context) {
@@ -336,18 +335,49 @@ class _StorePageState extends State<StorePage> {
         },
       ),
     );
+    if (!gated) return page;
+    // La tienda se ve detrás, difuminada y oscurecida, y no se puede tocar hasta
+    // responder (0.16.2). Única excepción a «sin difuminados» del rediseño.
+    return Theme(
+      data: theme,
+      child: Builder(
+        builder: (context) => Stack(
+          fit: StackFit.expand,
+          children: [
+            IgnorePointer(
+              child: ExcludeSemantics(
+                child: ImageFiltered(
+                  key: const ValueKey('adult-gate-blur'),
+                  imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: page,
+                ),
+              ),
+            ),
+            ColoredBox(color: Colors.black.withValues(alpha: 0.6)),
+            _adultGate(context, store),
+          ],
+        ),
+      ),
+    );
   }
 
-  /// «Esta tienda vende productos para mayores de 18 años» (0.16.0)
+  /// «Esta tienda vende productos para mayores de 18 años» (0.16.0): tarjeta encima de
+  /// la tienda difuminada (0.16.2)
   Widget _adultGate(BuildContext context, PublicStore store) {
     final c = context.colors;
-    return Scaffold(
-      backgroundColor: c.paper,
-      body: Center(
+    return Material(
+      type: MaterialType.transparency,
+      child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpace.xl),
-          child: ConstrainedBox(
+          padding: const EdgeInsets.all(AppSpace.lg),
+          child: Container(
             constraints: const BoxConstraints(maxWidth: 420),
+            padding: const EdgeInsets.all(AppSpace.xl),
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: c.line),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [

@@ -163,11 +163,15 @@ void main() {
   testWidgets('aviso +18: no deja ver la tienda hasta decir que sí', (tester) async {
     await pumpStore(tester, vapeStore);
     expect(find.text('Esta tienda vende productos para mayores de 18 años'), findsOneWidget);
-    expect(find.text('Elf Bar BC5000'), findsNothing);
+    // La tienda se ve detrás, difuminada, pero no se puede tocar (0.16.2)
+    expect(find.byKey(const ValueKey('adult-gate-blur')), findsOneWidget);
+    expect(find.text('Elf Bar BC5000'), findsOneWidget);
+    expect(find.text('Elf Bar BC5000').hitTestable(), findsNothing);
     await tester.tap(find.text('No'));
     await tester.pumpAndSettle();
     expect(find.text('Lo sentimos: solo pueden entrar mayores de edad.'), findsOneWidget);
-    expect(find.text('Elf Bar BC5000'), findsNothing);
+    expect(find.text('Elf Bar BC5000').hitTestable(), findsNothing);
+    expect(find.byKey(const ValueKey('adult-gate-blur')), findsOneWidget);
   });
 
   testWidgets('vapers en la tienda: se entra con «Sí», pide nicotina y sabor, y filtra por marca', (tester) async {

@@ -18,6 +18,11 @@ import '../../sales/models/payment_method.dart';
 
 class SalesRepository {
   static final SalesRepository instance = SalesRepository();
+
+  /// Qué junta las filas de una misma venta: cada fila de `sales` es una línea de
+  /// producto y todas las de una venta comparten comprobante. Para contar ventas se
+  /// usa `COUNT(DISTINCT $saleKey)`, nunca `COUNT(*)` (eso cuenta líneas).
+  static const saleKey = 'COALESCE(invoice_number, id)';
   final AppDatabase _dbProvider = AppDatabase.instance;
 
   /// Registra una venta aislada por empresa y descuenta stock

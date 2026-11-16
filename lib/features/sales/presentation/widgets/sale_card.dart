@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/clock_text.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/design/app_dialog.dart';
@@ -124,7 +125,7 @@ class SaleCard extends StatelessWidget {
     final isFiado = sale.paymentMethod == PaymentMethod.credit;
     final voided = sale.isVoided;
     final meta = [
-      DateFormat('h:mm a', 'es_CO').format(sale.date),
+      clockText(sale.date),
       PaymentMethod.label(sale.paymentMethod),
       if (isFiado && sale.customerName != null && sale.customerName!.trim().isNotEmpty) sale.customerName!,
     ].join(' · ');

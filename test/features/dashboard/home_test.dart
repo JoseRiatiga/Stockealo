@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stockealo/features/dashboard/presentation/widgets/quick_actions_section.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -218,6 +219,10 @@ void main() {
         // 0.16.1: los accesos rápidos van arriba, antes de las cifras del día
         expect(find.text('Editar'), findsOneWidget);
         expect(tester.getTopLeft(find.text('Editar')).dy, lessThan(tester.getTopLeft(find.text('Ventas de hoy')).dy));
+        // 0.16.3: todos los accesos miden lo mismo, tengan el nombre en una o dos líneas
+        final tiles = find.descendant(of: find.byType(QuickActionsSection), matching: find.byType(InkWell));
+        final heights = {for (final e in tiles.evaluate()) tester.getSize(find.byWidget(e.widget)).height};
+        expect(heights.length, 1, reason: 'alturas distintas: $heights');
 
         final out = Platform.environment['PREVIEW_OUT'];
         if (out != null) {

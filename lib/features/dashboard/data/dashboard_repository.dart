@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import '../../sales/data/sales_repository.dart';
 import '../../../core/database/app_database.dart';
 
 class DashboardRepository {
@@ -66,7 +67,7 @@ class DashboardRepository {
     // 2. Ventas y ganancias del periodo
     final salesRes = await db.rawQuery('''
       SELECT 
-        COUNT(*) as count,
+        COUNT(DISTINCT ${SalesRepository.saleKey}) as count,
         COALESCE(SUM(s.total), 0.0) as total_amount,
         COALESCE(SUM(s.net_profit), 0.0) as net_profit,
         COALESCE(SUM(s.quantity), 0) as units_sold

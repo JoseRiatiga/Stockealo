@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/widgets/tooltip_cleaner.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -35,6 +36,8 @@ class AdminApp extends StatelessWidget {
           supportedLocales: AppLocale.supported,
           localizationsDelegates: AppLocale.delegates,
       title: 'Stockealo · Administrador',
+      // Las ayudas del mouse no se quedan pegadas al abrir otra cosa (0.16.3)
+      navigatorObservers: [TooltipCleaner()],
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

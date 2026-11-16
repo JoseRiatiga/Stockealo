@@ -185,4 +185,12 @@ void main() {
     expect(await isCashClosedFor(business), isFalse);
     await repo.requireOpen(businessId);
   });
+
+  test('contando por billetes no dice «Faltan» antes de contar (0.16.3)', () {
+    expect(countDiff(counted: 0, expected: 50000, byDenomination: true, blind: false), isNull);
+    expect(countDiff(counted: 20000, expected: 50000, byDenomination: true, blind: false), -30000);
+    expect(countDiff(counted: 0, expected: 50000, byDenomination: false, blind: false), -50000);
+    expect(countDiff(counted: null, expected: 50000, byDenomination: false, blind: false), isNull);
+    expect(countDiff(counted: 50000, expected: 50000, byDenomination: true, blind: true), isNull);
+  });
 }

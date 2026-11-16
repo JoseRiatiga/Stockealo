@@ -14,6 +14,7 @@ import 'package:stockealo/features/business/models/business.dart';
 import 'package:stockealo/features/products/data/product_repository.dart';
 import 'package:stockealo/features/products/data/product_templates.dart';
 import 'package:stockealo/features/products/models/product.dart';
+import 'package:stockealo/features/products/presentation/screens/product_form_screen.dart';
 import 'package:stockealo/features/products/presentation/widgets/product_template_sheet.dart';
 import 'package:stockealo/features/products/presentation/widgets/variant_editor.dart';
 import 'package:stockealo/features/store/data/online_store_service.dart';
@@ -91,6 +92,41 @@ void main() {
     // Cargarla otra vez no duplica nada
     expect(await ProductTemplate.licorera.apply(businessId, categories: ['Ron']), 0);
     expect(ProductTemplate.plain('Lácteos  y huevos'), 'lacteos y huevos');
+  });
+
+  test('lote encendido por defecto: droguería siempre, barrio solo en lo perecedero (0.16.3)', () {
+    expect(ProductTemplate.drogueria.expiryByDefault('Analgésicos'), isTrue);
+    expect(ProductTemplate.barrio.expiryByDefault('Lácteos y huevos'), isTrue);
+    expect(ProductTemplate.barrio.expiryByDefault('panadería'), isTrue);
+    expect(ProductTemplate.barrio.expiryByDefault('Carnes frías'), isTrue);
+    expect(ProductTemplate.barrio.expiryByDefault('Bebidas'), isFalse);
+    expect(ProductTemplate.barrio.expiryByDefault('Aseo'), isFalse);
+    expect(ProductTemplate.barrio.expiryByDefault(null), isFalse);
+    expect(ProductTemplate.licorera.expiryByDefault('Ron'), isFalse);
+  });
+
+  testWidgets('Nuevo producto: el lote no salta al escribir precios y en Bebidas viene apagado', (tester) async {
+    tester.view.physicalSize = const Size(390, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.runAsync(() => ProductTemplate.barrio.apply(businessId, categories: ['Bebidas', 'Lácteos y huevos']));
+    await tester.pumpWidget(MaterialApp(theme: AppTheme.lightTheme, home: const ProductFormScreen(businessId: businessId)));
+    for (var i = 0; i < 6; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+      await tester.pump();
+    }
+    final lot = find.widgetWithText(SwitchListTile, 'Controla vencimiento por lote');
+    expect(lot, findsOneWidget);
+    // La primera categoría es Bebidas: apagado
+    expect(tester.widget<SwitchListTile>(lot).value, isFalse);
+    final before = tester.getTopLeft(lot).dy;
+    expect(find.text('Escribe el costo para ver precios sugeridos'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Precio de Compra'), '2000');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Precio de Venta *'), '3000');
+    await tester.pump();
+    expect(find.text('Precio para ganar'), findsOneWidget);
+    expect(tester.getTopLeft(lot).dy, before);
+    expect(tester.takeException(), isNull);
   });
 
   test('la marca se guarda en el producto', () {
@@ -181,6 +217,9 @@ void main() {
     expect(find.text('Elf Bar BC5000'), findsOneWidget);
     expect(find.textContaining('nicotina y sabor'), findsOneWidget);
     expect(find.text('Mango'), findsOneWidget, reason: 'el sabor sale con su nombre, sin muestra de color');
+    // 0.16.3: sin foto se ve una caja, no la percha de la ropa
+    expect(find.byIcon(NoPhotoIcon.icon), findsWidgets);
+    expect(find.byIcon(Icons.checkroom_outlined), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

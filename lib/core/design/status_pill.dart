@@ -41,6 +41,10 @@ class StatusPill extends StatelessWidget {
   final bool compact;
   final IconData? icon;
 
+  /// Puntito de otro tono sobre el fondo de [tone] (0.16.3): «Quedan 3» va gris con
+  /// el puntito naranja, más sobrio que todo el fondo de aviso
+  final AppTone? dotTone;
+
   const StatusPill(
     this.label, {
     super.key,
@@ -48,6 +52,7 @@ class StatusPill extends StatelessWidget {
     this.dot = false,
     this.compact = false,
     this.icon,
+    this.dotTone,
   });
 
   @override
@@ -59,8 +64,15 @@ class StatusPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (dot) ...[
-            Container(width: 7, height: 7, decoration: BoxDecoration(color: t.strong, shape: BoxShape.circle)),
+          if (dot || dotTone != null) ...[
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: dotTone == null ? t.strong : ToneColors.of(context, dotTone!).strong,
+                shape: BoxShape.circle,
+              ),
+            ),
             const SizedBox(width: 6),
           ] else if (icon != null) ...[
             Icon(icon, size: 14, color: t.text),

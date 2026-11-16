@@ -46,6 +46,12 @@ Future<void> _save(WidgetTester tester, GlobalKey key, String name) async {
   });
 }
 
+/// El texto se ve completo: ni se corta con «…» ni pasa de su línea
+void _expectWhole(WidgetTester tester, String text) {
+  final paragraph = tester.renderObject<RenderParagraph>(find.text(text));
+  expect(paragraph.didExceedMaxLines, isFalse, reason: '«$text» se corta');
+}
+
 void main() {
   for (final brightness in Brightness.values) {
     testWidgets('computador: menú que sigue el día y encabezado (${brightness.name})', (tester) async {
@@ -67,8 +73,8 @@ void main() {
                   child: Column(
                     children: [
                       AppHeaderBar(
-                        title: 'Productos',
-                        subtitle: 'Catálogo, precios, tallas y colores',
+                        title: 'Minimercado La Esperanza',
+                        subtitle: 'Toca o escanea, cobra y sigue',
                         business: _business,
                         alertCount: 3,
                         onSearchTap: () {},
@@ -92,6 +98,9 @@ void main() {
       expect(find.text('DÍA A DÍA'), findsOneWidget);
       expect(find.text('Nueva venta'), findsOneWidget);
       expect(find.text('Tienda Olinda'), findsOneWidget);
+      // 0.16.3: el nombre y el buscador se leen enteros
+      _expectWhole(tester, 'Minimercado La Esperanza');
+      _expectWhole(tester, 'Busca producto, cliente o función');
       expect(tester.takeException(), isNull);
       await _save(tester, key, 'computador_${brightness.name}');
     });
@@ -114,8 +123,8 @@ void main() {
             body: Column(
               children: [
                 AppHeaderBar(
-                  title: 'Productos',
-                  subtitle: 'Catálogo, precios, tallas y colores',
+                  title: 'Minimercado La Esperanza',
+                  subtitle: 'Toca o escanea, cobra y sigue',
                   compact: true,
                   business: _business,
                   alertCount: 2,
@@ -132,12 +141,18 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(find.text('Nueva venta'), findsOneWidget);
+      // 0.16.3: a 390 px el nombre del negocio y el subtítulo caben enteros
+      _expectWhole(tester, 'Minimercado La Esperanza');
+      _expectWhole(tester, 'Toca o escanea, cobra y sigue');
+      expect(find.byTooltip('Cambiar a modo oscuro').evaluate().length + find.byTooltip('Cambiar a modo claro').evaluate().length, 0,
+          reason: 'en el celular el botón de tema está en el menú');
       expect(tester.takeException(), isNull);
       await _save(tester, key, 'celular_${brightness.name}');
 
       await tester.tap(find.byTooltip('Abrir el menú'));
       await tester.pumpAndSettle();
       expect(find.text('Clientes y proveedores'), findsOneWidget);
+      expect(find.byTooltip(brightness == Brightness.dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await _save(tester, key, 'celular_menu_${brightness.name}');
     });

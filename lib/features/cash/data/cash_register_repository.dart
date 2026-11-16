@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart' show DatabaseException;
+import '../../sales/data/sales_repository.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
@@ -158,7 +159,7 @@ class CashRegisterRepository {
     // Un pago mixto suma a cada medio lo que entró por él; una venta es un número
     final cashInvoices = <String>{};
     final sales = await db.rawQuery('''
-      SELECT payment_method AS method, total, payment_split, COALESCE(invoice_number, id) AS invoice FROM sales_ok
+      SELECT payment_method AS method, total, payment_split, ${SalesRepository.saleKey} AS invoice FROM sales_ok
       WHERE business_id = ? AND date >= ? AND date <= ?
     ''', [biz, from, to]);
     for (final r in sales) {

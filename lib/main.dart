@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/widgets/tooltip_cleaner.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/auth_repository.dart';
@@ -53,6 +54,8 @@ class StockealoApp extends StatelessWidget {
           supportedLocales: AppLocale.supported,
           localizationsDelegates: AppLocale.delegates,
           title: 'Stockealo',
+          // Las ayudas del mouse no se quedan pegadas al abrir otra cosa (0.16.3)
+          navigatorObservers: [TooltipCleaner()],
           debugShowCheckedModeBanner: false,
           theme: AppTheme.build(Brightness.light, accent: ThemeController.instance.accent),
           darkTheme: AppTheme.build(Brightness.dark, accent: ThemeController.instance.accent),

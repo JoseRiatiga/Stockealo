@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:stockealo/core/database/app_database.dart';
@@ -33,7 +34,8 @@ void main() {
 
   test('la cuadrícula de accesos cambia de columnas según el ancho', () {
     expect(QuickAccessRow.columnsFor(320), 2);
-    expect(QuickAccessRow.columnsFor(360), 3);
+    expect(QuickAccessRow.columnsFor(358), 2); // celular de 390 px (0.16.3)
+    expect(QuickAccessRow.columnsFor(500), 3);
     expect(QuickAccessRow.columnsFor(900), 4);
   });
 
@@ -59,6 +61,40 @@ void main() {
       expect(box.right, lessThanOrEqualTo(360), reason: '$label se sale de la pantalla');
     }
     expect(find.byType(ListView), findsNothing, reason: 'ya no es una fila que se desliza');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a 390 px «Promociones» no se parte y los de una fila miden lo mismo (0.16.3)', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.runAsync(() async {
+      final loader = FontLoader('Inter');
+      for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+        loader.addFont(rootBundle.load('assets/fonts/inter/Inter-$w.ttf'));
+      }
+      await loader.load();
+    });
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.build(Brightness.light),
+      home: Scaffold(
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: QuickAccessRow(items: [
+            QuickAccessItem(icon: Icons.menu_book_outlined, label: 'Catálogo', caption: 'PDF e historias', onTap: () {}),
+            QuickAccessItem(icon: Icons.local_offer_outlined, label: 'Promociones', caption: '% y 2×1 con fechas', onTap: () {}),
+            QuickAccessItem(icon: Icons.upload_file_outlined, label: 'Importar desde Excel', caption: 'Trae tus productos', onTap: () {}),
+          ]),
+        ),
+      ),
+    ));
+    // Una sola línea: la palabra cabe entera
+    final line = tester.getSize(find.text('Catálogo')).height;
+    expect(tester.getSize(find.text('Promociones')).height, line);
+    final tiles = find.byType(InkWell);
+    expect(tester.getSize(tiles.at(0)).height, tester.getSize(tiles.at(1)).height);
+    // El tercero, solo en su fila, ocupa todo el ancho
+    expect(tester.getSize(tiles.at(2)).width, greaterThan(tester.getSize(tiles.at(0)).width * 1.9));
     expect(tester.takeException(), isNull);
   });
 

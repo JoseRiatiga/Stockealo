@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../../../../core/utils/clock_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -732,7 +733,7 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     if (diff.inMinutes < 1) return 'Ahora';
     if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes} min';
     if (at.year == now.year && at.month == now.month && at.day == now.day) {
-      return DateFormat('h:mm a', 'es_CO').format(at);
+      return clockText(at);
     }
     return DateFormat('d MMM, h:mm a', 'es_CO').format(at);
   }

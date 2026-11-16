@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../dashboard/presentation/widgets/stocky_floating_button.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -696,7 +697,8 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
               ? _errorView(c)
               : ContentWidth(
                   child: ListView(
-                  padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
+                  // Abajo, espacio para que «Publicar mi tienda» suba por encima de Stocky
+                  padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, StockyFloatingButton.clearance),
                   children: [
                     if (_saved != null && _saved!.enabled && _pro) ...[
                       _liveCard(c, _saved!),

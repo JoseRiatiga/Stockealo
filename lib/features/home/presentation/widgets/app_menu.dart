@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/theme_mode_button.dart';
 
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -102,6 +103,8 @@ class _AppMenuState extends State<AppMenu> {
                     const SizedBox(width: AppSpace.md - 2),
                     Expanded(child: Text('Stockealo', style: AppText.title(context, weight: FontWeight.w700))),
                   ],
+                  // En el celular el botón de tema vive aquí (0.16.3), no en el encabezado
+                  if (widget.inDrawer) const ThemeModeButton(size: 20),
                   if (widget.inDrawer)
                     IconButton(
                       tooltip: 'Cerrar menú',

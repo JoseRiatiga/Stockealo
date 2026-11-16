@@ -293,8 +293,10 @@ class TeamRepository {
     // 3. Verificar si existe algún dueño ya registrado en miembros para evitar usurpación accidental
     final existingOwnerQuery = await db.query(
       'business_members',
-      where: 'business_id = ? AND role = "OWNER"',
-      whereArgs: [businessId],
+      // El valor va como parámetro: el SQLite de la web no acepta texto entre comillas
+      // dobles (lo toma como columna y fallaba al entrar a un negocio nuevo, 0.16.3)
+      where: 'business_id = ? AND role = ?',
+      whereArgs: [businessId, 'OWNER'],
       limit: 1,
     );
     if (existingOwnerQuery.isNotEmpty) {

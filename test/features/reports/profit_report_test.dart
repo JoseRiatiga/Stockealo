@@ -33,7 +33,7 @@ void main() {
   }
 
   var saleCount = 0;
-  Future<void> sale(String product, {required double total, required double cost, required DateTime date, int qty = 1, String method = 'EFECTIVO', double discount = 0}) async {
+  Future<void> sale(String product, {required double total, required double cost, required DateTime date, int qty = 1, String method = 'EFECTIVO', double discount = 0, String? invoice}) async {
     saleCount++;
     await (await appDb.database).insert('sales', {
       'id': 's$saleCount',
@@ -47,6 +47,7 @@ void main() {
       'payment_method': method,
       'payment_status': method == 'FIADO' ? 'PENDIENTE' : 'PAGADO',
       'discount_amount': discount,
+      'invoice_number': invoice,
       'created_at': date.toIso8601String(),
     });
   }
@@ -84,6 +85,12 @@ void main() {
     await sale('Azúcar', total: 1000, cost: 1500, date: DateTime(2026, 10, 12), method: 'FIADO'); // bajo costo
     // Mes pasado
     await sale('Arroz', total: 6000, cost: 4000, qty: 2, date: DateTime(2026, 9, 15));
+    // Agosto: 2 ventas de 3 productos cada una (6 líneas con el mismo comprobante)
+    for (final invoice in ['F-1', 'F-2']) {
+      for (final product in ['Arroz', 'Aceite', 'Azúcar']) {
+        await sale(product, total: 1000, cost: 500, date: DateTime(2026, 8, 3), invoice: invoice);
+      }
+    }
 
     // Merma de 2 arroces este mes y un abono de fiado
     await db.insert('stock_movements', {
@@ -112,6 +119,18 @@ void main() {
     await appDb.close();
     await deleteDbFile();
     if (await dbDir.exists()) await dbDir.delete(recursive: true);
+  });
+
+  test('cuenta ventas, no líneas de producto', () async {
+    final r = await ProfitReportRepository.instance.buildRange(
+      businessId,
+      DateTime(2026, 8, 1),
+      DateTime(2026, 9, 1),
+      prevFrom: DateTime(2026, 7, 1),
+      prevTo: DateTime(2026, 8, 1),
+    );
+    expect(r.salesCount, 2);
+    expect(r.revenue, 6000);
   });
 
   test('este mes: ventas, costos, mermas, pérdidas y comparación', () async {

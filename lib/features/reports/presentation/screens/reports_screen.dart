@@ -307,12 +307,20 @@ class _ReportsTabState extends State<ReportsTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // En el celular van sin ícono, para que «Ganancias» quepa entera (0.16.3)
                     SegmentedButton<int>(
                       showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(value: 0, icon: Icon(Icons.insights_outlined), label: Text('Ganancias')),
-                        ButtonSegment(value: 1, icon: Icon(Icons.flag_outlined), label: Text('Metas')),
-                        ButtonSegment(value: 2, icon: Icon(Icons.table_chart_outlined), label: Text('Excel')),
+                      segments: [
+                        for (final (value, icon, label) in const [
+                          (0, Icons.insights_outlined, 'Ganancias'),
+                          (1, Icons.flag_outlined, 'Metas'),
+                          (2, Icons.table_chart_outlined, 'Excel'),
+                        ])
+                          ButtonSegment(
+                            value: value,
+                            icon: MediaQuery.sizeOf(context).width < 420 ? null : Icon(icon),
+                            label: Text(label, maxLines: 1, softWrap: false),
+                          ),
                       ],
                       selected: {_view},
                       onSelectionChanged: (v) => setState(() => _view = v.first),

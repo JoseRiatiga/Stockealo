@@ -1,4 +1,5 @@
 import '../../../core/database/app_database.dart';
+import '../../sales/data/sales_repository.dart';
 
 /// Periodos del reporte de ganancias
 enum ReportPeriod {
@@ -143,7 +144,7 @@ class ProfitReportRepository {
     const inRange = 'business_id = ? AND date >= ? AND date < ?';
 
     final totals = (await db.rawQuery('''
-      SELECT COUNT(*) AS n,
+      SELECT COUNT(DISTINCT ${SalesRepository.saleKey}) AS n,
              COALESCE(SUM(total), 0) AS revenue,
              COALESCE(SUM(total_cost), 0) AS cost,
              COALESCE(SUM(discount_amount), 0) AS discounts,

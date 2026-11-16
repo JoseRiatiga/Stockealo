@@ -5,6 +5,7 @@ import '../../cash/data/cash_register_repository.dart';
 import '../../sales/data/sales_repository.dart';
 import '../../store/data/store_orders_repository.dart';
 import '../../services/data/appointments_repository.dart';
+import 'sold_out_prefs.dart';
 
 /// Rango del gráfico de ventas del Inicio
 enum HomeRange { days14, month, year }
@@ -40,6 +41,9 @@ class AttentionItem {
   final DateTime? lastEntry;
   final String? supplierId;
 
+  /// Pidió que le recordaran y ya pasaron los días: no ha llegado (0.16.0)
+  final int? waitingDays;
+
   // Cliente
   final double amount;
   final String? phone;
@@ -53,6 +57,7 @@ class AttentionItem {
   final int count;
 
   const AttentionItem({
+    this.waitingDays,
     required this.kind,
     required this.refId,
     required this.name,
@@ -214,6 +219,7 @@ class HomeRepository {
     ''', [weekAgo.toIso8601String(), businessId]);
     final out = <AttentionItem>[];
     final low = <AttentionItem>[];
+    final reminders = await SoldOutPrefs.reminders(businessId);
     for (final r in stockRows) {
       final item = AttentionItem(
         kind: ((r['stock'] as num?) ?? 0) <= 0 ? AttentionKind.outOfStock : AttentionKind.lowStock,
@@ -224,6 +230,7 @@ class HomeRepository {
         soldThisWeek: (r['sold_week'] as num?)?.toInt() ?? 0,
         lastEntry: DateTime.tryParse('${r['last_entry']}'),
         supplierId: r['supplier_id'] as String?,
+        waitingDays: ((r['stock'] as num?) ?? 0) <= 0 ? SoldOutPrefs.overdueDays(reminders['${r['id']}']) : null,
       );
       (item.kind == AttentionKind.outOfStock ? out : low).add(item);
     }

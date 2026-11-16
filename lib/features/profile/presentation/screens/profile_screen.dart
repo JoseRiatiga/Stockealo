@@ -45,6 +45,7 @@ import '../../../../core/permissions/permissions.dart';
 import '../../data/personal_data_export.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/security/app_lock.dart';
+import '../../../home/presentation/widgets/whats_new_sheet.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -1013,6 +1014,12 @@ actions: [
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                               : null,
                         ),
+                      SettingsRow(
+                        icon: Icons.auto_awesome_outlined,
+                        title: 'Novedades',
+                        subtitle: 'Lo que trajo cada versión',
+                        onTap: () => WhatsNewSheet.show(context),
+                      ),
                       SettingsRow(
                         icon: Icons.explore_outlined,
                         title: 'Dónde quedó cada cosa',

@@ -34,12 +34,12 @@ class WhereThingsMovedSheet {
     final db = AppDatabase.instance;
     if (await db.getSetting(seenKey) == mapVersion) return;
     await db.setSetting(seenKey, mapVersion);
-    if (!await _usedBefore(db)) return;
+    if (!await usedBefore(db)) return;
     if (context.mounted) await show(context);
   }
 
   /// Ya usaba la app: vio el aviso de la 0.12 o tiene un negocio de hace más de un día
-  static Future<bool> _usedBefore(AppDatabase db) async {
+  static Future<bool> usedBefore(AppDatabase db) async {
     if (await db.getSetting(pendingKey) != null) return true;
     try {
       final d = await db.database;

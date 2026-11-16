@@ -344,12 +344,15 @@ class _StorePageState extends State<StorePage> {
         builder: (context) => Stack(
           fit: StackFit.expand,
           children: [
+            // Sin toques, sin lector de pantalla y sin foco con el teclado (Tab)
             IgnorePointer(
-              child: ExcludeSemantics(
-                child: ImageFiltered(
-                  key: const ValueKey('adult-gate-blur'),
-                  imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                  child: page,
+              child: ExcludeFocus(
+                child: ExcludeSemantics(
+                  child: ImageFiltered(
+                    key: const ValueKey('adult-gate-blur'),
+                    imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: page,
+                  ),
                 ),
               ),
             ),

@@ -204,7 +204,13 @@ class AppTheme {
         side: BorderSide(color: c.line),
         shape: const StadiumBorder(),
         showCheckmark: false,
-        labelStyle: t(AppText.sizeSmall, FontWeight.w600, c.ink),
+        // Elegida: letra clara sobre el fondo oscuro (0.16.2). Antes la letra era del
+        // mismo color que el fondo y no se leía (días del horario de la tienda, filtros)
+        labelStyle: t(
+          AppText.sizeSmall,
+          FontWeight.w600,
+          WidgetStateColor.resolveWith((states) => states.contains(WidgetState.selected) ? c.surface : c.ink),
+        ),
         secondaryLabelStyle: t(AppText.sizeSmall, FontWeight.w600, c.surface),
         padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: AppSpace.xs),
       ),

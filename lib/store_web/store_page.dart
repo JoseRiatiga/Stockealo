@@ -819,15 +819,9 @@ class _StorePageState extends State<StorePage> {
         children: [
           Row(
             children: [
-              if (wide)
-                Expanded(
-                  child: Wrap(
-                    spacing: AppSpace.lg,
-                    children: [
-                      if (offers) _navLink('OFERTAS', () => setState(() => _filters.onlyOffers = true), active: _filters.onlyOffers),
-                    ],
-                  ),
-                ),
+              // Espacio a la izquierda para que el nombre quede centrado. «Ofertas» se
+              // filtra en el lateral («Solo ofertas»), no aquí arriba (0.16.2)
+              if (wide) const Spacer(),
               Expanded(
                 flex: wide ? 1 : 3,
                 child: Text(
@@ -987,17 +981,6 @@ class _StorePageState extends State<StorePage> {
     final left = first.endsAt!.difference(DateTime.now());
     final when = left.inHours < 24 ? 'termina hoy' : 'termina en ${left.inDays} ${left.inDays == 1 ? 'día' : 'días'}';
     return '${first.name} · $when';
-  }
-
-  Widget _navLink(String label, VoidCallback onTap, {bool active = false}) {
-    final c = context.colors;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
-        child: Text(label, style: AppText.small(context, weight: FontWeight.w600, color: active ? c.accent : c.ink).copyWith(letterSpacing: 1)),
-      ),
-    );
   }
 
   Widget _cartButton(BuildContext context, PublicStore store) {

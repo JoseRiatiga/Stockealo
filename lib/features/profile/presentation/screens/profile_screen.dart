@@ -46,6 +46,7 @@ import '../../data/personal_data_export.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/security/app_lock.dart';
 import '../../../home/presentation/widgets/whats_new_sheet.dart';
+import '../../../auth/presentation/logout_confirm.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -1030,7 +1031,9 @@ actions: [
                         icon: Icons.logout_outlined,
                         title: 'Cerrar sesión',
                         danger: true,
-                        onTap: widget.onLogout,
+                        onTap: () async {
+                          if (await LogoutConfirm.ask(context)) widget.onLogout();
+                        },
                       ),
                     ]),
                     Center(

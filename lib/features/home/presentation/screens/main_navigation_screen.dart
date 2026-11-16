@@ -51,6 +51,7 @@ import '../../../services/models/work_schedule.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/security/app_lock_gate.dart';
 import '../widgets/whats_new_sheet.dart';
+import '../../../auth/presentation/logout_confirm.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -69,6 +70,11 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> with ActiveBusinessAware {
   @override
   void onActiveBusinessChanged() => _loadNavigationContext();
+
+  /// Cerrar sesión pregunta antes (0.16.1), desde el menú, Ajustes o fuera de horario
+  Future<void> _logout() async {
+    if (await LogoutConfirm.ask(context)) widget.onLogout();
+  }
 
   int _currentIndex = 0;
   final _authRepo = AuthRepository.instance;
@@ -510,7 +516,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   Widget _content(BuildContext context) {
     // Fuera de su horario de acceso: la app se bloquea hasta su próximo turno
     if (_outOfHours) {
-      return _OutOfHours(schedule: _accessSchedule!, businessName: _activeBusiness?.name, onLogout: widget.onLogout);
+      return _OutOfHours(schedule: _accessSchedule!, businessName: _activeBusiness?.name, onLogout: _logout);
     }
     // Si la persona deja de poder ver el lugar (rol o plan), vuelve a Inicio
     final place = AppPlace.byId(_currentIndex);
@@ -558,7 +564,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
             if (inDrawer) Navigator.of(context).maybePop();
             _handleSelectBusiness();
           },
-          onLogout: widget.onLogout,
+          onLogout: _logout,
           inDrawer: inDrawer,
           // Pedidos de la tienda sin ver (0.13.5)
           badges: {

@@ -513,7 +513,8 @@ actions: [
             onPressed: _isLoading || _googleLoading ? null : _google,
             icon: _googleLoading
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.account_circle_outlined),
+                // La «G» oficial de Google (0.16.1): se reconoce al instante
+                : Image.asset('assets/brand/google_g.png', width: 18, height: 18, filterQuality: FilterQuality.medium),
             label: Text(_googleLoading ? 'Esperando a Google…' : 'Continuar con Google'),
           ),
           const SizedBox(height: AppSpace.lg),

@@ -89,6 +89,7 @@ flutter:
 
   assets:
     - assets/icon/
+    - assets/brand/
 
   # Letra de la app (Google Fonts, licencia OFL en assets/fonts/inter/OFL.txt)
   fonts:

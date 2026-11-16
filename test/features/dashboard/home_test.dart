@@ -215,6 +215,9 @@ void main() {
         expect(find.textContaining('Juan Gómez debe'), findsOneWidget);
         expect(find.text('Efectivo en caja'), findsOneWidget);
         expect(find.text('Lo más vendido'), findsOneWidget);
+        // 0.16.1: los accesos rápidos van arriba, antes de las cifras del día
+        expect(find.text('Editar'), findsOneWidget);
+        expect(tester.getTopLeft(find.text('Editar')).dy, lessThan(tester.getTopLeft(find.text('Ventas de hoy')).dy));
 
         final out = Platform.environment['PREVIEW_OUT'];
         if (out != null) {

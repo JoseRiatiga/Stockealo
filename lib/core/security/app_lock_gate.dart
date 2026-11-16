@@ -78,6 +78,9 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void initState() {
     super.initState();
+    _lock.pinLength().then((n) {
+      if (mounted) setState(() => _length = n);
+    });
     _prepareBio();
   }
 
@@ -86,6 +89,9 @@ class _LockScreenState extends State<LockScreen> {
     _tick?.cancel();
     super.dispose();
   }
+
+  /// Cuántos números tiene el PIN: al completarlos se revisa solo
+  int? _length;
 
   Future<void> _prepareBio() async {
     final on = await _lock.bioOn() && await _lock.bioAvailable();
@@ -100,11 +106,10 @@ class _LockScreenState extends State<LockScreen> {
       _error = null;
       if (_pin.length < 6) _pin += d;
     });
-    if (_pin.length >= 4) {
-      final ok = await _lock.check(_pin);
-      if (ok || !mounted) return;
-      // Puede ser un PIN de 5 o 6: solo se marca error al llegar a 6 o si se pide revisar
-      if (_pin.length == 6) _wrong();
+    // Se revisa una sola vez, al completar el PIN (o con «Entrar» si no se sabe el largo)
+    final length = _length;
+    if (length != null ? _pin.length == length : _pin.length == 6) {
+      if (!await _lock.check(_pin) && mounted) _wrong();
     }
   }
 

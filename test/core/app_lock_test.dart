@@ -139,4 +139,32 @@ void main() {
     expect(usedPassword, isTrue);
     expect(await tester.runAsync(() => lock.isOn()), isFalse);
   });
+
+  testWidgets('un PIN de 6 números se revisa al completarlo (los primeros no cuentan como fallos)', (tester) async {
+    await tester.runAsync(() => lock.enable('258013'));
+    await pumpGate(tester, onUsePassword: () async {});
+    Future<void> type(String pin) async {
+      for (final d in pin.split('')) {
+        await tester.tap(find.text(d));
+        await tester.pump();
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump();
+      }
+      for (var i = 0; i < 6; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+        await tester.pump();
+      }
+    }
+
+    // Dos intentos equivocados: antes contaban 3 fallos cada uno y bloqueaba 30 s
+    await type('111111');
+    await type('222222');
+    expect(lock.waitLeft, isNull);
+    await type('258013');
+    for (var i = 0; i < 6; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+      await tester.pump();
+    }
+    expect(find.text('La app'), findsOneWidget);
+  });
 }

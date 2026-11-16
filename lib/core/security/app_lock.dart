@@ -20,6 +20,10 @@ class AppLock {
   static const _bioKey = 'app_lock_bio';
   static const _afterKey = 'app_lock_after_minutes';
 
+  /// Cuántos números tiene el PIN: se revisa solo al completarlo (si no, un PIN de 6
+  /// contaba como fallidos los 4 y 5 primeros números)
+  static const _lengthKey = 'app_lock_pin_length';
+
   /// Tras estos intentos fallidos, espera [waitAfterFails]
   static const maxFails = 5;
   static const waitAfterFails = Duration(seconds: 30);
@@ -58,13 +62,14 @@ class AppLock {
     final salt = base64Url.encode(List<int>.generate(16, (_) => r.nextInt(256)));
     await _set(_saltKey, salt);
     await _set(_hashKey, _hash(salt, pin));
+    await _set(_lengthKey, '${pin.length}');
     await _set(_onKey, '1');
     _fails = 0;
   }
 
   /// Apaga el bloqueo y borra el PIN
   Future<void> disable() async {
-    for (final k in [_onKey, _hashKey, _saltKey, _bioKey]) {
+    for (final k in [_onKey, _hashKey, _saltKey, _bioKey, _lengthKey]) {
       await _set(k, null);
     }
     locked.value = false;
@@ -72,6 +77,9 @@ class AppLock {
 
   Future<void> setBio(bool on) => _set(_bioKey, on ? '1' : null);
   Future<void> setAfter(int minutes) => _set(_afterKey, '$minutes');
+
+  /// Cuántos números tiene el PIN; null si no se sabe (se revisa al tocar «Entrar»)
+  Future<int?> pinLength() async => int.tryParse(await _get(_lengthKey) ?? '');
 
   /// Si está esperando por muchos intentos, cuánto falta
   Duration? get waitLeft {

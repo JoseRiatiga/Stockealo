@@ -1,103 +1,114 @@
 <div align="center">
 
-# 📦 Stockealo
+<img src="assets/icon/app_icon.png" width="96" alt="Stockealo" />
 
-### *Control inteligente de inventario, ventas y finanzas para tu negocio*
+# Stockealo
 
-Una solución móvil ágil, potente y privada diseñada para comerciantes, tiendas y emprendimientos que necesitan gestionar sus operaciones diarias con total rapidez, fiabilidad y sin depender de conexión a internet.
+**Inventario, ventas, caja, servicios y tienda en línea para negocios de barrio y emprendimientos.**
 
----
+Funciona en el celular (Android) y en el navegador, con o sin internet.
+
+[Usar en la web](https://stockealo.online/app/) · [Descargar para Android](https://github.com/JoseRiatiga/Stockealo/releases/latest) · [Cómo instalar](https://stockealo.online/instalar) · [stockealo.online](https://stockealo.online)
+
+Versión actual: **0.16.2**
 
 </div>
 
-## 📸 Vistas de la Aplicación
+---
+
+## Así se ve
 
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" width="50%">
-        <b>📊 Dashboard Operativo</b><br/><br/>
-        <img src="screenshots/dashboard.png" width="300" alt="Dashboard Stockealo" />
-      </td>
-      <td align="center" width="50%">
-        <b>🔐 Acceso y Seguridad</b><br/><br/>
-        <img src="screenshots/login.png" width="300" alt="Login Stockealo" />
-      </td>
-    </tr>
-    <tr>
-      <td align="center" width="50%">
-        <b>⚙️ Ajustes y Privacidad</b><br/><br/>
-        <img src="screenshots/ajustes.png" width="300" alt="Ajustes Stockealo" />
-      </td>
-      <td align="center" width="50%">
-        <b>🔄 Actualizaciones en Vivo</b><br/><br/>
-        <img src="screenshots/actualizaciones.png" width="300" alt="Actualizaciones Stockealo" />
-      </td>
-    </tr>
-  </table>
+<table>
+  <tr>
+    <td align="center"><b>Inicio</b><br/><br/><img src="screenshots/inicio.jpg" width="240" alt="Inicio" /></td>
+    <td align="center"><b>Vender</b><br/><br/><img src="screenshots/vender.jpg" width="240" alt="Vender" /></td>
+    <td align="center"><b>Cobrar</b><br/><br/><img src="screenshots/vender-cuenta.jpg" width="240" alt="Cuenta y formas de pago" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Comprobante</b><br/><br/><img src="screenshots/comprobante.jpg" width="240" alt="Comprobante de venta" /></td>
+    <td align="center"><b>Caja</b><br/><br/><img src="screenshots/caja.jpg" width="240" alt="Caja con arqueo" /></td>
+    <td align="center"><b>Tienda en línea</b><br/><br/><img src="screenshots/tienda-vista-previa.jpg" width="240" alt="Tienda en línea" /></td>
+  </tr>
+</table>
+
+<img src="screenshots/inicio-escritorio.jpg" width="760" alt="Stockealo en el computador" />
+<br/><sub>En el computador, con el menú lateral.</sub>
 </div>
 
 ---
 
-## ✨ Características Principales
+## Qué hace
 
-### 📦 Gestión Completa de Inventario y Catálogo
-- **Fichas detalladas de producto**: Nombre, foto, precio de compra, precio de venta, margen de ganancia y stock disponible.
-- **Escaneo integrado**: Identificación instantánea de productos mediante lector de códigos de barras y códigos QR usando la cámara del dispositivo.
-- **Alertas de reposición**: Notificaciones automáticas de productos agotados o próximos a agotarse según el stock mínimo configurado.
-- **Valorización financiera**: Conoce en todo momento el valor exacto de tu mercancía invertida y su proyección de ventas.
-- **Importación y Exportación masiva**: Compatible con plantillas de Microsoft Excel (`.xlsx`) para migrar o respaldar catálogos en segundos.
+### Inventario
+- Productos con foto, precio de compra y de venta, margen, marca y código de barras.
+- Tallas, colores y otras variantes, cada una con su stock.
+- Lotes con fecha de vencimiento: vende primero lo que vence antes y avisa lo vencido.
+- Avisos de stock bajo, productos agotados y productos quietos.
+- Plantillas por tipo de negocio: barrio, licorera, droguería, ropa, comidas y más.
+- Importar desde Excel con vista previa, y catálogo en PDF.
 
-### 💳 Punto de Venta Rápido (POS)
-- **Registro de transacciones en segundos**: Agrega productos por escáner o selección directa para cobrar sin demoras en mostrador.
-- **Múltiples métodos de pago**: Soporte para efectivo, transferencias bancarias, tarjetas y ventas a crédito (fiado).
-- **Cálculo de utilidad neta en vivo**: Cada venta calcula automáticamente el costo del producto vs. el valor cobrado, mostrando la ganancia real obtenida.
+### Ventas y caja
+- Vender tocando o escaneando, con descuento por línea o a toda la venta.
+- Efectivo, Nequi, transferencia, tarjeta, fiado y pago mixto.
+- Comprobante para compartir por WhatsApp como imagen.
+- Ventas en espera, cotizaciones y devoluciones parciales.
+- Caja con base, entradas y salidas, cierre con conteo por billetes y lo cobrado por forma de pago.
+- Promociones con fechas (porcentaje o 2×1).
 
-### 👥 Cartera de Clientes y Control de Fiados
-- **Historial de deuda por cliente**: Lleva el registro exacto de quién te debe, cuánto te debe y cuándo compró.
-- **Registro de abonos parciales**: Control de pagos con deducción automática del saldo pendiente y comprobante digital.
-- **Contacto directo**: Acceso rápido para coordinar cobranzas o enviar detalles de cuenta por WhatsApp.
+### Clientes y proveedores
+- Fiados y abonos por cliente, con recordatorio por WhatsApp.
+- Proveedores, entradas de mercancía y cuentas por pagar.
 
-### 📊 Dashboard y Análisis Financiero
-- **Resumen operativo diario**: Métricas en tiempo real de ventas del día, ganancia neta, unidades despachadas y cuentas pendientes de cobro.
-- **Gráfica de rendimiento semanal**: Tendencias de ventas de los últimos 7 días para identificar los días de mayor movimiento comercial.
+### Reportes y metas
+- Ganancia neta por día, semana, mes o año, con lo que se perdió y por qué.
+- Metas de ventas semanales o mensuales con su avance.
+- Cierre del día por WhatsApp y descarga en Excel.
 
-### 🏢 Multi-Negocio y Colaboradores
-- **Múltiples empresas independientes**: Gestiona dos o más tiendas o sucursales de manera totalmente separada desde la misma cuenta.
-- **Equipo de trabajo y cajeros**: Asigna colaboradores con perfiles de acceso específicos para operar la caja sin exponer información sensible.
+### Tienda en línea
+- Catálogo con carrito: el cliente pide y el pedido llega a la app y por WhatsApp.
+- Plantillas Clásica, Moda, Mercado, Menú y Boutique, con color propio y modo oscuro.
+- Horario de atención, destacados, cupones de descuento y estadísticas de visitas.
+- Piezas para Instagram, QR de la tienda y enlace para compartir cada producto.
 
-### 🌙 Experiencia Visual de Alto Contraste
-- **Modo oscuro nativo (WCAG)**: Interfaz optimizada en tonos pizarra y esmeralda de alto contraste para máxima legibilidad bajo cualquier condición de luz y menor consumo de batería durante largas jornadas de trabajo.
+### Servicios (Pro Servicios)
+- Para lavaderos, barberías, peluquerías, talleres y lavanderías.
+- Tablero de órdenes, agenda y reservas en línea.
+- Empleados con horario, comisiones y alquiler de silla.
 
----
+### Equipo
+- Varios negocios en la misma cuenta.
+- Roles con permisos (dueño, administrador, cajero o uno propio) y horario de acceso.
+- El cajero no ve costos ni ganancias.
 
-## 🛡️ Privacidad y Seguridad por Diseño (Offline-First)
-
-Stockealo está construida bajo la filosofía **Offline-First**, lo que significa que el negocio nunca se detiene:
-
-- **100% Funcional sin Internet**: Todas las operaciones, ventas y consultas se ejecutan directamente en la memoria local de tu dispositivo mediante SQLite cifrado.
-- **Sincronización Opcional en la Nube**: Si decides activar el respaldo en la nube, tus datos se sincronizan de forma segura para permitir acceso multidispositivo.
-- **Zona de Privacidad y Control de Datos**:
-  - **Purgar la nube**: Borra las copias remotas de internet en cualquier momento y regresa al modo local privado, conservando el 100% de tus ventas y productos intactos en el dispositivo.
-  - **Eliminación total**: Posibilidad de dar de baja la cuenta y suprimir todos los registros de forma definitiva conforme a normativas de protección de datos.
-
----
-
-## 🔄 Actualizaciones Autónomas Integradas (OTA)
-
-Stockealo cuenta con su propio canal de actualizaciones directas dentro de la aplicación:
-- **Detección inteligente**: Notifica al usuario cuando existe una nueva versión con mejoras o nuevas herramientas.
-- **Instalación segura sin pérdida de información**: La app descarga e instala la actualización sobreescribiendo el sistema sin afectar la base de datos local ni la sesión del usuario.
+### Stocky
+- Asistente con IA que responde sobre el negocio y lleva a cada función.
 
 ---
 
-## 📄 Propiedad y Derechos de Autor
+## Privacidad y seguridad
 
-**Stockealo** es un software comercial propietario desarrollado por **Jose Riatiga**.
-
-Todos los derechos sobre el código fuente, diseño, logotipos, arquitectura y marcas asociadas están estrictamente reservados conforme a la legislación internacional de propiedad intelectual. Consulta el archivo [LICENSE](LICENSE) para más detalles.
+- **Funciona sin internet.** Todo se guarda primero en el equipo y se sube a la nube cuando vuelve la conexión.
+- **Copia en la nube** para usar el mismo negocio en varios equipos.
+- **Bloqueo con PIN o huella** en el celular.
+- **Entrar con correo o con Google.**
+- **Descargar todos tus datos** en Excel y **eliminar la cuenta** cuando quieras.
 
 ---
+
+## Planes
+
+- **Gratis:** inventario, ventas, caja, clientes, proveedores, reportes y metas del negocio.
+- **Pro:** tienda en línea, catálogos, metas por persona y límites por empleado.
+- **Pro Servicios:** el módulo de servicios para lavaderos, barberías y talleres.
+
+Los precios se consultan en la app.
+
+---
+
+## Propiedad y derechos de autor
+
+**Stockealo** es software comercial propietario desarrollado por **Jose Riatiga**. Todos los derechos sobre el código, el diseño, los logotipos y las marcas están reservados. Consulta [LICENSE](LICENSE).
 
 <div align="center">
   <sub>© 2026 Jose Riatiga. Todos los derechos reservados.</sub>

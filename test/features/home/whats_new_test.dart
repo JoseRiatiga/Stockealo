@@ -71,10 +71,13 @@ void main() {
     ));
   }
 
-  Future<void> settle(WidgetTester tester) async {
-    for (var i = 0; i < 8; i++) {
+  /// Deja que la base responda. Con [until], espera hasta verlo (máximo ~4 s): en la
+  /// máquina de GitHub la base tarda más y 8 vueltas fijas a veces no alcanzaban
+  Future<void> settle(WidgetTester tester, {Finder? until}) async {
+    for (var i = 0; i < (until == null ? 8 : 80); i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
       await tester.pump(const Duration(milliseconds: 100));
+      if (until != null && until.evaluate().isNotEmpty) break;
     }
   }
 
@@ -82,7 +85,7 @@ void main() {
     await tester.runAsync(() => appDb.setSetting(WhereThingsMovedSheet.pendingKey, '1'));
     await pumpHost(tester, '0.16.0');
     await tester.tap(find.text('abrir'));
-    await settle(tester);
+    await settle(tester, until: find.text('Lo nuevo en Stockealo 0.16.0'));
     expect(find.text('Lo nuevo en Stockealo 0.16.0'), findsOneWidget);
     expect(find.textContaining('PIN o huella'), findsOneWidget);
     expect(tester.takeException(), isNull);

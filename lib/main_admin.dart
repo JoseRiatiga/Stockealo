@@ -16,15 +16,13 @@ import 'admin/admin_mfa_gate.dart';
 /// Panel de administrador de Stockealo (solo web, en stockealo.online/admin).
 /// Es una app aparte: no está dentro de la app de los negocios.
 ///   flutter run -d chrome -t lib/main_admin.dart
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // Errores al panel de administración (0.16.0, fase 5)
-  ErrorReporter.instance.install('admin');
-  // Fechas en español (las pantallas usan DateFormat con 'es_CO')
-  await initializeDateFormatting('es_CO', null);
-  await SupabaseService.instance.initialize();
-  runApp(const AdminApp());
-}
+// Errores al panel de administración (0.16.0, fase 5), también los que nadie atrapa (0.16.3)
+void main() => ErrorReporter.instance.run('admin', () async {
+      // Fechas en español (las pantallas usan DateFormat con 'es_CO')
+      await initializeDateFormatting('es_CO', null);
+      await SupabaseService.instance.initialize();
+      runApp(const AdminApp());
+    });
 
 class AdminApp extends StatelessWidget {
   const AdminApp({super.key});
@@ -32,9 +30,9 @@ class AdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-          locale: AppLocale.locale,
-          supportedLocales: AppLocale.supported,
-          localizationsDelegates: AppLocale.delegates,
+      locale: AppLocale.locale,
+      supportedLocales: AppLocale.supported,
+      localizationsDelegates: AppLocale.delegates,
       title: 'Stockealo · Administrador',
       // Las ayudas del mouse no se quedan pegadas al abrir otra cosa (0.16.3)
       navigatorObservers: [TooltipCleaner()],

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../app_version.dart';
 import 'supabase_service.dart';
@@ -21,6 +24,29 @@ class ErrorReporter {
   /// desarrollo no se manda nada)
   @visibleForTesting
   Future<void> Function(Map<String, dynamic> report)? sender;
+
+  /// Arranca una app ('app', 'admin' o 'tienda') dentro de una zona protegida
+  /// (0.16.3): un error que nadie atrapa, como el de una tarea lanzada sin esperar,
+  /// llega aquí en cualquier plataforma. En la web, Flutter no usa
+  /// PlatformDispatcher.onError y esos errores solo salían como «Uncaught Error» en
+  /// la consola, sin llegar al panel.
+  void run(String app, Future<void> Function() start) {
+    runZonedGuarded(() async {
+      // En la misma zona que runApp: si no, Flutter avisa «Zone mismatch»
+      WidgetsFlutterBinding.ensureInitialized();
+      install(app);
+      await start();
+    }, onUncaught);
+  }
+
+  /// Lo que hace la zona con un error sin atrapar: a la consola, con el mensaje
+  /// completo, y al panel
+  @visibleForTesting
+  void onUncaught(Object error, StackTrace stack) {
+    debugPrint('Error sin atrapar: $error');
+    debugPrint('$stack');
+    report(error, stack, kind: 'async');
+  }
 
   /// Se llama al arrancar: 'app', 'admin' o 'tienda'
   void install(String app) {

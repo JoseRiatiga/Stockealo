@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Instalar Stockealo · Android, iPhone y computador</title>
+  <meta name="description" content="Cómo instalar Stockealo en tu celular Android, en tu iPhone o en tu computador, paso a paso.">
+  <meta property="og:title" content="Instalar Stockealo">
+  <meta property="og:description" content="Paso a paso para Android, iPhone y computador.">
+  <meta property="og:image" content="https://stockealo.online/logo.png">
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/site.css">
+  <style>
+    .steps { counter-reset: step; list-style: none; padding: 0; margin: 0; }
+    .steps li { counter-increment: step; position: relative; padding: 0 0 14px 44px; color: var(--ink-muted); }
+    .steps li::before { content: counter(step); position: absolute; left: 0; top: -2px; width: 30px; height: 30px;
+      border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-weight: 800;
+      display: grid; place-items: center; }
+    .steps b { color: var(--ink); }
+    .panel[hidden] { display: none; }
+    .tip { margin-top: 8px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-muted);
+      color: var(--ink-muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-in">
+      <a class="brand" href="/"><img src="/logo.png" alt="" width="32" height="32"> Stockealo</a>
+      <nav>
+        <a class="btn btn-primary btn-sm" href="/app/">Entrar</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap doc">
+    <h1>Instala Stockealo</h1>
+    <p class="muted">Elige tu equipo y sigue los pasos. Es gratis y toma un minuto.</p>
+
+    <div class="tabs" role="tablist" aria-label="Equipo">
+      <button role="tab" id="t-android" aria-controls="p-android" aria-selected="true">Android</button>
+      <button role="tab" id="t-iphone" aria-controls="p-iphone" aria-selected="false">iPhone</button>
+      <button role="tab" id="t-pc" aria-controls="p-pc" aria-selected="false">Computador</button>
+    </div>
+
+    <section class="doc-section panel" id="p-android" role="tabpanel" aria-labelledby="t-android">
+      <h2>En un celular Android</h2>
+      <ol class="steps">
+        <li>Toca <b>Descargar Stockealo</b> (abajo). Se baja el archivo <b>Stockealo.apk</b>.</li>
+        <li>Abre el archivo desde la notificación o desde <b>Descargas</b>.</li>
+        <li>Si el celular pregunta, toca <b>Configuración</b> y activa <b>Permitir de esta fuente</b> para tu navegador. Luego vuelve atrás.</li>
+        <li>Toca <b>Instalar</b> y después <b>Abrir</b>.</li>
+        <li>Entra con tu correo o crea tu cuenta.</li>
+      </ol>
+      <a class="btn btn-primary" href="https://github.com/JoseRiatiga/Stockealo/releases/latest/download/Stockealo.apk">Descargar Stockealo</a>
+      <p class="tip">Si sale «Play Protect» o un aviso de app desconocida, toca <b>Más detalles</b> › <b>Instalar de todas formas</b>.
+        Para tener la versión más nueva: en la app, <b>Ajustes</b> › <b>Buscar actualizaciones</b>.</p>
+    </section>
+
+    <section class="doc-section panel" id="p-iphone" role="tabpanel" aria-labelledby="t-iphone" hidden>
+      <h2>En un iPhone</h2>
+      <ol class="steps">
+        <li>Abre <b>stockealo.online/app</b> en <b>Safari</b>.</li>
+        <li>Toca el botón <b>Compartir</b> (el cuadrado con la flecha hacia arriba).</li>
+        <li>Baja y toca <b>Agregar a inicio</b>.</li>
+        <li>Toca <b>Agregar</b>. Stockealo queda en tu pantalla como una app más.</li>
+        <li>Ábrela desde el ícono y entra con tu correo.</li>
+      </ol>
+      <a class="btn btn-primary" href="/app/">Abrir Stockealo</a>
+      <p class="tip">Si no ves «Agregar a inicio», revisa que estés en Safari. Las actualizaciones llegan solas: basta con abrir la app.</p>
+    </section>
+
+    <section class="doc-section panel" id="p-pc" role="tabpanel" aria-labelledby="t-pc" hidden>
+      <h2>En el computador</h2>
+      <ol class="steps">
+        <li>Abre <b>stockealo.online/app</b> en <b>Chrome</b> o <b>Edge</b>.</li>
+        <li>En la barra de la dirección, toca el ícono de <b>Instalar</b> (una pantalla con una flecha).</li>
+        <li>Si no lo ves: en Chrome, menú <b>⋮</b> › <b>Transmitir, guardar y compartir</b> › <b>Instalar página como app</b>. En Edge, menú <b>…</b> › <b>Aplicaciones</b> › <b>Instalar este sitio como una aplicación</b>.</li>
+        <li>Toca <b>Instalar</b>. Queda en el menú de inicio y en el escritorio, en su propia ventana.</li>
+      </ol>
+      <a class="btn btn-primary" href="/app/">Abrir Stockealo</a>
+      <p class="tip">En el computador también puedes usar el lector USB de código de barras, y arrastrar o pegar la foto de un código en el lector.</p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="brand" href="/" style="font-size:16px"><img src="/logo.png" alt="" width="28" height="28"> Stockealo</a>
+        <p class="muted">Inventario y ventas para tu negocio.</p>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="/terminos/">Términos</a></li>
+          <li><a href="/privacidad/">Privacidad</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    var tabs = document.querySelectorAll('[role="tab"]');
+    function pick(id) {
+      tabs.forEach(function (t) {
+        var on = t.id === id;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+      });
+    }
+    tabs.forEach(function (t) { t.addEventListener('click', function () { pick(t.id); }); });
+    // Abre la pestaña del equipo de quien entra (o la que diga el enlace: #iphone, #pc)
+    var ua = navigator.userAgent, hash = location.hash.replace('#', '');
+    if (hash === 'android' || hash === 'iphone' || hash === 'pc') pick('t-' + hash);
+    else if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document)) pick('t-iphone');
+    else if (!/Android/.test(ua)) pick('t-pc');
+  </script>
+</body>
+</html>

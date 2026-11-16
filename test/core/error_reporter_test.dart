@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -44,6 +47,25 @@ void main() {
       await reporter.report(StateError('Error distinto $i'), null);
     }
     expect(sent.length, ErrorReporter.maxPerSession);
+  });
+
+  test('un error que nadie atrapa (tarea sin esperar) llega al panel (0.16.3)', () async {
+    // run() instala los avisos de Flutter: se dejan como estaban al terminar
+    final flutterBefore = FlutterError.onError;
+    final platformBefore = PlatformDispatcher.instance.onError;
+    addTearDown(() {
+      FlutterError.onError = flutterBefore;
+      PlatformDispatcher.instance.onError = platformBefore;
+    });
+    reporter.run('app', () async {
+      // Como la consulta de la 0.16.2 que se lanzaba sin esperar y fallaba en la web
+      unawaited(Future<void>.error(StateError('no such column: "OWNER"')));
+    });
+    await pumpEventQueue();
+    expect(sent, hasLength(1));
+    expect(sent.single['p_kind'], 'async');
+    expect(sent.single['p_app'], 'app');
+    expect(sent.single['p_message'], contains('no such column'));
   });
 
   test('el mismo mensaje en otro lugar es otro error', () {

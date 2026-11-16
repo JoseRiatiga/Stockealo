@@ -23,23 +23,21 @@ import 'core/services/error_reporter.dart';
 /// Bienvenida pendiente en este dispositivo (se decide al arrancar, sin sesión)
 bool _showWelcome = false;
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // Errores al panel de administración (0.16.0, fase 5)
-  ErrorReporter.instance.install('app');
-  try {
-    await initializeDateFormatting('es_CO', null);
-  } catch (e) {
-    debugPrint('Error inicializando formato de fecha: $e');
-  }
-  await SupabaseService.instance.initialize();
-  MaintenanceService.instance.start(SupabaseService.instance.client);
-  await ThemeController.instance.initialize();
-  _showWelcome = await WelcomeScreen.shouldShow();
-  // La sincronización empieza al restaurar o iniciar la sesión (syncFromCloud sube
-  // primero los cambios pendientes); subir todo aquí pisaba datos más nuevos.
-  runApp(const StockealoApp());
-}
+// Errores al panel de administración (0.16.0, fase 5), también los que nadie atrapa (0.16.3)
+void main() => ErrorReporter.instance.run('app', () async {
+      try {
+        await initializeDateFormatting('es_CO', null);
+      } catch (e) {
+        debugPrint('Error inicializando formato de fecha: $e');
+      }
+      await SupabaseService.instance.initialize();
+      MaintenanceService.instance.start(SupabaseService.instance.client);
+      await ThemeController.instance.initialize();
+      _showWelcome = await WelcomeScreen.shouldShow();
+      // La sincronización empieza al restaurar o iniciar la sesión (syncFromCloud sube
+      // primero los cambios pendientes); subir todo aquí pisaba datos más nuevos.
+      runApp(const StockealoApp());
+    });
 
 class StockealoApp extends StatelessWidget {
   const StockealoApp({super.key});

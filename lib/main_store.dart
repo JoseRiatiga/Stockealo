@@ -12,22 +12,20 @@ import 'core/services/error_reporter.dart';
 /// Tienda pública de un negocio (solo web, en stockealo.online/tienda/<slug>).
 /// Es una app aparte y no necesita cuenta.
 ///   flutter run -d chrome -t lib/main_store.dart --web-browser-flag=--disable-web-security
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // Errores al panel de administración (0.16.0, fase 5)
-  ErrorReporter.instance.install('tienda');
-  // Fechas en español (las pantallas usan DateFormat con 'es_CO')
-  await initializeDateFormatting('es_CO', null);
-  await SupabaseService.instance.initialize();
-  // Se lee la dirección completa ANTES de limpiarla: el producto compartido (?p=) y de
-  // dónde llegó (?src=qr) se perderían al dejar solo /tienda/<slug> (0.16.0)
-  final uri = Uri.base;
-  final slug = slugFromUri(uri);
-  final shared = sharedProductFromUri(uri);
-  final source = sourceFromUri(uri);
-  if (slug != null) showCleanStoreUrl(slug);
-  runApp(StoreApp(slug: slug, sharedProductId: shared, source: source));
-}
+// Errores al panel de administración (0.16.0, fase 5), también los que nadie atrapa (0.16.3)
+void main() => ErrorReporter.instance.run('tienda', () async {
+      // Fechas en español (las pantallas usan DateFormat con 'es_CO')
+      await initializeDateFormatting('es_CO', null);
+      await SupabaseService.instance.initialize();
+      // Se lee la dirección completa ANTES de limpiarla: el producto compartido (?p=) y de
+      // dónde llegó (?src=qr) se perderían al dejar solo /tienda/<slug> (0.16.0)
+      final uri = Uri.base;
+      final slug = slugFromUri(uri);
+      final shared = sharedProductFromUri(uri);
+      final source = sourceFromUri(uri);
+      if (slug != null) showCleanStoreUrl(slug);
+      runApp(StoreApp(slug: slug, sharedProductId: shared, source: source));
+    });
 
 class StoreApp extends StatelessWidget {
   final String? slug;
@@ -38,9 +36,9 @@ class StoreApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-          locale: AppLocale.locale,
-          supportedLocales: AppLocale.supported,
-          localizationsDelegates: AppLocale.delegates,
+      locale: AppLocale.locale,
+      supportedLocales: AppLocale.supported,
+      localizationsDelegates: AppLocale.delegates,
       title: 'Tienda',
       // Las ayudas del mouse no se quedan pegadas al abrir otra cosa (0.16.3)
       navigatorObservers: [TooltipCleaner()],

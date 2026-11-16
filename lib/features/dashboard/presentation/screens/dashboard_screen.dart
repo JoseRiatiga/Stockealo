@@ -34,6 +34,8 @@ import '../../../goals/presentation/goals_widgets.dart';
 import '../../../products/presentation/widgets/lots_widgets.dart';
 import '../widgets/first_steps_card.dart';
 import '../../../products/presentation/widgets/idle_products_alert.dart';
+import '../../../team/presentation/screens/activity_screen.dart';
+import '../../../team/data/activity_line.dart';
 
 /// Inicio: cómo va el día de un vistazo y lo que necesita atención, con su
 /// solución a un toque. Diseño aprobado el 11 nov 2026 (re-diseño 0.13.0).
@@ -227,6 +229,18 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
               children: [
                 _greeting(wide),
                 SizedBox(height: gap),
+                // Accesos rápidos arriba, en una fila (0.16.1): antes quedaban al final
+                if (_business != null) ...[
+                  QuickActionsSection(
+                    key: ValueKey('quick-${_business!.id}-$_role'),
+                    business: _business!,
+                    role: _role,
+                    userName: _auth.currentUser?.displayName ?? '',
+                    onNavigateToTab: _go,
+                    onReturn: () => _load(quiet: true),
+                  ),
+                  SizedBox(height: gap),
+                ],
                 CloudSyncReminder(key: ValueKey('cloud-${_business?.id}-$_role'), canManage: _can(Perm.cloud)),
                 if (_role == Permissions.owner && _business != null) _ProExpiry(business: _business!),
                 // Primeros pasos y productos quietos (0.16.0, fase 5)
@@ -263,17 +277,6 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                     if (_board != null) _servicesCard(),
                   ],
                 ),
-                if (_business != null) ...[
-                  SizedBox(height: gap + AppSpace.sm),
-                  QuickActionsSection(
-                    key: ValueKey('quick-${_business!.id}-$_role'),
-                    business: _business!,
-                    role: _role,
-                    userName: _auth.currentUser?.displayName ?? '',
-                    onNavigateToTab: _go,
-                    onReturn: () => _load(quiet: true),
-                  ),
-                ],
               ],
             );
           },
@@ -608,38 +611,71 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
   Widget _activityCard() {
     final c = context.colors;
     final items = _activity;
+    final list = items ?? const <ActivityEntry>[];
     return _card(
       title: 'Actividad del equipo',
-      trailing: Text('Lo último', style: AppText.small(context)),
+      trailing: _business == null ? null : _link('Ver todo', () => ActivityScreen.open(context, _business!)),
       children: [
         if (items == null) const SkeletonBox(height: 60, radius: AppRadius.control),
         if (items != null && items.isEmpty)
           Text('Aquí verás quién vende, abre la caja o recibe mercancía.', style: AppText.body(context, color: c.inkMuted)),
-        for (final e in items ?? const <ActivityEntry>[])
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpace.md - 2),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 15,
-                  backgroundColor: c.surfaceMuted,
-                  child: Text(_initials(e.actorName ?? e.actorEmail),
-                      style: AppText.caption(context, weight: FontWeight.w700, color: c.ink)),
-                ),
-                const SizedBox(width: AppSpace.md - 2),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(e.summary, style: AppText.body(context)),
-                      Text(_when(e.createdAt), style: AppText.caption(context)),
-                    ],
+        for (var i = 0; i < list.length; i++) ...[
+          if (i > 0) Divider(height: AppSpace.md + 2, color: c.line),
+          _activityRow(list[i]),
+        ],
+      ],
+    );
+  }
+
+  /// Un movimiento (0.16.1): ícono por tipo, título corto, el valor a la derecha, un
+  /// renglón de detalle y abajo quién y cuándo
+  Widget _activityRow(ActivityEntry e) {
+    final c = context.colors;
+    final line = ActivityLine.of(e);
+    final t = ToneColors.of(context, line.tone);
+    final who = (e.actorName ?? '').trim().isNotEmpty ? e.actorName!.trim().split(' ').first : e.actorEmail.split('@').first;
+    final valueColor = line.valueUp == null ? c.ink : (line.valueUp! ? c.success : c.danger);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(color: t.soft, borderRadius: BorderRadius.circular(AppRadius.control)),
+          child: Icon(line.icon, size: 17, color: t.text),
+        ),
+        const SizedBox(width: AppSpace.md - 2),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(line.title,
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600)),
                   ),
-                ),
-              ],
-            ),
+                  if (line.value != null) ...[
+                    const SizedBox(width: AppSpace.sm),
+                    Text(line.value!, style: AppText.amount(context, size: AppText.sizeBody, weight: FontWeight.w700, color: valueColor)),
+                  ],
+                ],
+              ),
+              if (line.detail != null)
+                Text(line.detail!, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.small(context, color: c.inkMuted)),
+              const SizedBox(height: 2),
+              Wrap(
+                spacing: AppSpace.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text('$who · ${_when(e.createdAt)}', style: AppText.caption(context)),
+                  if (line.tag != null) StatusPill(line.tag!, tone: AppTone.info),
+                ],
+              ),
+            ],
           ),
+        ),
       ],
     );
   }
@@ -688,12 +724,6 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
         ),
       ),
     );
-  }
-
-  static String _initials(String name) {
-    final parts = name.split(RegExp(r'[\s@.]+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    return (parts.first[0] + (parts.length > 1 ? parts[1][0] : '')).toUpperCase();
   }
 
   static String _when(DateTime at) {

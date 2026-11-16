@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/app_dialog.dart';
@@ -120,60 +122,63 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
       builder: (context, status, _) {
         final services = status.services;
         final items = _current(services);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Accesos rápidos', style: AppText.title(context)),
-                ),
-                TextButton.icon(
-                  onPressed: () => _customize(services),
-                  icon: const Icon(Icons.tune_outlined, size: 18),
-                  label: const Text('Personalizar'),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpace.sm),
-            LayoutBuilder(builder: (context, box) {
-              // 4 por fila en el celular, hasta 8 en una sola fila en pantallas anchas
-              final perRow = box.maxWidth >= 700 ? kMaxShortcuts : 4;
-              const gap = AppSpace.sm;
-              final w = (box.maxWidth - gap * (perRow - 1)) / perRow;
-              return Wrap(
-                spacing: gap,
-                runSpacing: gap,
-                children: [for (final f in items) SizedBox(width: w, child: _tile(f))],
-              );
-            }),
-          ],
+        // Una sola fila, arriba del Inicio (0.16.1). Si no caben, se desliza: en el
+        // celular se ven 4 y un pedazo del siguiente, para que se note que hay más.
+        return Semantics(
+          label: 'Accesos rápidos',
+          container: true,
+          child: LayoutBuilder(builder: (context, box) {
+            const gap = AppSpace.sm;
+            final count = items.length + 1;
+            final fits = (box.maxWidth - gap * (count - 1)) / count >= 84;
+            // Nunca más angosto que 64 px (en una ventana muy estrecha, simplemente se desliza)
+            final w = math.max(64.0, fits ? (box.maxWidth - gap * (count - 1)) / count : (box.maxWidth - gap * 4) / 4.4);
+            final tiles = [
+              for (final f in items) _tile(f),
+              _tile(null, onTap: () => _customize(services)),
+            ];
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: fits ? const NeverScrollableScrollPhysics() : null,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < tiles.length; i++) ...[
+                    if (i > 0) const SizedBox(width: gap),
+                    SizedBox(width: w, child: tiles[i]),
+                  ],
+                ],
+              ),
+            );
+          }),
         );
       },
     );
   }
 
-  Widget _tile(AppFunction f) {
+  /// Un acceso; sin función es «Editar» (elegir y ordenar los accesos)
+  Widget _tile(AppFunction? f, {VoidCallback? onTap}) {
     final c = context.colors;
+    final edit = f == null;
     return Material(
       color: c.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card),
-        side: BorderSide(color: c.line),
+        side: BorderSide(color: edit ? c.lineStrong : c.line),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.card),
-        onTap: () => _open(f),
+        onTap: edit ? onTap : () => _open(f),
         child: Tooltip(
-          message: f.where,
+          message: edit ? 'Elegir y ordenar los accesos rápidos' : f.where,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpace.md, horizontal: AppSpace.xs),
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.sm + 2, horizontal: AppSpace.xs),
             child: Column(
               children: [
-                Icon(f.icon, color: c.accent, size: 24),
+                Icon(edit ? Icons.tune_outlined : f.icon, color: edit ? c.inkMuted : c.accent, size: 22),
                 const SizedBox(height: 6),
                 Text(
-                  f.title,
+                  edit ? 'Editar' : f.title,
                   maxLines: 2,
                   textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,

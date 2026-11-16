@@ -69,32 +69,15 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Metas de ventas
-            - Pon una meta semanal o mensual y mira el avance con su gráfica en Inicio y en Reportes › Metas.
-            - Con Pro: meta para cada empleado e historial.
+            ### Inicio más ordenado
+            - Los accesos rápidos ahora están arriba, en una sola fila (en el celular se deslizan).
+            - La actividad del equipo se lee más clara: qué pasó, cuánto y quién, con un ícono por tipo.
 
-            ### Tienda en línea a tu estilo
-            - Cinco estilos (Clásica, Moda, Mercado, Menú y Boutique), tu color, modo oscuro, hasta 6 destacados y horario con «Abierto» o «Cerrado».
-            - Cupones: crea «BIENVENIDA10» y compártelo. Cada cliente lo usa una vez. Gratis 1 cupón activo; con Pro, varios.
-            - Estadísticas: visitas, pedidos, lo más pedido y de dónde llegan tus clientes.
-            - Comparte en Instagram (historia, cuadrado, vertical o carrusel), el QR de tu tienda y el catálogo con cinta de oferta.
+            ### Más seguro y más claro
+            - «Salir» en rojo y con confirmación, para no cerrar sesión por accidente. Si hay cambios sin subir a la nube, te lo dice.
+            - El botón «Continuar con Google» lleva la «G» de Google.
 
-            ### Productos
-            - Plantillas por tipo de negocio (licorera, vapers, droguería, ropa, comidas y tienda de barrio) y marca del producto.
-            - Lotes con fecha de vencimiento: aviso antes de que venzan y cambio al distribuidor.
-            - En un agotado: «Recordarme si no llega» y «Ocultarlo en Vender».
-            - En el computador, arrastra o pega la foto del código en el lector.
-
-            ### Seguridad y cuenta
-            - Bloquea la app con PIN o huella.
-            - Entra con Google.
-            - Descarga todos tus datos en Excel (Perfil › Privacidad).
-
-            ### Y además
-            - La app habla el español de tu celular (fechas y calendario).
-            - Ves si tus datos están al día en la nube.
-            - Primeros pasos para negocios nuevos y aviso de productos quietos.
-            - Novedades en Ajustes › Acerca de, y «Lo nuevo» al actualizar.
-            - Cupones de descuento al pagar Pro.
+            ### Lo de la 0.16.0
+            - Metas de ventas, tienda a tu estilo, cupones, lotes con vencimiento, bloqueo con PIN o huella y entrar con Google.
           draft: false
           prerelease: false

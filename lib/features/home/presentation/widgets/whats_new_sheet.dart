@@ -21,6 +21,16 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.16.1',
+      title: 'Inicio más ordenado',
+      items: [
+        'Los accesos rápidos ahora están arriba, en una sola fila.',
+        'La actividad del equipo se lee más clara: qué pasó, cuánto y quién.',
+        '«Salir» en rojo y con confirmación, para no cerrar sesión por accidente.',
+        'El botón de Google lleva su «G» de colores.',
+      ],
+    ),
+    (
       version: '0.16.0',
       title: 'Tienda a tu estilo, metas y más seguridad',
       items: [

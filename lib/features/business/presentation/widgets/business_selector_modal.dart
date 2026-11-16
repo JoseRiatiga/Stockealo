@@ -15,6 +15,7 @@ import '../../models/business.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/permissions/permissions.dart';
+import '../../../auth/presentation/logout_confirm.dart';
 
 class BusinessSelectorModal extends StatefulWidget {
   final String userId;
@@ -422,7 +423,8 @@ actions: [
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.logout_outlined, color: c.danger),
             title: Text('Cerrar sesión', style: TextStyle(color: c.danger, fontWeight: FontWeight.w600)),
-            onTap: () {
+            onTap: () async {
+              if (!await LogoutConfirm.ask(context) || !context.mounted) return;
               Navigator.pop(context);
               AuthRepository.instance.logout();
               BusinessRepository.instance.setActiveBusiness(null);

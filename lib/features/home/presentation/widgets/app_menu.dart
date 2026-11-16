@@ -149,7 +149,7 @@ class _AppMenuState extends State<AppMenu> {
               child: collapsed
                   ? IconButton(
                       tooltip: 'Cerrar sesión',
-                      icon: Icon(Icons.logout_outlined, size: 20, color: c.inkMuted),
+                      icon: Icon(Icons.logout_outlined, size: 20, color: c.danger),
                       onPressed: widget.onLogout,
                     )
                   : Row(
@@ -173,10 +173,25 @@ class _AppMenuState extends State<AppMenu> {
                             ],
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Cerrar sesión',
-                          icon: Icon(Icons.logout_outlined, size: 19, color: c.inkMuted),
-                          onPressed: widget.onLogout,
+                        // En rojo para que se distinga (0.16.1), en la misma fila para no
+                        // hacer más alto el menú; pide confirmación antes de salir
+                        const SizedBox(width: AppSpace.xs),
+                        Tooltip(
+                          message: 'Cerrar sesión',
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: c.danger,
+                              backgroundColor: c.dangerSoft,
+                              side: BorderSide(color: c.danger.withValues(alpha: 0.35)),
+                              minimumSize: const Size(0, 34),
+                              padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm + 2),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: widget.onLogout,
+                            icon: const Icon(Icons.logout_outlined, size: 17),
+                            label: const Text('Salir'),
+                          ),
                         ),
                       ],
                     ),

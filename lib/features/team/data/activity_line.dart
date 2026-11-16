@@ -93,6 +93,8 @@ class ActivityLine {
       }
     }
     if (adjust && title.startsWith('Ajustó ')) title = 'Ajustó el stock de ${title.substring(7)}';
+    // Un movimiento sin texto (no debería pasar) igual se muestra con un título
+    if (title.trim().isEmpty) title = 'Movimiento del equipo';
     if (method != null) parts.add(method);
     if (left != null) parts.add(left);
 

@@ -51,6 +51,7 @@ void main() {
     expect(other.title, 'Se unió al equipo como Cajero');
     expect(other.detail, isNull);
     expect(other.value, isNull);
+    expect(ActivityLine.of(entry(ActivityAction.sale, '   ')).title, 'Movimiento del equipo');
   });
 
   test('una baja muestra cuánto bajó', () {

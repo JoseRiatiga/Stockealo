@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/app_dialog.dart';
@@ -129,7 +131,8 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
             const gap = AppSpace.sm;
             final count = items.length + 1;
             final fits = (box.maxWidth - gap * (count - 1)) / count >= 84;
-            final w = fits ? (box.maxWidth - gap * (count - 1)) / count : (box.maxWidth - gap * 4) / 4.4;
+            // Nunca más angosto que 64 px (en una ventana muy estrecha, simplemente se desliza)
+            final w = math.max(64.0, fits ? (box.maxWidth - gap * (count - 1)) / count : (box.maxWidth - gap * 4) / 4.4);
             final tiles = [
               for (final f in items) _tile(f),
               _tile(null, onTap: () => _customize(services)),

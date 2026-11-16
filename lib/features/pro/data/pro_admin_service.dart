@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
 import 'pro_service.dart' show proKindLabel;
+import '../../../core/utils/coupons.dart';
 
 DateTime? _date(Object? v) => v == null ? null : DateTime.tryParse(v as String)?.toLocal();
 int _int(Object? v) => (v as num?)?.toInt() ?? 0;
@@ -584,6 +585,34 @@ class ProAdminService {
       _rows(await _rpc('admin_list_pro_codes', {'p_limit': limit, 'p_search': search})).map(ProCode.fromRow).toList();
 
   Future<void> disableCode(String code) => _rpc('admin_disable_code', {'p_code': code});
+
+  // --- Cupones de descuento (0.16.0) ------------------------------------------
+
+  Future<List<Coupon>> listCoupons() async => _rows(await _rpc('admin_list_pro_coupons')).map(Coupon.fromRow).toList();
+
+  Future<String> saveCoupon({
+    required String code,
+    double? percent,
+    double? amount,
+    required List<String> kinds,
+    int? maxUses,
+    bool firstPurchaseOnly = false,
+    int? validDays,
+    String? note,
+  }) async =>
+      '${await _rpc('admin_save_pro_coupon', {
+        'p_code': code,
+        'p_percent': percent,
+        'p_amount': amount,
+        'p_kinds': kinds,
+        'p_max_uses': maxUses,
+        'p_first_purchase_only': firstPurchaseOnly,
+        'p_valid_days': validDays,
+        'p_note': (note ?? '').isEmpty ? null : note,
+      })}';
+
+  Future<void> setCouponActive(String code, bool active) =>
+      _rpc('admin_set_pro_coupon_active', {'p_code': code, 'p_active': active});
 
   // --- Pagos -----------------------------------------------------------------
 

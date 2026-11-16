@@ -29,6 +29,7 @@ import '../../../../core/design/app_dialog.dart';
 import '../../../products/data/product_templates.dart';
 import '../widgets/store_qr_sheet.dart';
 import 'store_stats_screen.dart';
+import 'store_coupons_screen.dart';
 
 /// Tienda en línea (lugar del menú): publica el catálogo en stockealo.online/tienda/<slug> con
 /// carrito; los pedidos llegan por WhatsApp (Stockealo Pro).
@@ -818,6 +819,12 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                   onPressed: () => StoreStatsScreen.open(context, widget.business),
                   icon: const Icon(Icons.insights_outlined, size: 18),
                   label: const Text('Estadísticas'),
+                ),
+                // Cupones de la tienda (0.16.0, fase 7)
+                OutlinedButton.icon(
+                  onPressed: () => StoreCouponsScreen.open(context, widget.business, store.url),
+                  icon: const Icon(Icons.local_offer_outlined, size: 18),
+                  label: const Text('Cupones'),
                 ),
                 // QR para el mostrador (0.16.0, fase 3)
                 OutlinedButton.icon(

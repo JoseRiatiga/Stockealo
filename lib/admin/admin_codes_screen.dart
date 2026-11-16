@@ -7,6 +7,7 @@ import '../features/pro/data/pro_admin_service.dart';
 import 'admin_widgets.dart';
 import '../core/design/app_dialog.dart';
 import '../core/design/filter_tabs.dart';
+import 'admin_coupons_section.dart';
 
 /// Duraciones que se ofrecen; null = permanente
 const _durations = <int?>[1, 7, 30, 90, 365, null];
@@ -35,6 +36,9 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
   List<ProCode> _created = const [];
 
   List<ProCode> _codes = const [];
+
+  /// Códigos canjeables o cupones de descuento (0.16.0)
+  bool _showCoupons = false;
   String _search = '';
   bool _loading = true;
   String? _error;
@@ -149,6 +153,18 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
       subtitle: 'Crea códigos Pro para entregar después de cada pago',
       onRefresh: _loadCodes,
       children: [
+        FilterTabs<bool>(
+          options: const {false: 'Códigos canjeables', true: 'Cupones de descuento'},
+          value: _showCoupons,
+          onChanged: (v) => setState(() => _showCoupons = v),
+        ),
+        const SizedBox(height: AppSpace.md),
+        if (_showCoupons) const AdminCouponsSection() else ..._codesView(c, state),
+      ],
+    );
+  }
+
+  List<Widget> _codesView(StockealoColors c, AdminLoadState state) => [
         AdminCard(child: _form(c)),
         if (_created.isNotEmpty) _createdCard(c),
         const SizedBox(height: AppSpace.lg),
@@ -162,9 +178,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
           },
         ),
         if (state.blocking) state else for (final code in _codes) _codeRow(c, code),
-      ],
-    );
-  }
+      ];
 
   Widget _label(StockealoColors c, String text) => Padding(
         padding: const EdgeInsets.only(bottom: AppSpace.sm),

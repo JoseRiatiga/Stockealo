@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/coupons.dart';
 
 /// Dirección pública de las tiendas
 const storeBaseUrl = 'https://stockealo.online/tienda';
@@ -812,15 +813,20 @@ class OnlineStoreService {
   /// Guarda el pedido en la nube con su código por negocio (T-0001). Devuelve el código,
   /// o null si no se pudo (sin conexión o la nube aún no tiene pedidos): el pedido sigue
   /// por WhatsApp como antes. (0.13.4)
-  Future<String?> createOrder({
+  ///
+  /// Con cupón (0.16.0) la nube lo revisa y descuenta; si el cupón no sirve devuelve el
+  /// motivo en `error` y el pedido NO se guarda (para que el comprador lo corrija).
+  Future<({String? code, String? error})> createOrder({
     required String slug,
     required String customerName,
     String? customerPhone,
     String? note,
     required List<CartLine> lines,
+    String? coupon,
+    String Function(num)? money,
   }) async {
     final client = _client;
-    if (client == null) return null;
+    if (client == null) return (code: null, error: null);
     try {
       final data = await client.rpc('create_store_order', params: {
         'p_slug': slug,
@@ -840,12 +846,81 @@ class OnlineStoreService {
             },
         ],
         'p_total': lines.fold<double>(0, (s, l) => s + l.subtotal),
+        if (coupon != null && coupon.isNotEmpty) 'p_coupon': CouponText.normalize(coupon),
       });
-      return (data as Map)['code'] as String?;
+      return (code: (data as Map)['code'] as String?, error: null);
+    } on PostgrestException catch (e) {
+      if (e.message.contains('coupon_')) return (code: null, error: CouponText.error(e.message, money: money));
+      debugPrint('No se pudo guardar el pedido: $e');
+      return (code: null, error: null);
     } catch (e) {
       debugPrint('No se pudo guardar el pedido: $e');
-      return null;
+      return (code: null, error: null);
     }
+  }
+
+  // --- Cupones de la tienda (0.16.0) -------------------------------------------
+
+  /// Revisa un cupón en el carrito sin gastarlo. Lanza el motivo si no sirve.
+  Future<Coupon> checkCoupon({
+    required String slug,
+    required String code,
+    required double total,
+    String? phone,
+    String Function(num)? money,
+  }) async {
+    final client = _client;
+    if (client == null) throw const CouponException('Necesitas conexión a internet para usar el cupón.');
+    try {
+      final data = Map<String, dynamic>.from(await client.rpc('check_store_coupon', params: {
+        'p_slug': slug,
+        'p_code': CouponText.normalize(code),
+        'p_total': total,
+        'p_phone': (phone ?? '').trim().isEmpty ? null : phone!.trim(),
+      }) as Map);
+      return Coupon.fromRow(data);
+    } on PostgrestException catch (e) {
+      throw CouponException(CouponText.error(e.message, money: money));
+    } catch (e) {
+      debugPrint('Cupón: $e');
+      throw CouponException(CouponText.error(''));
+    }
+  }
+
+  /// Los cupones del negocio (dueño o administrador)
+  Future<List<Coupon>> myCoupons(String businessId) async {
+    final client = _client;
+    if (client == null) throw const CouponException('Necesitas conexión a internet para ver los cupones.');
+    final rows = await client.rpc('list_my_store_coupons', params: {'p_business_id': businessId});
+    return [for (final r in rows as List) Coupon.fromRow(Map<String, dynamic>.from(r as Map))];
+  }
+
+  /// Crea o cambia un cupón. Lanza [CouponException] con el motivo.
+  Future<void> saveCoupon(String businessId, Coupon coupon) async {
+    final client = _client;
+    if (client == null) throw const CouponException('Necesitas conexión a internet para guardar el cupón.');
+    try {
+      await client.rpc('save_my_store_coupon', params: {
+        'p_business_id': businessId,
+        'p_id': coupon.id,
+        'p_code': CouponText.normalize(coupon.code),
+        'p_percent': coupon.percent,
+        'p_amount': coupon.amount,
+        'p_min_total': coupon.minTotal,
+        'p_max_uses': coupon.maxUses,
+        'p_expires_at': coupon.expiresAt?.toUtc().toIso8601String(),
+        'p_active': coupon.active,
+      });
+    } on PostgrestException catch (e) {
+      if (e.message.contains('not_allowed')) throw CouponException(errorMessage(e.message));
+      throw CouponException(CouponText.error(e.message));
+    }
+  }
+
+  Future<void> deleteCoupon(String businessId, String id) async {
+    final client = _client;
+    if (client == null) throw const CouponException('Necesitas conexión a internet para borrar el cupón.');
+    await client.rpc('delete_my_store_coupon', params: {'p_business_id': businessId, 'p_id': id});
   }
 
   static String orderMessage({
@@ -858,9 +933,14 @@ class OnlineStoreService {
     /// Código del pedido (T-0001), para buscarlo en Ventas › Cotizaciones
     String? code,
     String? phone,
+
+    /// Cupón aplicado y su descuento (0.16.0)
+    String? couponCode,
+    double discount = 0,
   }) {
     String money(num v) => CurrencyFormatter.formatIn(v, currency);
-    final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final subtotal = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final total = (subtotal - discount).clamp(0, subtotal);
     final name = customerName?.trim() ?? '';
     final extra = note?.trim() ?? '';
     final cel = phone?.trim() ?? '';
@@ -869,6 +949,7 @@ class OnlineStoreService {
       '',
       for (final l in lines) '• ${l.quantity} × ${l.name} — ${money(l.subtotal)}',
       '',
+      if (couponCode != null && discount > 0) ...['Subtotal: ${money(subtotal)}', 'Cupón $couponCode: −${money(discount)}'],
       'Total: ${money(total)}',
       if (name.isNotEmpty) 'A nombre de: $name',
       if (cel.isNotEmpty) 'Celular: $cel',

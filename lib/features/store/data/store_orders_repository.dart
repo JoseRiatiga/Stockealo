@@ -124,8 +124,9 @@ class StoreOrdersRepository {
               'customer_name': o['customer_name'],
               'customer_phone': o['customer_phone'],
               'total_amount': (o['total'] as num?)?.toDouble() ?? 0,
-              'discount_amount': 0.0,
-              'notes': o['note'],
+              // Cupón de la tienda (0.16.0): el descuento pasa a la venta al facturarlo
+              'discount_amount': (o['discount'] as num?)?.toDouble() ?? 0.0,
+              'notes': _notes(o),
               'status': 'PENDIENTE',
               'valid_until': created.add(const Duration(days: validDays)).toIso8601String(),
               'created_at': created.toIso8601String(),
@@ -162,6 +163,14 @@ class StoreOrdersRepository {
       debugPrint('Pedidos de la tienda: $e');
       return const [];
     }
+  }
+
+  /// La nota del pedido y, si trae cupón, cuál fue
+  static String? _notes(Map<String, dynamic> o) {
+    final note = (o['note'] as String?)?.trim() ?? '';
+    final coupon = o['coupon_code'] as String?;
+    final parts = [if (coupon != null && coupon.isNotEmpty) 'Cupón $coupon', if (note.isNotEmpty) note];
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 
   /// Cuántos pedidos de la tienda esperan confirmación (sin vencer)

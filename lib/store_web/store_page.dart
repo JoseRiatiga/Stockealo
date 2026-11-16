@@ -17,6 +17,7 @@ import '../features/store/data/online_store_service.dart';
 import '../features/store/data/booking_service.dart';
 import 'booking_panel.dart';
 import 'clean_url_stub.dart' if (dart.library.js_interop) 'clean_url_web.dart';
+import '../core/utils/coupons.dart';
 
 /// Nombre de la tienda en la dirección: /tienda/<slug> o /tienda/?t=<slug>
 /// (el 404 del sitio convierte la primera en la segunda)
@@ -1913,8 +1914,108 @@ class _CartFormState extends State<_CartForm> {
   /// 1 = el pedido; 2 = los datos del comprador
   int _step = 1;
 
+  /// Cupón de la tienda (0.16.0): lo revisa la nube y lo vuelve a calcular al pedir
+  final _couponField = TextEditingController();
+  bool _showCoupon = false;
+  bool _checkingCoupon = false;
+  bool _phoneMissing = false;
+  String? _couponError;
+  Coupon? _coupon;
+
+  String _money(num v) => CurrencyFormatter.formatIn(v, widget.store.currency);
+
+  double _discount(double subtotal) => _coupon?.discountFor(subtotal) ?? 0;
+
+  Future<void> _applyCoupon(double subtotal) async {
+    final code = _couponField.text.trim();
+    if (code.isEmpty) return;
+    setState(() {
+      _checkingCoupon = true;
+      _couponError = null;
+    });
+    try {
+      final coupon = await OnlineStoreService.instance.checkCoupon(
+        slug: widget.store.slug,
+        code: code,
+        total: subtotal,
+        phone: _phone.text,
+        money: _money,
+      );
+      if (mounted) setState(() => _coupon = coupon);
+    } on CouponException catch (e) {
+      if (mounted) setState(() => _couponError = e.message);
+    } finally {
+      if (mounted) setState(() => _checkingCoupon = false);
+    }
+  }
+
+  /// «¿Tienes un cupón?» → el campo → «BIENVENIDA10 · −$5.000»
+  Widget _couponBox(StockealoColors c, double subtotal) {
+    final coupon = _coupon;
+    if (coupon != null) {
+      final discount = _discount(subtotal);
+      return Padding(
+        padding: const EdgeInsets.only(top: AppSpace.md),
+        child: Row(
+          children: [
+            Icon(Icons.local_offer_outlined, size: 18, color: discount > 0 ? c.success : c.warning),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              child: Text(
+                discount > 0
+                    ? '${coupon.code} · −${_money(discount)}'
+                    : '${coupon.code}: es para compras desde ${_money(coupon.minTotal)}',
+                style: AppText.body(context, weight: FontWeight.w600, color: discount > 0 ? c.success : c.warning),
+              ),
+            ),
+            TextButton(
+              onPressed: () => setState(() {
+                _coupon = null;
+                _couponField.clear();
+              }),
+              child: const Text('Quitar'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (!_showCoupon) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => setState(() => _showCoupon = true),
+          icon: const Icon(Icons.local_offer_outlined, size: 18),
+          label: const Text('¿Tienes un cupón?'),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpace.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _couponField,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(labelText: 'Cupón', isDense: true, errorText: _couponError, errorMaxLines: 3),
+              onSubmitted: (_) => _applyCoupon(subtotal),
+            ),
+          ),
+          const SizedBox(width: AppSpace.sm),
+          OutlinedButton(
+            onPressed: _checkingCoupon ? null : () => _applyCoupon(subtotal),
+            child: Text(_checkingCoupon ? 'Revisando…' : 'Aplicar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _couponField.dispose();
     _name.dispose();
     _note.dispose();
     _phone.dispose();
@@ -1929,6 +2030,8 @@ class _CartFormState extends State<_CartForm> {
         note: _note.text,
         code: _code,
         phone: _phone.text,
+        couponCode: _coupon?.code,
+        discount: _discount(lines.fold<double>(0, (s, l) => s + l.subtotal)),
       );
 
   Future<void> _sendWhatsApp(List<CartLine> lines) async {
@@ -1941,17 +2044,35 @@ class _CartFormState extends State<_CartForm> {
   Future<void> _showTicket(List<CartLine> lines) async {
     if (_sending) return;
     setState(() => _sending = true);
-    // El pedido se guarda en la tienda con su código; sin conexión sigue por WhatsApp
-    _code ??= await OnlineStoreService.instance.createOrder(
-      slug: widget.store.slug,
-      customerName: _name.text,
-      customerPhone: _phone.text,
-      note: _note.text,
-      lines: lines,
-    );
+    // El pedido se guarda en la tienda con su código; sin conexión sigue por WhatsApp.
+    // Si el cupón no sirve, se dice y el pedido espera a que lo corrija.
+    if (_code == null) {
+      final saved = await OnlineStoreService.instance.createOrder(
+        slug: widget.store.slug,
+        customerName: _name.text,
+        customerPhone: _phone.text,
+        note: _note.text,
+        lines: lines,
+        coupon: _coupon?.code,
+        money: _money,
+      );
+      if (!mounted) return;
+      if (saved.error != null) {
+        setState(() {
+          _sending = false;
+          _couponError = saved.error;
+          _coupon = null;
+          _showCoupon = true;
+        });
+        return;
+      }
+      _code = saved.code;
+    }
     if (!mounted) return;
     setState(() => _sending = false);
-    final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final subtotal = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final discount = _discount(subtotal);
+    final total = subtotal - discount;
     final now = DateTime.now();
     final doc = SaleDocument(
       title: 'Pedido',
@@ -1959,6 +2080,7 @@ class _CartFormState extends State<_CartForm> {
       date: now,
       lines: [for (final l in lines) SaleDocumentLine(quantity: l.quantity, name: l.name, unitPrice: l.unitPrice, total: l.subtotal)],
       total: total,
+      discount: discount,
       customerName: _name.text.trim().isEmpty ? null : _name.text.trim(),
       notes: _note.text.trim().isEmpty ? null : _note.text.trim(),
       closing: 'El negocio te confirma el precio final y la entrega.',
@@ -1987,7 +2109,8 @@ class _CartFormState extends State<_CartForm> {
     final lines = widget.lines();
     // Si se vació el pedido estando en los datos, vuelve al primer paso
     if (lines.isEmpty) _step = 1;
-    final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final subtotal = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final total = subtotal - _discount(subtotal);
     final count = lines.fold<int>(0, (s, l) => s + l.quantity);
     String money(num v) => CurrencyFormatter.formatIn(v, widget.store.currency);
     final products = '$count ${count == 1 ? 'producto' : 'productos'}';
@@ -2103,7 +2226,14 @@ class _CartFormState extends State<_CartForm> {
           TextField(
             controller: _phone,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Tu celular (recomendado)', hintText: 'Para avisarte cuando esté listo'),
+            decoration: InputDecoration(
+              labelText: _coupon != null ? 'Tu celular (lo pide el cupón)' : 'Tu celular (recomendado)',
+              hintText: 'Para avisarte cuando esté listo',
+              errorText: _phoneMissing ? CouponText.error('coupon_phone_required') : null,
+            ),
+            onChanged: (_) {
+              if (_phoneMissing) setState(() => _phoneMissing = false);
+            },
           ),
           const SizedBox(height: AppSpace.md),
           TextField(
@@ -2113,6 +2243,8 @@ class _CartFormState extends State<_CartForm> {
             minLines: 1,
             decoration: const InputDecoration(labelText: 'Nota (opcional)', hintText: 'Ej.: dirección de entrega, forma de pago'),
           ),
+          // Cupón de la tienda (0.16.0)
+          _couponBox(c, subtotal),
         ],
       );
       footer = [
@@ -2121,6 +2253,11 @@ class _CartFormState extends State<_CartForm> {
           onPressed: () {
             if (_name.text.trim().isEmpty) {
               setState(() => _nameMissing = true);
+              return;
+            }
+            // Con cupón el celular es obligatorio: se usa una vez por cliente
+            if (_coupon != null && _phone.text.replaceAll(RegExp(r'\D'), '').length < 7) {
+              setState(() => _phoneMissing = true);
               return;
             }
             _showTicket(lines);

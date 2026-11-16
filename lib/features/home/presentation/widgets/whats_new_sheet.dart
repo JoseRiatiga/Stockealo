@@ -21,6 +21,15 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.16.2',
+      title: 'Detalles de la tienda',
+      items: [
+        'En la plantilla Moda, las ofertas se filtran desde el lateral.',
+        'Las opciones elegidas se leen bien, como los días del horario.',
+        'El aviso de mayores de 18 aparece sobre la tienda difuminada.',
+      ],
+    ),
+    (
       version: '0.16.1',
       title: 'Inicio más ordenado',
       items: [

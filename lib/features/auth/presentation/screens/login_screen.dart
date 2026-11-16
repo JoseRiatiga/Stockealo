@@ -11,6 +11,9 @@ import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../widgets/forgot_password_dialog.dart';
 import '../widgets/stocky_mascot.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -40,6 +43,10 @@ class _LoginScreenState extends State<LoginScreen> {
   double _mascotLookProgress = 0.0;
 
   bool _isRegisterMode = false;
+
+  /// Entrar con Google (0.16.0): la sesión llega por aquí cuando Google vuelve a la app
+  StreamSubscription<AuthState>? _oauthSub;
+  bool _googleLoading = false;
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _acceptTerms = false;
@@ -53,10 +60,43 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _oauthSub = SupabaseService.instance.client?.auth.onAuthStateChange.listen((data) async {
+      if (data.event != AuthChangeEvent.signedIn || data.session == null || !_googleLoading) return;
+      try {
+        final user = await _authRepo.completeOAuthLogin();
+        if (user != null && mounted) widget.onLoginSuccess();
+      } catch (e) {
+        if (mounted) setState(() => _errorMessage = '$e'.replaceFirst('Exception: ', ''));
+      } finally {
+        if (mounted) setState(() => _googleLoading = false);
+      }
+    });
     _emailFocus.addListener(_onFocusChanged);
     _passwordFocus.addListener(_onFocusChanged);
     _confirmPasswordFocus.addListener(_onFocusChanged);
     _emailController.addListener(_onEmailChanged);
+  }
+
+  Future<void> _google() async {
+    setState(() {
+      _googleLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      await _authRepo.startGoogleLogin();
+      // En el celular se queda esperando a que Google vuelva; si la persona cierra
+      // Google sin elegir, puede volver a tocar el botón
+      Future<void>.delayed(const Duration(minutes: 2), () {
+        if (mounted && _googleLoading) setState(() => _googleLoading = false);
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _googleLoading = false;
+          _errorMessage = '$e'.replaceFirst('Exception: ', '');
+        });
+      }
+    }
   }
 
   void _onEmailChanged() {
@@ -87,6 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _oauthSub?.cancel();
     _emailFocus.dispose();
     _passwordFocus.dispose();
     _confirmPasswordFocus.dispose();
@@ -453,6 +494,27 @@ actions: [
                 : (_isRegisterMode ? 'Crear cuenta' : 'Ingresar'),
             icon: _isRegisterMode ? Icons.person_add_alt_1_outlined : Icons.arrow_forward_outlined,
             onPressed: _isLoading ? null : _submit,
+          ),
+          // Entrar con Google (0.16.0, fase 6)
+          const SizedBox(height: AppSpace.md),
+          Row(
+            children: [
+              Expanded(child: Divider(color: c.line)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm),
+                child: Text('o', style: AppText.small(context, color: c.inkMuted)),
+              ),
+              Expanded(child: Divider(color: c.line)),
+            ],
+          ),
+          const SizedBox(height: AppSpace.md),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            onPressed: _isLoading || _googleLoading ? null : _google,
+            icon: _googleLoading
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.account_circle_outlined),
+            label: Text(_googleLoading ? 'Esperando a Google…' : 'Continuar con Google'),
           ),
           const SizedBox(height: AppSpace.lg),
           Row(

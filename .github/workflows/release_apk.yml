@@ -69,29 +69,32 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Arreglo de la 0.15.1
-            - Los roles propios que crea el dueño ahora sí se guardan en la nube y llegan a los celulares de todo el equipo.
+            ### Metas de ventas
+            - Pon una meta semanal o mensual y mira el avance con su gráfica en Inicio y en Reportes › Metas.
+            - Con Pro: meta para cada empleado e historial.
 
-            ### Tu equipo, con sus propios permisos
-            - Crea roles a tu medida (por ejemplo «Cajero de la tarde») y elige qué puede hacer cada uno. Con «Ver como» ves la app igual que tu empleado.
-            - Con Pro: límites por rol (descuento, fiado, horas para anular y salidas de caja). Si alguien los pasa, te llega la solicitud al celular para aprobarla.
-            - Horario de acceso por empleado, con aviso 10 minutos antes de cerrarle.
-            - Arqueo ciego: el cajero cuenta la caja sin ver cuánto debería haber.
+            ### Tienda en línea a tu estilo
+            - Cinco estilos (Clásica, Moda, Mercado, Menú y Boutique), tu color, modo oscuro, hasta 6 destacados y horario con «Abierto» o «Cerrado».
+            - Cupones: crea «BIENVENIDA10» y compártelo. Cada cliente lo usa una vez. Gratis 1 cupón activo; con Pro, varios.
+            - Estadísticas: visitas, pedidos, lo más pedido y de dónde llegan tus clientes.
+            - Comparte en Instagram (historia, cuadrado, vertical o carrusel), el QR de tu tienda y el catálogo con cinta de oferta.
 
-            ### Ventas
-            - Devolución parcial: elige cuántas unidades y si vuelven al inventario o llegaron dañadas. El dinero vuelve según cómo pagó (efectivo sale de la caja, fiado baja la deuda).
-            - Descuento por producto, además del descuento a toda la venta.
-            - Las ventas en espera ya no se pierden al cerrar la app.
-            - Precio sugerido según el margen que quieras ganar.
-            - Tiquete con tu NIT, dirección, teléfono y tu propia despedida.
-            - Cierre del día por WhatsApp y recordatorio para cerrar la caja.
+            ### Productos
+            - Plantillas por tipo de negocio (licorera, vapers, droguería, ropa, comidas y tienda de barrio) y marca del producto.
+            - Lotes con fecha de vencimiento: aviso antes de que venzan y cambio al distribuidor.
+            - En un agotado: «Recordarme si no llega» y «Ocultarlo en Vender».
+            - En el computador, arrastra o pega la foto del código en el lector.
 
-            ### Tienda en línea
-            - Foto de portada o tu logo.
-            - Tallas y colores se eligen en la tarjeta del producto; lo agotado sale tachado.
-            - Una foto por color y un carrito más claro, en dos pasos.
+            ### Seguridad y cuenta
+            - Bloquea la app con PIN o huella.
+            - Entra con Google.
+            - Descarga todos tus datos en Excel (Perfil › Privacidad).
 
-            ### Planes
-            - Un solo plan Pro, un buscador que te dice qué plan te sirve y aviso antes de que venza.
+            ### Y además
+            - La app habla el español de tu celular (fechas y calendario).
+            - Ves si tus datos están al día en la nube.
+            - Primeros pasos para negocios nuevos y aviso de productos quietos.
+            - Novedades en Ajustes › Acerca de, y «Lo nuevo» al actualizar.
+            - Cupones de descuento al pagar Pro.
           draft: false
           prerelease: false

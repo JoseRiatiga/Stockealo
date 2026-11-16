@@ -8,12 +8,17 @@ import 'core/services/supabase_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_tokens.dart';
 import 'features/pro/data/pro_admin_service.dart';
+import 'core/l10n/app_locale.dart';
+import 'core/services/error_reporter.dart';
+import 'admin/admin_mfa_gate.dart';
 
 /// Panel de administrador de Stockealo (solo web, en stockealo.online/admin).
 /// Es una app aparte: no está dentro de la app de los negocios.
 ///   flutter run -d chrome -t lib/main_admin.dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Errores al panel de administración (0.16.0, fase 5)
+  ErrorReporter.instance.install('admin');
   // Fechas en español (las pantallas usan DateFormat con 'es_CO')
   await initializeDateFormatting('es_CO', null);
   await SupabaseService.instance.initialize();
@@ -26,6 +31,9 @@ class AdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+          locale: AppLocale.locale,
+          supportedLocales: AppLocale.supported,
+          localizationsDelegates: AppLocale.delegates,
       title: 'Stockealo · Administrador',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
@@ -64,9 +72,13 @@ class _AdminGate extends StatelessWidget {
                 onSignOut: () => client.auth.signOut(),
               );
             }
-            return AdminShell(
-              email: session.user.email ?? '',
+            // Verificación en dos pasos obligatoria (0.16.0, fase 6)
+            return AdminMfaGate(
               onSignOut: () => client.auth.signOut(),
+              child: AdminShell(
+                email: session.user.email ?? '',
+                onSignOut: () => client.auth.signOut(),
+              ),
             );
           },
         );

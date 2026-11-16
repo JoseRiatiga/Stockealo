@@ -3,13 +3,14 @@
 // Inicia el pago de Stockealo Pro con Wompi.
 //
 // Entrada (POST, con el JWT de la cuenta):
-//   { "business_id": "...", "plan_id": "business_month_cop", "platform": "app" | "web" }
+//   { "business_id": "...", "plan_id": "business_month_cop", "platform": "app" | "web", "coupon"?: "PRIMERMES30" }
 // Salida:
 //   { "reference": "STK-…", "url": "https://checkout.wompi.co/p/?…" }
 //
 // El precio sale de pro_plans en el servidor (la app no lo puede cambiar) y el enlace
 // lleva la firma de integridad de Wompi. Pro se activa cuando llega el aviso a
-// wompi-webhook, no aquí.
+// wompi-webhook, no aquí. Con cupón (0.16.0), pro_coupon_price revisa el cupón y da el
+// precio con descuento; el uso se cuenta cuando el pago queda aprobado.
 //
 // Permisos: Pro Negocio lo compra el dueño o un administrador del negocio;
 // Pro Global, solo el dueño (aplica a todos sus negocios).
@@ -63,7 +64,7 @@ Deno.serve(async (req) => {
   // ilike sin comodines: el "_" de un correo no debe coincidir con otro carácter
   const emailPattern = email.replace(/[\\%_]/g, "\\$&");
 
-  let body: { business_id?: unknown; plan_id?: unknown; platform?: unknown };
+  let body: { business_id?: unknown; plan_id?: unknown; platform?: unknown; coupon?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -113,7 +114,25 @@ Deno.serve(async (req) => {
     if (!isAdmin) return json({ error: "payments_not_configured" }, 503);
   }
 
-  const amountInCents = Math.round(Number(plan.price) * 100);
+  // Cupón de descuento (0.16.0): el servidor lo revisa y fija el precio
+  const coupon = typeof body.coupon === "string" ? body.coupon.trim().toUpperCase() : "";
+  let price = Number(plan.price);
+  let couponCode: string | null = null;
+  if (coupon) {
+    const { data: quote, error: couponError } = await admin.rpc("pro_coupon_price", {
+      p_code: coupon,
+      p_plan_id: plan.id,
+      p_email: email,
+    });
+    if (couponError) {
+      const reason = /coupon_[a-z_]+/.exec(couponError.message)?.[0] ?? "coupon_not_found";
+      return json({ error: reason }, 400);
+    }
+    price = Number((quote as { price: number }).price);
+    couponCode = (quote as { code: string }).code;
+  }
+
+  const amountInCents = Math.round(price * 100);
   const reference = `STK-${crypto.randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`;
 
   const { error: insertError } = await admin.from("pro_payments").insert({
@@ -125,6 +144,8 @@ Deno.serve(async (req) => {
     amount_in_cents: amountInCents,
     currency: "COP",
     user_email: email,
+    coupon_code: couponCode,
+    regular_amount_in_cents: couponCode ? Math.round(Number(plan.price) * 100) : null,
   });
   if (insertError) {
     console.error("pro-checkout insert", insertError.message);

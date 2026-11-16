@@ -4,6 +4,8 @@ import '../../models/product.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/status_pill.dart';
+import 'lots_widgets.dart';
+import '../../data/lots_repository.dart';
 
 /// Ajuste rápido de stock de un producto, con motivo para el kardex.
 class QuickStockDialog {
@@ -68,6 +70,23 @@ actions: [
         newStock,
         'Ajuste rápido desde catálogo',
       );
+      // Lotes (0.16.0, fase 2b): las unidades nuevas con su fecha; si no la pone, quedan «sin fecha»
+      final added = newStock - product.stock;
+      if (added > 0 && product.tracksExpiry && !product.hasVariants && context.mounted) {
+        final d = await LotDatePrompt.show(context, productName: product.name, quantity: added);
+        if (d != null) {
+          await LotsRepository.instance.addLot(
+            businessId: product.businessId,
+            productId: product.id,
+            quantity: added,
+            expiresOn: d.expiresOn,
+            code: d.code,
+            cost: product.purchasePrice,
+            source: 'AJUSTE',
+          );
+        }
+      }
+      if (newStock < product.stock) await LotsRepository.instance.reconcile(product.businessId);
       onSaved();
     }
   }

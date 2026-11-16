@@ -26,6 +26,13 @@ class Product {
   /// Solo cuenta si es mayor al precio de venta.
   final double? comparePrice;
 
+  /// Marca (0.16.0): «Elf Bar», «Tecnoquímicas». La tienda en línea filtra por marca.
+  final String? brand;
+
+  /// Controla vencimiento por lote (0.16.0, fase 2b): cada entrada pide su fecha y lo
+  /// vencido no se vende. Solo en productos sin tallas ni colores.
+  final bool tracksExpiry;
+
   Product({
     required this.id,
     required this.businessId,
@@ -46,6 +53,8 @@ class Product {
     this.variants = const [],
     this.supplierId,
     this.comparePrice,
+    this.brand,
+    this.tracksExpiry = false,
   });
 
   /// Está en oferta: tiene un precio de antes mayor al de ahora
@@ -97,6 +106,9 @@ class Product {
     bool clearSupplier = false,
     double? comparePrice,
     bool clearComparePrice = false,
+    String? brand,
+    bool clearBrand = false,
+    bool? tracksExpiry,
   }) {
     return Product(
       id: id ?? this.id,
@@ -118,6 +130,8 @@ class Product {
       variants: variants ?? this.variants,
       supplierId: clearSupplier ? null : (supplierId ?? this.supplierId),
       comparePrice: clearComparePrice ? null : (comparePrice ?? this.comparePrice),
+      brand: clearBrand ? null : (brand ?? this.brand),
+      tracksExpiry: tracksExpiry ?? this.tracksExpiry,
     );
   }
 
@@ -141,6 +155,8 @@ class Product {
       'has_variants': hasVariants ? 1 : 0,
       'supplier_id': supplierId,
       'compare_price': comparePrice,
+      'brand': brand,
+      'tracks_expiry': tracksExpiry ? 1 : 0,
     };
   }
 
@@ -165,6 +181,8 @@ class Product {
       variants: variants,
       supplierId: map['supplier_id'] as String?,
       comparePrice: (map['compare_price'] as num?)?.toDouble(),
+      brand: (map['brand'] as String?)?.trim().isEmpty == true ? null : (map['brand'] as String?)?.trim(),
+      tracksExpiry: map['tracks_expiry'] == 1 || map['tracks_expiry'] == true,
     );
   }
 }

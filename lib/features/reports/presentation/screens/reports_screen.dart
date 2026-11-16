@@ -11,6 +11,7 @@ import '../../data/report_export_service.dart';
 import 'profit_report_screen.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../data/daily_close.dart';
+import '../../../goals/presentation/goals_widgets.dart';
 
 /// Reportes: el dueño elige qué descargar, de qué periodo y si va todo en un solo
 /// Excel (una hoja por parte) o en un archivo por cada parte.
@@ -266,7 +267,8 @@ class ReportsTab extends StatefulWidget {
 }
 
 class _ReportsTabState extends State<ReportsTab> {
-  bool _excel = false;
+  /// 0 Ganancias, 1 Metas (0.16.0), 2 Descargar Excel
+  int _view = 0;
 
   String get userRole => widget.userRole;
   static bool allowed(String role) => ReportsTab.allowed(role);
@@ -305,14 +307,15 @@ class _ReportsTabState extends State<ReportsTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SegmentedButton<bool>(
+                    SegmentedButton<int>(
                       showSelectedIcon: false,
                       segments: const [
-                        ButtonSegment(value: false, icon: Icon(Icons.insights_outlined), label: Text('Ganancias')),
-                        ButtonSegment(value: true, icon: Icon(Icons.table_chart_outlined), label: Text('Descargar Excel')),
+                        ButtonSegment(value: 0, icon: Icon(Icons.insights_outlined), label: Text('Ganancias')),
+                        ButtonSegment(value: 1, icon: Icon(Icons.flag_outlined), label: Text('Metas')),
+                        ButtonSegment(value: 2, icon: Icon(Icons.table_chart_outlined), label: Text('Excel')),
                       ],
-                      selected: {_excel},
-                      onSelectionChanged: (v) => setState(() => _excel = v.first),
+                      selected: {_view},
+                      onSelectionChanged: (v) => setState(() => _view = v.first),
                     ),
                     // Cierre del día por WhatsApp (0.15.0)
                     Align(
@@ -332,15 +335,17 @@ class _ReportsTabState extends State<ReportsTab> {
             ),
           ),
           Expanded(
-            child: _excel
-                ? ReportsScreen(
-                    key: ValueKey('reports-${business.id}'),
-                    business: business,
-                    userId: user.id,
-                    userEmail: user.email,
-                    embedded: true,
-                  )
-                : ProfitReportScreen(key: ValueKey('profit-${business.id}'), business: business, embedded: true),
+            child: switch (_view) {
+              2 => ReportsScreen(
+                  key: ValueKey('reports-${business.id}'),
+                  business: business,
+                  userId: user.id,
+                  userEmail: user.email,
+                  embedded: true,
+                ),
+              1 => GoalsView(key: ValueKey('goals-${business.id}'), business: business, role: userRole, embedded: true),
+              _ => ProfitReportScreen(key: ValueKey('profit-${business.id}'), business: business, embedded: true),
+            },
           ),
         ],
       ),

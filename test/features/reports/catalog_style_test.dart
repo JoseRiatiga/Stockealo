@@ -135,4 +135,29 @@ void main() {
       await file.delete();
     }
   });
+
+  test('0.16.0: las 6 plantillas, con el QR de la tienda y la cinta de oferta', () async {
+    final business = Business(id: 'b1', userId: 'u1', name: 'Panadería La Espiga', color: '#A9481F', createdAt: DateTime(2026));
+    final products = [
+      for (var i = 0; i < 18; i++)
+        _product('$i', description: i.isEven ? 'Arroz, fríjol, arepa y huevo' : null).copyWith(comparePrice: i == 0 ? 3500 : null),
+    ];
+    expect(CatalogPdfService.instance.hasPromo(products.first), isTrue, reason: 'precio de antes: lleva la cinta');
+    expect(CatalogPdfService.instance.hasPromo(products[1]), isFalse);
+    expect(CatalogStyle.templates.keys, containsAll(['moda', 'menu']));
+    expect(CatalogStyle.fromStoreTemplate('mercado'), 'lista');
+    expect(CatalogStyle.fromStoreTemplate('boutique'), 'vitrina');
+    expect(CatalogStyle.fromStoreTemplate('menu'), 'menu');
+    for (final t in CatalogStyle.templates.keys) {
+      final file = await CatalogPdfService.instance.generateCatalogPdf(
+        business: business,
+        products: products,
+        style: CatalogStyle(template: t, darkBackground: t == 'moda', whatsapp: '+57 300 000 0000'),
+        storeUrl: 'https://stockealo.online/tienda/la-espiga',
+      );
+      final bytes = await file.readAsBytes();
+      expect(bytes.length, greaterThan(1000), reason: t);
+      await file.delete();
+    }
+  });
 }

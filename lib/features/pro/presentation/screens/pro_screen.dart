@@ -60,6 +60,13 @@ class _ProScreenState extends State<ProScreen> {
   bool _paying = false;
   bool _showManual = false;
 
+  /// Cupón de descuento al pagar con Wompi (0.16.0): el código y el precio para el plan elegido
+  final _couponController = TextEditingController();
+  bool _showCoupon = false;
+  bool _checkingCoupon = false;
+  String? _couponError;
+  ({String code, double price, double regular, String planId})? _coupon;
+
   /// Cuenta administradora: puede probar Wompi con la llave de pruebas
   bool _isAdmin = false;
   String? _codeError;
@@ -95,6 +102,7 @@ class _ProScreenState extends State<ProScreen> {
     _codeFocus.dispose();
     _scroll.dispose();
     _codeController.dispose();
+    _couponController.dispose();
     super.dispose();
   }
 
@@ -560,21 +568,112 @@ class _ProScreenState extends State<ProScreen> {
             style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
           ),
           const SizedBox(height: AppSpace.md),
+          if (plan != null) _couponBox(c, plan),
           FilledButton.icon(
             onPressed: plan == null || _paying ? null : () => _payOnline(plan),
             icon: _paying
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.lock_outline, size: 20),
-            label: Text(plan == null ? 'Elige un plan' : 'Pagar ${_money(plan.price)} con Wompi'),
+            label: Text(plan == null ? 'Elige un plan' : 'Pagar ${_money(_couponFor(plan)?.price ?? plan.price)} con Wompi'),
           ),
         ],
       );
+
+  /// El cupón aplicado, si es para este plan (al cambiar de plan hay que volver a aplicarlo)
+  ({String code, double price, double regular, String planId})? _couponFor(ProPlan plan) =>
+      _coupon?.planId == plan.id ? _coupon : null;
+
+  Future<void> _applyCoupon(ProPlan plan) async {
+    final text = _couponController.text.trim();
+    if (text.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _checkingCoupon = true;
+      _couponError = null;
+    });
+    try {
+      final q = await ProService.instance.quoteCoupon(text, plan.id);
+      if (mounted) setState(() => _coupon = (code: q.code, price: q.price, regular: q.regular, planId: plan.id));
+    } on ProCheckoutException catch (e) {
+      if (mounted) setState(() => _couponError = e.message);
+    } finally {
+      if (mounted) setState(() => _checkingCoupon = false);
+    }
+  }
+
+  /// «¿Tienes un cupón?»: se escribe, se aplica y se ve el precio tachado y el nuevo
+  Widget _couponBox(StockealoColors c, ProPlan plan) {
+    final applied = _couponFor(plan);
+    if (applied != null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpace.md),
+        child: Row(
+          children: [
+            Icon(Icons.local_offer_outlined, size: 18, color: c.success),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: '${applied.code} · ', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+                  TextSpan(
+                    text: _money(applied.regular),
+                    style: TextStyle(color: c.inkFaint, decoration: TextDecoration.lineThrough),
+                  ),
+                  TextSpan(text: '  ${_money(applied.price)}', style: TextStyle(fontWeight: FontWeight.w800, color: c.success)),
+                ]),
+                style: const TextStyle(fontSize: AppText.sizeBody),
+              ),
+            ),
+            TextButton(
+              onPressed: () => setState(() {
+                _coupon = null;
+                _couponController.clear();
+              }),
+              child: const Text('Quitar'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (!_showCoupon) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => setState(() => _showCoupon = true),
+          icon: const Icon(Icons.local_offer_outlined, size: 18),
+          label: const Text('¿Tienes un cupón?'),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpace.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _couponController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(labelText: 'Cupón', isDense: true, errorText: _couponError, errorMaxLines: 3),
+              onSubmitted: (_) => _applyCoupon(plan),
+            ),
+          ),
+          const SizedBox(width: AppSpace.sm),
+          OutlinedButton(
+            onPressed: _checkingCoupon ? null : () => _applyCoupon(plan),
+            child: Text(_checkingCoupon ? 'Revisando…' : 'Aplicar'),
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Abre el pago de Wompi y espera la confirmación del servidor
   Future<void> _payOnline(ProPlan plan) async {
     setState(() => _paying = true);
     try {
-      final checkout = await ProService.instance.startCheckout(widget.business.id, plan.id);
+      final checkout = await ProService.instance.startCheckout(widget.business.id, plan.id, coupon: _couponFor(plan)?.code);
       final opened = await launchUrl(Uri.parse(checkout.url), mode: LaunchMode.externalApplication);
       if (!mounted) return;
       if (!opened) {

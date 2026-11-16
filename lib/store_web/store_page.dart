@@ -16,6 +16,8 @@ import '../features/sales/presentation/widgets/sale_document.dart';
 import '../features/store/data/online_store_service.dart';
 import '../features/store/data/booking_service.dart';
 import 'booking_panel.dart';
+import 'clean_url_stub.dart' if (dart.library.js_interop) 'clean_url_web.dart';
+import '../core/utils/coupons.dart';
 
 /// Nombre de la tienda en la dirección: /tienda/<slug> o /tienda/?t=<slug>
 /// (el 404 del sitio convierte la primera en la segunda)
@@ -28,27 +30,48 @@ String? slugFromUri(Uri uri) {
   return null;
 }
 
+/// De dónde llegó la visita (?src=qr, fase 4)
+String? sourceFromUri(Uri uri) {
+  final s = uri.queryParameters['src']?.trim().toLowerCase();
+  return s == null || s.isEmpty ? null : s;
+}
+
+/// Producto compartido (?p=<id>, 0.16.0): sale primero y resaltado
+String? sharedProductFromUri(Uri uri) {
+  final p = uri.queryParameters['p']?.trim();
+  return p == null || p.isEmpty ? null : p;
+}
+
 /// Lo que se está filtrando en la tienda
 class StoreFilters {
   String query = '';
   String? category;
   String? size;
   String? colorHex;
+
+  /// Marca (0.16.0)
+  String? brand;
   RangeValues? price;
   bool onlyOffers = false;
 
-  bool get any => category != null || size != null || colorHex != null || price != null || onlyOffers;
+  bool get any => category != null || size != null || colorHex != null || brand != null || price != null || onlyOffers;
 
   void clear() {
-    category = size = colorHex = null;
+    category = size = colorHex = brand = null;
     price = null;
     onlyOffers = false;
   }
 
   bool matches(StoreProduct p) {
     final q = query.trim().toLowerCase();
-    if (q.isNotEmpty && !p.name.toLowerCase().contains(q) && !p.category.toLowerCase().contains(q)) return false;
+    if (q.isNotEmpty &&
+        !p.name.toLowerCase().contains(q) &&
+        !p.category.toLowerCase().contains(q) &&
+        !(p.brand?.toLowerCase().contains(q) ?? false)) {
+      return false;
+    }
     if (category != null && p.category != category) return false;
+    if (brand != null && p.brand != brand) return false;
     if (size != null && !p.sizes.contains(size)) return false;
     if (colorHex != null && !p.colorHexes.contains(colorHex)) return false;
     if (onlyOffers && !p.onOffer) return false;
@@ -70,7 +93,25 @@ class StorePage extends StatefulWidget {
   /// Estado del mantenimiento (por defecto, el servidor; las pruebas pasan el suyo)
   final Future<MaintenanceState> Function()? maintenanceLoader;
 
-  const StorePage({super.key, required this.slug, this.loader, this.maintenanceLoader});
+  /// Producto que le compartieron al cliente (0.16.0): va primero con «Te compartieron este producto»
+  final String? sharedProductId;
+
+  /// De dónde llegó (?src=qr) (fase 4)
+  final String? source;
+
+  /// Cuenta visitas y productos agregados (fase 4). Por defecto, la nube cuando la tienda
+  /// viene del servidor; las pruebas y la vista previa no cuentan.
+  final void Function(String slug, String kind, String? productId)? tracker;
+
+  const StorePage({
+    super.key,
+    required this.slug,
+    this.loader,
+    this.maintenanceLoader,
+    this.sharedProductId,
+    this.source,
+    this.tracker,
+  });
 
   static Future<MaintenanceState> _serverMaintenance() async {
     try {
@@ -100,6 +141,13 @@ class _StorePageState extends State<StorePage> {
 
   /// Reservas en línea (0.14.0); null si el negocio no las recibe
   PublicBooking? _booking;
+
+  /// Aviso +18 (0.16.0): ya dijo que es mayor de edad en esta visita
+  bool _adultOk = false;
+
+  /// Cerró el aviso del producto compartido
+  bool _sharedClosed = false;
+  bool _adultNo = false;
 
   Future<void> _loadBooking(String slug) async {
     final now = DateTime.now();
@@ -160,9 +208,14 @@ class _StorePageState extends State<StorePage> {
       final store = await (widget.loader ?? OnlineStoreService.instance.getPublic)(slug);
       final maintenance = await maintenanceFuture;
       if (store != null && widget.loader == null) _loadBooking(slug);
+      if (store != null) _countVisit(store);
       if (mounted) {
         setState(() {
-          _store = store;
+          // El producto compartido va primero, como un destacado más
+          final shared = widget.sharedProductId;
+          _store = store != null && shared != null && store.products.any((p) => p.id == shared)
+              ? store.copyWith(look: store.look.copyWith(featured: [shared, ...store.look.featured.where((f) => f != shared)]))
+              : store;
           _maintenance = maintenance;
         });
       }
@@ -171,6 +224,28 @@ class _StorePageState extends State<StorePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Estadísticas (fase 4): la visita una vez, de dónde llegó, y cada producto agregado
+  /// una vez por visita
+  final Set<String> _counted = {};
+
+  void Function(String, String, String?)? get _track =>
+      widget.tracker ?? (widget.loader == null ? (s, k, p) => OnlineStoreService.instance.track(s, k, productId: p) : null);
+
+  void _countVisit(PublicStore store) {
+    final track = _track;
+    if (track == null || !firstTimeThisVisit('visit_${store.slug}')) return;
+    track(store.slug, 'VISIT', null);
+    if (widget.source == 'qr') track(store.slug, 'QR', null);
+    if (widget.sharedProductId != null) track(store.slug, 'SHARED', widget.sharedProductId);
+  }
+
+  void _countAdd(StoreProduct p) {
+    final store = _store;
+    final track = _track;
+    if (store == null || track == null || !_counted.add(p.id) || !firstTimeThisVisit('add_${store.slug}_${p.id}')) return;
+    track(store.slug, 'ADD', p.id);
   }
 
   List<CartLine> get _lines => _cart.values.toList();
@@ -198,6 +273,7 @@ class _StorePageState extends State<StorePage> {
     final key = CartLine.keyOf(p, variant);
     final current = _cart[key]?.quantity ?? 0;
     _setLine(CartLine(p, current, variant), current + 1);
+    _countAdd(p);
   }
 
   /// Elegir talla y color: a la derecha en el computador, desde abajo en el celular
@@ -219,21 +295,90 @@ class _StorePageState extends State<StorePage> {
         onRetry: _error != null ? _load : null,
       );
     }
-    final accent = AppPalette.fromHex(store.color) ?? AppPalette.brand;
+    // Color propio de la tienda o el del negocio; Moda siempre es oscura y las demás
+    // con «Modo oscuro» (0.16.0)
+    final accent = AppPalette.fromHex(store.accentHex) ?? AppPalette.brand;
     final fashion = store.template == StoreTemplate.fashion;
-    final theme = AppTheme.build(fashion ? Brightness.dark : Brightness.light, accent: accent);
+    final theme = AppTheme.build(fashion || store.look.dark ? Brightness.dark : Brightness.light, accent: accent);
     if (_maintenance.storesClosed) {
       return Theme(data: AppTheme.build(Brightness.light, accent: accent), child: _MaintenancePage(store: store, maintenance: _maintenance));
     }
     final notice = _maintenance.affects('stores') && (_maintenance.notice || _maintenance.active);
+    final shared = widget.sharedProductId == null ? null : store.products.where((p) => p.id == widget.sharedProductId).firstOrNull;
+    if (store.look.adult && !_adultOk) {
+      return Theme(data: theme, child: Builder(builder: (context) => _adultGate(context, store)));
+    }
     return Theme(
       data: theme,
       child: Builder(
         builder: (context) {
           _themed = context;
-          final view = fashion ? _fashion(context, store) : _classic(context, store);
-          return notice ? Column(children: [_MaintenanceNotice(maintenance: _maintenance), Expanded(child: view)]) : view;
+          final view = switch (store.template) {
+            StoreTemplate.fashion => _fashion(context, store),
+            StoreTemplate.market => _market(context, store),
+            StoreTemplate.menu => _menu(context, store),
+            StoreTemplate.boutique => _boutique(context, store),
+            _ => _classic(context, store),
+          };
+          final banner = shared == null || _sharedClosed
+              ? null
+              : MaterialBanner(
+                  leading: const Icon(Icons.share_outlined),
+                  content: Text('Te compartieron este producto: ${shared.name}. Va de primero.'),
+                  actions: [TextButton(onPressed: () => setState(() => _sharedClosed = true), child: const Text('Entendido'))],
+                );
+          if (!notice && banner == null) return view;
+          return Column(children: [
+            if (notice) _MaintenanceNotice(maintenance: _maintenance),
+            if (banner != null) banner,
+            Expanded(child: view),
+          ]);
         },
+      ),
+    );
+  }
+
+  /// «Esta tienda vende productos para mayores de 18 años» (0.16.0)
+  Widget _adultGate(BuildContext context, PublicStore store) {
+    final c = context.colors;
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpace.xl),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _Logo(store: store, size: 56),
+                const SizedBox(height: AppSpace.md),
+                Text(store.businessName, textAlign: TextAlign.center, style: AppText.title(context)),
+                const SizedBox(height: AppSpace.xl),
+                Icon(Icons.warning_amber_outlined, size: 36, color: c.warning),
+                const SizedBox(height: AppSpace.sm),
+                Text('Esta tienda vende productos para mayores de 18 años',
+                    textAlign: TextAlign.center, style: AppText.bodyLarge(context, weight: FontWeight.w700)),
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  _adultNo ? 'Lo sentimos: solo pueden entrar mayores de edad.' : '¿Tienes 18 años o más?',
+                  textAlign: TextAlign.center,
+                  style: AppText.body(context, color: c.inkMuted),
+                ),
+                const SizedBox(height: AppSpace.lg),
+                if (!_adultNo)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      OutlinedButton(onPressed: () => setState(() => _adultNo = true), child: const Text('No')),
+                      const SizedBox(width: AppSpace.md),
+                      FilledButton(onPressed: () => setState(() => _adultOk = true), child: const Text('Sí, entrar')),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -244,7 +389,7 @@ class _StorePageState extends State<StorePage> {
 
   Widget _classic(BuildContext context, PublicStore store) {
     final c = context.colors;
-    final visible = store.products.where(_filters.matches).toList();
+    final visible = store.ordered.where(_filters.matches).toList();
     final width = MediaQuery.sizeOf(context).width;
     final side = width > 1100 ? (width - 1040) / 2 : AppSpace.lg;
     final hasMore = _hasExtraFilters(store);
@@ -313,6 +458,7 @@ class _StorePageState extends State<StorePage> {
                     const SizedBox(height: AppSpace.xs),
                     Text(store.welcome!, style: AppText.body(context, color: c.onAccent)),
                   ],
+                  if (store.look.schedule != null) ...[const SizedBox(height: AppSpace.sm), _openPill(store, onAccent: true)],
                 ],
               ),
             ),
@@ -358,13 +504,310 @@ class _StorePageState extends State<StorePage> {
     );
   }
 
+
+  /// «Abierto · cierra 8 p. m.» o «Cerrado · abre mañana 7 a. m.» (0.16.0); nada sin horario
+  Widget _openPill(PublicStore store, {bool onAccent = false}) {
+    final schedule = store.look.schedule;
+    if (schedule == null) return const SizedBox.shrink();
+    final now = DateTime.now();
+    final open = schedule.isOpen(now);
+    if (onAccent) {
+      final c = context.colors;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(open ? Icons.schedule_outlined : Icons.do_not_disturb_on_outlined, size: 16, color: c.onAccent),
+          const SizedBox(width: AppSpace.xs),
+          Flexible(child: Text(schedule.status(now), style: AppText.small(context, color: c.onAccent, weight: FontWeight.w600))),
+        ],
+      );
+    }
+    return StatusPill(schedule.status(now), tone: open ? AppTone.success : AppTone.warning, dot: true);
+  }
+
+  /// Agregar o quitar uno desde una fila (Mercado y Menú)
+  Widget _rowControls(PublicStore store, StoreProduct p) {
+    final qty = _qtyOf(p);
+    return _RowAdd(
+      quantity: qty,
+      onAdd: () => _add(p),
+      onRemove: () {
+        final line = _cart.values.where((l) => l.product.id == p.id).lastOrNull;
+        if (line != null) _setLine(line, line.quantity - 1);
+      },
+    );
+  }
+
+  Widget _compactHeader(StockealoColors c, PublicStore store, double side, {bool soft = true}) => Container(
+        color: soft ? c.accent.withValues(alpha: 0.12) : c.surface,
+        padding: EdgeInsets.fromLTRB(side, AppSpace.md, side, AppSpace.md),
+        child: Row(
+          children: [
+            _Logo(store: store, size: 40),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(store.businessName, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.title(context)),
+                  if (store.look.schedule != null) ...[const SizedBox(height: AppSpace.xs), _openPill(store)],
+                ],
+              ),
+            ),
+            _bookButton(store, compact: true),
+          ],
+        ),
+      );
+
+  // ---------------------------------------------------------------------------
+  // Plantilla Mercado (0.16.0): lista compacta con botón +
+  // ---------------------------------------------------------------------------
+
+  Widget _market(BuildContext context, PublicStore store) {
+    final c = context.colors;
+    final visible = store.ordered.where(_filters.matches).toList();
+    final width = MediaQuery.sizeOf(context).width;
+    final side = width > 900 ? (width - 820) / 2 : AppSpace.md;
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _compactHeader(c, store, side)),
+          if (store.welcome?.isNotEmpty == true)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(side, AppSpace.md, side, 0),
+                child: Text(store.welcome!, style: AppText.body(context, color: c.inkMuted)),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: Padding(padding: EdgeInsets.fromLTRB(side, AppSpace.md, side, 0), child: _searchField()),
+          ),
+          if (store.categories.length > 1)
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 56,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.fromLTRB(side, AppSpace.sm, side, 0),
+                  children: [_categoryChip(store, null), for (final cat in store.categories) _categoryChip(store, cat)],
+                ),
+              ),
+            ),
+          if (store.brands.length > 1) SliverToBoxAdapter(child: _brandChips(store, side)),
+          if (visible.isEmpty) ..._grid(context, store, visible, side, minWidth: 180, extent: 300, fashion: false),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(side, AppSpace.sm, side, 0),
+            sliver: SliverList.separated(
+              itemCount: visible.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: c.line),
+              itemBuilder: (context, i) {
+                final p = visible[i];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
+                  child: Row(
+                    children: [
+                      _RowThumb(url: p.imageUrl, size: 52),
+                      const SizedBox(width: AppSpace.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            _RowPrice(product: p, currency: store.currency, featured: store.isFeatured(p)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.sm),
+                      _rowControls(store, p),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          SliverToBoxAdapter(child: _footer(context, side, _lines.isEmpty)),
+        ],
+      ),
+      bottomNavigationBar: _lines.isEmpty ? null : _cartBar(context, store),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Plantilla Menú (0.16.0): cada categoría es una sección de la carta
+  // ---------------------------------------------------------------------------
+
+  Widget _menu(BuildContext context, PublicStore store) {
+    final c = context.colors;
+    final visible = store.ordered.where(_filters.matches).toList();
+    final width = MediaQuery.sizeOf(context).width;
+    final side = width > 860 ? (width - 760) / 2 : AppSpace.lg;
+    final featured = _filters.any ? const <StoreProduct>[] : visible.where(store.isFeatured).toList();
+    final sections = <String, List<StoreProduct>>{};
+    for (final p in visible) {
+      if (featured.contains(p)) continue;
+      sections.putIfAbsent(p.category.isEmpty ? 'Otros' : p.category, () => []).add(p);
+    }
+    Widget section(String title) => Padding(
+          padding: EdgeInsets.fromLTRB(side, AppSpace.xl, side, AppSpace.xs),
+          child: Container(
+            padding: const EdgeInsets.only(bottom: AppSpace.xs + 2),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.lineStrong))),
+            child: Text(title.toUpperCase(), style: AppText.caption(context, color: c.inkMuted).copyWith(letterSpacing: 1.6)),
+          ),
+        );
+    Widget dish(StoreProduct p) => Padding(
+          padding: EdgeInsets.fromLTRB(side, AppSpace.sm + 2, side, AppSpace.sm + 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(p.name, style: AppText.bodyLarge(context, weight: FontWeight.w600)),
+                    if (p.description != null) ...[
+                      const SizedBox(height: 2),
+                      Text(p.description!, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.small(context, color: c.inkMuted)),
+                    ],
+                    const SizedBox(height: AppSpace.xs),
+                    _RowPrice(product: p, currency: store.currency, featured: false),
+                  ],
+                ),
+              ),
+              if (p.imageUrl != null) ...[const SizedBox(width: AppSpace.md), _RowThumb(url: p.imageUrl, size: 72)],
+              const SizedBox(width: AppSpace.sm),
+              _rowControls(store, p),
+            ],
+          ),
+        );
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(side, AppSpace.xl, side, 0),
+              child: Column(
+                children: [
+                  Row(children: [const Spacer(), _bookButton(store, compact: true)]),
+                  _Logo(store: store, size: 64),
+                  const SizedBox(height: AppSpace.md),
+                  Text(store.businessName, textAlign: TextAlign.center, style: AppText.page(context)),
+                  if (store.welcome?.isNotEmpty == true) ...[
+                    const SizedBox(height: AppSpace.xs),
+                    Text(store.welcome!, textAlign: TextAlign.center, style: AppText.body(context, color: c.inkMuted)),
+                  ],
+                  if (store.look.schedule != null) ...[const SizedBox(height: AppSpace.sm), _openPill(store)],
+                  if (store.heroImageUrl != null) ...[
+                    const SizedBox(height: AppSpace.lg),
+                    _coverImage(c, store, height: width > 700 ? 220 : 150),
+                  ],
+                  const SizedBox(height: AppSpace.lg),
+                  _searchField(pill: true),
+                ],
+              ),
+            ),
+          ),
+          if (visible.isEmpty) ..._grid(context, store, visible, side, minWidth: 180, extent: 300, fashion: false),
+          if (featured.isNotEmpty) ...[
+            SliverToBoxAdapter(child: section('Recomendados')),
+            SliverList.list(children: [for (final p in featured) dish(p)]),
+          ],
+          for (final e in sections.entries) ...[
+            SliverToBoxAdapter(child: section(e.key)),
+            SliverList.list(children: [for (final p in e.value) dish(p)]),
+          ],
+          SliverToBoxAdapter(child: _footer(context, side, _lines.isEmpty)),
+        ],
+      ),
+      bottomNavigationBar: _lines.isEmpty ? null : _cartBar(context, store),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Plantilla Boutique (0.16.0): fotos grandes y mucho espacio
+  // ---------------------------------------------------------------------------
+
+  Widget _boutique(BuildContext context, PublicStore store) {
+    final c = context.colors;
+    final visible = store.ordered.where(_filters.matches).toList();
+    final width = MediaQuery.sizeOf(context).width;
+    final side = width > 1200 ? (width - 1100) / 2 : (width >= 700 ? AppSpace.xxl : AppSpace.lg);
+    final hero = !_filters.any ? visible.where((p) => store.isFeatured(p) && p.imageUrl != null).firstOrNull : null;
+    final rest = hero == null ? visible : visible.where((p) => p != hero).toList();
+    return Scaffold(
+      backgroundColor: c.paper,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(side, AppSpace.xl, side, AppSpace.md),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Spacer(),
+                      _bookButton(store, compact: true),
+                      _cartButton(context, store),
+                    ],
+                  ),
+                  Text(
+                    store.businessName.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: AppText.heading(context, weight: FontWeight.w500).copyWith(letterSpacing: 6),
+                  ),
+                  if (store.welcome?.isNotEmpty == true) ...[
+                    const SizedBox(height: AppSpace.sm),
+                    Text(store.welcome!, textAlign: TextAlign.center, style: AppText.body(context, color: c.inkMuted)),
+                  ],
+                  if (store.look.schedule != null) ...[const SizedBox(height: AppSpace.sm), _openPill(store)],
+                ],
+              ),
+            ),
+          ),
+          if (store.heroImageUrl != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(side, 0, side, AppSpace.lg),
+                child: _coverImage(c, store, height: width > 700 ? 320 : 200),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(side, 0, side, 0),
+              child: Row(children: [Expanded(child: _searchField(pill: true)), if (_hasExtraFilters(store)) ...[const SizedBox(width: AppSpace.sm), _filtersButton(store)]]),
+            ),
+          ),
+          if (hero != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(side, AppSpace.xl, side, 0),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: SizedBox(height: (width > 600 ? 600 : 470) + _optionsExtra(store), child: _card(store, hero, fashion: false)),
+                  ),
+                ),
+              ),
+            ),
+          SliverToBoxAdapter(child: SizedBox(height: hero == null ? AppSpace.md : AppSpace.lg)),
+          ..._grid(context, store, rest, side, minWidth: width > 600 ? 240 : 150, extent: (width > 600 ? 400 : 320) + _optionsExtra(store), fashion: false),
+          SliverToBoxAdapter(child: _footer(context, side, _lines.isEmpty)),
+        ],
+      ),
+      bottomNavigationBar: _lines.isEmpty ? null : _cartBar(context, store),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Plantilla Moda
   // ---------------------------------------------------------------------------
 
   Widget _fashion(BuildContext context, PublicStore store) {
     final c = context.colors;
-    final visible = store.products.where(_filters.matches).toList();
+    final visible = store.ordered.where(_filters.matches).toList();
     final width = MediaQuery.sizeOf(context).width;
     final side = width > 1380 ? (width - 1320) / 2 : (width >= 700 ? AppSpace.xl : AppSpace.md + 2);
     final wide = width >= 980;
@@ -577,7 +1020,28 @@ class _StorePageState extends State<StorePage> {
   // ---------------------------------------------------------------------------
 
   bool _hasExtraFilters(PublicStore store) =>
-      store.products.any((p) => p.variants.isNotEmpty || p.onOffer) || store.products.length > 8;
+      store.products.any((p) => p.variants.isNotEmpty || p.onOffer) || store.products.length > 8 || store.brands.length > 1;
+
+  /// Marcas como chips (Mercado), si hay más de una (0.16.0)
+  Widget _brandChips(PublicStore store, double side) => SizedBox(
+        height: 52,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.fromLTRB(side, AppSpace.sm, side, 0),
+          children: [
+            for (final b in <String?>[null, ...store.brands])
+              Padding(
+                padding: const EdgeInsets.only(right: AppSpace.sm),
+                child: ChoiceChip(
+                  showCheckmark: false,
+                  label: Text(b ?? 'Todas las marcas'),
+                  selected: _filters.brand == b,
+                  onSelected: (_) => setState(() => _filters.brand = b),
+                ),
+              ),
+          ],
+        ),
+      );
 
   Widget _searchField({bool pill = false}) => TextField(
         onChanged: (v) => setState(() => _filters.query = v),
@@ -886,6 +1350,22 @@ class _FiltersPanel extends StatelessWidget {
               );
             }(),
         ],
+        if (store.brands.length > 1) ...[
+          label('MARCA'),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final b in store.brands)
+                ChoiceChip(
+                  showCheckmark: false,
+                  label: Text(b),
+                  selected: filters.brand == b,
+                  onSelected: (v) => set(() => filters.brand = v ? b : null),
+                ),
+            ],
+          ),
+        ],
         if (sizes.isNotEmpty) ...[
           label('TALLA'),
           Wrap(
@@ -1087,12 +1567,17 @@ class _ProductCardState extends State<_ProductCard> {
 
   String get _hint {
     // Un color sin nombre (solo la muestra) no se escribe
-    if (_chosen != null) return [if (_size != null) 'Talla $_size', if (_chosen!.color != null) _chosen!.color!].join(' · ');
+    final p = widget.product;
+    final sizeName = p.sizeName, option = p.optionName.toLowerCase();
+    if (_chosen != null) return [if (_size != null) '$sizeName $_size', if (_chosen!.color != null) _chosen!.color!].join(' · ');
     final missSize = _sizes.isNotEmpty && _size == null;
     final missColor = _colors.isNotEmpty && _color == null;
-    if (missSize && missColor) return _nudge ? 'Elige la talla y el color' : 'Elige talla y color';
-    if (missSize) return 'Elige la talla';
-    if (missColor) return _size == null ? 'Elige el color' : 'Talla $_size · elige el color';
+    // «la talla», «la nicotina», «la presentación»; «el color», «el sabor»
+    String art(String w) => const {'color', 'sabor', 'tamaño', 'aroma'}.contains(w.toLowerCase()) ? 'el' : 'la';
+    final size = sizeName.toLowerCase();
+    if (missSize && missColor) return _nudge ? 'Elige ${art(size)} $size y ${art(option)} $option' : 'Elige $size y $option';
+    if (missSize) return 'Elige ${art(size)} $size';
+    if (missColor) return _size == null ? 'Elige ${art(option)} $option' : '$sizeName $_size · elige ${art(option)} $option';
     return 'Esa combinación está agotada';
   }
 
@@ -1429,8 +1914,108 @@ class _CartFormState extends State<_CartForm> {
   /// 1 = el pedido; 2 = los datos del comprador
   int _step = 1;
 
+  /// Cupón de la tienda (0.16.0): lo revisa la nube y lo vuelve a calcular al pedir
+  final _couponField = TextEditingController();
+  bool _showCoupon = false;
+  bool _checkingCoupon = false;
+  bool _phoneMissing = false;
+  String? _couponError;
+  Coupon? _coupon;
+
+  String _money(num v) => CurrencyFormatter.formatIn(v, widget.store.currency);
+
+  double _discount(double subtotal) => _coupon?.discountFor(subtotal) ?? 0;
+
+  Future<void> _applyCoupon(double subtotal) async {
+    final code = _couponField.text.trim();
+    if (code.isEmpty) return;
+    setState(() {
+      _checkingCoupon = true;
+      _couponError = null;
+    });
+    try {
+      final coupon = await OnlineStoreService.instance.checkCoupon(
+        slug: widget.store.slug,
+        code: code,
+        total: subtotal,
+        phone: _phone.text,
+        money: _money,
+      );
+      if (mounted) setState(() => _coupon = coupon);
+    } on CouponException catch (e) {
+      if (mounted) setState(() => _couponError = e.message);
+    } finally {
+      if (mounted) setState(() => _checkingCoupon = false);
+    }
+  }
+
+  /// «¿Tienes un cupón?» → el campo → «BIENVENIDA10 · −$5.000»
+  Widget _couponBox(StockealoColors c, double subtotal) {
+    final coupon = _coupon;
+    if (coupon != null) {
+      final discount = _discount(subtotal);
+      return Padding(
+        padding: const EdgeInsets.only(top: AppSpace.md),
+        child: Row(
+          children: [
+            Icon(Icons.local_offer_outlined, size: 18, color: discount > 0 ? c.success : c.warning),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              child: Text(
+                discount > 0
+                    ? '${coupon.code} · −${_money(discount)}'
+                    : '${coupon.code}: es para compras desde ${_money(coupon.minTotal)}',
+                style: AppText.body(context, weight: FontWeight.w600, color: discount > 0 ? c.success : c.warning),
+              ),
+            ),
+            TextButton(
+              onPressed: () => setState(() {
+                _coupon = null;
+                _couponField.clear();
+              }),
+              child: const Text('Quitar'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (!_showCoupon) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => setState(() => _showCoupon = true),
+          icon: const Icon(Icons.local_offer_outlined, size: 18),
+          label: const Text('¿Tienes un cupón?'),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpace.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _couponField,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(labelText: 'Cupón', isDense: true, errorText: _couponError, errorMaxLines: 3),
+              onSubmitted: (_) => _applyCoupon(subtotal),
+            ),
+          ),
+          const SizedBox(width: AppSpace.sm),
+          OutlinedButton(
+            onPressed: _checkingCoupon ? null : () => _applyCoupon(subtotal),
+            child: Text(_checkingCoupon ? 'Revisando…' : 'Aplicar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _couponField.dispose();
     _name.dispose();
     _note.dispose();
     _phone.dispose();
@@ -1445,6 +2030,8 @@ class _CartFormState extends State<_CartForm> {
         note: _note.text,
         code: _code,
         phone: _phone.text,
+        couponCode: _coupon?.code,
+        discount: _discount(lines.fold<double>(0, (s, l) => s + l.subtotal)),
       );
 
   Future<void> _sendWhatsApp(List<CartLine> lines) async {
@@ -1457,17 +2044,35 @@ class _CartFormState extends State<_CartForm> {
   Future<void> _showTicket(List<CartLine> lines) async {
     if (_sending) return;
     setState(() => _sending = true);
-    // El pedido se guarda en la tienda con su código; sin conexión sigue por WhatsApp
-    _code ??= await OnlineStoreService.instance.createOrder(
-      slug: widget.store.slug,
-      customerName: _name.text,
-      customerPhone: _phone.text,
-      note: _note.text,
-      lines: lines,
-    );
+    // El pedido se guarda en la tienda con su código; sin conexión sigue por WhatsApp.
+    // Si el cupón no sirve, se dice y el pedido espera a que lo corrija.
+    if (_code == null) {
+      final saved = await OnlineStoreService.instance.createOrder(
+        slug: widget.store.slug,
+        customerName: _name.text,
+        customerPhone: _phone.text,
+        note: _note.text,
+        lines: lines,
+        coupon: _coupon?.code,
+        money: _money,
+      );
+      if (!mounted) return;
+      if (saved.error != null) {
+        setState(() {
+          _sending = false;
+          _couponError = saved.error;
+          _coupon = null;
+          _showCoupon = true;
+        });
+        return;
+      }
+      _code = saved.code;
+    }
     if (!mounted) return;
     setState(() => _sending = false);
-    final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final subtotal = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final discount = _discount(subtotal);
+    final total = subtotal - discount;
     final now = DateTime.now();
     final doc = SaleDocument(
       title: 'Pedido',
@@ -1475,6 +2080,7 @@ class _CartFormState extends State<_CartForm> {
       date: now,
       lines: [for (final l in lines) SaleDocumentLine(quantity: l.quantity, name: l.name, unitPrice: l.unitPrice, total: l.subtotal)],
       total: total,
+      discount: discount,
       customerName: _name.text.trim().isEmpty ? null : _name.text.trim(),
       notes: _note.text.trim().isEmpty ? null : _note.text.trim(),
       closing: 'El negocio te confirma el precio final y la entrega.',
@@ -1503,7 +2109,8 @@ class _CartFormState extends State<_CartForm> {
     final lines = widget.lines();
     // Si se vació el pedido estando en los datos, vuelve al primer paso
     if (lines.isEmpty) _step = 1;
-    final total = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final subtotal = lines.fold<double>(0, (s, l) => s + l.subtotal);
+    final total = subtotal - _discount(subtotal);
     final count = lines.fold<int>(0, (s, l) => s + l.quantity);
     String money(num v) => CurrencyFormatter.formatIn(v, widget.store.currency);
     final products = '$count ${count == 1 ? 'producto' : 'productos'}';
@@ -1574,6 +2181,17 @@ class _CartFormState extends State<_CartForm> {
             ],
           ),
           stepLabel('Paso 2 de 2 · para que la tienda te confirme'),
+          // Fuera del horario se recibe igual, con aviso (0.16.0)
+          if (widget.store.look.schedule case final s? when !s.isOpen(DateTime.now()))
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpace.md),
+              child: _CartNotice(
+                icon: Icons.schedule_outlined,
+                tone: AppTone.warning,
+                title: 'Estamos cerrados en este momento',
+                text: 'Puedes hacer tu pedido igual: te atendemos al abrir. Horario: ${s.text}.',
+              ),
+            ),
           // Resumen: las fotos, cuántos productos, el total y «Editar»
           Container(
             padding: const EdgeInsets.all(AppSpace.sm + 2),
@@ -1608,7 +2226,14 @@ class _CartFormState extends State<_CartForm> {
           TextField(
             controller: _phone,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Tu celular (recomendado)', hintText: 'Para avisarte cuando esté listo'),
+            decoration: InputDecoration(
+              labelText: _coupon != null ? 'Tu celular (lo pide el cupón)' : 'Tu celular (recomendado)',
+              hintText: 'Para avisarte cuando esté listo',
+              errorText: _phoneMissing ? CouponText.error('coupon_phone_required') : null,
+            ),
+            onChanged: (_) {
+              if (_phoneMissing) setState(() => _phoneMissing = false);
+            },
           ),
           const SizedBox(height: AppSpace.md),
           TextField(
@@ -1618,6 +2243,8 @@ class _CartFormState extends State<_CartForm> {
             minLines: 1,
             decoration: const InputDecoration(labelText: 'Nota (opcional)', hintText: 'Ej.: dirección de entrega, forma de pago'),
           ),
+          // Cupón de la tienda (0.16.0)
+          _couponBox(c, subtotal),
         ],
       );
       footer = [
@@ -1628,11 +2255,21 @@ class _CartFormState extends State<_CartForm> {
               setState(() => _nameMissing = true);
               return;
             }
+            // Con cupón el celular es obligatorio: se usa una vez por cliente
+            if (_coupon != null && _phone.text.replaceAll(RegExp(r'\D'), '').length < 7) {
+              setState(() => _phoneMissing = true);
+              return;
+            }
             _showTicket(lines);
           },
           icon: const Icon(Icons.receipt_long_outlined),
           label: Text(_sending ? 'Guardando tu pedido…' : 'Hacer el pedido · ${money(total)}'),
         ),
+        // Cómo pagarle al negocio (0.16.0)
+        if (widget.store.look.payment != null) ...[
+          const SizedBox(height: AppSpace.sm),
+          _CartNotice(icon: Icons.payments_outlined, tone: AppTone.info, title: 'Cómo pagar', text: widget.store.look.payment!),
+        ],
         const SizedBox(height: AppSpace.sm),
         Text(
           'Te mostramos tu tiquete y lo envías por WhatsApp. La tienda te confirma el precio final y la entrega.',
@@ -1668,6 +2305,41 @@ class _CartFormState extends State<_CartForm> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Aviso dentro del carrito: «Estamos cerrados» o «Cómo pagar» (0.16.0)
+class _CartNotice extends StatelessWidget {
+  final IconData icon;
+  final AppTone tone;
+  final String title;
+  final String text;
+  const _CartNotice({required this.icon, required this.tone, required this.title, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ToneColors.of(context, tone);
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(color: t.soft, borderRadius: BorderRadius.circular(AppRadius.card)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: t.strong),
+          const SizedBox(width: AppSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppText.body(context, weight: FontWeight.w700, color: t.text)),
+                const SizedBox(height: 2),
+                SelectableText(text, style: AppText.small(context, color: t.text)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1714,7 +2386,7 @@ class _CartItem extends StatelessWidget {
                     spacing: 4,
                     runSpacing: 4,
                     children: [
-                      if (v.size != null) tag(Text('Talla ${v.size}', style: AppText.caption(context, color: c.inkMuted))),
+                      if (v.size != null) tag(Text('${v.sizeName} ${v.size}', style: AppText.caption(context, color: c.inkMuted))),
                       if (v.color != null || hasSwatch)
                         tag(Row(
                           mainAxisSize: MainAxisSize.min,
@@ -2167,6 +2839,89 @@ class _OptionChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+/// Foto pequeña de una fila (Mercado y Menú)
+class _RowThumb extends StatelessWidget {
+  final String? url;
+  final double size;
+  const _RowThumb({required this.url, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.tile),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: url == null
+            ? ColoredBox(color: c.surfaceMuted, child: Icon(Icons.inventory_2_outlined, color: c.inkFaint, size: size * 0.4))
+            : Image.network(url!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => ColoredBox(color: c.surfaceMuted)),
+      ),
+    );
+  }
+}
+
+/// Precio de una fila, con el de antes tachado y «Destacado»
+class _RowPrice extends StatelessWidget {
+  final StoreProduct product;
+  final String currency;
+  final bool featured;
+  const _RowPrice({required this.product, required this.currency, required this.featured});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final p = product;
+    return Wrap(
+      spacing: AppSpace.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('${p.variants.isNotEmpty && p.variants.any((v) => v.extra > 0) ? 'Desde ' : ''}${CurrencyFormatter.formatIn(p.price, currency)}',
+            style: AppText.body(context, weight: FontWeight.w700, color: c.ink)),
+        if (p.onOffer)
+          Text(CurrencyFormatter.formatIn(p.oldPrice!, currency),
+              style: AppText.small(context, color: c.inkFaint).copyWith(decoration: TextDecoration.lineThrough)),
+        if (featured) const StatusPill('Destacado', tone: AppTone.accent, compact: true),
+      ],
+    );
+  }
+}
+
+/// «+» o «− 2 +» al lado de cada producto (Mercado y Menú)
+class _RowAdd extends StatelessWidget {
+  final int quantity;
+  final VoidCallback onAdd;
+  final VoidCallback onRemove;
+  const _RowAdd({required this.quantity, required this.onAdd, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    if (quantity == 0) {
+      return IconButton.filled(
+        tooltip: 'Agregar',
+        onPressed: onAdd,
+        style: IconButton.styleFrom(backgroundColor: c.accent, foregroundColor: c.onAccent),
+        icon: const Icon(Icons.add),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.outlined(tooltip: 'Quitar uno', onPressed: onRemove, icon: const Icon(Icons.remove, size: 18)),
+        SizedBox(width: 28, child: Text('$quantity', textAlign: TextAlign.center, style: AppText.title(context))),
+        IconButton.filled(
+          tooltip: 'Agregar otro',
+          onPressed: onAdd,
+          style: IconButton.styleFrom(backgroundColor: c.accent, foregroundColor: c.onAccent),
+          icon: const Icon(Icons.add, size: 18),
+        ),
+      ],
     );
   }
 }

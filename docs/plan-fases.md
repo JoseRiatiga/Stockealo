@@ -149,11 +149,25 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 
 ## 0.16.0 · Tienda y crecimiento (antes 0.15.0)
 
+### Orden por fases (aprobado el 15 nov)
+
+- **Fase 0 · Metas de ventas** (lo pidió el dueño el 15 nov, va primero): punto 21.
+- **Fase 1 · La tienda se ve mejor:** puntos 13, 17 y 24.
+- **Fase 2 · Tipos de negocio que venden productos:** punto 16 (usa las plantillas de la fase 1).
+- **Fase 3 · Vender por redes:** puntos 14, 15 y 12.
+- **Fase 4 · Pedidos y números de la tienda:** puntos 18 y 11 (Firebase lo crea el dueño).
+- **Fase 5 · Calidad y confianza:** puntos 1 a 7.
+- **Fase 6 · Seguridad:** MFA, PIN o huella, limpieza y punto 22.
+- **Fase 7 · Crecimiento y detalles:** puntos 23, 20, 19, 25, 26 y 27.
+
+Las fases 1 a 3 van en ese orden porque dependen entre sí; las 4 a 7 se pueden mover.
+
 ### Movidos desde la 0.15.0 (15 nov)
 
 - MFA del panel admin (necesita la app de códigos en el celular del dueño).
 - Bloqueo opcional con PIN o huella para abrir la app (librería local_auth y cambio en Android; probar en un celular real).
 - Limpieza de seguridad: contraseña vieja, `crypto` y `legacy-login` (antes, revisar si alguien todavía los usa).
+- **Fase 6, decidido (15 nov, boceto aprobado):** verificación en dos pasos **obligatoria** en el panel (la nube también la exige); bloqueo opcional con PIN o huella (Perfil › Privacidad, 5 min por defecto, olvidé el PIN = contraseña); `crypto` **se queda**: ya no la usa la contraseña vieja, pero ahora cifra el PIN. `legacy-login` **se mantiene** mientras quede 1 cuenta con contraseña vieja (15 nov). Entrar con Google: **incluido** (decisión del dueño, 15 nov). Vuelve por stockealo://login-callback en el celular y a /app/ en la web; necesita que el dueño configure Google Cloud y Supabase.
 
 ### Calidad y confianza
 
@@ -164,13 +178,15 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
 5. Primeros pasos para negocios nuevos.
 6. Alerta de productos sin ventas en 30 días.
 7. Revisión de Supabase y copia diaria verificada.
+    - **Fase 5, decidido (15 nov, boceto aprobado):** la nube siempre a la vista en la barra; primeros pasos para negocios nuevos; productos quietos (30 días sin ventas) en Inicio y Stock; «Descargar todos mis datos» en Excel (Perfil › Privacidad); errores en el panel de administración (sin datos de clientes); toda la app en español.
+    - **Copia diaria: copia propia** (decisión del dueño): cada noche una tarea en la nube guarda los datos importantes en el almacenamiento de Supabase, la verifica contando filas y el panel muestra la última copia. Sin pasar al plan de pago.
 
 ### Tienda y pedidos (Pro)
 
 8. ~~Pedidos con número, sección Pedidos y «Convertir en venta».~~ HECHO en la 0.13.4 (T-0001, Cotizaciones «Tienda», «Por entregar»).
 9. ~~Aviso de pedido nuevo.~~ HECHO en la 0.13.5 con la app abierta o en segundo plano (`docs/plan-avisos.md`).
 10. ~~Nombre obligatorio y precio por unidad en el mensaje.~~ HECHO en la 0.13.3.
-11. **Avisos con la app cerrada (Firebase), fase D de `docs/plan-avisos.md`:**
+11. **EN PAUSA (decisión del dueño, 15 nov: no lo convence por ahora).** **Avisos con la app cerrada (Firebase), fase D de `docs/plan-avisos.md`:**
     - el pedido de la tienda avisa aunque la app esté cerrada del todo;
     - sirve también para los demás avisos que lleguen de la nube.
     - Hace falta:
@@ -188,7 +204,10 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
     - las 4 plantillas actuales (Clásica, Vitrina, Lista de precios y Promoción) pasan al diseño nuevo, con la cinta de promociones;
     - se agregan **Moda** y **Menú**;
     - el catálogo sale por defecto con el mismo estilo de la tienda.
+    - **Fase 3, decidido (15 nov, boceto aprobado):** el catálogo sale por defecto con el estilo de la tienda y lleva el QR de la tienda en la portada.
 15. **Instagram** (decidido el 14 nov). Hoy solo hay historias 9:16:
+    - **Decidido (15 nov):** hashtags **propios** (se escriben una vez en Personalizar tienda) **y sugeridos** por el tipo de negocio. «Compartir en Instagram» abre el **menú de compartir del celular** (Android, iPhone y web); sin pieza nativa directa a la historia.
+    - Además: QR de la tienda para el mostrador (imagen y cartel en PDF) y **compartir un producto** con un link que abre la tienda con ese producto primero y resaltado.
     - **Formatos:** historia 9:16, publicación cuadrada 1:1, vertical 4:5 y **carrusel** (hasta 10 imágenes, una por producto).
     - **Enlace:** el link o el QR de la tienda en la imagen («Pide en stockealo.online/tienda/…»).
     - **Texto listo para copiar:** nombre, precios, promoción, link y hashtags del negocio.
@@ -206,14 +225,29 @@ Absorbe de la 0.14.0: pago mixto, vuelto y anular sin borrar (porque Vender y Ve
       - **Tienda de barrio o miscelánea:** categorías de barrio y tienda «Mercado».
     - La pregunta «¿Para qué usarás Stockealo?» al crear el negocio se hace en la **0.14.0** (punto 20). Aquí solo se suman las opciones de productos.
     - Las plantillas de servicios (Lavadero, Barbería, Spa, Taller, Servicio técnico y Lavandería) ya funcionan así y se revisan en la 0.14.0.
+    - **Decidido (15 nov, boceto aprobado):** tarjeta en Productos según «¿Para qué usarás Stockealo?», elegir el tipo (el sugerido primero), revisar y quitar lo que no sirva, y «Cargar plantilla» (no crea productos ni toca los que hay). Aviso +18 en la tienda para licorera y vapers (una vez por visita; interruptor en Personalizar tienda). Se agrega «Vapers» a las respuestas.
+    - **Fase 2a:** los 6 tipos, aviso +18, **marca** del producto (la tienda filtra por marca) y variantes **nicotina · sabor** (la segunda lista del editor acepta sabores, sin muestra de color).
+    - **Fase 2b:** droguería con **lotes**: cada entrada de mercancía con cantidad y fecha de vencimiento; al vender se descuenta primero el que vence antes; aviso 30 días antes en Inicio y Stock; sincronizado en la nube.
+      - **Decidido (15 nov, boceto aprobado):** interruptor «Controla vencimiento por lote» en el producto (encendido en las plantillas Droguería y Tienda de barrio). Las unidades de un lote vencido **no se venden** (salen del stock vendible y de la tienda). Camino principal: **«Devolver al proveedor para cambio»** → cambio pendiente (se comparte por WhatsApp) → **«Llegó el cambio»** entra un lote nuevo sin costo. Si no lo cambian, **«Dar de baja»** (merma). El aviso de Inicio y Stock también cuenta los cambios pendientes.
 17. «Personalizar tienda»: portada, color, destacados, horario, modo oscuro, datos de pago y vista previa.
+    - **Decidido (15 nov, boceto aprobado):** color propio de la tienda, modo oscuro en cualquier plantilla, hasta 6 destacados que salen primero, horario con «Abierto»/«Cerrado», datos de pago al final del pedido y vista previa con los productos del negocio antes de guardar.
+    - **Fuera del horario los pedidos se reciben con aviso** («Estamos cerrados, te atendemos al abrir»), no se bloquean.
 18. Estadísticas de la tienda.
 
 ### Crecimiento
 
 19. Guías de instalación para Android, web e iPhone.
 20. Página de novedades.
-21. Meta de ventas.
+21. **Metas de ventas** (pedido del dueño, 15 nov; ahora es la fase 0):
+    - El negocio elige si quiere meta **semanal**, **mensual** o las dos, y el valor de cada una.
+    - Se ve **en una gráfica**: barra de avance con el porcentaje, lo que falta y cuánto hay que vender por día para llegar.
+    - Gráfica de la semana o del mes: lo vendido día a día frente a la línea de la meta.
+    - Tarjeta en Inicio y detalle en Reportes; historial de metas pasadas (cumplida o no).
+    - **Decidido (15 nov):**
+      - Se mide **solo en ventas**.
+      - **Gratis para todos:** la meta del negocio (semanal y/o mensual), su barra y la gráfica.
+      - **Con Pro:** metas personales por empleado (las pone el jefe si quiere) e historial de metas pasadas.
+      - Cada empleado ve solo su propia meta; el jefe ve todas.
 22. Entrar con Google (y Apple).
 23. Cupones desde el panel.
 

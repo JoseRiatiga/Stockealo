@@ -654,6 +654,40 @@ class SupabaseService {
         } catch (e) {
           debugPrint('No se pudieron bajar los roles del negocio: $e');
         }
+        // Lotes con vencimiento y cambios con el proveedor (0.16.0, fase 2b)
+        for (final (table, cols) in const [
+          ('product_lots', ['id', 'business_id', 'product_id', 'code', 'expires_on', 'quantity', 'initial_quantity', 'cost', 'source', 'purchase_id', 'status', 'created_at', 'updated_at']),
+          ('lot_exchanges', ['id', 'business_id', 'product_id', 'product_name', 'lot_id', 'supplier_id', 'supplier_name', 'quantity', 'status', 'new_lot_id', 'created_at', 'closed_at']),
+        ]) {
+          try {
+            final List<dynamic> rows = await client!.from(table).select();
+            for (final r in rows) {
+              final row = Map<String, dynamic>.from(r as Map);
+              await db.insert(table, {for (final k in cols) k: row[k] is bool ? (row[k] == true ? 1 : 0) : row[k]},
+                  conflictAlgorithm: ConflictAlgorithm.replace);
+            }
+          } catch (e) {
+            debugPrint('No se pudo bajar $table: $e');
+          }
+        }
+        // Metas de ventas (0.16.0): cada persona baja las del negocio y las suyas
+        try {
+          final List<dynamic> cloudGoals = await client!.from('sales_goals').select();
+          for (final g in cloudGoals) {
+            final row = Map<String, dynamic>.from(g as Map);
+            await db.insert(
+              'sales_goals',
+              {
+                for (final k in const ['id', 'business_id', 'period', 'member_user_id', 'member_name', 'starts_on', 'created_at', 'updated_at'])
+                  k: row[k] == null ? null : '${row[k]}',
+                'amount': (row['amount'] as num?)?.toDouble() ?? 0,
+              },
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+        } catch (e) {
+          debugPrint('No se pudieron bajar las metas de ventas: $e');
+        }
         final List<dynamic> cloudMembers = await client!.from('business_members').select();
         for (final m in cloudMembers) {
           final rawUserId = m['user_id'] as String?;
@@ -738,7 +772,7 @@ class SupabaseService {
         final List<dynamic> cloudProducts = await client!.from('products').select();
         // Lo que la nube no guardaba antes (variantes, descripción) no se pierde al reescribir
         final localExtras = <String, Map<String, Object?>>{
-          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description', 'supplier_id', 'compare_price']))
+          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description', 'supplier_id', 'compare_price', 'brand', 'tracks_expiry']))
             r['id'] as String: r,
         };
         for (final p in cloudProducts) {
@@ -755,6 +789,8 @@ class SupabaseService {
               'has_variants': (p['has_variants'] == true || localHasVariants) ? 1 : 0,
               'supplier_id': p.containsKey('supplier_id') ? p['supplier_id'] : local?['supplier_id'],
               'compare_price': p.containsKey('compare_price') ? p['compare_price'] : local?['compare_price'],
+              'brand': p.containsKey('brand') ? p['brand'] : local?['brand'],
+              'tracks_expiry': p.containsKey('tracks_expiry') ? (p['tracks_expiry'] == true ? 1 : 0) : (local?['tracks_expiry'] ?? 0),
               'category': p['category'] ?? 'General',
               'purchase_price': (p['cost_price'] as num?)?.toDouble() ?? 0.0,
               'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
@@ -1350,6 +1386,23 @@ class SupabaseService {
       case 'upsert_business_role':
         // La marca interna _edited_at no es una columna de la nube (0.15.1)
         await db.from('business_roles').upsert(Map<String, dynamic>.from(p)..remove(_editedAtKey), onConflict: 'id');
+      case 'upsert_product_lot':
+        await db.from('product_lots').upsert({
+          for (final k in const ['id', 'business_id', 'product_id', 'code', 'expires_on', 'quantity', 'initial_quantity', 'cost', 'source',
+            'purchase_id', 'status', 'created_at', 'updated_at'])
+            k: p[k],
+        }, onConflict: 'id');
+      case 'upsert_lot_exchange':
+        await db.from('lot_exchanges').upsert({
+          for (final k in const ['id', 'business_id', 'product_id', 'product_name', 'lot_id', 'supplier_id', 'supplier_name', 'quantity',
+            'status', 'new_lot_id', 'created_at', 'closed_at'])
+            k: p[k],
+        }, onConflict: 'id');
+      case 'upsert_sales_goal':
+        await db.from('sales_goals').upsert({
+          for (final k in const ['id', 'business_id', 'period', 'member_user_id', 'member_name', 'amount', 'starts_on', 'created_at', 'updated_at'])
+            k: p[k],
+        }, onConflict: 'id');
       case 'delete_business_role':
         await db.from('business_roles').delete().eq('id', p['id'] as String);
       case 'insert_activity':
@@ -1470,14 +1523,24 @@ class SupabaseService {
       'supplier_id': p['supplier_id'],
       // Precio de antes (oferta en la tienda en línea)
       'compare_price': (p['compare_price'] as num?)?.toDouble(),
+      // Marca (0.16.0)
+      'brand': (p['brand'] as String?)?.trim().isEmpty == true ? null : (p['brand'] as String?)?.trim(),
+      // Controla vencimiento por lote (0.16.0, fase 2b)
+      'tracks_expiry': p['tracks_expiry'] == 1 || p['tracks_expiry'] == true,
     };
     try {
       await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
     } catch (e) {
       // Nube sin la columna del proveedor o del precio de antes todavía: se guarda el resto
-      if (!e.toString().contains('supplier_id') && !e.toString().contains('compare_price') && !e.toString().contains('42703')) rethrow;
+      if (!e.toString().contains('supplier_id') && !e.toString().contains('compare_price') && !e.toString().contains('brand') &&
+          !e.toString().contains('tracks_expiry') &&
+          !e.toString().contains('42703') && !e.toString().contains('PGRST204')) {
+        rethrow;
+      }
       row.remove('supplier_id');
       row.remove('compare_price');
+      row.remove('brand');
+      row.remove('tracks_expiry');
       await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
     }
   }
@@ -1919,6 +1982,13 @@ class SupabaseService {
   /// Roles del negocio (0.15.0): ajustes del Administrador y del Cajero, y roles propios
   Future<void> upsertBusinessRoleToCloud(Map<String, dynamic> row) => _write('upsert_business_role', row);
   Future<void> deleteBusinessRoleFromCloud(String roleId) => _write('delete_business_role', {'id': roleId});
+
+  /// Sube un lote con vencimiento o un cambio con el proveedor (0.16.0, fase 2b)
+  Future<void> upsertProductLotToCloud(Map<String, dynamic> row) => _write('upsert_product_lot', row);
+  Future<void> upsertLotExchangeToCloud(Map<String, dynamic> row) => _write('upsert_lot_exchange', row);
+
+  /// Sube una meta de ventas (0.16.0)
+  Future<void> upsertSalesGoalToCloud(Map<String, dynamic> row) => _write('upsert_sales_goal', row);
 
   /// Sube una anotación del registro de actividad (ver ActivityRepository)
   Future<void> insertActivityToCloud(Map<String, dynamic> row) => _write('insert_activity', row);

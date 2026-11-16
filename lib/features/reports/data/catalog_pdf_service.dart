@@ -13,6 +13,7 @@ import '../../business/models/business.dart';
 import '../../products/models/product.dart';
 import '../models/catalog_style.dart';
 import '../../sales/models/promotion.dart';
+import 'pdf_type.dart';
 
 class CatalogPdfService {
   static final CatalogPdfService instance = CatalogPdfService._internal();
@@ -82,6 +83,11 @@ class CatalogPdfService {
   /// generador de catálogos al abrirse). Las usan el PDF y las historias.
   List<Promotion> promotions = const [];
 
+  /// Tiene promoción vigente o precio de antes: lleva la cinta «OFERTA» (0.16.0)
+  bool hasPromo(Product p) =>
+      p.onOffer ||
+      Promotion.catalogLabel(promotions, productId: p.id, category: p.category, price: p.salePrice, money: CurrencyFormatter.format) != null;
+
   /// El precio del producto, con su promoción si tiene
   String priceOf(Product p) =>
       Promotion.catalogLabel(promotions, productId: p.id, category: p.category, price: p.salePrice, money: CurrencyFormatter.format) ??
@@ -93,6 +99,9 @@ class CatalogPdfService {
     CatalogStyle style = const CatalogStyle(),
     String? categoryFilter,
     void Function(double progress, String status)? onProgress,
+
+    /// Dirección de la tienda en línea: el catálogo lleva su QR en la portada (0.16.0)
+    String? storeUrl,
   }) async {
     final targetProducts = selectProducts(products, style, categoryFilter: categoryFilter);
     if (targetProducts.isEmpty) {
@@ -123,10 +132,11 @@ class CatalogPdfService {
       theme: await pdfTheme(),
     );
 
-    // La lista de precios va en renglones; las demás, en tarjetas
+    // La lista de precios y el menú van en renglones; las demás, en tarjetas
     final isList = style.template == 'lista';
-    final perPage = isList ? listRowsPerPage : style.itemsPerPage;
-    final columns = isList ? 1 : (perPage >= 4 ? 2 : 1);
+    final isMenu = style.template == 'menu';
+    final perPage = isMenu ? menuRowsPerPage : (isList ? listRowsPerPage : style.itemsPerPage);
+    final columns = isList || isMenu ? 1 : (perPage >= 4 ? 2 : 1);
     final totalPages = (targetProducts.length / perPage).ceil();
     final title = style.title.trim().isNotEmpty
         ? style.title.trim()
@@ -148,10 +158,14 @@ class CatalogPdfService {
           build: (_) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(business: business, title: title, logo: logo, colors: colors, compact: page > 0, style: style),
+              if (style.template == 'moda' || isMenu)
+                _buildCenteredHeader(business: business, title: title, colors: colors, compact: page > 0, style: style, storeUrl: storeUrl)
+              else
+                _buildHeader(business: business, title: title, logo: logo, colors: colors, compact: page > 0, style: style, storeUrl: storeUrl),
               pw.SizedBox(height: 12),
               if (isList) _buildPriceList(pageProducts, imageMap, style, colors),
-              if (!isList)
+              if (isMenu) _buildMenu(pageProducts, style, colors),
+              if (!isList && !isMenu)
               for (final row in rows)
                 pw.Padding(
                   padding: const pw.EdgeInsets.only(bottom: 10),
@@ -162,7 +176,7 @@ class CatalogPdfService {
                         if (i > 0) pw.SizedBox(width: 10),
                         pw.Expanded(
                           child: i < row.length
-                              ? (style.template == 'vitrina'
+                              ? (style.template == 'vitrina' || style.template == 'moda'
                                   ? _buildShowcaseCard(row[i], imageMap[row[i].id], style, colors, perPage)
                                   : _buildProductCard(row[i], imageMap[row[i].id], style, colors, perPage))
                               : pw.SizedBox(),
@@ -261,6 +275,7 @@ class CatalogPdfService {
     required _CatalogColors colors,
     required bool compact,
     required CatalogStyle style,
+    String? storeUrl,
   }) {
     final logoSize = compact ? 28.0 : 46.0;
     final logoBox = logo != null
@@ -311,12 +326,12 @@ class CatalogPdfService {
                     ),
                     child: pw.Text(
                       title.toUpperCase(),
-                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: colors.band),
+                      style: pw.TextStyle(fontSize: PdfPt.item, fontWeight: pw.FontWeight.bold, color: colors.band),
                     ),
                   ),
                 ] else if (!compact) ...[
                   pw.SizedBox(height: 2),
-                  pw.Text(title, style: const pw.TextStyle(fontSize: 11, color: PdfColors.white)),
+                  pw.Text(title, style: const pw.TextStyle(fontSize: PdfPt.body, color: PdfColors.white)),
                 ],
               ],
             ),
@@ -325,17 +340,133 @@ class CatalogPdfService {
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.end,
               children: [
-                pw.Text('Pedidos por WhatsApp', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
+                pw.Text('Pedidos por WhatsApp', style: const pw.TextStyle(fontSize: PdfPt.caption, color: PdfColors.white)),
                 pw.Text(
                   style.whatsapp.trim(),
                   style: pw.TextStyle(fontSize: compact ? 10 : 12, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
                 ),
               ],
             ),
+          if (!compact && storeUrl != null) ...[pw.SizedBox(width: 12), _qrBox(storeUrl)],
         ],
       ),
     );
   }
+
+  /// QR de la tienda en la portada: «Escanea y pide» (0.16.0)
+  pw.Widget _qrBox(String url) => pw.Container(
+        padding: const pw.EdgeInsets.all(5),
+        decoration: const pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.all(pw.Radius.circular(8))),
+        child: pw.Column(
+          children: [
+            pw.BarcodeWidget(barcode: pw.Barcode.qrCode(), data: url, width: 54, height: 54),
+            pw.SizedBox(height: 2),
+            pw.Text('Escanea y pide', style: const pw.TextStyle(fontSize: PdfPt.tiny, color: PdfColors.black)),
+          ],
+        ),
+      );
+
+  /// Encabezado de Moda y Menú (0.16.0): el nombre centrado sobre el fondo, sin franja
+  pw.Widget _buildCenteredHeader({
+    required Business business,
+    required String title,
+    required _CatalogColors colors,
+    required bool compact,
+    required CatalogStyle style,
+    String? storeUrl,
+  }) {
+    final menu = style.template == 'menu';
+    final name = pw.Column(
+      children: [
+        pw.Text(
+          menu ? business.name : business.name.toUpperCase(),
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(
+            fontSize: compact ? 13 : (menu ? 24 : 22),
+            fontWeight: pw.FontWeight.bold,
+            letterSpacing: menu ? 0 : (compact ? 3 : 6),
+            color: colors.ink,
+          ),
+        ),
+        if (!compact) ...[
+          pw.SizedBox(height: 4),
+          pw.Text(menu ? title : title.toUpperCase(),
+              textAlign: pw.TextAlign.center,
+              style: pw.TextStyle(fontSize: PdfPt.label, letterSpacing: menu ? 0 : 2, color: colors.muted)),
+          if (style.whatsapp.trim().isNotEmpty) ...[
+            pw.SizedBox(height: 2),
+            pw.Text('Pedidos por WhatsApp ${style.whatsapp.trim()}', style: pw.TextStyle(fontSize: PdfPt.small, color: colors.accent)),
+          ],
+        ],
+      ],
+    );
+    return pw.Container(
+      padding: pw.EdgeInsets.only(bottom: compact ? 6 : 12),
+      decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: colors.accent, width: menu ? 1.2 : 0.6))),
+      child: !compact && storeUrl != null
+          ? pw.Row(children: [pw.SizedBox(width: 64), pw.Expanded(child: name), _qrBox(storeUrl)])
+          : name,
+    );
+  }
+
+  /// Renglones de la plantilla «Menú» (0.16.0)
+  static const menuRowsPerPage = 14;
+
+  /// Plantilla «Menú»: cada categoría es una sección de la carta, con la descripción
+  /// debajo del nombre y el precio a la derecha
+  pw.Widget _buildMenu(List<Product> products, CatalogStyle style, _CatalogColors colors) {
+    final sections = <String, List<Product>>{};
+    for (final p in products) {
+      sections.putIfAbsent(p.category.trim().isEmpty ? 'Otros' : p.category.trim(), () => []).add(p);
+    }
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        for (final e in sections.entries) ...[
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 8, bottom: 4),
+            child: pw.Text(e.key.toUpperCase(),
+                style: pw.TextStyle(fontSize: PdfPt.label, letterSpacing: 2, fontWeight: pw.FontWeight.bold, color: colors.accent)),
+          ),
+          for (final p in e.value)
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Row(children: [
+                          pw.Flexible(
+                            child: pw.Text(p.name, maxLines: 1, style: pw.TextStyle(fontSize: PdfPt.item, fontWeight: pw.FontWeight.bold, color: colors.ink)),
+                          ),
+                          if (hasPromo(p)) ...[pw.SizedBox(width: 6), _ribbon(colors, small: true)],
+                        ]),
+                        if (style.showDescription && (p.description?.trim().isNotEmpty ?? false))
+                          pw.Text(p.description!.trim(), maxLines: 2, style: pw.TextStyle(fontSize: PdfPt.note, color: colors.muted)),
+                      ],
+                    ),
+                  ),
+                  if (style.showPrice) ...[
+                    pw.SizedBox(width: 10),
+                    pw.Text(priceOf(p), style: pw.TextStyle(fontSize: PdfPt.item, fontWeight: pw.FontWeight.bold, color: colors.ink)),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  /// La cinta «OFERTA» (0.16.0: en todas las plantillas, cuando hay promoción)
+  pw.Widget _ribbon(_CatalogColors colors, {bool small = false}) => pw.Container(
+        padding: pw.EdgeInsets.symmetric(horizontal: small ? 5 : 7, vertical: small ? 1.5 : 3),
+        decoration: pw.BoxDecoration(color: colors.band, borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8))),
+        child: pw.Text('OFERTA', style: pw.TextStyle(fontSize: small ? 6.5 : 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+      );
 
   /// Tarjeta de producto; el tamaño depende de cuántos van por página
   pw.Widget _buildProductCard(Product product, Uint8List? image, CatalogStyle style, _CatalogColors colors, int perPage) {
@@ -369,22 +500,7 @@ class CatalogPdfService {
               fit: pw.StackFit.expand,
               children: [
                 _productImage(product, image, colors, imageHeight, perPage == 1 ? pw.BoxFit.contain : pw.BoxFit.cover),
-                if (style.template == 'promo')
-                  pw.Positioned(
-                    top: 8,
-                    left: 8,
-                    child: pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: pw.BoxDecoration(
-                        color: colors.band,
-                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                      ),
-                      child: pw.Text(
-                        'OFERTA',
-                        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-                      ),
-                    ),
-                  ),
+                if (style.template == 'promo' || hasPromo(product)) pw.Positioned(top: 8, left: 8, child: _ribbon(colors)),
               ],
             ),
           ),
@@ -428,7 +544,7 @@ class CatalogPdfService {
                           color: colors.accentSoft,
                           borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
                         ),
-                        child: pw.Text(stockText, style: pw.TextStyle(fontSize: 7, color: colors.accent)),
+                        child: pw.Text(stockText, style: pw.TextStyle(fontSize: PdfPt.micro, color: colors.accent)),
                       ),
                   ],
                 ),
@@ -472,13 +588,19 @@ class CatalogPdfService {
           height: imageHeight,
           decoration: pw.BoxDecoration(
             color: colors.imageBg,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(16)),
+            borderRadius: pw.BorderRadius.all(pw.Radius.circular(style.template == 'moda' ? 4 : 16)),
           ),
-          child: _productImage(product, image, colors, imageHeight, pw.BoxFit.cover),
+          child: pw.Stack(
+            fit: pw.StackFit.expand,
+            children: [
+              _productImage(product, image, colors, imageHeight, pw.BoxFit.cover),
+              if (hasPromo(product)) pw.Positioned(top: 8, left: 8, child: _ribbon(colors)),
+            ],
+          ),
         ),
         pw.SizedBox(height: 6),
         pw.Text(
-          product.name,
+          style.template == 'moda' ? product.name.toUpperCase() : product.name,
           maxLines: 2,
           textAlign: pw.TextAlign.center,
           style: pw.TextStyle(fontSize: nameSize, fontWeight: pw.FontWeight.bold, color: colors.ink),
@@ -510,7 +632,7 @@ class CatalogPdfService {
           pw.Text(
             '${product.stock} disponibles',
             textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(fontSize: 7, color: colors.muted),
+            style: pw.TextStyle(fontSize: PdfPt.micro, color: colors.muted),
           ),
       ],
     );
@@ -549,21 +671,26 @@ class CatalogPdfService {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text(
-                          products[i].name,
-                          maxLines: 1,
-                          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: colors.ink),
-                        ),
+                        pw.Row(children: [
+                          pw.Flexible(
+                            child: pw.Text(
+                              products[i].name,
+                              maxLines: 1,
+                              style: pw.TextStyle(fontSize: PdfPt.body, fontWeight: pw.FontWeight.bold, color: colors.ink),
+                            ),
+                          ),
+                          if (hasPromo(products[i])) ...[pw.SizedBox(width: 6), _ribbon(colors, small: true)],
+                        ]),
                         if (listMeta(products[i], style).isNotEmpty)
                           pw.Text(listMeta(products[i], style),
-                              maxLines: 1, style: pw.TextStyle(fontSize: 8, color: colors.muted)),
+                              maxLines: 1, style: pw.TextStyle(fontSize: PdfPt.caption, color: colors.muted)),
                       ],
                     ),
                   ),
                   if (style.showPrice)
                     pw.Text(
                       priceOf(products[i]),
-                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: colors.accent),
+                      style: pw.TextStyle(fontSize: PdfPt.item, fontWeight: pw.FontWeight.bold, color: colors.accent),
                     ),
                 ],
               ),
@@ -598,13 +725,13 @@ class CatalogPdfService {
           pw.Expanded(
             child: pw.Text(
               contact.isNotEmpty ? contact : 'Precios sujetos a disponibilidad',
-              style: pw.TextStyle(fontSize: 7.5, color: colors.muted),
+              style: pw.TextStyle(fontSize: PdfPt.footnote, color: colors.muted),
             ),
           ),
           pw.SizedBox(width: 12),
           pw.Text(
             style.showBranding ? 'Página $pageIndex de $totalPages · Hecho con Stockealo' : 'Página $pageIndex de $totalPages',
-            style: pw.TextStyle(fontSize: 7.5, color: colors.muted),
+            style: pw.TextStyle(fontSize: PdfPt.footnote, color: colors.muted),
           ),
         ],
       ),

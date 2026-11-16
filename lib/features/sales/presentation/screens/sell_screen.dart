@@ -31,6 +31,7 @@ import '../widgets/deliveries.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../../core/permissions/permission_guard.dart';
 import '../../../team/presentation/widgets/authorization_gate.dart';
+import '../../../dashboard/data/sold_out_prefs.dart';
 
 /// Vender: el punto de venta. Buscar o escanear (también con lector USB: el código
 /// entra solo al carrito), tocar productos, cobrar con F9 y seguir con la
@@ -190,11 +191,13 @@ class _SellScreenState extends State<SellScreen> {
     final products = await ProductRepository.instance.searchProducts('', businessId: widget.business.id);
     final customers = await CustomerRepository.instance.getCustomers(widget.business.id);
     final closed = await isCashClosedFor(widget.business);
+    // Agotados que el dueño pidió ocultar en Vender (0.16.0): vuelven solos con el stock
+    final hidden = await SoldOutPrefs.hidden(widget.business.id);
     // Las promociones vigentes se aplican solas a la cuenta (0.13.4)
     _cart.setPromotions(await PromotionsRepository.instance.live(widget.business.id));
     if (!mounted) return;
     setState(() {
-      _products = products.where((p) => p.isActive).toList();
+      _products = products.where((p) => p.isActive && !(p.stock <= 0 && hidden.contains(p.id))).toList();
       _customers = [for (final c in customers) c.name];
       _cashClosed = closed;
       _loading = false;

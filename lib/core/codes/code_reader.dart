@@ -7,6 +7,7 @@ import '../design/status_pill.dart';
 import '../theme/app_tokens.dart';
 import 'barcode_check.dart';
 import 'photo_barcode.dart';
+import '../utils/paste_image.dart';
 
 /// Cómo se leyó el código
 enum CodeSource { camera, photo, manual }
@@ -92,6 +93,9 @@ class _CodeReaderState extends State<CodeReader> {
   bool _photoAvailable = false;
   MobileScannerController? _camera;
 
+  /// En la web: dejar de escuchar Ctrl+V y las fotos arrastradas (0.16.0)
+  void Function()? _stopPaste;
+
   /// La línea de ayuda que cambia según el paso
   String _status = '';
   AppTone _statusTone = AppTone.neutral;
@@ -130,11 +134,18 @@ class _CodeReaderState extends State<CodeReader> {
     PhotoBarcode.available.then((v) {
       if (mounted) setState(() => _photoAvailable = v);
     });
+    // En el computador: arrastrar la foto del código o pegarla con Ctrl+V (0.16.0)
+    _stopPaste = listenForPastedOrDroppedImages((image) {
+      if (!mounted || !_photoAvailable) return;
+      if (_source != CodeSource.photo) _choose(CodeSource.photo);
+      _readPhoto(image.bytes, XFile.fromData(image.bytes, mimeType: image.mimeType));
+    });
     if (_field.text.isNotEmpty) _lookupOwner();
   }
 
   @override
   void dispose() {
+    _stopPaste?.call();
     _camera?.dispose();
     _field.dispose();
     _focus.dispose();
@@ -178,7 +189,9 @@ class _CodeReaderState extends State<CodeReader> {
     _statusTone = AppTone.neutral;
     _status = switch (_source) {
       CodeSource.camera => 'Apunta la cámara al código de barras o al QR.',
-      CodeSource.photo => 'Elige una foto donde se vea el código: del producto, una captura o un archivo.',
+      CodeSource.photo => canPasteImages
+          ? 'Elige una foto donde se vea el código, arrástrala aquí o pégala con Ctrl + V.'
+          : 'Elige una foto donde se vea el código: del producto, una captura o un archivo.',
       CodeSource.manual => 'Escribe el código o pásalo con el lector de código de barras.',
     };
   }
@@ -222,7 +235,12 @@ class _CodeReaderState extends State<CodeReader> {
   Future<void> _pickPhoto() async {
     final file = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (file == null) return;
-    final bytes = await file.readAsBytes();
+    await _readPhoto(await file.readAsBytes(), file);
+  }
+
+  /// Busca el código en una foto: elegida, pegada o arrastrada
+  Future<void> _readPhoto(Uint8List bytes, XFile file) async {
+    if (!mounted) return;
     setState(() {
       _photo = bytes;
       _statusTone = AppTone.neutral;
@@ -417,7 +435,11 @@ class _CodeReaderState extends State<CodeReader> {
                   ),
                 if (_source == CodeSource.photo)
                   _photo == null
-                      ? _viewerMessage(Icons.image_outlined, 'Toca para elegir una foto', onTap: _pickPhoto)
+                      ? _viewerMessage(
+                          Icons.image_outlined,
+                          canPasteImages ? 'Arrastra aquí una foto del código\no pégala con Ctrl + V' : 'Toca para elegir una foto',
+                          onTap: _pickPhoto,
+                        )
                       : GestureDetector(onTap: _pickPhoto, child: Image.memory(_photo!, fit: BoxFit.contain)),
                 if (_source == CodeSource.manual)
                   _viewerMessage(Icons.keyboard_outlined, 'Listo para el lector de código de barras'),

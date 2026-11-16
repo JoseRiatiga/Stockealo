@@ -21,6 +21,15 @@ import '../../../products/data/product_image_service.dart';
 import '../../../../core/design/filter_tabs.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/design/app_card.dart';
+import '../../../../store_web/store_page.dart';
+import '../../../products/data/product_repository.dart';
+import '../../../../core/services/maintenance_service.dart';
+import '../../../../core/design/app_time_picker.dart';
+import '../../../../core/design/app_dialog.dart';
+import '../../../products/data/product_templates.dart';
+import '../widgets/store_qr_sheet.dart';
+import 'store_stats_screen.dart';
+import 'store_coupons_screen.dart';
 
 /// Tienda en línea (lugar del menú): publica el catálogo en stockealo.online/tienda/<slug> con
 /// carrito; los pedidos llegan por WhatsApp (Stockealo Pro).
@@ -47,7 +56,14 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
   String? _initialWhatsapp;
   final _welcomeController = TextEditingController();
   final _heroController = TextEditingController();
+  final _paymentController = TextEditingController();
+
+  /// Hashtags propios para Instagram (0.16.0, fase 3)
+  final _hashtagsController = TextEditingController();
   String _template = StoreTemplate.classic;
+
+  /// Personalizar tienda (0.16.0): color, modo oscuro, destacados y horario
+  StoreLook _look = StoreLook.none;
 
   OnlineStoreConfig? _saved;
   bool _enabled = true;
@@ -86,6 +102,8 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
     _slugController.dispose();
     _welcomeController.dispose();
     _heroController.dispose();
+    _paymentController.dispose();
+    _hashtagsController.dispose();
     super.dispose();
   }
 
@@ -108,12 +126,17 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         _enabled = saved?.enabled ?? true;
         _showStock = saved?.showStock ?? false;
         _heroPhotos = saved?.heroPhotos ?? true;
-        _template = saved?.template ?? StoreTemplate.classic;
+        // Sin tienda todavía: la plantilla y el aviso +18 que le quedan a su tipo de negocio
+        final suggested = ProductTemplate.suggestedFor(widget.business.icon);
+        _template = saved?.template ?? suggested?.storeTemplate ?? StoreTemplate.classic;
         _coverUrl = saved?.heroImageUrl;
         _cover = _coverUrl != null
             ? _coverOwn
             : (_template == StoreTemplate.fashion && _heroPhotos ? _coverProducts : _coverNone);
         _heroController.text = saved?.heroTitle ?? '';
+        _look = saved?.look ?? StoreLook(adult: suggested?.adult ?? false);
+        _paymentController.text = _look.payment ?? '';
+        _hashtagsController.text = _look.hashtags.join(' ');
       });
     } catch (e) {
       if (mounted) setState(() => _loadError = '$e');
@@ -182,10 +205,20 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         await SupabaseService.instance.removeStorageFiles('product-images', widget.business.id, prefix: _coverFile);
         _coverUrl = null;
       }
+      // Personalizar tienda (0.16.0): si la nube aún no lo tiene, lo demás queda guardado
+      var lookSaved = true;
+      try {
+        _look = await _service.saveLook(businessId: widget.business.id, look: _lookToSave);
+      } catch (e) {
+        lookSaved = false;
+        if (mounted) AppToast.show(context, message: '$e', type: ToastType.warning);
+      }
       if (!mounted) return;
       setState(() => _saved = saved);
-      AppToast.show(context,
-          message: saved.enabled ? 'Tu tienda está publicada.' : 'Guardado. La tienda está apagada.', type: ToastType.success);
+      if (lookSaved) {
+        AppToast.show(context,
+            message: saved.enabled ? 'Tu tienda está publicada.' : 'Guardado. La tienda está apagada.', type: ToastType.success);
+      }
     } catch (e) {
       if (mounted) AppToast.show(context, message: '$e', type: ToastType.error);
     } finally {
@@ -273,6 +306,375 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
             label: Text(_coverUrl == null ? 'Subir foto' : 'Cambiar foto'),
           ),
         ],
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Personalizar tienda (0.16.0)
+  // ---------------------------------------------------------------------------
+
+  static IconData _templateIcon(String t) => switch (t) {
+        StoreTemplate.fashion => Icons.checkroom_outlined,
+        StoreTemplate.market => Icons.local_grocery_store_outlined,
+        StoreTemplate.menu => Icons.restaurant_menu_outlined,
+        StoreTemplate.boutique => Icons.diamond_outlined,
+        _ => Icons.storefront_outlined,
+      };
+
+  /// Las 5 plantillas, de a dos por fila
+  Widget _templatePicker(StockealoColors c) => LayoutBuilder(
+        builder: (context, box) {
+          final w = (box.maxWidth - AppSpace.sm) / 2;
+          return Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final t in StoreTemplate.all)
+                SizedBox(
+                  width: box.maxWidth < 360 ? box.maxWidth : w,
+                  child: Semantics(
+                    button: true,
+                    selected: _template == t,
+                    child: Material(
+                      color: c.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.control + 2),
+                        side: BorderSide(color: _template == t ? c.accent : c.line, width: _template == t ? 2 : 1),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(AppRadius.control + 2),
+                        onTap: () => setState(() => _template = t),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpace.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(_templateIcon(t), size: 18, color: _template == t ? c.accent : c.inkMuted),
+                                  const SizedBox(width: AppSpace.sm),
+                                  Expanded(child: Text(StoreTemplate.label(t), style: AppText.body(context, weight: FontWeight.w700))),
+                                  if (ProductTemplate.suggestedFor(widget.business.icon)?.storeTemplate == t)
+                                    const StatusPill('Sugerida', tone: AppTone.accent, compact: true),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpace.xs),
+                              Text(StoreTemplate.description(t), style: AppText.caption(context)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      );
+
+  Widget _personalize(StockealoColors c) {
+    final fashion = _template == StoreTemplate.fashion;
+    final schedule = _look.schedule;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: AppSpace.lg),
+        const SectionLabel('PERSONALIZAR', padding: EdgeInsets.only(bottom: AppSpace.sm)),
+        Text('Color de la tienda', style: AppText.body(context, weight: FontWeight.w600)),
+        const SizedBox(height: AppSpace.sm),
+        Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ChoiceChip(
+              label: const Text('El del negocio'),
+              selected: _look.accent == null,
+              onSelected: (_) => setState(() => _look = _look.copyWith(clearAccent: true)),
+            ),
+            for (final e in AppPalette.businessColors.entries)
+              Tooltip(
+                message: e.key,
+                child: InkResponse(
+                  onTap: () => setState(() => _look = _look.copyWith(accent: AppPalette.toHex(e.value))),
+                  radius: 22,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: e.value,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _look.accent == AppPalette.toHex(e.value) ? c.ink : c.line,
+                        width: _look.accent == AppPalette.toHex(e.value) ? 3 : 1,
+                      ),
+                    ),
+                    child: _look.accent == AppPalette.toHex(e.value) ? Icon(Icons.check, size: 18, color: c.onAccent) : null,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text('Aviso +18', style: AppText.body(context)),
+          subtitle: Text('Al entrar pregunta «¿Tienes 18 años o más?». Para licores y vapers.', style: AppText.small(context)),
+          value: _look.adult,
+          onChanged: (v) => setState(() => _look = _look.copyWith(adult: v)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text('Modo oscuro', style: AppText.body(context)),
+          subtitle: Text(fashion ? 'Moda siempre es oscura.' : 'Fondo oscuro con tu color.', style: AppText.small(context)),
+          value: fashion || _look.dark,
+          onChanged: fashion ? null : (v) => setState(() => _look = _look.copyWith(dark: v)),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.star_outline),
+          title: Text('Destacados', style: AppText.body(context)),
+          subtitle: Text(
+            _look.featured.isEmpty
+                ? 'Hasta ${StoreLook.maxFeatured} productos que salen primero'
+                : '${_look.featured.length} ${_look.featured.length == 1 ? 'elegido' : 'elegidos'}: salen primero',
+            style: AppText.small(context),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _pickFeatured,
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.schedule_outlined),
+          title: Text('Horario', style: AppText.body(context)),
+          subtitle: Text(
+            schedule == null ? 'Muestra «Abierto» o «Cerrado». Fuera del horario los pedidos llegan con aviso.' : schedule.text,
+            style: AppText.small(context),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _editSchedule,
+        ),
+        const SizedBox(height: AppSpace.sm),
+        TextField(
+          controller: _paymentController,
+          maxLength: 300,
+          maxLines: 3,
+          minLines: 1,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'Datos de pago (opcional)',
+            hintText: 'Ej.: Nequi 300 123 4567 a nombre de Rosa',
+            helperText: 'Salen al final del pedido, para que el cliente sepa cómo pagarte.',
+          ),
+        ),
+        const SizedBox(height: AppSpace.sm),
+        TextField(
+          controller: _hashtagsController,
+          maxLines: 2,
+          minLines: 1,
+          decoration: InputDecoration(
+            labelText: 'Tus hashtags (opcional)',
+            hintText: '${StoreLook.nameHashtag(widget.business.name) ?? '#MiNegocio'} #Domicilios',
+            helperText: 'Salen en el texto de Instagram, junto a los sugeridos para tu tipo de negocio.',
+            helperMaxLines: 2,
+          ),
+        ),
+        const SizedBox(height: AppSpace.sm),
+        OutlinedButton.icon(
+          onPressed: _preview,
+          icon: const Icon(Icons.visibility_outlined, size: 18),
+          label: const Text('Vista previa'),
+        ),
+      ],
+    );
+  }
+
+  StoreLook get _lookToSave {
+    final pay = _paymentController.text.trim();
+    final look = _look.copyWith(hashtags: StoreLook.parseHashtags(_hashtagsController.text));
+    return pay.isEmpty ? look.copyWith(clearPayment: true) : look.copyWith(payment: pay);
+  }
+
+  Future<void> _pickFeatured() async {
+    final products = (await ProductRepository.instance.getAllProducts(widget.business.id)).where((p) => p.stock > 0).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    if (!mounted) return;
+    final picked = [..._look.featured];
+    var query = '';
+    final ok = await AppSheet.show<bool>(
+      context: context,
+      title: 'Destacados',
+      subtitle: 'Elige hasta ${StoreLook.maxFeatured}. Salen primero, en el orden en que los eliges.',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final shown = products.where((p) => query.isEmpty || p.name.toLowerCase().contains(query)).take(60).toList();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                decoration: const InputDecoration(hintText: 'Buscar producto', prefixIcon: Icon(Icons.search_outlined)),
+                onChanged: (v) => setLocal(() => query = v.trim().toLowerCase()),
+              ),
+              const SizedBox(height: AppSpace.sm),
+              if (products.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(AppSpace.lg),
+                  child: Text('No tienes productos con stock.', textAlign: TextAlign.center, style: AppText.body(ctx)),
+                ),
+              for (final p in shown)
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: picked.contains(p.id),
+                  title: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: picked.contains(p.id) ? Text('N.º ${picked.indexOf(p.id) + 1}') : null,
+                  onChanged: (v) => setLocal(() {
+                    if (v == true) {
+                      if (picked.length >= StoreLook.maxFeatured) {
+                        AppToast.show(ctx, message: 'Máximo ${StoreLook.maxFeatured} destacados.', type: ToastType.warning);
+                        return;
+                      }
+                      picked.add(p.id);
+                    } else {
+                      picked.remove(p.id);
+                    }
+                  }),
+                ),
+              const SizedBox(height: AppSpace.md),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Listo · ${picked.length} de ${StoreLook.maxFeatured}')),
+            ],
+          );
+        },
+      ),
+    );
+    if (ok == true && mounted) setState(() => _look = _look.copyWith(featured: picked));
+  }
+
+  Future<void> _editSchedule() async {
+    final current = _look.schedule;
+    final days = {...?current?.days};
+    if (days.isEmpty) days.addAll([1, 2, 3, 4, 5, 6]);
+    var open = current?.open ?? '07:00';
+    var close = current?.close ?? '20:00';
+    TimeOfDay time(String hhmm) => TimeOfDay(hour: int.parse(hhmm.split(':')[0]), minute: int.parse(hhmm.split(':')[1]));
+    String hhmm(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    final result = await AppSheet.show<String>(
+      context: context,
+      title: 'Horario de la tienda',
+      subtitle: 'Fuera del horario la tienda dice «Cerrado», pero los pedidos llegan igual con aviso.',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Días', style: AppText.body(ctx, weight: FontWeight.w600)),
+            const SizedBox(height: AppSpace.sm),
+            Wrap(
+              spacing: AppSpace.xs + 2,
+              runSpacing: AppSpace.xs + 2,
+              children: [
+                for (var d = 1; d <= 7; d++)
+                  FilterChip(
+                    label: Text(StoreSchedule.dayShort[d - 1]),
+                    tooltip: const ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][d - 1],
+                    selected: days.contains(d),
+                    showCheckmark: false,
+                    onSelected: (v) => setLocal(() => v ? days.add(d) : days.remove(d)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpace.md),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.wb_sunny_outlined, size: 18),
+                    label: Text('Abre ${StoreSchedule.hourText(open)}'),
+                    onPressed: () async {
+                      final t = await showAppTimePicker(ctx, initialTime: time(open), helpText: 'Hora de abrir');
+                      if (t != null) setLocal(() => open = hhmm(t));
+                    },
+                  ),
+                ),
+                const SizedBox(width: AppSpace.sm),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.nightlight_outlined, size: 18),
+                    label: Text('Cierra ${StoreSchedule.hourText(close)}'),
+                    onPressed: () async {
+                      final t = await showAppTimePicker(ctx, initialTime: time(close), helpText: 'Hora de cerrar');
+                      if (t != null) setLocal(() => close = hhmm(t));
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpace.lg),
+            FilledButton(onPressed: days.isEmpty ? null : () => Navigator.pop(ctx, 'ok'), child: const Text('Listo')),
+            if (current != null)
+              TextButton(onPressed: () => Navigator.pop(ctx, 'clear'), child: const Text('Quitar el horario')),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _look = result == 'clear'
+        ? _look.copyWith(clearSchedule: true)
+        : _look.copyWith(schedule: StoreSchedule(days: days, open: open, close: close)));
+  }
+
+  /// Cómo queda, con lo que está en pantalla y sin guardar: la tienda publicada con el
+  /// diseño nuevo, o (si aún no está publicada) con los productos de este celular
+  Future<void> _preview() async {
+    final slug = _slugController.text.trim().toLowerCase();
+    PublicStore? base;
+    try {
+      if (_saved?.enabled == true) base = await _service.getPublic(_saved!.slug);
+    } catch (_) {}
+    base ??= await _localStore(slug);
+    if (!mounted) return;
+    final store = base.copyWith(
+      template: _template,
+      heroTitle: _heroController.text.trim().isEmpty ? null : _heroController.text.trim(),
+      heroPhotos: _template == StoreTemplate.fashion ? _cover == _coverProducts : _heroPhotos,
+      heroImageUrl: _cover == _coverOwn ? _coverUrl : null,
+      welcome: _welcomeController.text.trim(),
+      look: _lookToSave,
+    );
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Vista previa'), actions: const [
+            Padding(padding: EdgeInsets.only(right: AppSpace.md), child: StatusPill('Sin guardar', tone: AppTone.warning)),
+          ]),
+          body: StorePage(slug: store.slug, loader: (_) async => store, maintenanceLoader: () async => MaintenanceState.none),
+        ),
+      ),
+    );
+  }
+
+  Future<PublicStore> _localStore(String slug) async {
+    final products = await ProductRepository.instance.getAllProducts(widget.business.id);
+    return PublicStore(
+      slug: slug.isEmpty ? 'mi-tienda' : slug,
+      whatsapp: _whatsapp?.replaceAll('+', '') ?? '',
+      businessName: widget.business.name,
+      currency: widget.business.currency,
+      color: widget.business.color,
+      logoUrl: (widget.business.logoUrl ?? '').startsWith('https://') ? widget.business.logoUrl : null,
+      products: [
+        for (final p in products)
+          if (p.stock > 0 && p.salePrice > 0)
+            StoreProduct(
+              id: p.id,
+              name: p.name,
+              category: p.category.trim(),
+              price: p.salePrice,
+              description: (p.description ?? '').trim().isEmpty ? null : p.description!.trim(),
+              imageUrl: (p.photoPath ?? '').startsWith('https://') ? p.photoPath : null,
+              oldPrice: (p.comparePrice ?? 0) > p.salePrice ? p.comparePrice : null,
+              few: p.stock <= 3,
+            ),
       ],
     );
   }
@@ -412,6 +814,24 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                   onPressed: () => _copyLink(store.url),
                   icon: const Icon(Icons.copy_outlined, size: 18),
                 ),
+                // Estadísticas (0.16.0, fase 4)
+                OutlinedButton.icon(
+                  onPressed: () => StoreStatsScreen.open(context, widget.business),
+                  icon: const Icon(Icons.insights_outlined, size: 18),
+                  label: const Text('Estadísticas'),
+                ),
+                // Cupones de la tienda (0.16.0, fase 7)
+                OutlinedButton.icon(
+                  onPressed: () => StoreCouponsScreen.open(context, widget.business, store.url),
+                  icon: const Icon(Icons.local_offer_outlined, size: 18),
+                  label: const Text('Cupones'),
+                ),
+                // QR para el mostrador (0.16.0, fase 3)
+                OutlinedButton.icon(
+                  onPressed: () => StoreQrSheet.show(context, business: widget.business, store: store),
+                  icon: const Icon(Icons.qr_code_2_outlined, size: 18),
+                  label: const Text('QR'),
+                ),
               ],
             ),
           ],
@@ -469,53 +889,9 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
               onChanged: (v) => _whatsapp = v.isValid ? v.e164 : null,
             ),
             const SizedBox(height: AppSpace.lg),
-            // Cómo se ve la tienda: Clásica o Moda
+            // Cómo se ve la tienda: Clásica, Moda, Mercado, Menú o Boutique (0.16.0)
             const SectionLabel('PLANTILLA', padding: EdgeInsets.only(bottom: AppSpace.sm)),
-            Row(
-              children: [
-                for (final (t, desc) in [
-                  (StoreTemplate.classic, 'Clara, con el color de tu negocio arriba. Para cualquier negocio.'),
-                  (StoreTemplate.fashion, 'Oscura, con portada grande, filtros por talla, color y precio, y ofertas. Para ropa y calzado.'),
-                ]) ...[
-                  if (t == StoreTemplate.fashion) const SizedBox(width: AppSpace.sm),
-                  Expanded(
-                    child: Semantics(
-                      button: true,
-                      selected: _template == t,
-                      child: Material(
-                        color: c.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.control + 2),
-                          side: BorderSide(color: _template == t ? c.accent : c.line, width: _template == t ? 2 : 1),
-                        ),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(AppRadius.control + 2),
-                          onTap: () => setState(() => _template = t),
-                          child: Padding(
-                            padding: const EdgeInsets.all(AppSpace.md),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(t == StoreTemplate.fashion ? Icons.checkroom_outlined : Icons.storefront_outlined,
-                                        size: 18, color: _template == t ? c.accent : c.inkMuted),
-                                    const SizedBox(width: AppSpace.sm),
-                                    Text(StoreTemplate.label(t), style: AppText.body(context, weight: FontWeight.w700)),
-                                  ],
-                                ),
-                                const SizedBox(height: AppSpace.xs),
-                                Text(desc, style: AppText.caption(context)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+            _templatePicker(c),
             if (_template == StoreTemplate.fashion) ...[
               const SizedBox(height: AppSpace.md),
               TextField(
@@ -551,6 +927,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
               value: _showStock,
               onChanged: (v) => setState(() => _showStock = v),
             ),
+            _personalize(c),
             const SizedBox(height: AppSpace.md),
             PrimaryActionButton(
               label: _saving ? 'Guardando…' : (_saved == null ? 'Publicar mi tienda' : 'Guardar cambios'),

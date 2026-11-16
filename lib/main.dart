@@ -16,12 +16,16 @@ import 'core/widgets/maintenance_gate.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/presentation/widgets/stockealo_splash_screen.dart';
 import 'features/onboarding/presentation/welcome_screen.dart';
+import 'core/l10n/app_locale.dart';
+import 'core/services/error_reporter.dart';
 
 /// Bienvenida pendiente en este dispositivo (se decide al arrancar, sin sesión)
 bool _showWelcome = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Errores al panel de administración (0.16.0, fase 5)
+  ErrorReporter.instance.install('app');
   try {
     await initializeDateFormatting('es_CO', null);
   } catch (e) {
@@ -45,6 +49,9 @@ class StockealoApp extends StatelessWidget {
       animation: ThemeController.instance,
       builder: (context, _) {
         return MaterialApp(
+          locale: AppLocale.locale,
+          supportedLocales: AppLocale.supported,
+          localizationsDelegates: AppLocale.delegates,
           title: 'Stockealo',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.build(Brightness.light, accent: ThemeController.instance.accent),

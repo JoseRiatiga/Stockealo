@@ -9,6 +9,10 @@ class PurchaseItem {
   final int quantity;
   final double unitCost;
 
+  /// Lote y vencimiento (0.16.0, fase 2b): solo en productos que controlan vencimiento
+  final String? lotCode;
+  final DateTime? expiresOn;
+
   const PurchaseItem({
     required this.productId,
     required this.productName,
@@ -16,6 +20,8 @@ class PurchaseItem {
     this.variantName,
     required this.quantity,
     required this.unitCost,
+    this.lotCode,
+    this.expiresOn,
   });
 
   double get subtotal => unitCost * quantity;
@@ -29,6 +35,9 @@ class PurchaseItem {
         if (variantName != null) 'variant_name': variantName,
         'quantity': quantity,
         'unit_cost': unitCost,
+        if (lotCode != null) 'lot_code': lotCode,
+        if (expiresOn != null)
+          'expires_on': '${expiresOn!.year.toString().padLeft(4, '0')}-${expiresOn!.month.toString().padLeft(2, '0')}-${expiresOn!.day.toString().padLeft(2, '0')}',
       };
 
   factory PurchaseItem.fromJson(Map<String, dynamic> j) => PurchaseItem(
@@ -38,6 +47,8 @@ class PurchaseItem {
         variantName: j['variant_name'] as String?,
         quantity: (j['quantity'] as num?)?.toInt() ?? 0,
         unitCost: (j['unit_cost'] as num?)?.toDouble() ?? 0,
+        lotCode: j['lot_code'] as String?,
+        expiresOn: DateTime.tryParse('${j['expires_on'] ?? ''}'),
       );
 }
 

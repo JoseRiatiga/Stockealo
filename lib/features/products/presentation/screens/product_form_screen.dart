@@ -27,6 +27,9 @@ import '../../../../core/codes/barcode_check.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../data/pricing.dart';
+import '../widgets/lots_widgets.dart';
+import '../../data/product_templates.dart';
+import '../../../store/presentation/widgets/store_qr_sheet.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? productToEdit;
@@ -60,6 +63,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   late TextEditingController _codeController;
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
+
+  /// Marca (0.16.0)
+  late TextEditingController _brandController;
   late TextEditingController _purchasePriceController;
   late TextEditingController _salePriceController;
 
@@ -84,6 +90,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   // Variantes (tallas y colores)
   bool _hasVariants = false;
+
+  /// Controla vencimiento por lote (0.16.0, fase 2b)
+  bool _tracksExpiry = false;
   final _variants = VariantEditorController();
 
   // Proveedor principal (opcional)
@@ -99,6 +108,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _codeController = TextEditingController(text: p?.code ?? CodeGenerator.generateUniqueCode());
     _nameController = TextEditingController(text: p?.name ?? '');
     _descriptionController = TextEditingController(text: p?.description ?? '');
+    _brandController = TextEditingController(text: p?.brand ?? '');
     _purchasePriceController = TextEditingController(
       text: p != null && p.purchasePrice > 0 ? p.purchasePrice.toStringAsFixed(0) : '',
     );
@@ -111,6 +121,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _stockController = TextEditingController(text: p?.stock.toString() ?? '0');
     _minStockController = TextEditingController(text: p?.minStock.toString() ?? '5');
     _photoPath = p?.photoPath;
+    _tracksExpiry = p?.tracksExpiry ?? false;
+    // Producto nuevo en una droguería o tienda de barrio: viene encendido
+    if (p == null) {
+      ProductTemplate.applied(widget.businessId).then((t) {
+        if (mounted && (t == ProductTemplate.drogueria || t == ProductTemplate.barrio)) setState(() => _tracksExpiry = true);
+      });
+    }
     if (p != null) {
       _selectedCategory = p.category;
       _hasVariants = p.hasVariants;
@@ -174,6 +191,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _codeController.dispose();
     _nameController.dispose();
     _descriptionController.dispose();
+    _brandController.dispose();
     _purchasePriceController.dispose();
     _salePriceController.dispose();
     _comparePriceController.dispose();
@@ -388,6 +406,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           ? null
           : _descriptionController.text.trim(),
       category: _selectedCategory!,
+      brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
       purchasePrice: purchasePrice,
       salePrice: salePrice,
       comparePrice: (double.tryParse(_comparePriceController.text.trim()) ?? 0) > salePrice
@@ -401,6 +420,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       hasVariants: _hasVariants,
       variants: variants,
       supplierId: _supplierId,
+      tracksExpiry: _tracksExpiry && !_hasVariants,
     );
 
     try {
@@ -444,6 +464,15 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Editar Producto' : 'Nuevo Producto'),
+        actions: [
+          // Compartir el producto con el link de la tienda (0.16.0, fase 3)
+          if (isEditing)
+            IconButton(
+              tooltip: 'Compartir',
+              icon: const Icon(Icons.share_outlined),
+              onPressed: () => ProductShare.share(context, product: widget.productToEdit!),
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -760,6 +789,26 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     ),
                   const SizedBox(height: 16),
 
+                  // Lotes con vencimiento (0.16.0, fase 2b)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: const Icon(Icons.event_outlined),
+                    title: const Text('Controla vencimiento por lote'),
+                    subtitle: Text(
+                      _hasVariants
+                          ? 'No disponible en productos con tallas o variantes.'
+                          : 'Cada entrada pide su fecha y lo vencido no se vende. Avisamos 30 días antes.',
+                      style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.inkMuted),
+                    ),
+                    value: _tracksExpiry && !_hasVariants,
+                    onChanged: _hasVariants ? null : (v) => setState(() => _tracksExpiry = v),
+                  ),
+                  if (widget.productToEdit != null && _tracksExpiry && !_hasVariants && widget.productToEdit!.tracksExpiry) ...[
+                    const SizedBox(height: AppSpace.sm),
+                    ProductLotsSection(product: widget.productToEdit!),
+                  ],
+                  const SizedBox(height: 16),
+
                   // 5. Stock y Variantes (tallas y colores)
                   Container(
                     decoration: BoxDecoration(
@@ -904,6 +953,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Marca (0.16.0): la tienda en línea filtra por marca
+                  TextFormField(
+                    controller: _brandController,
+                    textCapitalization: TextCapitalization.words,
+                    maxLength: 60,
+                    decoration: const InputDecoration(
+                      labelText: 'Marca (opcional)',
+                      hintText: 'Ej.: Elf Bar, Tecnoquímicas',
+                      counterText: '',
+                    ),
                   ),
                   const SizedBox(height: 16),
 

@@ -20,6 +20,7 @@ import '../../models/product.dart';
 import '../../../business/presentation/business_identity.dart';
 import 'story_catalog_modal.dart';
 import '../../../sales/data/promotions_repository.dart';
+import '../../../store/data/online_store_service.dart';
 
 /// Arma el catálogo del negocio: qué productos, cómo se ve y qué datos de
 /// contacto lleva. El estilo se recuerda por negocio y sirve para el PDF y las
@@ -72,6 +73,10 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
 
   /// Stockealo Pro activo en este negocio: abre plantillas, colores, fondo y pie
   bool _pro = false;
+
+  /// La tienda: el catálogo lleva su QR e Instagram su link y hashtags (0.16.0)
+  OnlineStoreConfig? _store;
+  String? get _storeUrl => _store?.enabled == true ? _store!.qrUrl : null;
 
   @override
   void initState() {
@@ -140,7 +145,20 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
   Future<void> _loadInitialData() async {
     try {
       final db = AppDatabase.instance;
-      var style = CatalogStyle.decode(await db.getSetting(CatalogStyle.settingsKey(widget.business.id)));
+      final savedRaw = await db.getSetting(CatalogStyle.settingsKey(widget.business.id));
+      var style = CatalogStyle.decode(savedRaw);
+      // 0.16.0: la tienda publicada da el QR y, la primera vez, el estilo (plantilla, color y fondo)
+      try {
+        final store = await OnlineStoreService.instance.getMine(widget.business.id);
+        _store = store;
+        if (store != null && savedRaw == null) {
+          style = style.copyWith(
+            template: CatalogStyle.fromStoreTemplate(store.template),
+            colorHex: store.look.accent,
+            darkBackground: store.look.dark || store.template == StoreTemplate.fashion,
+          );
+        }
+      } catch (_) {}
 
       // La primera vez, el WhatsApp sale del teléfono de la cuenta
       final phone = AuthRepository.instance.currentUser?.phone?.trim() ?? '';
@@ -231,6 +249,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
         products: _allInStockProducts,
         style: _currentStyle,
         categoryFilter: _selectedCategory,
+        storeUrl: _storeUrl,
         onProgress: (p, msg) {
           if (mounted) {
             setState(() {
@@ -273,6 +292,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
       business: widget.business,
       products: _targetProducts,
       style: _currentStyle,
+      store: _store?.enabled == true ? _store : null,
     );
   }
 
@@ -538,7 +558,7 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                 child: OutlinedButton.icon(
                   onPressed: count == 0 ? null : _openStories,
                   icon: const Icon(Icons.amp_stories_outlined),
-                  label: const Text('Historias'),
+                  label: const Text('Instagram'),
                 ),
               ),
               const SizedBox(width: AppSpace.sm),

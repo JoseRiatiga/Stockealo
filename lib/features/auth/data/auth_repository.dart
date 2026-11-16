@@ -115,6 +115,40 @@ class AuthRepository {
     return user;
   }
 
+  /// Dónde vuelve Google después de elegir la cuenta (0.16.0, fase 6): en la web, la misma
+  /// app; en el celular, el enlace stockealo://login-callback (Android e iPhone lo abren)
+  static String get googleRedirect => kIsWeb ? '${Uri.base.origin}/app/' : 'stockealo://login-callback';
+
+  /// Abre Google para elegir la cuenta. La sesión llega después, cuando Google vuelve a la
+  /// app: [completeOAuthLogin] termina de entrar.
+  Future<void> startGoogleLogin() async {
+    final auth = await _requireAuth();
+    try {
+      final opened = await auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: googleRedirect,
+        authScreenLaunchMode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+      );
+      if (!opened) throw Exception('No se pudo abrir Google. Inténtalo de nuevo.');
+    } on AuthException catch (e) {
+      throw Exception(_translateAuthError(e));
+    }
+  }
+
+  /// Termina de entrar con la sesión que dejó Google: la cuenta de este equipo y el
+  /// perfil (lo crea si es la primera vez). null si no hay sesión.
+  Future<AppUser?> completeOAuthLogin() async {
+    if (_currentUser != null) return _currentUser;
+    final authUser = SupabaseService.instance.client?.auth.currentUser;
+    final email = authUser?.email?.toLowerCase();
+    if (authUser == null || email == null) return null;
+    await _dbProvider.useAccount(authUser.id, email);
+    final meta = authUser.userMetadata ?? const {};
+    final user = await _resolveAppUser(authUser, name: (meta['full_name'] ?? meta['name']) as String?);
+    await _finishLogin(user);
+    return user;
+  }
+
   /// Restaura la sesión guardada por Supabase (funciona sin conexión)
   Future<AppUser?> restoreSession() async {
     if (_currentUser != null) return _currentUser;
@@ -133,9 +167,11 @@ class AuthRepository {
       return _currentUser;
     }
 
-    // Sesión válida pero el perfil no está en este dispositivo: traerlo de la nube
+    // Sesión válida pero el perfil no está en este dispositivo: traerlo de la nube (o
+    // crearlo, si entró por primera vez con Google y la web se recargó)
     try {
-      final user = await _resolveAppUser(authUser);
+      final meta = authUser.userMetadata ?? const {};
+      final user = await _resolveAppUser(authUser, name: (meta['full_name'] ?? meta['name']) as String?);
       await _finishLogin(user);
       return user;
     } catch (e) {

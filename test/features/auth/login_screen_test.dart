@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stockealo/core/design/primary_action_button.dart';
 import 'package:stockealo/core/theme/app_theme.dart';
 import 'package:stockealo/features/auth/presentation/screens/login_screen.dart';
+import 'package:stockealo/features/auth/data/auth_repository.dart';
 
 Future<void> _pump(WidgetTester tester, {GlobalKey? key, Brightness brightness = Brightness.light}) async {
   tester.view.physicalSize = const Size(1080, 2400);
@@ -81,6 +82,17 @@ void main() {
     await _frames(tester);
     expect(find.textContaining('acepta los términos'), findsOneWidget);
     await _snapshot(tester, key, 'register_error');
+  });
+
+  testWidgets('0.16.0: «Continuar con Google» está y cabe en un celular angosto', (tester) async {
+    tester.view.physicalSize = const Size(1000, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(theme: AppTheme.lightTheme, home: LoginScreen(onLoginSuccess: () {})));
+    await _frames(tester);
+    expect(find.text('Continuar con Google'), findsOneWidget);
+    expect(AuthRepository.googleRedirect, 'stockealo://login-callback', reason: 'en el celular vuelve por el enlace de la app');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('modo oscuro se dibuja', (tester) async {

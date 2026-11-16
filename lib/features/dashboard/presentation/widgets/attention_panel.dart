@@ -15,6 +15,7 @@ import '../../../suppliers/models/supplier.dart';
 import '../../data/home_data.dart';
 import '../../../sales/presentation/widgets/quotations_list_modal.dart';
 import '../../../sales/presentation/widgets/deliveries.dart';
+import '../../data/sold_out_prefs.dart';
 
 /// Cómo se ve cada aviso: ícono, tono, título, detalle y pastilla. Lo usan la fila
 /// del Inicio y su panel, para que digan siempre lo mismo.
@@ -46,8 +47,9 @@ extension AttentionLook on AttentionItem {
       };
 
   String get detail => switch (kind) {
-        AttentionKind.outOfStock =>
-          soldThisWeek > 0 ? 'Esta semana vendiste $soldThisWeek' : 'Sin unidades para vender',
+        AttentionKind.outOfStock => waitingDays != null
+            ? 'Lo pediste hace $waitingDays días y no ha llegado'
+            : (soldThisWeek > 0 ? 'Esta semana vendiste $soldThisWeek' : 'Sin unidades para vender'),
         AttentionKind.lowStock => 'Mínimo $minStock${soldThisWeek > 0 ? ' · vendiste $soldThisWeek esta semana' : ''}',
         AttentionKind.overdueDebt => neverPaid ? 'Hace $days días · no ha abonado' : 'Último abono hace $days días',
         AttentionKind.cashLeftOpen => 'Desde el ${DateFormat("d MMM, h:mm a", 'es_CO').format(since!)}',
@@ -195,6 +197,8 @@ class _PanelBody extends StatelessWidget {
           );
         },
       ),
+      // Los interruptores del diseño (0.16.0, fase 7)
+      if (out) _SoldOutSwitches(businessId: business.id, productId: item.refId),
     ];
   }
 
@@ -285,6 +289,61 @@ class _PanelBody extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: AppSpace.lg),
         child: Wrap(spacing: AppSpace.sm, runSpacing: AppSpace.sm, children: pills),
       );
+}
+
+/// «Recordarme si no llega» y «Ocultarlo en Vender»
+class _SoldOutSwitches extends StatefulWidget {
+  final String businessId;
+  final String productId;
+  const _SoldOutSwitches({required this.businessId, required this.productId});
+
+  @override
+  State<_SoldOutSwitches> createState() => _SoldOutSwitchesState();
+}
+
+class _SoldOutSwitchesState extends State<_SoldOutSwitches> {
+  bool _remind = false;
+  bool _hide = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final remind = (await SoldOutPrefs.reminders(widget.businessId)).containsKey(widget.productId);
+    final hide = (await SoldOutPrefs.hidden(widget.businessId)).contains(widget.productId);
+    if (mounted) setState(() => (_remind = remind, _hide = hide));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text('Recordarme si no llega', style: AppText.body(context)),
+          subtitle: Text('Si en ${SoldOutPrefs.remindAfterDays} días sigue agotado, te avisa en Inicio', style: AppText.small(context)),
+          value: _remind,
+          onChanged: (v) async {
+            await SoldOutPrefs.setReminder(widget.businessId, widget.productId, v);
+            if (mounted) setState(() => _remind = v);
+          },
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text('Ocultarlo en Vender', style: AppText.body(context)),
+          subtitle: Text('No sale en Vender hasta que vuelva el stock', style: AppText.small(context)),
+          value: _hide,
+          onChanged: (v) async {
+            await SoldOutPrefs.setHidden(widget.businessId, widget.productId, v);
+            if (mounted) setState(() => _hide = v);
+          },
+        ),
+      ],
+    );
+  }
 }
 
 /// «Por qué pasó» / «Si nadie hace nada»

@@ -7,6 +7,7 @@ import '../../../../core/widgets/theme_mode_button.dart';
 import '../../../business/models/business.dart';
 import '../../../cash/data/cash_register_repository.dart';
 import '../../../cash/models/cash_session.dart';
+import '../../../../core/widgets/sync_pill.dart';
 
 /// EL encabezado de Stockealo, en el computador y en el celular: título del lugar
 /// con su línea de contexto, la caja siempre a la vista, el buscador (Ctrl K), los
@@ -105,6 +106,8 @@ class AppHeaderBar extends StatelessWidget {
                       onPressed: onSearchTap,
                       icon: Icon(Icons.search_outlined, size: 20, color: c.inkMuted),
                     ),
+                    // La nube (0.16.0): en el celular, solo el ícono con su color
+                    const SyncPill(iconOnly: true),
                     bell,
                     const ThemeModeButton(size: 20),
                   ],
@@ -150,6 +153,8 @@ class AppHeaderBar extends StatelessWidget {
           if (cash != null) ...[cash, const SizedBox(width: AppSpace.md - 2)],
           Flexible(flex: 2, child: _SearchBox(onTap: onSearchTap)),
           const SizedBox(width: AppSpace.md - 2),
+          const SyncPill(),
+          const SizedBox(width: AppSpace.sm),
           bell,
           const SizedBox(width: AppSpace.xs),
           const ThemeModeButton(size: 20),

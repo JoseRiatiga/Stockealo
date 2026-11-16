@@ -16,6 +16,7 @@ import 'admin_team_page.dart';
 import '../features/pro/data/pro_admin_service.dart';
 import 'admin_businesses_page.dart';
 import '../core/design/status_pill.dart';
+import 'admin_errors_page.dart';
 
 /// Secciones del panel, en grupos como el menú de la app (re-diseño 2026-11)
 enum AdminSection {
@@ -27,6 +28,7 @@ enum AdminSection {
   payments('Pagos', Icons.payments_outlined, 'Ingresos'),
   codes('Códigos', Icons.confirmation_number_outlined, 'Ingresos'),
   feedback('Sugerencias y fallos', Icons.feedback_outlined, 'Soporte'),
+  errors('Errores', Icons.bug_report_outlined, 'Soporte'),
   maintenance('Mantenimiento', Icons.construction_outlined, 'Soporte'),
   team('Equipo y registro', Icons.badge_outlined, 'Sistema'),
   config('Configuración', Icons.tune_outlined, 'Sistema');
@@ -63,6 +65,7 @@ class _AdminShellState extends State<AdminShell> {
         AdminSection.payments => const AdminPaymentsPage(),
         AdminSection.codes => const AdminCodesPage(),
         AdminSection.feedback => const AdminFeedbackPage(),
+        AdminSection.errors => const AdminErrorsPage(),
         AdminSection.maintenance => const AdminMaintenancePage(),
         AdminSection.team => const AdminTeamPage(),
         AdminSection.config => const AdminConfigPage(),

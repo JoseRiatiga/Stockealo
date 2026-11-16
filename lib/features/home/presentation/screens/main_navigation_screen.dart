@@ -49,6 +49,8 @@ import '../../../team/presentation/widgets/authorization_gate.dart';
 import '../../../team/data/authorization_service.dart';
 import '../../../services/models/work_schedule.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/security/app_lock_gate.dart';
+import '../widgets/whats_new_sheet.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String userId;
@@ -113,9 +115,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     }
     // Con Pro Servicios aparece la pestaña Servicios
     ProService.instance.status.addListener(_onProChanged);
-    // Después de actualizar: «Dónde quedó cada cosa», una sola vez
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) WhereThingsMovedSheet.showOnce(context);
+    // Después de actualizar: «Dónde quedó cada cosa» y «Lo nuevo», una sola vez cada uno
+    Future.delayed(const Duration(seconds: 2), () async {
+      if (mounted) await WhereThingsMovedSheet.showOnce(context);
+      if (mounted) await WhatsNewSheet.showOnce(context);
     });
     _ordersTimer = Timer.periodic(const Duration(minutes: 2), (_) => _pullOrders());
     StoreOrdersRepository.instance.unseen.addListener(_onUnseenChanged);
@@ -496,6 +499,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   @override
   Widget build(BuildContext context) {
+    // Bloqueo con PIN o huella (0.16.0, fase 6): tapa la app sin cerrarla
+    return AppLockGate(
+      title: _activeBusiness?.name,
+      onUsePassword: () async => widget.onLogout(),
+      child: _content(context),
+    );
+  }
+
+  Widget _content(BuildContext context) {
     // Fuera de su horario de acceso: la app se bloquea hasta su próximo turno
     if (_outOfHours) {
       return _OutOfHours(schedule: _accessSchedule!, businessName: _activeBusiness?.name, onLogout: widget.onLogout);

@@ -13,6 +13,7 @@ import '../../../../core/design/app_dialog.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../data/product_image_service.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../data/product_templates.dart';
 
 /// Un color: nombre libre ("Blanco con rojo") y su muestra.
 class VariantColor {
@@ -63,7 +64,32 @@ class VariantEditorController extends ChangeNotifier {
   /// Variantes antiguas escritas como "M (ROJO)" que se pueden separar
   bool canSplitLegacy = false;
 
+  /// Nombre de la segunda lista (0.16.0): 'Color' (con su muestra) o 'Sabor' (vapers)
+  String secondName = 'Color';
+  bool get usesColor => secondName == 'Color';
+
+  /// "Colores", "Sabores"
+  String get secondPlural => secondName.endsWith('or') ? '${secondName}es' : '${secondName}s';
+
   VariantEditorController({this.attributeName = 'Talla'});
+
+  /// Botón rápido (Ropa, Calzado, Presentación, Nicotina · sabor)
+  void applyPreset(VariantPreset preset) {
+    attributeName = preset.attributeName;
+    secondName = preset.secondName;
+    setSizes(preset.values);
+  }
+
+  /// Un sabor (o color sin muestra) en todas las tallas, o solo en [size]
+  void addOption(String name, {String? size}) {
+    for (final part in name.split(',')) {
+      final n = part.trim();
+      if (n.isEmpty) continue;
+      for (final s in size == null ? _sizeList : [size]) {
+        if (!colorsOf(s).any((c) => c.key == n.toLowerCase())) addColorTo(s, VariantColor(n));
+      }
+    }
+  }
 
   static String _sizeKey(String size) => size.trim().toLowerCase();
 
@@ -118,6 +144,7 @@ class VariantEditorController extends ChangeNotifier {
   void load(List<ProductVariant> variants) {
     if (variants.isEmpty) return;
     attributeName = variants.first.attributeName;
+    secondName = variants.map((v) => v.attribute2Name).whereType<String>().where((n) => n.trim().isNotEmpty).firstOrNull ?? 'Color';
     for (final v in variants) {
       final size = v.attributeValue.trim();
       final colorName = (v.attribute2Value ?? '').trim();
@@ -297,11 +324,12 @@ class VariantEditorController extends ChangeNotifier {
           productId: productId,
           attributeName: attributeName.trim().isEmpty ? 'Talla' : attributeName.trim(),
           attributeValue: c.size,
-          attribute2Name: c.color == null ? null : 'Color',
+          attribute2Name: c.color == null ? null : secondName,
           attribute2Value: c.color?.name.trim(),
-          colorHex: ProductVariant.validHex(c.color?.hex, allowMulti: true),
-          colorHex2: ProductVariant.validHex(c.color?.hex2),
-          imageUrl: c.color?.imageUrl,
+          // Un sabor no lleva muestra de color ni foto propia
+          colorHex: usesColor ? ProductVariant.validHex(c.color?.hex, allowMulti: true) : null,
+          colorHex2: usesColor ? ProductVariant.validHex(c.color?.hex2) : null,
+          imageUrl: usesColor ? c.color?.imageUrl : null,
           skuOrBarcode: (cellFor(c.key).barcode ?? '').trim().isEmpty ? null : cellFor(c.key).barcode!.trim(),
           stock: cellFor(c.key).value.clamp(0, 1 << 30),
           createdAt: now,
@@ -535,6 +563,7 @@ class _VariantEditorState extends State<VariantEditor> {
   }
 
   Future<void> _addColor(String size) async {
+    if (!ctrl.usesColor) return _addOption(size);
     final result = await showDialog<VariantColor>(
       context: context,
       builder: (_) => _ColorDialog(
@@ -546,7 +575,48 @@ class _VariantEditorState extends State<VariantEditor> {
     if (result != null) ctrl.addColorTo(size, result);
   }
 
+  /// Sabores (0.16.0): se escriben separados por coma; por defecto van en todas
+  Future<void> _addOption(String size) async {
+    final input = TextEditingController();
+    var everywhere = ctrl.sizes.length > 1;
+    final ok = await AppDialog.show<bool>(
+      context: context,
+      icon: Icons.add_outlined,
+      title: 'Agregar ${ctrl.secondName.toLowerCase()}',
+      subtitle: 'Varios separados por coma.',
+      content: StatefulBuilder(
+        builder: (ctx, setLocal) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: input,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(labelText: ctrl.secondName, hintText: 'Ej.: Mango, Uva, Menta'),
+              onSubmitted: (_) => Navigator.pop(ctx, true),
+            ),
+            if (ctrl.sizes.length > 1)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: everywhere,
+                title: Text('En todas las ${ctrl.attributeName.toLowerCase()}s'),
+                onChanged: (v) => setLocal(() => everywhere = v ?? false),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        Builder(builder: (ctx) => TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar'))),
+        Builder(builder: (ctx) => FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Agregar'))),
+      ],
+    );
+    final text = input.text;
+    input.dispose();
+    if (ok == true && text.trim().isNotEmpty) ctrl.addOption(text, size: everywhere ? null : size);
+  }
+
   Future<void> _editColor(String size, VariantColor color) async {
+    if (!ctrl.usesColor) return;
     final result = await showDialog<VariantColor>(
       context: context,
       builder: (_) => _ColorDialog(
@@ -585,17 +655,19 @@ class _VariantEditorState extends State<VariantEditor> {
           Row(
             children: [
               Expanded(child: Text('${label}s', style: section)),
-              ActionChip(
-                visualDensity: VisualDensity.compact,
-                label: const Text('Ropa', style: TextStyle(fontSize: AppText.sizeCaption)),
-                onPressed: () => ctrl.setSizes(['S', 'M', 'L', 'XL']),
-              ),
-              const SizedBox(width: 4),
-              ActionChip(
-                visualDensity: VisualDensity.compact,
-                label: const Text('Calzado', style: TextStyle(fontSize: AppText.sizeCaption)),
-                onPressed: () => ctrl.setSizes(['36', '37', '38', '39', '40']),
-              ),
+            ],
+          ),
+          // Botones rápidos (0.16.0: también presentación en ml y nicotina · sabor)
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              for (final p in VariantPreset.all)
+                ActionChip(
+                  visualDensity: VisualDensity.compact,
+                  label: Text(p.label, style: const TextStyle(fontSize: AppText.sizeCaption)),
+                  onPressed: () => ctrl.applyPreset(p),
+                ),
             ],
           ),
           const SizedBox(height: AppSpace.sm),
@@ -656,7 +728,7 @@ class _VariantEditorState extends State<VariantEditor> {
           ),
           const SizedBox(height: 2),
           Text(
-            'Si una ${label.toLowerCase()} viene en varios colores, toca "+ Color" en esa ${label.toLowerCase()}.',
+            'Si una ${label.toLowerCase()} viene en varios ${ctrl.secondPlural.toLowerCase()}, toca "+ ${ctrl.secondName}" en esa ${label.toLowerCase()}.',
             style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
           ),
           const SizedBox(height: AppSpace.sm),
@@ -669,7 +741,7 @@ class _VariantEditorState extends State<VariantEditor> {
             const SizedBox(height: AppSpace.sm),
             _totals(c),
           ],
-          if (ctrl.colors.isNotEmpty && widget.businessId != null && widget.productId != null) ...[
+          if (ctrl.usesColor && ctrl.colors.isNotEmpty && widget.businessId != null && widget.productId != null) ...[
             const SizedBox(height: AppSpace.lg),
             _colorPhotos(c, section),
           ],
@@ -791,7 +863,7 @@ class _VariantEditorState extends State<VariantEditor> {
   /// Una talla: su encabezado con "+ Color" y sus filas de existencias
   Widget _sizeBlock(StockealoColors c, String size) {
     final colors = ctrl.colorsOf(size);
-    final title = size.isEmpty ? 'Colores' : '${ctrl.attributeName} $size';
+    final title = size.isEmpty ? ctrl.secondPlural : '${ctrl.attributeName} $size';
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpace.sm),
       padding: const EdgeInsets.fromLTRB(AppSpace.sm + 2, 4, 4, AppSpace.sm),
@@ -814,7 +886,7 @@ class _VariantEditorState extends State<VariantEditor> {
               TextButton.icon(
                 onPressed: () => _addColor(size),
                 icon: const Icon(Icons.add_outlined, size: 18),
-                label: const Text('Color'),
+                label: Text(ctrl.secondName),
                 style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               ),
               if (size.isNotEmpty && colors.isNotEmpty)
@@ -831,7 +903,7 @@ class _VariantEditorState extends State<VariantEditor> {
                 ? Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
-                      'Agrega tallas arriba o toca "+ Color" si solo varía por color.',
+                      'Agrega ${ctrl.attributeName.toLowerCase()}s arriba o toca "+ ${ctrl.secondName}" si solo varía por ${ctrl.secondName.toLowerCase()}.',
                       style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                     ),
                   )
@@ -860,7 +932,7 @@ class _VariantEditorState extends State<VariantEditor> {
           Expanded(
             child: color == null
                 ? Text(
-                    'Sin color',
+                    'Sin ${ctrl.secondName.toLowerCase()}',
                     style: TextStyle(fontSize: AppText.sizeBody, color: c.inkMuted),
                   )
                 : InkWell(
@@ -870,8 +942,10 @@ class _VariantEditorState extends State<VariantEditor> {
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Row(
                         children: [
-                          ColorSwatchDot(hex: color.hex, hex2: color.hex2, size: 18),
-                          const SizedBox(width: AppSpace.sm),
+                          if (ctrl.usesColor) ...[
+                            ColorSwatchDot(hex: color.hex, hex2: color.hex2, size: 18),
+                            const SizedBox(width: AppSpace.sm),
+                          ],
                           Flexible(
                             child: Text(
                               color.name,

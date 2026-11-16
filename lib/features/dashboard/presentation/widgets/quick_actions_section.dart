@@ -19,6 +19,7 @@ import '../../data/dashboard_repository.dart';
 import '../../../sales/presentation/screens/promotions_screen.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../team/presentation/screens/roles_screen.dart';
+import '../../../goals/presentation/goals_widgets.dart';
 
 /// «Accesos rápidos» de Inicio (volvieron en la 0.12.1, a pedido del dueño):
 /// llevan a una función en un toque. Salen de `kAppFunctions`, la misma lista
@@ -93,6 +94,8 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
         await PromotionsScreen.open(context, business: biz);
       case 'profits':
         await ProfitReportScreen.open(context, biz);
+      case 'goals':
+        await GoalsView.open(context, business: biz, role: widget.role);
       case 'team':
         await Navigator.push(context, MaterialPageRoute(builder: (_) => EmployeesScreen(business: biz)));
       case 'roles':

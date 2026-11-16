@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/database/app_database.dart';
 import 'dart:convert';
+import '../../../core/utils/coupons.dart';
 
 /// Estado Pro de un negocio
 class ProStatus {
@@ -236,7 +237,7 @@ class ProService {
   }
 
   /// Inicia el pago de un plan con Wompi: el servidor fija el precio y firma el enlace
-  Future<ProCheckout> startCheckout(String businessId, String planId) async {
+  Future<ProCheckout> startCheckout(String businessId, String planId, {String? coupon}) async {
     final client = _client;
     if (client == null) throw const ProCheckoutException('Necesitas conexión a internet para pagar.');
     // Antes de cobrar: el pago se aplica a un negocio que debe existir en la nube
@@ -246,7 +247,12 @@ class ProService {
     try {
       // En la web, Wompi devuelve a una página que dice "vuelve a la pestaña de Stockealo"
       final res = await client.functions.invoke('pro-checkout',
-          body: {'business_id': businessId, 'plan_id': planId, 'platform': kIsWeb ? 'web' : 'app'});
+          body: {
+            'business_id': businessId,
+            'plan_id': planId,
+            'platform': kIsWeb ? 'web' : 'app',
+            if (coupon != null && coupon.isNotEmpty) 'coupon': CouponText.normalize(coupon),
+          });
       final data = Map<String, dynamic>.from(res.data as Map);
       return ProCheckout(data['reference'] as String, data['url'] as String);
     } on FunctionException catch (e) {
@@ -257,6 +263,27 @@ class ProService {
     } catch (e) {
       debugPrint('Pago en línea: $e');
       throw const ProCheckoutException('No se pudo iniciar el pago. Inténtalo de nuevo.');
+    }
+  }
+
+  /// El precio de un plan con un cupón (0.16.0). Lanza [ProCheckoutException] con el
+  /// motivo si el cupón no sirve.
+  Future<({String code, double price, double regular})> quoteCoupon(String coupon, String planId) async {
+    final client = _client;
+    if (client == null) throw const ProCheckoutException('Necesitas conexión a internet para usar el cupón.');
+    try {
+      final data = Map<String, dynamic>.from(
+          await client.rpc('pro_coupon_quote', params: {'p_code': CouponText.normalize(coupon), 'p_plan_id': planId}) as Map);
+      return (
+        code: data['code'] as String,
+        price: (data['price'] as num).toDouble(),
+        regular: (data['regular'] as num).toDouble(),
+      );
+    } on PostgrestException catch (e) {
+      throw ProCheckoutException(CouponText.error(e.message));
+    } catch (e) {
+      debugPrint('Cupón Pro: $e');
+      throw ProCheckoutException(CouponText.error(''));
     }
   }
 
@@ -289,6 +316,7 @@ class ProService {
     if (code.contains('currency_not_supported')) return 'El pago en línea por ahora es solo en pesos colombianos.';
     if (code.contains('payments_not_configured')) return 'El pago en línea no está disponible ahora. Usa Nequi.';
     if (code.contains('plan_not_found')) return 'Ese plan ya no está disponible.';
+    if (code.contains('coupon_')) return CouponText.error(code);
     return 'No se pudo iniciar el pago. Inténtalo de nuevo.';
   }
 

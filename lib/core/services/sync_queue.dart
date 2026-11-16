@@ -51,6 +51,9 @@ class SyncQueue {
   /// Estado de la subida, para el aviso «Sin conexión» y Ajustes
   final ValueNotifier<SyncStatus> status = ValueNotifier(const SyncStatus());
 
+  /// Cuándo quedó todo arriba por última vez (la nube de la barra, 0.16.0)
+  final ValueNotifier<DateTime?> lastUpload = ValueNotifier(null);
+
   /// El error es por falta de conexión (no un rechazo de la nube)
   static bool isNetworkError(Object e) {
     final text = e.toString();
@@ -145,6 +148,7 @@ class SyncQueue {
   Future<void> _flush(SyncSender send) async {
     final offline = await _sendAll(send);
     await refreshStatus(offline: offline);
+    if (!offline && status.value.pending == 0) lastUpload.value = DateTime.now();
   }
 
   /// Devuelve true si se detuvo por falta de conexión

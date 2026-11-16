@@ -26,6 +26,7 @@ class WhatsNewSheet {
       items: [
         'Metas de ventas del negocio y por empleado, con su gráfica.',
         'Cinco estilos para la tienda en línea, horario, destacados y estadísticas de visitas.',
+        'Cupones para tu tienda: crea «BIENVENIDA10» y compártelo.',
         'Comparte en Instagram, código QR de la tienda y catálogo con promociones.',
         'Lotes con fecha de vencimiento y cambio al distribuidor.',
         'Plantillas de producto por tipo de negocio y marca en el producto.',

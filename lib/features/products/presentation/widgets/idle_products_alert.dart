@@ -79,6 +79,15 @@ class _IdleProductsAlertState extends State<IdleProductsAlert> {
   }
 
   Future<void> _load() async {
+    // Inicio no se cae si la base se cerró mientras cargaba (cerrar sesión, cambiar de cuenta)
+    try {
+      await _loadNow();
+    } catch (e) {
+      debugPrint('Inicio: no se pudo cargar: $e');
+    }
+  }
+
+  Future<void> _loadNow() async {
     try {
       final idle = await IdleProducts.find(widget.business.id, now: widget.now);
       if (mounted) setState(() => _idle = idle);

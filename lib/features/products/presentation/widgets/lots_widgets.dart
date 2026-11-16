@@ -233,6 +233,15 @@ class _ProductLotsSectionState extends State<ProductLotsSection> {
   }
 
   Future<void> _load({bool reconcile = false}) async {
+    // Inicio no se cae si la base se cerró mientras cargaba (cerrar sesión, cambiar de cuenta)
+    try {
+      await _loadNow(reconcile: reconcile);
+    } catch (e) {
+      debugPrint('Inicio: no se pudo cargar: $e');
+    }
+  }
+
+  Future<void> _loadNow({bool reconcile = false}) async {
     final repo = LotsRepository.instance;
     if (reconcile) await repo.reconcile(widget.product.businessId);
     final lots = await repo.lotsFor(widget.product.id);
@@ -329,6 +338,15 @@ class _ExpiryAlertState extends State<ExpiryAlert> {
   }
 
   Future<void> _load({bool reconcile = false}) async {
+    // Inicio no se cae si la base se cerró mientras cargaba (cerrar sesión, cambiar de cuenta)
+    try {
+      await _loadNow(reconcile: reconcile);
+    } catch (e) {
+      debugPrint('Inicio: no se pudo cargar: $e');
+    }
+  }
+
+  Future<void> _loadNow({bool reconcile = false}) async {
     final repo = LotsRepository.instance;
     if (reconcile) await repo.reconcile(widget.business.id);
     final a = await repo.alerts(widget.business.id);

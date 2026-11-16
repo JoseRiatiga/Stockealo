@@ -60,6 +60,15 @@ class _FirstStepsCardState extends State<FirstStepsCard> {
   }
 
   Future<void> _load() async {
+    // Inicio no se cae si la base se cerró mientras cargaba (cerrar sesión, cambiar de cuenta)
+    try {
+      await _loadNow();
+    } catch (e) {
+      debugPrint('Inicio: no se pudo cargar: $e');
+    }
+  }
+
+  Future<void> _loadNow() async {
     final b = widget.business;
     final now = widget.now ?? DateTime.now();
     if (now.difference(b.createdAt).inDays > FirstStepsCard.newForDays ||

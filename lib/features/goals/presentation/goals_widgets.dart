@@ -358,6 +358,15 @@ class _GoalsCardState extends State<GoalsCard> {
   }
 
   Future<void> _load() async {
+    // Inicio no se cae si la base se cerró mientras cargaba (cerrar sesión, cambiar de cuenta)
+    try {
+      await _loadNow();
+    } catch (e) {
+      debugPrint('Inicio: no se pudo cargar: $e');
+    }
+  }
+
+  Future<void> _loadNow() async {
     final repo = GoalsRepository.instance;
     final biz = widget.business.id;
     final goals = await repo.list(biz);
@@ -495,6 +504,15 @@ class _GoalsViewState extends State<GoalsView> {
   }
 
   Future<void> _load() async {
+    // Inicio no se cae si la base se cerró mientras cargaba (cerrar sesión, cambiar de cuenta)
+    try {
+      await _loadNow();
+    } catch (e) {
+      debugPrint('Inicio: no se pudo cargar: $e');
+    }
+  }
+
+  Future<void> _loadNow() async {
     final repo = GoalsRepository.instance;
     final biz = widget.business.id;
     final now = DateTime.now();

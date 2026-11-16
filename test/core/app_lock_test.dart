@@ -132,7 +132,8 @@ void main() {
     var usedPassword = false;
     await pumpGate(tester, onUsePassword: () async => usedPassword = true);
     await tester.tap(find.text('¿Olvidaste tu PIN? Entra con tu contraseña'));
-    for (var i = 0; i < 6; i++) {
+    // Borrar el PIN son varias escrituras en la base: en un equipo lento tarda más
+    for (var i = 0; i < 60 && !usedPassword; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
       await tester.pump();
     }

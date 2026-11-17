@@ -31,6 +31,7 @@ import '../../../products/data/product_templates.dart';
 import '../widgets/store_qr_sheet.dart';
 import 'store_stats_screen.dart';
 import 'store_coupons_screen.dart';
+import '../../../home/navigation/app_pane.dart';
 
 /// Tienda en línea (lugar del menú): publica el catálogo en stockealo.online/tienda/<slug> con
 /// carrito; los pedidos llegan por WhatsApp (Stockealo Pro).
@@ -640,7 +641,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
       welcome: _welcomeController.text.trim(),
       look: _lookToSave,
     );
-    await Navigator.push(
+    await AppPane.push(
       context,
       MaterialPageRoute(
         fullscreenDialog: true,

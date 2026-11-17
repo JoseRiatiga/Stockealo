@@ -9,6 +9,7 @@ import '../../../pro/data/pro_service.dart';
 import '../../../pro/presentation/screens/pro_screen.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
+import '../../../home/navigation/app_pane.dart';
 
 /// Ajustes › Tu negocio › Módulos: todo lo que ofrece Stockealo, qué hace, si
 /// está encendido y en qué pestaña está. Es el único lugar donde se enciende el
@@ -20,7 +21,7 @@ class ModulesScreen extends StatefulWidget {
   const ModulesScreen({super.key, required this.business, required this.canEdit});
 
   static Future<void> open(BuildContext context, {required Business business, required bool canEdit}) =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => ModulesScreen(business: business, canEdit: canEdit)));
+      AppPane.push(context, MaterialPageRoute(builder: (_) => ModulesScreen(business: business, canEdit: canEdit)));
 
   @override
   State<ModulesScreen> createState() => _ModulesScreenState();

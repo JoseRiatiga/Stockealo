@@ -29,6 +29,7 @@ import '../widgets/supplier_picker.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/design/app_dialog.dart';
 import 'package:intl/intl.dart';
+import '../../../home/navigation/app_pane.dart';
 
 /// Un producto en la entrada, con su cantidad (o una por talla y color) y su costo
 class _Line {
@@ -131,7 +132,7 @@ class PurchaseEntryScreen extends StatefulWidget {
   /// true si se registró la entrada
   static Future<bool?> open(BuildContext context,
           {required Business business, Supplier? supplier, SupplierOrder? order}) =>
-      Navigator.of(context).push<bool>(MaterialPageRoute(
+      AppPane.push<bool>(context, MaterialPageRoute(
         builder: (_) => PurchaseEntryScreen(business: business, supplier: supplier, order: order),
       ));
 

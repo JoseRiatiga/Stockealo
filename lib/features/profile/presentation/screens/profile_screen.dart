@@ -47,6 +47,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/security/app_lock.dart';
 import '../../../home/presentation/widgets/whats_new_sheet.dart';
 import '../../../auth/presentation/logout_confirm.dart';
+import '../../../home/navigation/app_pane.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -852,10 +853,7 @@ actions: [
                           icon: Icons.groups_2_outlined,
                           title: 'Equipo',
                           subtitle: 'Miembros, permisos e invitación',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => EmployeesScreen(business: _activeBusiness!)),
-                          ),
+                          onTap: () => AppPane.open(context, (_) => EmployeesScreen(business: _activeBusiness!)),
                         ),
                         if (Permissions.can(_currentBusinessRole, Perm.activity))
                           SettingsRow(

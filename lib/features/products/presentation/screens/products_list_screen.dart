@@ -37,6 +37,7 @@ import '../../../../core/permissions/permissions.dart';
 import '../widgets/product_template_sheet.dart';
 import '../widgets/lots_widgets.dart';
 import '../widgets/idle_products_alert.dart';
+import '../../../home/navigation/app_pane.dart';
 
 /// Productos (el catálogo) y, en [ProductsListMode.stock], el lugar Stock: la
 /// misma lista arrancando en «por reponer», con el aviso del proveedor que pasa
@@ -271,7 +272,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
       // Si hay coincidencia exacta de producto, abrir directamente el detalle
       final exactMatch = await _repository.getProductByCode(code, _activeBusiness!.id);
       if (exactMatch != null && mounted) {
-        await Navigator.push(
+        await AppPane.push(
           context,
           MaterialPageRoute(
             builder: (_) => ProductDetailScreen(product: exactMatch),
@@ -324,7 +325,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
 
   Future<void> _openNewProduct() async {
     if (_activeBusiness == null) return;
-    final created = await Navigator.push<bool>(
+    final created = await AppPane.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id)),
     );
@@ -332,7 +333,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   }
 
   Future<void> _openProduct(Product product) async {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)));
+    await AppPane.open(context, (_) => ProductDetailScreen(product: product));
     _loadData();
   }
 
@@ -830,7 +831,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
           : (canCreate
               ? () async {
                   if (_activeBusiness == null) return;
-                  final created = await Navigator.push<bool>(
+                  final created = await AppPane.push<bool>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => ProductFormScreen(businessId: _activeBusiness!.id),

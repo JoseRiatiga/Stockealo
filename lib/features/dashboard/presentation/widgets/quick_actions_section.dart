@@ -22,6 +22,7 @@ import '../../../sales/presentation/screens/promotions_screen.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../team/presentation/screens/roles_screen.dart';
 import '../../../goals/presentation/goals_widgets.dart';
+import '../../../home/navigation/app_pane.dart';
 
 /// «Accesos rápidos» de Inicio (volvieron en la 0.12.1, a pedido del dueño):
 /// llevan a una función en un toque. Salen de `kAppFunctions`, la misma lista
@@ -86,8 +87,7 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
       case 'quotes':
         await QuotationsListModal.show(context, businessId: biz.id);
       case 'new_product':
-        await Navigator.push(
-            context, MaterialPageRoute(builder: (_) => ProductFormScreen(businessId: biz.id, userRole: widget.role)));
+        await AppPane.open(context, (_) => ProductFormScreen(businessId: biz.id, userRole: widget.role));
       case 'import_excel':
         await GuidedImportScreen.open(context, businessId: biz.id);
       case 'catalog':
@@ -99,7 +99,7 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
       case 'goals':
         await GoalsView.open(context, business: biz, role: widget.role);
       case 'team':
-        await Navigator.push(context, MaterialPageRoute(builder: (_) => EmployeesScreen(business: biz)));
+        await AppPane.open(context, (_) => EmployeesScreen(business: biz));
       case 'roles':
         await RolesScreen.open(context, business: biz, canEdit: widget.role == Permissions.owner);
       case 'modules':

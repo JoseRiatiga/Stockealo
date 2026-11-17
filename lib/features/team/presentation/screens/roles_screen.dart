@@ -11,6 +11,7 @@ import '../../data/roles_repository.dart';
 import '../../models/business_role.dart';
 import '../../../../core/design/status_pill.dart';
 import 'package:flutter/services.dart';
+import '../../../home/navigation/app_pane.dart';
 
 /// Ajustes › Equipo › Roles y permisos (0.15.0, etapa 2 de `docs/plan-roles.md`).
 ///
@@ -26,7 +27,7 @@ class RolesScreen extends StatefulWidget {
   const RolesScreen({super.key, required this.business, required this.canEdit});
 
   static Future<void> open(BuildContext context, {required Business business, required bool canEdit}) =>
-      Navigator.push(context, MaterialPageRoute(builder: (_) => RolesScreen(business: business, canEdit: canEdit)));
+      AppPane.push(context, MaterialPageRoute(builder: (_) => RolesScreen(business: business, canEdit: canEdit)));
 
   @override
   State<RolesScreen> createState() => _RolesScreenState();

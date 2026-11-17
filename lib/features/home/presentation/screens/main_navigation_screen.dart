@@ -27,6 +27,7 @@ import '../../../../core/services/notification_service.dart';
 import '../../../../core/widgets/update_dialog.dart';
 import '../widgets/app_menu.dart';
 import '../places/places.dart';
+import '../../navigation/app_pane.dart';
 import '../../navigation/app_places.dart';
 import '../../../sales/presentation/screens/sell_screen.dart';
 import '../../../sales/data/sell_cart.dart';
@@ -76,7 +77,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   /// Cerrar sesión pregunta antes (0.16.1), desde el menú, Ajustes o fuera de horario
   Future<void> _logout() async {
-    if (await LogoutConfirm.ask(context)) widget.onLogout();
+    if (await LogoutConfirm.ask(context)) {
+      AppPane.clear();
+      widget.onLogout();
+    }
   }
 
   int _currentIndex = 0;
@@ -298,6 +302,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   /// Empieza o termina «Ver como»: se redibuja todo con ese rol
   void _onViewAs() {
     if (!mounted) return;
+    // «Ver como»: lo abierto en el panel era del rol de antes
+    AppPane.clear();
     setState(() {});
   }
 
@@ -348,6 +354,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         AppointmentsRepository.instance.pullOnline(biz.id);
       }
       if (mounted) {
+        // Otro negocio: lo abierto en el panel era del anterior
+        if (_activeBusiness?.id != biz?.id) AppPane.clear();
         setState(() {
           _activeBusiness = biz;
           _realRole = role;
@@ -435,7 +443,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     _navigateToTab(id);
   }
 
-  void _navigateToTab(int index) {
+  Future<void> _navigateToTab(int index) async {
+    // Lo abierto en el panel se cierra al ir a otro lugar del menú; si tiene cambios
+    // sin guardar, esa pantalla pregunta y, si se queda, no se cambia de lugar
+    if (!await AppPane.closeAll() || !mounted) return;
     // Al cambiar de lugar no queda ninguna ayuda del mouse pegada (0.16.3)
     TooltipCleaner.clear();
     setState(() {
@@ -457,7 +468,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   Future<void> _openTeam() async {
     final biz = _activeBusiness;
     if (biz == null) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => EmployeesScreen(business: biz)));
+    await AppPane.open(context, (_) => EmployeesScreen(business: biz));
   }
 
   /// Ctrl K (o Cmd K) abre el buscador si esta pantalla es la de arriba
@@ -655,7 +666,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                 body: Row(
                   children: [
                     menu(inDrawer: false),
-                    Expanded(child: Column(children: [header(false), Expanded(child: body)])),
+                    // Panel (0.16.7): el detalle de un producto, Equipo, etc. se abren
+                    // aquí, con el menú a la izquierda
+                    Expanded(child: AppPaneHost(home: Column(children: [header(false), Expanded(child: body)]))),
                   ],
                 ),
               );

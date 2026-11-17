@@ -166,6 +166,9 @@ class _SellScreenState extends State<SellScreen> {
     _customer.text = _cart.customer;
     _load();
     DataEvents.instance.salesVersion.addListener(_reloadStock);
+    // Nombre, precio, stock o clientes cambiados en otra pantalla (0.16.4)
+    DataEvents.instance.productsVersion.addListener(_reloadStock);
+    DataEvents.instance.customersVersion.addListener(_reloadStock);
     DataEvents.instance.cashVersion.addListener(_checkCash);
     _cart.addListener(_onCart);
   }
@@ -173,6 +176,8 @@ class _SellScreenState extends State<SellScreen> {
   @override
   void dispose() {
     DataEvents.instance.salesVersion.removeListener(_reloadStock);
+    DataEvents.instance.productsVersion.removeListener(_reloadStock);
+    DataEvents.instance.customersVersion.removeListener(_reloadStock);
     DataEvents.instance.cashVersion.removeListener(_checkCash);
     _cart.removeListener(_onCart);
     _pay.dispose();

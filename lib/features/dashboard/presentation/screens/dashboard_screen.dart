@@ -87,6 +87,8 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     NotificationService.instance.remoteSalesVersion.addListener(_reload);
     DataEvents.instance.salesVersion.addListener(_reload);
     DataEvents.instance.cashVersion.addListener(_reload);
+    DataEvents.instance.productsVersion.addListener(_reload);
+    DataEvents.instance.customersVersion.addListener(_reload);
     _syncSilently();
   }
 
@@ -95,6 +97,8 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
     NotificationService.instance.remoteSalesVersion.removeListener(_reload);
     DataEvents.instance.salesVersion.removeListener(_reload);
     DataEvents.instance.cashVersion.removeListener(_reload);
+    DataEvents.instance.productsVersion.removeListener(_reload);
+    DataEvents.instance.customersVersion.removeListener(_reload);
     super.dispose();
   }
 

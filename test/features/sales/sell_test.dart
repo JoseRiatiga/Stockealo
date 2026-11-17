@@ -355,6 +355,34 @@ void main() {
     );
   });
 
+  test('devolución de una venta mixta: sale por el medio elegido, no queda «Mixto» en negativo (0.16.4)', () async {
+    await setCash(true);
+    final session = await cash.openSession(businessId: businessId, openingAmount: 100000, openedBy: 'Rosa');
+    final done = await sales.recordMultiProductSale(
+      businessId: businessId,
+      items: await items({'huevos': 2, 'gaseosa': 1}),
+      paymentMethod: PaymentMethod.mixed,
+      paymentSplit: {PaymentMethod.cash: 20000, PaymentMethod.nequi: 23400},
+    );
+    final gaseosa = done.firstWhere((s) => s.quantity == 1);
+    expect(SalesRepository.refundMethods(gaseosa), [PaymentMethod.cash, PaymentMethod.nequi]);
+
+    // Sin decir el medio, se devuelve en efectivo y la caja espera menos
+    final dev = await sales.returnSale(gaseosa, quantity: 1, restock: true);
+    expect(dev.paymentMethod, PaymentMethod.cash);
+    var summary = await cash.summarize(session);
+    expect(summary.byMethod.containsKey(PaymentMethod.mixed), isFalse);
+    expect(summary.expected, closeTo(120000 - gaseosa.totalAmount, 0.01));
+
+    // Por Nequi: baja Nequi, no la caja
+    final huevos = done.firstWhere((s) => s.quantity == 2);
+    final before = summary.expected;
+    await sales.returnSale(huevos, quantity: 1, restock: true, refundMethod: PaymentMethod.nequi);
+    summary = await cash.summarize(session);
+    expect(summary.expected, closeTo(before, 0.01));
+    expect(summary.byMethod[PaymentMethod.nequi], closeTo(23400 - huevos.totalAmount / 2, 0.01));
+  });
+
   test('anular sin borrar: la venta queda en el historial y deja de contar en Inicio y en la caja', () async {
     await setCash(true);
     final session = await cash.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Rosa');

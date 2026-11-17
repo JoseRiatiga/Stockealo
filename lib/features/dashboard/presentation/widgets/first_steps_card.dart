@@ -45,12 +45,16 @@ class _FirstStepsCardState extends State<FirstStepsCard> {
   void initState() {
     super.initState();
     DataEvents.instance.salesVersion.addListener(_load);
+    DataEvents.instance.productsVersion.addListener(_load);
+    DataEvents.instance.cashVersion.addListener(_load);
     _load();
   }
 
   @override
   void dispose() {
     DataEvents.instance.salesVersion.removeListener(_load);
+    DataEvents.instance.productsVersion.removeListener(_load);
+    DataEvents.instance.cashVersion.removeListener(_load);
     super.dispose();
   }
 

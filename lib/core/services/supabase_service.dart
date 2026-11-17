@@ -1880,12 +1880,30 @@ class SupabaseService {
   /// Turno de caja: nube -> local (resumen como texto)
   static Map<String, dynamic> cashSessionLocalRow(Map<String, dynamic> r) => {
         ...r,
-        for (final k in const ['opened_at', 'closed_at', 'updated_at']) k: localIso(r[k]),
+        // Apertura y cierre: la hora del reloj, como se subió (0.16.4)
+        for (final k in const ['opened_at', 'closed_at']) k: wallClockIso(r[k]),
+        'updated_at': localIso(r['updated_at']),
         'summary': r['summary'] is String ? r['summary'] : jsonEncode(r['summary'] ?? const {}),
       };
 
   /// Movimiento de caja: nube -> local con la hora del equipo (se compara como texto)
-  static Map<String, dynamic> cashMovementLocalRow(Map<String, dynamic> r) => {...r, 'date': localIso(r['date'])};
+  static Map<String, dynamic> cashMovementLocalRow(Map<String, dynamic> r) => {...r, 'date': wallClockIso(r['date'])};
+
+  /// Hora del reloj tal como la subió la app (0.16.4).
+  ///
+  /// La app sube la hora del equipo sin zona («17:04») y la nube la guarda como
+  /// si fuera UTC («17:04+00»). Las ventas se bajan tal cual; la caja usaba
+  /// [localIso], que le restaba la diferencia del país: la caja abierta a las
+  /// 5:04 p. m. salía «desde las 12:04 p. m.» en Colombia. Aquí se conserva la
+  /// hora del reloj, igual que en las ventas, y así quedan bien también las
+  /// cajas ya guardadas.
+  static String? wallClockIso(Object? v) {
+    if (v == null) return null;
+    final d = DateTime.tryParse('$v');
+    if (d == null) return '$v';
+    if (!d.isUtc) return d.toIso8601String();
+    return DateTime(d.year, d.month, d.day, d.hour, d.minute, d.second, d.millisecond, d.microsecond).toIso8601String();
+  }
 
   /// Fecha de la nube (UTC) en la hora del equipo, como la guarda la app
   static String? localIso(Object? v) {

@@ -718,6 +718,22 @@ actions: [
                       _syncDueDate();
                     }),
                   ),
+                  // De contado sale de la caja: antes no se decía y la caja bajaba sin aviso (0.16.4)
+                  if (!_credit && _total > 0) ...[
+                    const SizedBox(height: AppSpace.sm),
+                    Row(
+                      children: [
+                        Icon(Icons.point_of_sale_outlined, size: 16, color: context.colors.inkMuted),
+                        const SizedBox(width: AppSpace.sm),
+                        Expanded(
+                          child: Text(
+                            'Si la caja está abierta, ${CurrencyFormatter.format(_total)} salen de su efectivo.',
+                            style: AppText.caption(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (_credit) ...[
                     const SizedBox(height: AppSpace.sm),
                     ListTile(

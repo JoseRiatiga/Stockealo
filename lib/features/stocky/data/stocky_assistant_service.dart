@@ -1,3 +1,4 @@
+import '../../sales/models/payment_method.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../business/data/business_repository.dart';
@@ -720,7 +721,7 @@ class StockyAssistantService {
         type: StockyMessageType.text,
         actions: const [
           StockyAction(label: 'Ir a Vender', actionType: 'quick_sale'),
-          StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
+          StockyAction(label: 'Ver el historial', actionType: 'navigate_sales'),
         ],
       );
     }
@@ -829,9 +830,7 @@ class StockyAssistantService {
     final total = (summary['totalAmount'] as num?)?.toDouble() ?? 0.0;
     final profit = (summary['netProfit'] as num?)?.toDouble() ?? 0.0;
     final units = summary['totalUnits'] as int? ?? 0;
-    final efectivo = (summary['byEfectivo'] as num?)?.toDouble() ?? 0.0;
-    final transfer = (summary['byTransferencia'] as num?)?.toDouble() ?? 0.0;
-    final fiado = (summary['byFiado'] as num?)?.toDouble() ?? 0.0;
+    final methods = _methodLines(summary['byMethod']);
 
     final margin = total > 0 ? ((profit / total) * 100).toStringAsFixed(1) : '0';
 
@@ -845,20 +844,18 @@ class StockyAssistantService {
         type: StockyMessageType.salesSummary,
         actions: const [
           StockyAction(label: 'Ir a Vender', actionType: 'quick_sale'),
-          StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
+          StockyAction(label: 'Ver el historial', actionType: 'navigate_sales'),
         ],
         data: {'total': 0.0, 'count': 0, 'profit': 0.0},
       );
     }
 
-    final text = '📊 **Resumen de Ventas de Hoy en $bizName:**\n\n'
-        '• **Total Facturado:** ${CurrencyFormatter.formatCOP(total)}\n'
-        '• **Ganancia Neta:** ${CurrencyFormatter.formatCOP(profit)} *(Margen: $margin%)*\n'
-        '• **Transacciones:** $count ventas ($units unidades vendidas)\n\n'
-        '💳 **Medios de Pago:**\n'
-        '• Efectivo: ${CurrencyFormatter.formatCOP(efectivo)}\n'
-        '• Transferencia: ${CurrencyFormatter.formatCOP(transfer)}\n'
-        '• Fiados de hoy: ${CurrencyFormatter.formatCOP(fiado)}';
+    final text = '📊 **Ventas de hoy en $bizName:**\n\n'
+        '• **Total vendido:** ${CurrencyFormatter.formatCOP(total)}\n'
+        '• **Ganancia:** ${CurrencyFormatter.formatCOP(profit)} *(Margen: $margin%)*\n'
+        '• **Ventas:** $count ventas ($units unidades vendidas)\n\n'
+        '💳 **Medios de pago:**\n'
+        '$methods';
 
     return StockyAssistantMessage(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -867,7 +864,7 @@ class StockyAssistantService {
       timestamp: DateTime.now(),
       type: StockyMessageType.salesSummary,
       actions: const [
-        StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
+        StockyAction(label: 'Ver el historial', actionType: 'navigate_sales'),
         StockyAction(label: 'Ir a Vender', actionType: 'quick_sale'),
       ],
       data: {
@@ -876,9 +873,10 @@ class StockyAssistantService {
         'count': count,
         'units': units,
         'margin': margin,
-        'efectivo': efectivo,
-        'transfer': transfer,
-        'fiado': fiado,
+        'efectivo': (summary['byEfectivo'] as num?)?.toDouble() ?? 0.0,
+        'transfer': (summary['byTransferencia'] as num?)?.toDouble() ?? 0.0,
+        'fiado': (summary['byFiado'] as num?)?.toDouble() ?? 0.0,
+        'byMethod': summary['byMethod'],
       },
     );
   }
@@ -894,21 +892,17 @@ class StockyAssistantService {
     final total = (summary['totalAmount'] as num?)?.toDouble() ?? 0.0;
     final profit = (summary['netProfit'] as num?)?.toDouble() ?? 0.0;
     final units = summary['totalUnits'] as int? ?? 0;
-    final efectivo = (summary['byEfectivo'] as num?)?.toDouble() ?? 0.0;
-    final transfer = (summary['byTransferencia'] as num?)?.toDouble() ?? 0.0;
-    final fiado = (summary['byFiado'] as num?)?.toDouble() ?? 0.0;
+    final methods = _methodLines(summary['byMethod']);
     final margin = total > 0 ? ((profit / total) * 100).toStringAsFixed(1) : '0';
 
     final text = count == 0
         ? 'No hay ventas registradas ${_periodPhrase(period)} en **$bizName**.'
         : '📊 **Ventas de ${period.label} en $bizName:**\n\n'
-            '• **Total Facturado:** ${CurrencyFormatter.formatCOP(total)}\n'
-            '• **Ganancia Neta:** ${CurrencyFormatter.formatCOP(profit)} *(Margen: $margin%)*\n'
-            '• **Transacciones:** $count ventas ($units unidades vendidas)\n\n'
-            '💳 **Medios de Pago:**\n'
-            '• Efectivo: ${CurrencyFormatter.formatCOP(efectivo)}\n'
-            '• Transferencia: ${CurrencyFormatter.formatCOP(transfer)}\n'
-            '• Fiado: ${CurrencyFormatter.formatCOP(fiado)}';
+            '• **Total vendido:** ${CurrencyFormatter.formatCOP(total)}\n'
+            '• **Ganancia:** ${CurrencyFormatter.formatCOP(profit)} *(Margen: $margin%)*\n'
+            '• **Ventas:** $count ventas ($units unidades vendidas)\n\n'
+            '💳 **Medios de pago:**\n'
+        '$methods';
 
     return StockyAssistantMessage(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -917,10 +911,22 @@ class StockyAssistantService {
       timestamp: DateTime.now(),
       type: StockyMessageType.salesSummary,
       actions: const [
-        StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
+        StockyAction(label: 'Ver el historial', actionType: 'navigate_sales'),
       ],
       data: {'total': total, 'profit': profit, 'count': count, 'units': units, 'margin': margin},
     );
+  }
+
+  /// Cada medio de pago con lo que entró, en el orden de Vender (0.16.4): antes
+  /// faltaban Nequi, Tarjeta y Mixto y las cifras no sumaban el total.
+  static String _methodLines(Object? raw) {
+    final byMethod = raw is Map ? {for (final e in raw.entries) '${e.key}': (e.value as num).toDouble()} : const <String, double>{};
+    final order = [...PaymentMethod.forSale, ...byMethod.keys.where((k) => !PaymentMethod.forSale.contains(k))];
+    final lines = [
+      for (final m in order)
+        if ((byMethod[m] ?? 0).abs() >= 0.5) '• ${PaymentMethod.label(m)}: ${CurrencyFormatter.format(byMethod[m]!)}',
+    ];
+    return lines.isEmpty ? '• Sin cobros' : lines.join('\n');
   }
 
   /// "ayer" → "ayer"; "esta semana" → "en esta semana"
@@ -960,7 +966,7 @@ class StockyAssistantService {
       timestamp: DateTime.now(),
       type: StockyMessageType.salesSummary,
       actions: const [
-        StockyAction(label: 'Ver Historial de Ventas', actionType: 'navigate_sales'),
+        StockyAction(label: 'Ver el historial', actionType: 'navigate_sales'),
       ],
     );
   }

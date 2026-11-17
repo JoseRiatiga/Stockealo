@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/services/data_events.dart';
 import '../../../core/services/phone_alerts_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -226,6 +227,7 @@ class SupplierRepository {
           : 'Abonó ${CurrencyFormatter.format(pay)}$who (falta ${CurrencyFormatter.format(updated.balance)})',
       data: {'purchase_id': fresh.id},
     );
+    DataEvents.instance.cashChanged();
     return updated;
   }
 
@@ -260,6 +262,9 @@ class SupplierRepository {
         purchaseId: purchase.id,
       );
     }
+    // Stock nuevo y, si fue de contado, menos efectivo en la caja (0.16.4)
+    DataEvents.instance.productsChanged();
+    DataEvents.instance.cashChanged();
   }
 
   Future<void> _registerPurchase(Purchase purchase, {Map<String, double> newCosts = const {}}) async {

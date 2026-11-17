@@ -123,7 +123,14 @@ class CashMovement {
     'PROPINA': 'Propina entregada',
     'BASE': 'Más base',
     'OTRO': 'Otro',
+    voidReason: 'Anulación',
   };
+
+  /// Anulación de un movimiento equivocado (0.16.4): es el movimiento contrario,
+  /// por el mismo valor; la nota guarda cuál anula ([voidNotePrefix] + id).
+  /// No se borra nada: queda quién lo anuló y cuándo.
+  static const voidReason = 'ANULA';
+  static const voidNotePrefix = 'anula:';
 
   static const exitReasons = ['GASTO', 'RETIRO', 'PROVEEDOR', 'PROPINA', 'OTRO'];
   static const entryReasons = ['BASE', 'OTRO'];
@@ -152,6 +159,13 @@ class CashMovement {
 
   bool get isExit => kind == exit;
   String get reasonLabel => reasons[reason] ?? reason;
+
+  /// Si es una anulación, el id del movimiento que anula
+  String? get voidsId =>
+      reason == voidReason && (note ?? '').startsWith(voidNotePrefix) ? note!.substring(voidNotePrefix.length) : null;
+
+  /// La nota que se muestra (la de una anulación es interna)
+  String? get visibleNote => reason == voidReason ? null : note;
 
   /// Positivo si entra, negativo si sale
   double get signed => isExit ? -amount : amount;

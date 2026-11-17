@@ -1,3 +1,4 @@
+import '../../sales/models/payment_method.dart';
 import '../../../core/database/app_database.dart';
 import '../../sales/data/sales_repository.dart';
 
@@ -148,7 +149,8 @@ class ProfitReportRepository {
              COALESCE(SUM(total), 0) AS revenue,
              COALESCE(SUM(total_cost), 0) AS cost,
              COALESCE(SUM(discount_amount), 0) AS discounts,
-             COALESCE(SUM(CASE WHEN net_profit < 0 THEN -net_profit ELSE 0 END), 0) AS below_cost,
+             -- Las devoluciones restan ganancia, pero no son ventas por debajo del costo (0.16.4)
+             COALESCE(SUM(CASE WHEN net_profit < 0 AND return_of IS NULL THEN -net_profit ELSE 0 END), 0) AS below_cost,
              COALESCE(SUM(CASE WHEN payment_method = 'FIADO' AND payment_status != 'PAGADO' THEN total ELSE 0 END), 0) AS credit_pending
       FROM sales_ok WHERE $inRange
     ''', args)).first;
@@ -158,11 +160,19 @@ class ProfitReportRepository {
       FROM sales_ok WHERE $inRange
     ''', [businessId, _iso(prevFrom), _iso(prevTo)])).first;
 
-    final methods = await db.rawQuery('''
-      SELECT payment_method AS method, SUM(total) AS amount
+    // El pago mixto se reparte entre sus medios, igual que en Caja y Ventas (0.16.4)
+    final methodRows = await db.rawQuery('''
+      SELECT payment_method AS method, total, payment_split
       FROM sales_ok WHERE $inRange
-      GROUP BY payment_method ORDER BY amount DESC
     ''', args);
+    final byMethod = <String, double>{};
+    for (final r in methodRows) {
+      final parts = PaymentMethod.amounts('${r['method'] ?? 'OTRO'}', (r['total'] as num?)?.toDouble() ?? 0, r['payment_split'] as String?);
+      for (final e in parts.entries) {
+        byMethod[e.key] = (byMethod[e.key] ?? 0) + e.value;
+      }
+    }
+    final methods = byMethod.entries.where((e) => e.value.abs() >= 0.5).toList()..sort((a, b) => b.value.compareTo(a.value));
 
     // Mermas a costo actual del producto (el movimiento no guarda el costo de ese día)
     final shrinkage = (await db.rawQuery('''
@@ -177,13 +187,15 @@ class ProfitReportRepository {
       FROM customer_payments WHERE $inRange
     ''', args)).first;
 
+    // Por producto, con su nombre de hoy: un producto renombrado no sale en dos filas (0.16.4)
     final products = await db.rawQuery('''
-      SELECT product_name AS name,
-             SUM(quantity) AS qty,
-             SUM(total) AS revenue,
-             SUM(net_profit) AS profit
-      FROM sales_ok WHERE $inRange
-      GROUP BY product_name
+      SELECT COALESCE(MAX(p.name), MAX(s.product_name)) AS name,
+             SUM(s.quantity) AS qty,
+             SUM(s.total) AS revenue,
+             SUM(s.net_profit) AS profit
+      FROM sales_ok s LEFT JOIN products p ON p.id = s.product_id
+      WHERE s.business_id = ? AND s.date >= ? AND s.date < ?
+      GROUP BY CASE WHEN s.product_id IS NULL OR s.product_id = '' THEN 'n:' || s.product_name ELSE s.product_id END
     ''', args);
 
     final perProduct = [
@@ -209,7 +221,7 @@ class ProfitReportRepository {
       belowCostLoss: num0(totals['below_cost']),
       shrinkageLoss: num0(shrinkage['loss']),
       shrinkageUnits: (shrinkage['units'] as num?)?.toInt() ?? 0,
-      byPaymentMethod: {for (final m in methods) m['method'] as String: num0(m['amount'])},
+      byPaymentMethod: {for (final m in methods) m.key: m.value},
       creditPending: num0(totals['credit_pending']),
       debtCollected: num0(collected['amount']),
       topProducts: top.where((p) => p.profit > 0).take(5).toList(),

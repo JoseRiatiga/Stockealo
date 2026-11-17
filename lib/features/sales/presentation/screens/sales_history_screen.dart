@@ -205,6 +205,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     }
     var qty = 1;
     var restock = true;
+    // Venta mixta (0.16.4): por cuál medio se le devuelve la plata
+    final refundOptions = SalesRepository.refundMethods(sale);
+    var refund = SalesRepository.refundMethodFor(sale, null);
     final reason = TextEditingController();
     final ok = await AppSheet.show<bool>(
       context: context,
@@ -214,10 +217,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
         builder: (ctx, setLocal) {
           final amount = sale.totalAmount / sale.quantity * qty;
           final money = CurrencyFormatter.format(amount);
-          final how = switch (sale.paymentMethod) {
+          final how = switch (refund) {
             PaymentMethod.cash => 'Le devuelves $money en efectivo: sale de la caja.',
             PaymentMethod.credit => 'Su deuda baja $money.',
-            _ => 'Devuélvele $money por ${PaymentMethod.label(sale.paymentMethod)}.',
+            _ => 'Le devuelves $money ${PaymentMethod.phrase(refund)}.',
           };
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -246,6 +249,17 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                 onChanged: (v) => setLocal(() => restock = v),
               ),
               const SizedBox(height: AppSpace.md),
+              if (refundOptions.length > 1) ...[
+                Text('Se pagó en pago mixto. ¿Cómo le devuelves la plata?', style: AppText.body(ctx, weight: FontWeight.w600)),
+                const SizedBox(height: AppSpace.sm),
+                FilterTabs<String>(
+                  wrap: true,
+                  options: {for (final m in refundOptions) m: PaymentMethod.label(m)},
+                  value: refund,
+                  onChanged: (v) => setLocal(() => refund = v),
+                ),
+                const SizedBox(height: AppSpace.md),
+              ],
               TextField(
                 controller: reason,
                 textCapitalization: TextCapitalization.sentences,
@@ -264,7 +278,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     reason.dispose();
     if (ok != true || !mounted) return;
     try {
-      await _salesRepo.returnSale(sale, quantity: qty, restock: restock, reason: why);
+      await _salesRepo.returnSale(sale, quantity: qty, restock: restock, reason: why, refundMethod: refund);
       if (!mounted) return;
       AppToast.showSuccess(context, 'Devolución registrada.');
       await _loadSales();
@@ -440,10 +454,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     }).toList();
   }
 
+  /// Una venta = un comprobante (0.16.4). Cada devolución va en su propia tarjeta.
+  static List<List<Sale>> groupByInvoice(List<Sale> lines) {
+    final groups = <String, List<Sale>>{};
+    for (final s in lines) {
+      final invoice = s.invoiceNumber ?? '';
+      final key = s.isReturn ? 'dev:${s.id}' : (invoice.isEmpty ? 'id:${s.id}' : 'inv:$invoice');
+      groups.putIfAbsent(key, () => []).add(s);
+    }
+    return groups.values.toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final filtered = _filteredSales;
+    final filtered = groupByInvoice(_filteredSales);
     final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
     final currentPageClamped = _currentPage.clamp(1, totalPages);
     final pagedSales = filtered.skip((currentPageClamped - 1) * _pageSize).take(_pageSize).toList();
@@ -588,7 +613,17 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     );
   }
 
-  SaleCard _saleCard(Sale sale) => SaleCard(
+  Widget _saleCard(List<Sale> group) => group.length == 1
+      ? _lineCard(group.single)
+      : SaleGroupCard(
+          lines: group,
+          showProfit: canViewCosts,
+          lineCard: _lineCard,
+          onCancel: canCancelSale ? () => _cancelSale(group.first) : null,
+          pendingUpload: group.any((l) => _pendingIds.contains(l.id)),
+        );
+
+  SaleCard _lineCard(Sale sale) => SaleCard(
         sale: sale,
         showProfit: canViewCosts,
         onCancel: canCancelSale ? () => _cancelSale(sale) : null,

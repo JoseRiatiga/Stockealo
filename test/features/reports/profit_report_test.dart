@@ -133,6 +133,51 @@ void main() {
     expect(r.revenue, 6000);
   });
 
+  test('devolución, pago mixto y producto renombrado (0.16.4)', () async {
+    final db = await appDb.database;
+    final at = DateTime(2026, 6, 10, 17).toIso8601String();
+    Future<void> row(String id, Map<String, Object?> extra) => db.insert('sales', {
+          'id': id,
+          'business_id': businessId,
+          'quantity': 1,
+          'date': at,
+          'payment_status': 'PAGADO',
+          'invoice_number': 'INV-J',
+          'created_at': at,
+          ...extra,
+        });
+    // Venta mixta de Arroz: 1.000 en efectivo y 2.000 por Nequi
+    await row('j1', {
+      'product_id': 'arroz', 'product_name': 'Arroz viejo', 'total': 3000, 'total_cost': 2000, 'net_profit': 1000,
+      'payment_method': 'MIXTO', 'payment_split': '{"EFECTIVO":1000,"NEQUI":2000}',
+    });
+    // Otra venta del mismo producto, ya con el nombre nuevo
+    await row('j2', {
+      'product_id': 'arroz', 'product_name': 'Arroz', 'total': 3000, 'total_cost': 2000, 'net_profit': 1000,
+      'payment_method': 'EFECTIVO', 'invoice_number': 'INV-K',
+    });
+    // Devolución de la primera, en efectivo
+    await row('j3', {
+      'product_id': 'arroz', 'product_name': 'Arroz viejo', 'quantity': -1, 'total': -3000, 'total_cost': -2000,
+      'net_profit': -1000, 'payment_method': 'EFECTIVO', 'return_of': 'j1',
+    });
+
+    final r = await ProfitReportRepository.instance.buildRange(
+      businessId,
+      DateTime(2026, 6, 1),
+      DateTime(2026, 7, 1),
+      prevFrom: DateTime(2026, 5, 1),
+      prevTo: DateTime(2026, 6, 1),
+    );
+    expect(r.belowCostLoss, 0, reason: 'la devolución no es una venta por debajo del costo');
+    expect(r.byPaymentMethod.containsKey('MIXTO'), isFalse);
+    expect(r.byPaymentMethod['EFECTIVO'], 1000);
+    expect(r.byPaymentMethod['NEQUI'], 2000);
+    expect(r.topProducts, hasLength(1), reason: 'el producto renombrado es una sola fila');
+    expect(r.topProducts.single.name, 'Arroz');
+    expect(r.topProducts.single.quantity, 1);
+  });
+
   test('este mes: ventas, costos, mermas, pérdidas y comparación', () async {
     final r = await ProfitReportRepository.instance.build(businessId, ReportPeriod.month, now: now);
 

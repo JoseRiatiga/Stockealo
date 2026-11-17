@@ -212,6 +212,14 @@ void main() {
       final active = await db.query('sales', where: 'voided_at IS NULL');
       expect(active, isEmpty, reason: 'la devolución queda anulada con su venta');
     });
+
+    test('una devolución sola no se anula (no se sabe si volvió al inventario)', () async {
+      final product = await addProduct('p3', stock: 5);
+      final sale = await repo.recordSale(product: product, quantity: 1, paymentMethod: 'EFECTIVO');
+      final dev = await repo.returnSale(sale, quantity: 1, restock: false, reason: 'Dañado');
+      await expectLater(repo.voidSale(dev), throwsStateError);
+      expect(await stockOf('p3'), 4, reason: 'el stock no cambia');
+    });
   });
 
   group('recordMultiProductSale', () {

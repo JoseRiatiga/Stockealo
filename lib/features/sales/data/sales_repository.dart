@@ -1061,6 +1061,8 @@ class SalesRepository {
   /// [onlyThisLine] (0.14.0): anula solo esa línea (por ejemplo, un servicio cobrado por
   /// error) y deja cobrado lo demás de la venta, incluida la propina.
   Future<void> voidSale(Sale sale, {String? reason, bool onlyThisLine = false, String? voidAuthRequestId}) async {
+    // Una devolución sola no: no se sabe si volvió al inventario (0.16.6)
+    if (sale.isReturn) throw StateError('Una devolución se anula junto con su venta.');
     final db = await _dbProvider.database;
     final user = AuthRepository.instance.currentUser;
     final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');

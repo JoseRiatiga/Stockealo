@@ -638,7 +638,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
   SaleCard _lineCard(Sale sale) => SaleCard(
         sale: sale,
         showProfit: canViewCosts,
-        onCancel: canCancelSale ? () => _cancelSale(sale) : null,
+        // Una devolución no se anula sola (0.16.6): si no volvió al inventario, anularla
+        // restaba una unidad que nunca entró. Se anula junto con su venta.
+        onCancel: canCancelSale && !sale.isReturn ? () => _cancelSale(sale) : null,
         onReturn: Permissions.can(_effectiveRole, Perm.refund) ? () => _returnSale(sale) : null,
         pendingUpload: _pendingIds.contains(sale.id),
       );

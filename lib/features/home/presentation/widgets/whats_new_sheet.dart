@@ -21,6 +21,14 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.16.5',
+      title: 'Devoluciones en orden',
+      items: [
+        'Las devoluciones siguen en su propia tarjeta en Ventas después de recargar la app.',
+        'Ya no se puede devolver más de lo que se vendió.',
+      ],
+    ),
+    (
       version: '0.16.4',
       title: 'La caja y las cuentas, al día',
       items: [

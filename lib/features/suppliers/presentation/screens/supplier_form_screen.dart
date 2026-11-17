@@ -133,8 +133,7 @@ actions: [
             IconButton(icon: const Icon(Icons.delete_outline_outlined), tooltip: 'Quitar proveedor', onPressed: _delete),
         ],
       ),
-      body: ContentWidth(
-        child: ListView(
+      body: ContentListView(
           padding: const EdgeInsets.all(AppSpace.lg),
           children: [
             TextField(
@@ -261,7 +260,6 @@ initialValue: _visitDay,
             ),
           ],
         ),
-      ),
     );
   }
 }

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../../core/utils/countries.dart';
+
 class Business {
   final String id;
   final String userId;
@@ -8,6 +10,10 @@ class Business {
 
   /// Código ISO del país (prefijo telefónico, medios de pago, consejos de Stocky)
   final String country;
+
+  /// Zona horaria elegida (0.16.6): solo en países con varias; null = la del país.
+  /// La que manda es [zone].
+  final String? timeZone;
 
   /// Ícono elegido al crear el negocio (clave de BusinessIcons) y color "#RRGGBB"
   final String? icon;
@@ -45,6 +51,7 @@ class Business {
     required this.name,
     this.currency = 'COP',
     this.country = 'CO',
+    this.timeZone,
     this.icon,
     this.color,
     this.logoUrl,
@@ -78,12 +85,16 @@ class Business {
     return clean;
   }
 
+  /// La zona horaria del negocio: la elegida o la de su país (0.16.6)
+  String get zone => countryByCode(country).timeZone(timeZone);
+
   Business copyWith({
     String? id,
     String? userId,
     String? name,
     String? currency,
     String? country,
+    String? timeZone,
     String? icon,
     String? color,
     String? logoUrl,
@@ -105,6 +116,7 @@ class Business {
       name: name ?? this.name,
       currency: currency ?? this.currency,
       country: country ?? this.country,
+      timeZone: timeZone ?? this.timeZone,
       icon: icon ?? this.icon,
       color: color ?? this.color,
       logoUrl: logoUrl ?? this.logoUrl,
@@ -129,6 +141,7 @@ class Business {
       'name': name,
       'currency': currency,
       'country': country,
+      'time_zone': timeZone,
       'icon': icon,
       'color': color,
       'logo_url': logoUrl,
@@ -153,6 +166,7 @@ class Business {
       name: map['name'] as String,
       currency: map['currency'] as String? ?? 'COP',
       country: map['country'] as String? ?? 'CO',
+      timeZone: map['time_zone'] as String?,
       icon: map['icon'] as String?,
       color: map['color'] as String?,
       logoUrl: map['logo_url'] as String?,

@@ -640,8 +640,7 @@ actions: [
             ),
           ),
         ),
-        body: ContentWidth(
-          child: ListView(
+        body: ContentListView(
             padding: const EdgeInsets.all(AppSpace.lg),
             children: [
               if (_draftFrom != null) ...[
@@ -847,7 +846,6 @@ actions: [
               ),
             ],
           ),
-        ),
       ),
     );
   }

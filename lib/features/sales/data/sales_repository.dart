@@ -15,6 +15,7 @@ import '../models/sale.dart';
 import '../models/cart_item.dart';
 import '../models/quotation.dart';
 import '../../sales/models/payment_method.dart';
+import '../../../core/utils/business_clock.dart';
 
 class SalesRepository {
   static final SalesRepository instance = SalesRepository();
@@ -50,7 +51,7 @@ class SalesRepository {
     final totalCost = product.purchasePrice * quantity;
     final netProfit = total - totalCost;
     final newStock = product.stock - quantity;
-    final now = DateTime.now();
+    final now = appNow();
     final saleId = const Uuid().v4();
     final businessId = product.businessId;
 
@@ -241,7 +242,7 @@ class SalesRepository {
       }
     }
 
-    final now = DateTime.now();
+    final now = appNow();
     final invoiceNumber = '#INV-${now.millisecondsSinceEpoch.toString().substring(5)}';
 
     final currentUser = AuthRepository.instance.currentUser;
@@ -469,7 +470,7 @@ class SalesRepository {
     final subtotal = lines.fold(0.0, (s, l) => s + l.price);
     final discount = discountAmount.clamp(0.0, subtotal).toDouble();
     final finalTotal = subtotal - discount;
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final invoiceNumber = '#INV-${at.millisecondsSinceEpoch.toString().substring(5)}';
     final currentUser = AuthRepository.instance.currentUser;
     final seller = (currentUser?.name ?? '').trim().isNotEmpty
@@ -626,7 +627,7 @@ class SalesRepository {
     }
 
     final db = await _dbProvider.database;
-    final now = DateTime.now();
+    final now = appNow();
     final quotationId = const Uuid().v4();
     final quotationNumber = 'COT-${now.millisecondsSinceEpoch.toString().substring(6)}';
     final validUntil = now.add(Duration(days: validDays));
@@ -738,7 +739,7 @@ class SalesRepository {
   /// «Entregado»: guarda la fecha y lo sube a la nube
   Future<void> markDelivered(List<Sale> lines) async {
     final db = await _dbProvider.database;
-    final now = DateTime.now().toIso8601String();
+    final now = appNow().toIso8601String();
     for (final s in lines) {
       await db.update('sales', {'delivery_status': Sale.delivered, 'delivered_at': now}, where: 'id = ?', whereArgs: [s.id]);
       final row = await db.query('sales', where: 'id = ?', whereArgs: [s.id], limit: 1);
@@ -892,7 +893,7 @@ class SalesRepository {
     final left = line.quantity - await returnedQuantity(line.id);
     if (quantity < 1 || quantity > left) throw StateError('Solo quedan $left por devolver.');
     final db = await _dbProvider.database;
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final user = AuthRepository.instance.currentUser;
     final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
     final amount = _round(line.totalAmount / line.quantity * quantity);
@@ -1008,7 +1009,7 @@ class SalesRepository {
 
   /// Obtiene el resumen de ventas del día actual de la empresa
   Future<Map<String, dynamic>> getTodaySummary(String businessId) {
-    final now = DateTime.now();
+    final now = appNow();
     final today = DateTime(now.year, now.month, now.day);
     return getSalesSummary(businessId, from: today, to: today.add(const Duration(days: 1)));
   }
@@ -1060,72 +1061,97 @@ class SalesRepository {
   /// [onlyThisLine] (0.14.0): anula solo esa línea (por ejemplo, un servicio cobrado por
   /// error) y deja cobrado lo demás de la venta, incluida la propina.
   Future<void> voidSale(Sale sale, {String? reason, bool onlyThisLine = false, String? voidAuthRequestId}) async {
+    // Una devolución sola no: no se sabe si volvió al inventario (0.16.6)
+    if (sale.isReturn) throw StateError('Una devolución se anula junto con su venta.');
     final db = await _dbProvider.database;
     final user = AuthRepository.instance.currentUser;
     final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
     final cleanReason = (reason ?? '').trim().isEmpty ? null : reason!.trim();
-    final now = DateTime.now().toIso8601String();
+    final now = appNow().toIso8601String();
 
     final invoice = onlyThisLine || (sale.invoiceNumber ?? '').isEmpty ? null : sale.invoiceNumber;
-    final rows = await db.query(
-      'sales',
-      where: invoice == null
-          ? 'id = ? AND business_id = ? AND voided_at IS NULL'
-          : 'invoice_number = ? AND business_id = ? AND voided_at IS NULL',
-      whereArgs: [invoice ?? sale.id, sale.businessId],
-    );
-    if (rows.isEmpty) return;
-    final lines = [for (final r in rows) saleFromRow(r)];
-
     final stock = <String, int>{};
     final variants = <String, int>{};
     final debts = <String, double>{};
+    var lines = <Sale>[];
+    final businessOf = <String, String>{};
 
+    final missing = <String>{};
     await db.transaction((txn) async {
+      // Se leen dentro de la transacción (0.16.6): dos toques casi a la vez no anulan
+      // dos veces lo mismo ni reponen el stock dos veces
+      final rows = await txn.query(
+        'sales',
+        // Una sola línea (o venta sin comprobante): con sus devoluciones (0.16.6)
+        where: invoice == null
+            ? '(id = ? OR return_of = ?) AND business_id = ? AND voided_at IS NULL'
+            : 'invoice_number = ? AND business_id = ? AND voided_at IS NULL',
+        whereArgs: invoice == null ? [sale.id, sale.id, sale.businessId] : [invoice, sale.businessId],
+      );
+      if (rows.isEmpty) return;
+      lines = [for (final r in rows) saleFromRow(r)];
+
+      // Se suma todo el comprobante antes de tocar nada (0.16.6, hallazgo 63): una
+      // devolución ya hecha comparte el comprobante y resta. Así el stock y la deuda
+      // cambian una sola vez y no dependen del orden de las filas (con el tope de deuda
+      // en 0, anular la venta antes que su devolución dejaba al cliente debiendo).
       for (final line in lines) {
         if (line.productId.isNotEmpty) {
-          await txn.rawUpdate(
-            'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
-            [line.quantity, line.productId, line.businessId],
-          );
-          final p = await txn.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [line.productId], limit: 1);
-          if (line.variantId != null) {
-            await txn.rawUpdate(
-              'UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?',
-              [line.quantity, now, line.variantId],
-            );
-            variants[line.variantId!] = (variants[line.variantId!] ?? 0) + line.quantity;
-          }
-          if (p.isNotEmpty) {
-            stock[line.productId] = (stock[line.productId] ?? 0) + line.quantity;
-            await txn.insert('stock_movements', {
-              'id': const Uuid().v4(),
-              'business_id': line.businessId,
-              'product_id': line.productId,
-              'type': 'AJUSTE',
-              'quantity': line.quantity,
-              'resulting_stock': p.first['stock'] as int,
-              'reason': 'Venta anulada${invoice == null ? '' : ' $invoice'}${cleanReason == null ? '' : ': $cleanReason'}',
-              'date': now,
-            });
-          }
+          stock[line.productId] = (stock[line.productId] ?? 0) + line.quantity;
+          if (line.variantId != null) variants[line.variantId!] = (variants[line.variantId!] ?? 0) + line.quantity;
         }
+      }
+      businessOf.addAll({for (final l in lines) l.productId: l.businessId});
 
-        // Fiado: la deuda baja lo que se había fiado
+      for (final e in stock.entries) {
+        final rows = await txn.rawUpdate(
+          'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
+          [e.value, e.key, businessOf[e.key]],
+        );
+        // Producto que ya no está en este equipo: tampoco se ajusta en la nube (como antes)
+        if (rows == 0) missing.add(e.key);
+        if (rows == 0 || e.value == 0) continue;
+        final p = await txn.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [e.key], limit: 1);
+        // Un solo movimiento claro: «Venta anulada #A1: vuelven 2»
+        await txn.insert('stock_movements', {
+          'id': const Uuid().v4(),
+          'business_id': businessOf[e.key],
+          'product_id': e.key,
+          'type': 'AJUSTE',
+          'quantity': e.value,
+          'resulting_stock': p.first['stock'] as int,
+          'reason': 'Venta anulada${invoice == null ? '' : ' $invoice'}: '
+              '${e.value > 0 ? 'vuelven ${e.value}' : 'salen ${-e.value}'}${cleanReason == null ? '' : ' ($cleanReason)'}',
+          'date': now,
+        });
+      }
+      for (final e in variants.entries) {
+        if (e.value == 0) continue;
+        await txn.rawUpdate('UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?', [e.value, now, e.key]);
+      }
+
+      // Fiado: la deuda baja lo que se había fiado, neto de lo ya devuelto
+      final owed = <String, double>{};
+      for (final line in lines) {
         if (line.paymentMethod == PaymentMethod.credit && line.customerName != null) {
-          final c = await txn.query(
-            'customers',
-            where: 'business_id = ? AND LOWER(name) = ?',
-            whereArgs: [line.businessId, line.customerName!.toLowerCase()],
-            limit: 1,
-          );
-          if (c.isNotEmpty) {
-            final id = c.first['id'] as String;
-            await txn.rawUpdate('UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE id = ?', [line.totalAmount, id]);
-            debts[id] = (debts[id] ?? 0) + line.totalAmount;
-          }
+          final key = line.customerName!.toLowerCase();
+          owed[key] = (owed[key] ?? 0) + line.totalAmount;
         }
+      }
+      for (final e in owed.entries) {
+        final c = await txn.query(
+          'customers',
+          where: 'business_id = ? AND LOWER(name) = ?',
+          whereArgs: [sale.businessId, e.key],
+          limit: 1,
+        );
+        if (c.isEmpty || e.value == 0) continue;
+        final id = c.first['id'] as String;
+        await txn.rawUpdate('UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE id = ?', [e.value, id]);
+        debts[id] = (debts[id] ?? 0) + e.value;
+      }
 
+      for (final line in lines) {
         await txn.update(
           'sales',
           {'voided_at': now, 'void_reason': cleanReason, 'voided_by': by, 'is_synced': 0},
@@ -1135,6 +1161,7 @@ class SalesRepository {
       }
     });
 
+    if (lines.isEmpty) return;
     DataEvents.instance.salesChanged();
     for (final line in lines) {
       // Un servicio anulado no deja comisión (si ya se pagó, queda un ajuste)
@@ -1161,10 +1188,10 @@ class SalesRepository {
       });
     }
     for (final e in stock.entries) {
-      await cloud.adjustProductStockInCloud(e.key, e.value);
+      if (e.value != 0 && !missing.contains(e.key)) await cloud.adjustProductStockInCloud(e.key, e.value);
     }
     for (final e in variants.entries) {
-      await cloud.adjustVariantStockInCloud(e.key, e.value);
+      if (e.value != 0) await cloud.adjustVariantStockInCloud(e.key, e.value);
     }
     for (final e in debts.entries) {
       await cloud.adjustCustomerDebtInCloud(e.key, -e.value);

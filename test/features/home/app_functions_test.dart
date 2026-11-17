@@ -151,7 +151,7 @@ void main() {
           ));
           await tester.pump();
           expect(find.text('Dónde está cada cosa'), findsOneWidget);
-          expect(find.text('Busca un producto o una función'), findsOneWidget);
+          expect(find.text('Busca un producto, un cliente o una función'), findsOneWidget);
           expect(find.text('Cerrar'), findsOneWidget);
           expect(tester.takeException(), isNull);
         });

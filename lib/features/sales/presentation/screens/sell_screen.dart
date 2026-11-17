@@ -25,6 +25,7 @@ import '../../data/sell_cart.dart';
 import '../../models/payment_method.dart';
 import '../../models/sale.dart';
 import '../widgets/digital_ticket_modal.dart';
+import '../widgets/quotations_list_modal.dart';
 import '../widgets/variant_picker.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../data/promotions_repository.dart';
@@ -191,6 +192,8 @@ class _SellScreenState extends State<SellScreen> {
     if (_customer.text != _cart.customer) _customer.text = _cart.customer;
     // Agregar algo nuevo cierra el aviso de la venta anterior
     if (_last != null && !_cart.isEmpty) setState(() => _last = null);
+    // Cuenta vacía («Nueva venta», Para después, retomar): el pago vuelve a efectivo
+    if (_cart.isEmpty && (_pay.method != PaymentMethod.cash || _pay.received != null || _pay.mixedPaid > 0)) _pay.reset();
   }
 
   Future<void> _load() async {
@@ -448,11 +451,35 @@ class _SellScreenState extends State<SellScreen> {
 
   Future<void> _editDiscount() async {
     if (!PermissionGuard.check(context, Perm.discount)) return;
-    final field = TextEditingController(text: _cart.discount > 0 ? _cart.discount.round().toString() : '');
+    final base = _cart.subtotal - _cart.promoDiscount - _cart.lineDiscounts;
+    final value = await _discountSheet(
+      title: 'Descuento a toda la venta',
+      subtitle: 'Subtotal ${CurrencyFormatter.format(base)}',
+      base: base,
+      current: _cart.discount,
+      maxSafe: _cart.maxSafeDiscount,
+    );
+    if (value == null || !mounted) return;
+    _cart.setDiscount(value);
+    if (value > _cart.discount + 0.5) {
+      AppToast.showWarning(context, 'El descuento no puede pasar el valor de la venta. Quedó en ${CurrencyFormatter.format(_cart.discount)}.');
+    }
+  }
+
+  /// La misma ventana para el descuento de una línea y el de toda la venta (0.16.6,
+  /// hallazgo 8): porcentajes rápidos, «Máximo sin perder» y el valor en pesos.
+  Future<double?> _discountSheet({
+    required String title,
+    required String subtitle,
+    required double base,
+    required double current,
+    required double maxSafe,
+  }) async {
+    final field = TextEditingController(text: current > 0 ? current.round().toString() : '');
     final value = await AppSheet.show<double>(
       context: context,
-      title: 'Descuento a toda la venta',
-      subtitle: 'Subtotal ${CurrencyFormatter.format(_cart.subtotal)}',
+      title: title,
+      subtitle: subtitle,
       builder: (ctx) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -461,20 +488,20 @@ class _SellScreenState extends State<SellScreen> {
             autofocus: true,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(labelText: 'Descuento', prefixText: '\$ '),
-            onSubmitted: (t) => Navigator.pop(ctx, double.tryParse(t) ?? 0),
+            decoration: const InputDecoration(labelText: 'Descuento en pesos', prefixText: '\$ '),
+            onSubmitted: (t) => Navigator.pop(ctx, double.tryParse(t.trim()) ?? 0),
           ),
           const SizedBox(height: AppSpace.md),
           Wrap(
             spacing: AppSpace.sm,
             runSpacing: AppSpace.sm,
             children: [
-              for (final pct in [5, 10, 15, 20])
-                ActionChip(label: Text('$pct %'), onPressed: () => Navigator.pop(ctx, (_cart.subtotal * pct / 100).roundToDouble())),
-              if (_cart.maxSafeDiscount > 0)
+              for (final pct in const [5, 10, 15, 20])
+                ActionChip(label: Text('$pct %'), onPressed: () => Navigator.pop(ctx, (base * pct / 100).roundToDouble())),
+              if (maxSafe > 0)
                 ActionChip(
-                  label: Text('Máximo sin perder (${CurrencyFormatter.format(_cart.maxSafeDiscount)})'),
-                  onPressed: () => Navigator.pop(ctx, _cart.maxSafeDiscount.floorToDouble()),
+                  label: Text('Máximo sin perder (${CurrencyFormatter.format(maxSafe.floorToDouble())})'),
+                  onPressed: () => Navigator.pop(ctx, maxSafe.floorToDouble()),
                 ),
             ],
           ),
@@ -485,7 +512,7 @@ class _SellScreenState extends State<SellScreen> {
               const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: FilledButton(
-                  onPressed: () => Navigator.pop(ctx, double.tryParse(field.text) ?? 0),
+                  onPressed: () => Navigator.pop(ctx, double.tryParse(field.text.trim()) ?? 0),
                   child: const Text('Aplicar'),
                 ),
               ),
@@ -495,7 +522,7 @@ class _SellScreenState extends State<SellScreen> {
       ),
     );
     field.dispose();
-    if (value != null) _cart.setDiscount(value);
+    return value;
   }
 
   Future<void> _showHeld() async {
@@ -606,16 +633,9 @@ class _SellScreenState extends State<SellScreen> {
                       ),
                     ),
                   ],
-                  if (_cart.held.isNotEmpty) ...[
-                    const SizedBox(width: AppSpace.sm),
-                    OutlinedButton.icon(
-                      onPressed: _showHeld,
-                      icon: const Icon(Icons.pause_circle_outline, size: 18),
-                      label: Text('En espera ${_cart.held.length}'),
-                    ),
-                  ],
                 ],
               ),
+              _pendingRow(),
               const SizedBox(height: AppSpace.md),
               _categoryChips(),
               const SizedBox(height: AppSpace.md),
@@ -655,6 +675,43 @@ class _SellScreenState extends State<SellScreen> {
                         ),
         ),
       ],
+    );
+  }
+
+  /// Ventas en espera y cotizaciones, en todos los tamaños (0.16.6, hallazgos 4 y 49).
+  /// Escucha la cuenta: el contador baja apenas se retoma una venta (hallazgo 5).
+  Widget _pendingRow() {
+    final quotes = Permissions.can(widget.role, Perm.quotations);
+    return ListenableBuilder(
+      listenable: _cart,
+      builder: (context, _) {
+        final held = _cart.held.length;
+        if (held == 0 && !quotes) return const SizedBox.shrink();
+        final style = OutlinedButton.styleFrom(visualDensity: VisualDensity.compact);
+        return Padding(
+          padding: const EdgeInsets.only(top: AppSpace.sm),
+          child: Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              if (held > 0)
+                OutlinedButton.icon(
+                  style: style,
+                  onPressed: _showHeld,
+                  icon: const Icon(Icons.pause_circle_outline, size: 18),
+                  label: Text('En espera $held'),
+                ),
+              if (quotes)
+                OutlinedButton.icon(
+                  style: style,
+                  onPressed: () => QuotationsListModal.show(context, businessId: widget.business.id),
+                  icon: const Icon(Icons.request_quote_outlined, size: 18),
+                  label: const Text('Cotizaciones'),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -900,10 +957,16 @@ class _SellScreenState extends State<SellScreen> {
                   if (_last != null) ...[_saleDone(), const SizedBox(height: AppSpace.md)],
                   lines,
                   const SizedBox(height: AppSpace.md),
-                  footer,
+                  if (!_cart.isEmpty) _checkout(withActions: false),
                 ],
               ),
             ),
+            if (!_cart.isEmpty)
+              Container(
+                padding: const EdgeInsets.fromLTRB(AppSpace.lg + 2, 0, AppSpace.lg + 2, AppSpace.md),
+                decoration: BoxDecoration(border: Border(top: BorderSide(color: c.line))),
+                child: _chargeActions(),
+              ),
           ],
         );
       },
@@ -940,6 +1003,10 @@ class _SellScreenState extends State<SellScreen> {
                     ),
                   ),
                 ),
+                // La pérdida se avisa en la línea que la causa (0.16.6, hallazgo 8)
+                if (l.lineDiscount > 0 && l.netSubtotal < l.totalCost - 0.5)
+                  Text('Con este descuento pierdes ${CurrencyFormatter.format(l.totalCost - l.netSubtotal)}.',
+                      style: AppText.caption(context, weight: FontWeight.w600, color: c.danger)),
                 if (l.promotion != null)
                   Text(
                     l.promoDiscount > 0
@@ -973,53 +1040,27 @@ class _SellScreenState extends State<SellScreen> {
     if (i >= _cart.lines.length) return;
     final l = _cart.lines[i];
     final base = (l.subtotal - l.promoDiscount).clamp(0, double.infinity).toDouble();
-    final field = TextEditingController(text: l.lineDiscount > 0 ? l.lineDiscount.round().toString() : '');
-    final value = await AppSheet.show<double>(
-      context: context,
+    final value = await _discountSheet(
       title: 'Descuento de esta línea',
       subtitle: '${l.displayName} · ${CurrencyFormatter.format(base)}',
-      builder: (ctx) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: AppSpace.sm,
-            runSpacing: AppSpace.sm,
-            children: [
-              for (final pct in const [5, 10, 15, 20])
-                ActionChip(
-                  label: Text('$pct %'),
-                  onPressed: () => Navigator.pop(ctx, (base * pct / 100).roundToDouble()),
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpace.md),
-          TextField(
-            controller: field,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(labelText: 'Descuento en pesos', prefixText: '\$ '),
-          ),
-          const SizedBox(height: AppSpace.md),
-          Row(
-            children: [
-              if (l.lineDiscount > 0)
-                TextButton(onPressed: () => Navigator.pop(ctx, 0.0), child: const Text('Quitar descuento')),
-              const Spacer(),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, double.tryParse(field.text.trim()) ?? 0),
-                child: const Text('Aplicar'),
-              ),
-            ],
-          ),
-        ],
-      ),
+      base: base,
+      current: l.lineDiscount,
+      maxSafe: (base - l.totalCost).clamp(0, double.infinity).toDouble(),
     );
-    field.dispose();
-    if (value != null && mounted) _cart.setLineDiscount(i, value);
+    if (value == null || !mounted || i >= _cart.lines.length) return;
+    _cart.setLineDiscount(i, value);
+    // Antes se bajaba al valor de la línea sin avisar y quedaba «Cobrar \$ 0»
+    if (value > base + 0.5) {
+      AppToast.showWarning(context, 'El descuento no puede pasar el valor de la línea. Quedó en ${CurrencyFormatter.format(base)}.');
+    }
   }
 
-  Widget _checkout({BuildContext? sheet}) {
+  /// Alguna línea ya muestra su propia pérdida
+  bool get _lineShowsLoss => _cart.lines.any((l) => l.lineDiscount > 0 && l.netSubtotal < l.totalCost - 0.5);
+
+  /// Cliente, subtotales, total y cómo paga. En el computador va con la cuenta y
+  /// «Cobrar» queda fijo abajo (0.16.6, hallazgo 13); en el celular, todo seguido.
+  Widget _checkout({BuildContext? sheet, bool withActions = true}) {
     final c = context.colors;
     final total = _cart.total;
     final method = _pay.method;
@@ -1037,11 +1078,14 @@ class _SellScreenState extends State<SellScreen> {
             'Descuento a toda la venta',
             _cart.discount > 0 ? '− ${CurrencyFormatter.format(_cart.discount)}' : 'Agregar',
             link: _cart.discount <= 0,
-            danger: _cart.hasLoss,
+            danger: _cart.hasLoss && _cart.discount > 0,
           ),
         ),
-        if (_cart.hasLoss)
-          Text('Con ese descuento pierdes ${CurrencyFormatter.format(_cart.loss)}.',
+        if (_cart.hasLoss && (_cart.discount > 0 || !_lineShowsLoss))
+          Text(
+              _cart.discount > 0
+                  ? 'Con ese descuento pierdes ${CurrencyFormatter.format(_cart.loss)}.'
+                  : 'Esta venta deja pérdida de ${CurrencyFormatter.format(_cart.loss)}.',
               style: AppText.caption(context, weight: FontWeight.w600, color: c.danger)),
         const SizedBox(height: AppSpace.sm),
         Row(
@@ -1061,6 +1105,18 @@ class _SellScreenState extends State<SellScreen> {
             padding: const EdgeInsets.only(top: AppSpace.sm),
             child: Text('Para fiar, escribe arriba a quién.', style: AppText.small(context, color: c.warning)),
           ),
+        if (withActions) _chargeActions(sheet: sheet),
+      ],
+    );
+  }
+
+  /// «Cobrar», «Para después» y «Cotizar»
+  Widget _chargeActions({BuildContext? sheet}) {
+    final c = context.colors;
+    final total = _cart.total;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         const SizedBox(height: AppSpace.md),
         SizedBox(
           height: 56,
@@ -1162,8 +1218,9 @@ class _SellScreenState extends State<SellScreen> {
 
   Widget _methods() {
     return LayoutBuilder(builder: (context, box) {
-      const cols = 3;
       const gap = AppSpace.sm - 2;
+      // Tres columnas solo si cabe «Transferencia» con su ícono (0.16.6, hallazgo 14)
+      final cols = (box.maxWidth - gap * 2) / 3 >= 124 ? 3 : 2;
       final w = (box.maxWidth - gap * (cols - 1)) / cols;
       return Wrap(
         spacing: gap,

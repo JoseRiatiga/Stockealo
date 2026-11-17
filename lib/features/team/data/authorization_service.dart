@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Una solicitud de autorización (0.15.0, etapa 3 de `docs/plan-roles.md`)
 class AuthRequest {
@@ -53,7 +54,7 @@ class AuthRequest {
         requestedName: j['requested_name'] as String?,
         status: j['status'] as String? ?? pending,
         decidedName: j['decided_name'] as String?,
-        createdAt: DateTime.tryParse('${j['created_at']}')?.toLocal() ?? DateTime.now(),
+        createdAt: DateTime.tryParse('${j['created_at']}')?.toLocal() ?? appNow(),
         expiresAt: DateTime.tryParse('${j['expires_at']}')?.toLocal() ?? DateTime.now(),
       );
 }

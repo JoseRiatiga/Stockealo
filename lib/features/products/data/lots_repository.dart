@@ -6,6 +6,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../team/data/activity_repository.dart';
 import '../models/product_lot.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Lotes con vencimiento (0.16.0, fase 2b, decisiones del 15 nov):
 /// • Solo en productos con «Controla vencimiento por lote» y sin tallas ni colores.
@@ -88,7 +89,7 @@ class LotsRepository {
     String? purchaseId,
     DateTime? now,
   }) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final lot = ProductLot(
       id: const Uuid().v4(),
       businessId: businessId,
@@ -112,7 +113,7 @@ class LotsRepository {
   /// Cuadra los lotes con el stock y saca del stock vendible lo que ya venció.
   /// Se llama al abrir Inicio, Stock y la ficha del producto.
   Future<void> reconcile(String businessId, {DateTime? now}) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final db = await _db;
     final products = await db.query(
       'products',
@@ -185,7 +186,7 @@ class LotsRepository {
   Future<LotExchange> sendToExchange(ProductLot shown, {required String productName, String? supplierId, String? supplierName}) async {
     final lot = await _freshLot(shown.id);
     if (lot == null || lot.status != ProductLot.expired) throw StateError('Solo se devuelve un lote vencido.');
-    final at = DateTime.now();
+    final at = appNow();
     final db = await _db;
     final exchange = LotExchange(
       id: const Uuid().v4(),
@@ -219,7 +220,7 @@ class LotsRepository {
     final exchange = await _freshExchange(shown.id);
     if (exchange == null || !exchange.isPending) throw StateError('Ese cambio ya se cerró.');
     final qty = quantity ?? exchange.quantity;
-    final at = DateTime.now();
+    final at = appNow();
     final db = await _db;
     final lot = ProductLot(
       id: const Uuid().v4(),
@@ -268,7 +269,7 @@ class LotsRepository {
       throw StateError('Ese lote ya no se puede dar de baja.');
     }
     if (exchange != null && (await _freshExchange(exchange.id))?.isPending != true) throw StateError('Ese cambio ya se cerró.');
-    final at = DateTime.now();
+    final at = appNow();
     final db = await _db;
     await db.transaction((txn) async {
       final p = await txn.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [lot.productId], limit: 1);
@@ -307,7 +308,7 @@ class LotsRepository {
 
   /// Lo del aviso de Inicio y Stock
   Future<({List<ProductLot> expired, List<ProductLot> soon, List<LotExchange> pending})> alerts(String businessId, {DateTime? now}) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final lots = await lotsOfBusiness(businessId);
     return (
       expired: lots.where((l) => l.status == ProductLot.expired && l.quantity > 0).toList(),

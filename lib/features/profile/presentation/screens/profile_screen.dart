@@ -1024,7 +1024,7 @@ actions: [
                       SettingsRow(
                         icon: Icons.explore_outlined,
                         title: 'Dónde quedó cada cosa',
-                        subtitle: 'Lo que cambió de lugar en la 0.12.0',
+                        subtitle: 'Dónde está cada función en el menú',
                         onTap: () => WhereThingsMovedSheet.show(context),
                       ),
                       SettingsRow(

@@ -200,8 +200,7 @@ actions: [
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ContentWidth(
-        child: ListView(
+      child: ContentListView(
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.xs, AppSpace.lg, AppSpace.xxl),
           children: [
             Text('Cada servicio cobrado suma la comisión de quien lo hizo. Paga al final del día, la semana o el mes.',
@@ -279,7 +278,6 @@ actions: [
             ],
           ],
         ),
-      ),
     );
   }
 }

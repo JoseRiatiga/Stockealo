@@ -98,8 +98,7 @@ actions: [
     return Scaffold(
       backgroundColor: c.paper,
       appBar: AppBar(title: const Text('Pedidos a proveedores')),
-      body: ContentWidth(
-        child: list == null
+      body: list == null
             ? const Center(child: CircularProgressIndicator())
             : list.isEmpty
                 ? Center(
@@ -112,13 +111,12 @@ actions: [
                       ),
                     ),
                   )
-                : ListView.separated(
+                : ContentListView.separated(
                     padding: const EdgeInsets.all(AppSpace.lg),
                     itemCount: list.length,
                     separatorBuilder: (_, __) => const SizedBox(height: AppSpace.md),
                     itemBuilder: (_, i) => _orderCard(list[i]),
                   ),
-      ),
     );
   }
 

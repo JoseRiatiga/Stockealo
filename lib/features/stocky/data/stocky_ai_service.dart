@@ -9,6 +9,7 @@ import '../../business/data/business_repository.dart';
 import '../../customers/data/customer_repository.dart';
 import '../../dashboard/data/dashboard_repository.dart';
 import '../../products/data/product_repository.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Cuándo usa Stocky la IA para lo que sus reglas no entienden
 enum StockyAiMode {
@@ -177,16 +178,16 @@ class StockyAiService {
       SELECT product_name, SUM(quantity) AS qty
       FROM sales_ok WHERE business_id = ? AND date >= ?
       GROUP BY product_name ORDER BY qty DESC LIMIT 5
-    ''', [businessId, DateTime.now().subtract(const Duration(days: 30)).toIso8601String()]);
+    ''', [businessId, appNow().subtract(const Duration(days: 30)).toIso8601String()]);
     final stagnant = await db.rawQuery('''
       SELECT name FROM products
       WHERE business_id = ? AND is_active = 1 AND stock > 0
         AND id NOT IN (SELECT DISTINCT product_id FROM sales_ok WHERE business_id = ? AND date >= ? AND product_id IS NOT NULL)
       LIMIT 5
-    ''', [businessId, businessId, DateTime.now().subtract(const Duration(days: 14)).toIso8601String()]);
+    ''', [businessId, businessId, appNow().subtract(const Duration(days: 14)).toIso8601String()]);
 
     return {
-      'fecha': DateTime.now().toIso8601String().substring(0, 10),
+      'fecha': appNow().toIso8601String().substring(0, 10),
       'negocio': {
         'nombre': business?.name,
         'pais': countryByCode(business?.country).name,

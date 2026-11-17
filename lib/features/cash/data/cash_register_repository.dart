@@ -12,6 +12,7 @@ import '../../business/models/business.dart';
 import '../models/cash_session.dart';
 import '../../sales/models/payment_method.dart';
 import '../../../core/services/phone_alerts_service.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Arqueo de caja por negocio (0.12.0: con movimientos, propinas, cierre por forma
 /// de pago y en la nube).
@@ -70,7 +71,7 @@ class CashRegisterRepository {
     if (await getOpenSession(businessId) != null) {
       throw Exception('Ya hay una caja abierta. Ciérrala antes de abrir otra.');
     }
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final session = CashSession(
       id: const Uuid().v4(),
       businessId: businessId,
@@ -144,7 +145,7 @@ class CashRegisterRepository {
       amount: amount,
       note: (note ?? '').trim().isEmpty ? null : note!.trim(),
       createdBy: AuthRepository.instance.currentUser?.email,
-      date: now ?? DateTime.now(),
+      date: now ?? appNow(),
     );
     final db = await _dbProvider.database;
     final row = m.toMap();
@@ -208,7 +209,7 @@ class CashRegisterRepository {
   Future<CashSummary> summarize(CashSession session, {DateTime? until}) async {
     final db = await _dbProvider.database;
     final fromAt = session.openedAt;
-    final toAt = session.closedAt ?? until ?? DateTime.now();
+    final toAt = session.closedAt ?? until ?? appNow();
     final from = fromAt.toIso8601String();
     final to = toAt.toIso8601String();
     final biz = session.businessId;
@@ -316,7 +317,7 @@ class CashRegisterRepository {
     if (countedAmount < 0) {
       throw Exception('El efectivo contado no puede ser negativo.');
     }
-    final closedAt = now ?? DateTime.now();
+    final closedAt = now ?? appNow();
     final summary = await summarize(session.copyWith(closedAt: closedAt));
     final difference = countedAmount - summary.expected;
     final cleanNotes = (notes ?? '').trim();

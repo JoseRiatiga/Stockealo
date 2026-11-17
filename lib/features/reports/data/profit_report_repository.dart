@@ -1,6 +1,7 @@
 import '../../sales/models/payment_method.dart';
 import '../../../core/database/app_database.dart';
 import '../../sales/data/sales_repository.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Periodos del reporte de ganancias
 enum ReportPeriod {
@@ -129,7 +130,7 @@ class ProfitReportRepository {
   static String _iso(DateTime d) => d.toIso8601String();
 
   Future<ProfitReport> build(String businessId, ReportPeriod period, {DateTime? now}) async {
-    final r = period.range(now ?? DateTime.now());
+    final r = period.range(now ?? appNow());
     return buildRange(businessId, r.from, r.to, prevFrom: r.prevFrom, prevTo: r.prevTo);
   }
 

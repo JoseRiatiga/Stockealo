@@ -36,6 +36,9 @@ class CustomersScreen extends StatefulWidget {
     this.embedded = false,
   });
 
+  /// Cliente que pidió el buscador (0.16.6, hallazgo 45): la lista se abre filtrada por él
+  static final focus = ValueNotifier<String?>(null);
+
   @override
   State<CustomersScreen> createState() => _CustomersScreenState();
 }
@@ -57,6 +60,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
   void initState() {
     super.initState();
     _loadCustomers();
+    _applyFocus();
+    CustomersScreen.focus.addListener(_applyFocus);
     // Un fiado vendido o un abono en otra pantalla cambian las deudas (0.16.4)
     DataEvents.instance.salesVersion.addListener(_onDataChanged);
     DataEvents.instance.customersVersion.addListener(_onDataChanged);
@@ -64,6 +69,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
     ProService.instance.refresh(widget.businessId);
     // refresh limpia al instante el estado si era de otro negocio
     _pro = ProService.instance.status.value.active;
+  }
+
+  void _applyFocus() {
+    final name = CustomersScreen.focus.value;
+    if (name == null || !mounted) return;
+    // Se limpia después del cuadro: así la pestaña Clientes también alcanza a verlo
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (CustomersScreen.focus.value == name) CustomersScreen.focus.value = null;
+    });
+    setState(() {
+      _searchController.text = name;
+      _filter = 'TODOS';
+    });
   }
 
   void _onDataChanged() {
@@ -79,6 +97,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     DataEvents.instance.salesVersion.removeListener(_onDataChanged);
     DataEvents.instance.customersVersion.removeListener(_onDataChanged);
     ProService.instance.status.removeListener(_onProChanged);
+    CustomersScreen.focus.removeListener(_applyFocus);
     _searchController.dispose();
     super.dispose();
   }

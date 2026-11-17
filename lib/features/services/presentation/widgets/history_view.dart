@@ -179,8 +179,7 @@ actions: [
       'teléfono',
     ].join(', ');
 
-    return ContentWidth(
-      child: ListView(
+    return ContentListView(
         padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.xs, AppSpace.lg, AppSpace.xxl),
         children: [
           TextField(
@@ -256,8 +255,7 @@ actions: [
             const SizedBox(height: AppSpace.sm),
           ],
         ],
-      ),
-    );
+      );
   }
 }
 

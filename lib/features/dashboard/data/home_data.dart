@@ -6,6 +6,7 @@ import '../../sales/data/sales_repository.dart';
 import '../../store/data/store_orders_repository.dart';
 import '../../services/data/appointments_repository.dart';
 import 'sold_out_prefs.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Rango del gráfico de ventas del Inicio
 enum HomeRange { days14, month, year }
@@ -143,7 +144,7 @@ class HomeRepository {
 
   Future<HomeData> load(String businessId, {HomeRange range = HomeRange.days14, DateTime? now}) async {
     final db = await AppDatabase.instance.database;
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final today = DateTime(at.year, at.month, at.day);
     final tomorrow = today.add(const Duration(days: 1));
 
@@ -289,7 +290,7 @@ class HomeRepository {
   /// Barras del gráfico: 14 días, los días del mes o los 12 meses del año
   Future<List<HomeBar>> bars(String businessId, HomeRange range, {DateTime? now}) async {
     final db = await AppDatabase.instance.database;
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final today = DateTime(at.year, at.month, at.day);
     final byMonth = range == HomeRange.year;
     final starts = switch (range) {

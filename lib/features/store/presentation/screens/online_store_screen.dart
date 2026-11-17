@@ -695,8 +695,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _loadError != null
               ? _errorView(c)
-              : ContentWidth(
-                  child: ListView(
+              : ContentListView(
                   // Abajo, espacio para que «Publicar mi tienda» suba por encima de Stocky
                   padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, StockyFloatingButton.clearance),
                   children: [
@@ -713,7 +712,6 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                     ],
                     _formCard(c),
                   ],
-                ),
                 ),
     );
   }

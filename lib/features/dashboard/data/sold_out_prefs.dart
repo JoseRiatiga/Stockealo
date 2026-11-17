@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Los dos interruptores del panel «Resolver» de un agotado (0.16.0, fase 7):
 /// • «Recordarme si no llega»: si a los [remindAfterDays] días sigue agotado, Inicio lo
@@ -45,7 +46,7 @@ abstract final class SoldOutPrefs {
 
   static Future<void> setReminder(String businessId, String productId, bool on, {DateTime? now}) async {
     final map = await reminders(businessId);
-    on ? map[productId] = now ?? DateTime.now() : map.remove(productId);
+    on ? map[productId] = now ?? appNow() : map.remove(productId);
     await AppDatabase.instance.setSetting(
       _remindKey(businessId),
       map.isEmpty ? null : jsonEncode({for (final e in map.entries) e.key: e.value.toIso8601String()}),
@@ -55,7 +56,7 @@ abstract final class SoldOutPrefs {
   /// Días desde que lo pidió, si ya pasaron [remindAfterDays]; null si no toca avisar
   static int? overdueDays(DateTime? askedAt, {DateTime? now}) {
     if (askedAt == null) return null;
-    final days = (now ?? DateTime.now()).difference(askedAt).inDays;
+    final days = (now ?? appNow()).difference(askedAt).inDays;
     return days >= remindAfterDays ? days : null;
   }
 }

@@ -18,6 +18,9 @@ import '../business_identity.dart';
 class NewBusinessData {
   final String name;
   final String country;
+
+  /// Zona horaria elegida (0.16.6); null = la del país
+  final String? timeZone;
   final String currency;
   final String icon;
   final String color;
@@ -35,6 +38,7 @@ class NewBusinessData {
   const NewBusinessData({
     required this.name,
     required this.country,
+    this.timeZone,
     required this.currency,
     required this.icon,
     required this.color,
@@ -91,6 +95,7 @@ class CreateBusinessSheet extends StatefulWidget {
       currency: data.currency,
       description: data.description,
       country: data.country,
+      timeZone: data.timeZone ?? '',
       icon: data.icon,
       color: data.color,
       logoUrl: logoUrl,
@@ -113,6 +118,7 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
   late final _descriptionController = TextEditingController(text: widget.initial?.description);
   late Country _country = widget.initial != null ? countryByCode(widget.initial!.country) : deviceCountry();
   late String _currency = widget.initial?.currency ?? _country.currency;
+  late String _zone = _country.timeZone(widget.initial?.timeZone);
   late String _icon = widget.initial?.icon ?? kBusinessKinds.first.key;
   late String _colorKey = _colorKeyFor(widget.initial?.color);
   // La caja se enciende en Ajustes › Módulos (0.12.0); aquí se conserva lo que había
@@ -174,6 +180,8 @@ class _CreateBusinessSheetState extends State<CreateBusinessSheet> {
       NewBusinessData(
         name: name,
         country: _country.code,
+        // Solo se guarda si el país tiene varias zonas; si no, vale la del país
+        timeZone: _country.timeZones.length > 1 ? _zone : null,
         currency: _currency,
         icon: _icon,
         color: AppPalette.toHex(AppPalette.businessColors[_colorKey]!),
@@ -259,8 +267,26 @@ initialValue: _country.code,
                 onChanged: (code) => setState(() {
                   _country = countryByCode(code);
                   _currency = _country.currency;
+                  _zone = _country.timeZone();
                 }),
               ),
+              // Hora del negocio (0.16.6): recibos, caja y reportes van con esta zona
+              if (_country.timeZones.length > 1) ...[
+                const SizedBox(height: AppSpace.lg),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('zone-${_country.code}'),
+                  initialValue: _zone,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Zona horaria',
+                    helperText: 'La hora de recibos, caja y reportes',
+                  ),
+                  items: [
+                    for (final (id, label) in _country.timeZones) DropdownMenuItem(value: id, child: Text(label)),
+                  ],
+                  onChanged: (z) => setState(() => _zone = z ?? _zone),
+                ),
+              ],
               const SizedBox(height: AppSpace.lg),
               Row(
                 children: [

@@ -12,6 +12,7 @@ import '../models/purchase.dart';
 import '../models/supplier.dart';
 import '../models/supplier_order.dart';
 import '../../products/data/lots_repository.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Proveedores y entradas de mercancía. Todo se guarda primero en el equipo y
 /// luego se sube a la nube con la cola, como el resto de la app.
@@ -51,7 +52,7 @@ class SupplierRepository {
 
   /// Crea un proveedor nuevo solo con lo que se sabe (el nombre basta)
   Supplier newSupplier(String businessId, String name) {
-    final now = DateTime.now();
+    final now = appNow();
     return Supplier(
       id: const Uuid().v4(),
       businessId: businessId,
@@ -64,7 +65,7 @@ class SupplierRepository {
   Future<void> saveSupplier(Supplier supplier) async {
     final db = await _dbProvider.database;
     final existed = (await db.query('suppliers', columns: ['id'], where: 'id = ?', whereArgs: [supplier.id])).isNotEmpty;
-    final row = supplier.copyWith(updatedAt: DateTime.now()).toMap();
+    final row = supplier.copyWith(updatedAt: appNow()).toMap();
     if (existed) {
       await db.update('suppliers', row, where: 'id = ?', whereArgs: [supplier.id]);
     } else {
@@ -215,7 +216,7 @@ class SupplierRepository {
     final fresh = await getPurchase(purchase.id) ?? purchase;
     final pay = amount.clamp(0, fresh.balance).toDouble();
     if (pay <= 0) return fresh;
-    final payments = [...fresh.payments, PurchasePayment(amount: pay, date: date ?? DateTime.now(), note: note)];
+    final payments = [...fresh.payments, PurchasePayment(amount: pay, date: date ?? appNow(), note: note)];
     final paidNow = payments.fold(0.0, (s, p) => s + p.amount) >= fresh.total - 0.5;
     final updated = await _updatePurchase(fresh.copyWith(payments: payments, isPaid: paidNow));
     final who = (fresh.supplierName ?? '').isEmpty ? '' : ' a ${fresh.supplierName}';
@@ -269,7 +270,7 @@ class SupplierRepository {
 
   Future<void> _registerPurchase(Purchase purchase, {Map<String, double> newCosts = const {}}) async {
     final db = await _dbProvider.database;
-    final now = DateTime.now().toIso8601String();
+    final now = appNow().toIso8601String();
     final byProduct = <String, int>{};
     for (final item in purchase.items) {
       if (item.quantity <= 0) continue;
@@ -343,7 +344,7 @@ class SupplierRepository {
     final orderId = purchase.orderId;
     if (orderId != null) {
       final order = await getOrder(orderId);
-      if (order != null) await saveOrder(applyReceived(order, purchase.items, DateTime.now()));
+      if (order != null) await saveOrder(applyReceived(order, purchase.items, appNow()));
     }
 
     final who = (purchase.supplierName ?? '').isEmpty ? '' : ' de ${purchase.supplierName}';

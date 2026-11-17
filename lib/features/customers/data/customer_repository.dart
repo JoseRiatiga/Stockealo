@@ -9,6 +9,7 @@ import '../../team/data/activity_repository.dart';
 import '../models/customer.dart';
 import '../models/customer_payment.dart';
 import '../../sales/models/payment_method.dart';
+import '../../../core/utils/business_clock.dart';
 
 class PaymentResult {
   final Customer customer;
@@ -83,7 +84,7 @@ class CustomerRepository {
       phone: await _phoneWithPrefix(phone, businessId),
       address: address?.trim().isNotEmpty == true ? address!.trim() : null,
       debtBalance: max(0.0, initialDebt),
-      createdAt: DateTime.now(),
+      createdAt: appNow(),
     );
 
     final map = customer.toMap();
@@ -157,7 +158,7 @@ class CustomerRepository {
     }
 
     final remainingDebt = max(0.0, previousDebt - amount);
-    final now = DateTime.now();
+    final now = appNow();
 
     final payment = CustomerPayment(
       id: const Uuid().v4(),

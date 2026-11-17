@@ -39,6 +39,9 @@ class GoalBar extends StatelessWidget {
     final c = context.colors;
     final p = progress;
     final color = p.onPace ? c.success : c.warning;
+    // La barra es un semáforo (verde al día, ámbar atrás) y se ve igual en los dos
+    // modos: usa el relleno de aviso, no el ámbar oscuro de texto (0.16.6)
+    final bar = p.onPace ? c.success : c.warningFill;
     final detail = p.reached
         ? '¡Meta cumplida! ${_money(p.sold)} de ${_money(p.goal)}'
         : p.isOver
@@ -60,7 +63,7 @@ class GoalBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: p.ratio.clamp(0, 1).toDouble(),
             minHeight: 10,
-            color: color,
+            color: bar,
             backgroundColor: c.surfaceMuted,
           ),
         ),

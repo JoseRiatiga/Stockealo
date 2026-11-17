@@ -98,8 +98,7 @@ class _MessagesViewState extends State<MessagesView> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final sample = _sample;
-    return ContentWidth(
-      child: ListView(
+    return ContentListView(
         padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.xs, AppSpace.lg, AppSpace.xxl),
         children: [
           Text('Se envían a mano por WhatsApp desde el tablero. Apaga los que no quieras usar.',
@@ -173,7 +172,6 @@ class _MessagesViewState extends State<MessagesView> {
             child: Text(_saving ? 'Guardando…' : (_dirty ? 'Guardar mensajes' : 'Guardado')),
           ),
         ],
-      ),
-    );
+      );
   }
 }

@@ -7,6 +7,7 @@ import '../../../core/services/supabase_service.dart';
 import '../models/business_member.dart';
 import '../models/business_role.dart';
 import 'activity_repository.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Roles del negocio (0.15.0, etapa 2 de `docs/plan-roles.md`): los ajustes del
 /// Administrador y del Cajero, y los roles propios. Solo el dueño los cambia.
@@ -36,7 +37,7 @@ class RolesRepository {
 
   /// Rol propio nuevo, desde una plantilla o desde cero
   BusinessRole newCustom(String businessId, {required String name, required Set<Perm> perms, String? templateId}) {
-    final now = DateTime.now();
+    final now = appNow();
     final all = Permissions.withDependencies(perms);
     return BusinessRole(
       id: const Uuid().v4(),
@@ -52,7 +53,7 @@ class RolesRepository {
 
   /// El ajuste de un rol por defecto ('ADMIN' o 'CASHIER') con estos permisos
   BusinessRole builtinWith(String businessId, String code, Set<Perm> perms, {Map<RoleLimit, double> limits = const {}}) {
-    final now = DateTime.now();
+    final now = appNow();
     return BusinessRole(
       id: BusinessRole.builtinId(businessId, code),
       businessId: businessId,
@@ -69,8 +70,8 @@ class RolesRepository {
   /// Guarda un rol (nuevo o cambiado). [summary] queda en Actividad del equipo.
   Future<void> save(BusinessRole role, {String? summary}) async {
     final fixed = role.isBuiltin
-        ? role.copyWith(updatedAt: DateTime.now())
-        : role.copyWith(baseRole: Permissions.baseFor(role.perms), updatedAt: DateTime.now());
+        ? role.copyWith(updatedAt: appNow())
+        : role.copyWith(baseRole: Permissions.baseFor(role.perms), updatedAt: appNow());
     await (await _db).insert('business_roles', fixed.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
     SupabaseService.instance.upsertBusinessRoleToCloud(fixed.cloudRow());
     // Las personas con este rol propio se apoyan en el rol de la nube que le toca

@@ -14,6 +14,7 @@ import '../../products/models/product.dart';
 import '../models/catalog_style.dart';
 import '../../sales/models/promotion.dart';
 import 'pdf_type.dart';
+import '../../../core/utils/business_clock.dart';
 
 class CatalogPdfService {
   static final CatalogPdfService instance = CatalogPdfService._internal();
@@ -196,7 +197,7 @@ class CatalogPdfService {
     onProgress?.call(0.9, 'Guardando el PDF…');
     final bytes = await pdf.save();
     final cleanName = business.name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-    final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+    final dateStr = DateFormat('yyyyMMdd_HHmm').format(appNow());
 
     if (kIsWeb) {
       onProgress?.call(1.0, 'Catálogo listo');
@@ -216,7 +217,7 @@ class CatalogPdfService {
     required String businessName,
   }) async {
     final cleanName = businessName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-    final dateStr = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+    final dateStr = DateFormat('yyyyMMdd_HHmm').format(appNow());
     final fileName = 'Catalogo_${cleanName}_$dateStr.pdf';
 
     if (kIsWeb) {

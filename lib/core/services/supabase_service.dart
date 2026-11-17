@@ -521,6 +521,7 @@ class SupabaseService {
       // Subir antes de bajar: la descarga reemplaza filas locales y borraría
       // cambios que todavía no llegaron a la nube (por ejemplo, ventas sin conexión)
       await _initialUploadOnce();
+      await _backfillReceiptsOnce();
       final pending = await flushPendingSync();
       if (pending != 0) {
         return const SyncResult(
@@ -581,6 +582,7 @@ class SupabaseService {
               'name': b['name'],
               'currency': b['currency'] ?? 'COP',
               'country': b['country'] ?? 'CO',
+              'time_zone': b['time_zone'],
               'icon': b['icon'],
               'color': b['color'],
               'logo_url': b['logo_url'],
@@ -882,8 +884,8 @@ class SupabaseService {
       // 4. Descargar Ventas
       try {
         final List<dynamic> cloudSales = await client!.from('sales').select();
-        // La nube no guarda vendedor, factura, foto ni descuento: al reescribir la
-        // venta se conservan los del equipo (antes se borraban en cada descarga)
+        // La foto vive solo en el equipo; comprobante, vendedor y descuento llegan de la
+        // nube desde la 0.16.6 y, si la nube no los tiene, se conservan los del equipo
         final localSales = <String, Map<String, Object?>>{
           for (final r in await db.query('sales', columns: [
             'id', 'variant_id', 'variant_name', 'seller_name', 'invoice_number', 'product_photo_path', 'discount_amount',
@@ -994,10 +996,13 @@ class SupabaseService {
               // De qué venta es una devolución (0.16.5): sin esto, al recargar la
               // devolución se mezclaba con su venta y se podía devolver de más
               'return_of': s['return_of'] ?? local?['return_of'],
-              'seller_name': local?['seller_name'],
-              'invoice_number': local?['invoice_number'],
+              // Desde la 0.16.6 la nube también los guarda: llegan a los otros equipos
+              'seller_name': s['seller_name'] ?? local?['seller_name'],
+              'invoice_number': s['invoice_number'] ?? local?['invoice_number'],
               'product_photo_path': local?['product_photo_path'],
-              'discount_amount': local?['discount_amount'] ?? 0.0,
+              'discount_amount': (((s['discount_amount'] as num?) ?? 0) > 0 ? s['discount_amount'] : null) ??
+                  local?['discount_amount'] ??
+                  0.0,
               'is_synced': 1,
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
@@ -1096,6 +1101,49 @@ class SupabaseService {
   // intenta enviarla. Si no hay conexión el cambio queda pendiente y se reintenta
   // en la próxima escritura, al iniciar sesión o al volver a la app.
   // ---------------------------------------------------------------------------
+
+  /// Una sola vez por cuenta (0.16.6, decisión N1): sube el comprobante, el vendedor y
+  /// el descuento de las ventas que ya estaban en este equipo, porque antes la nube no
+  /// los guardaba. Solo llena las ventas que en la nube no tienen comprobante: nunca
+  /// reescribe la venta entera, así no pisa una anulación hecha en otro equipo.
+  Future<void> _backfillReceiptsOnce() async {
+    const key = 'receipts_backfill_0166';
+    try {
+      if (!(await isCloudSyncEnabled())) return;
+      final db = client;
+      if (db == null || db.auth.currentSession == null) return;
+      final local = AppDatabase.instance;
+      if (await local.getSetting(key) != null) return;
+      final rows = await (await local.database).query(
+        'sales',
+        columns: ['id', 'invoice_number', 'seller_name', 'discount_amount'],
+        where: "is_synced = 1 AND ((invoice_number IS NOT NULL AND invoice_number <> '') OR "
+            "(seller_name IS NOT NULL AND seller_name <> '') OR discount_amount > 0)",
+      );
+      var ok = true;
+      for (final r in rows) {
+        try {
+          final fields = receiptCloudFields(r);
+          if (fields.isEmpty) continue;
+          await db.from('sales').update(fields).eq('id', r['id'] as String).isFilter('invoice_number', null);
+        } catch (e) {
+          // La nube todavía no tiene las columnas (migración sin aplicar): se intenta otro día
+          if (e.toString().contains('42703') || e.toString().contains('invoice_number')) return;
+          ok = false;
+        }
+      }
+      if (ok) await local.setSetting(key, '1');
+    } catch (e) {
+      debugPrint('No se pudieron subir los comprobantes guardados: $e');
+    }
+  }
+
+  /// Comprobante, vendedor y descuento de una venta, solo los que tienen algo (0.16.6)
+  static Map<String, dynamic> receiptCloudFields(Map<String, Object?> s) => {
+        if ((s['invoice_number'] as String?)?.trim().isNotEmpty == true) 'invoice_number': s['invoice_number'],
+        if ((s['seller_name'] as String?)?.trim().isNotEmpty == true) 'seller_name': s['seller_name'],
+        if (((s['discount_amount'] as num?) ?? 0) > 0) 'discount_amount': s['discount_amount'],
+      };
 
   /// Una sola vez por cuenta: sube todo lo local. Cubre los datos creados antes de
   /// que existiera la cola; desde entonces solo se envían los cambios.
@@ -1438,6 +1486,8 @@ class SupabaseService {
         'type': (b['type'] ?? 'Comercio General').toString(),
         'currency': b['currency'] ?? 'COP',
         'country': b['country'] ?? 'CO',
+        // Zona horaria (0.16.6): null = la del país (así se borra al cambiar de país)
+        'time_zone': (b['time_zone'] as String?)?.isNotEmpty == true ? b['time_zone'] : null,
         'icon': b['icon'],
         'color': b['color'],
         'logo_url': b['logo_url'],
@@ -1566,6 +1616,9 @@ class SupabaseService {
     'delivery_status', 'delivery_note', 'delivered_at', 'auth_request_id', 'void_auth_request_id', 'return_of',
   ];
 
+  /// Columnas de la 0.16.6: comprobante, vendedor y descuento
+  static const _sale0166Columns = ['invoice_number', 'seller_name', 'discount_amount'];
+
   static Map<String, dynamic> _saleV13Fields(Map<String, dynamic> s) => {
         for (final c in _saleV13Columns)
           if ((s[c] as String?)?.isNotEmpty == true) c: s[c],
@@ -1599,6 +1652,28 @@ class SupabaseService {
       if (s['auth_request_id'] != null) 'auth_request_id': s['auth_request_id'],
       if (s['void_auth_request_id'] != null) 'void_auth_request_id': s['void_auth_request_id'],
     };
+    // Comprobante, vendedor y descuento (0.16.6). El descuento no viaja en la venta:
+    // se toma del equipo (también para lo que ya estaba en la cola)
+    var receipt = Map<String, Object?>.from(s);
+    if (receipt['discount_amount'] == null && s['id'] != null) {
+      final local = await (await AppDatabase.instance.database)
+          .query('sales', columns: ['discount_amount'], where: 'id = ?', whereArgs: [s['id']], limit: 1);
+      if (local.isNotEmpty) receipt['discount_amount'] = local.first['discount_amount'];
+    }
+    payload.addAll(receiptCloudFields(receipt));
+
+    // La nube sin las columnas de la 0.16.6 (migración sin aplicar o esquema sin
+    // recargar): se reintenta quitando SOLO esas tres. El camino viejo de abajo quita
+    // también anulación y devolución, y una venta anulada subiría como vigente.
+    if (_sale0166Columns.any(payload.containsKey)) {
+      try {
+        await db.from('sales').upsert(payload, onConflict: 'id');
+        return;
+      } catch (e) {
+        // Otro error: lo resuelve (o lo informa) el intento de abajo, como antes
+        if (_sale0166Columns.any(e.toString().contains)) _sale0166Columns.forEach(payload.remove);
+      }
+    }
 
     // upsert: si un reintento llega después de que la venta ya se guardó, no se duplica
     try {

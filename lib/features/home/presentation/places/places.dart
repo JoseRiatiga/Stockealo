@@ -99,6 +99,8 @@ class PeoplePlace extends StatelessWidget {
               tabs: const [Tab(text: 'Clientes y fiados'), Tab(text: 'Proveedores')],
             ),
           ),
+          // Un cliente pedido desde el buscador abre la pestaña Clientes (0.16.6)
+          _ShowCustomersTab(),
           Expanded(
             child: TabBarView(
               children: [
@@ -116,4 +118,31 @@ class PeoplePlace extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Pasa a la pestaña «Clientes y fiados» cuando el buscador pide un cliente
+class _ShowCustomersTab extends StatefulWidget {
+  @override
+  State<_ShowCustomersTab> createState() => _ShowCustomersTabState();
+}
+
+class _ShowCustomersTabState extends State<_ShowCustomersTab> {
+  @override
+  void initState() {
+    super.initState();
+    CustomersScreen.focus.addListener(_show);
+  }
+
+  @override
+  void dispose() {
+    CustomersScreen.focus.removeListener(_show);
+    super.dispose();
+  }
+
+  void _show() {
+    if (CustomersScreen.focus.value != null && mounted) DefaultTabController.of(context).animateTo(0);
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

@@ -69,7 +69,17 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Devoluciones en orden
+            ### Vender más fácil y la hora de tu negocio
+            - En Vender tienes a mano las ventas en espera y las cotizaciones, también en el celular.
+            - «Cobrar» queda siempre a la vista y los descuentos avisan si pasan el valor o dejan pérdida.
+            - «Nueva venta» guarda la cuenta que tenías en espera y abre una vacía.
+            - El recibo muestra la hora en 12 horas y Ventas cuenta «4 ventas · 1 devolución».
+            - El buscador encuentra clientes y más funciones, y Ctrl K funciona en toda la app.
+            - La hora de recibos, caja y reportes es la del país de tu negocio; en EE. UU. y México eliges la zona.
+            - El comprobante, el vendedor y el descuento de cada venta se ven en todos tus equipos.
+            - Anular una venta con devoluciones deja bien el stock y lo que debe el cliente.
+
+            ### Devoluciones en orden (0.16.5)
             - Las devoluciones siguen en su propia tarjeta en Ventas después de recargar la app, y no se puede devolver más de lo vendido.
 
             ### La caja y las cuentas, al día (0.16.4)
@@ -78,8 +88,5 @@ jobs:
             - Al devolver algo de un pago mixto, eliges si devuelves en efectivo o por otro medio.
             - Ventas muestra una tarjeta por venta, y Reportes, Caja y Stocky dan las mismas cifras.
             - Lo que cambias en una pantalla (productos, abonos, mercancía) se ve al instante en las demás.
-
-            ### Lo de la 0.16.3
-            - Arreglos de la web: crear un negocio ya no congela la página, Stocky no tapa el botón de cobrar y los textos no se cortan.
           draft: false
           prerelease: false

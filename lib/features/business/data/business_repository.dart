@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/utils/business_clock.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
@@ -15,6 +16,8 @@ class BusinessRepository extends ChangeNotifier {
     activeBusinessNotifier.addListener(() {
       final business = activeBusinessNotifier.value;
       CurrencyFormatter.useCurrency(business?.currency);
+      // La hora del negocio: la de su país o la elegida (0.16.6)
+      BusinessClock.use(business?.zone);
       // Acento de la app si el usuario eligió usar el color del negocio
       ThemeController.instance.setBusinessColor(business?.color);
     });
@@ -120,6 +123,7 @@ class BusinessRepository extends ChangeNotifier {
     required String userId,
     String currency = 'COP',
     String country = 'CO',
+    String? timeZone,
     String? icon,
     String? color,
   }) async {
@@ -130,6 +134,7 @@ class BusinessRepository extends ChangeNotifier {
       name: name.trim(),
       currency: currency,
       country: country,
+      timeZone: timeZone,
       icon: icon,
       color: color,
       createdAt: DateTime.now(),
@@ -193,6 +198,9 @@ class BusinessRepository extends ChangeNotifier {
 
     /// Datos del tiquete (0.15.0, JSON de TicketInfo); '' los quita
     String? ticketInfo,
+
+    /// Zona horaria (0.16.6); '' vuelve a la del país
+    String? timeZone,
   }) async {
     final db = await _dbProvider.database;
     final Map<String, dynamic> updateData = {
@@ -210,6 +218,7 @@ class BusinessRepository extends ChangeNotifier {
       if (servicesSchedule != null) 'services_schedule': servicesSchedule.isEmpty ? null : servicesSchedule,
       if (servicesMulti != null) 'services_multi': servicesMulti ? 1 : 0,
       if (ticketInfo != null) 'ticket_info': ticketInfo.isEmpty ? null : ticketInfo,
+      if (timeZone != null) 'time_zone': timeZone.isEmpty ? null : timeZone,
     };
 
     await db.update(

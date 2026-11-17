@@ -51,6 +51,7 @@ import '../../../team/presentation/widgets/authorization_gate.dart';
 import '../../../team/data/authorization_service.dart';
 import '../../../services/models/work_schedule.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/security/app_lock.dart';
 import '../../../../core/security/app_lock_gate.dart';
 import '../widgets/whats_new_sheet.dart';
 import '../../../auth/presentation/logout_confirm.dart';
@@ -104,6 +105,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   @override
   void initState() {
     super.initState();
+    // Ctrl K escucha el teclado de toda la app, no un foco que se pierde al volver
+    // de otras pantallas (0.16.6, hallazgo 46)
+    HardwareKeyboard.instance.addHandler(_onKey);
     AppPlace.request.addListener(_onPlaceRequest);
     Permissions.viewAs.addListener(_onViewAs);
     _loadNavigationContext();
@@ -299,6 +303,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
     AppPlace.request.removeListener(_onPlaceRequest);
     Permissions.viewAs.removeListener(_onViewAs);
     _authChannel?.unsubscribe();
@@ -455,6 +460,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     await Navigator.push(context, MaterialPageRoute(builder: (_) => EmployeesScreen(business: biz)));
   }
 
+  /// Ctrl K (o Cmd K) abre el buscador si esta pantalla es la de arriba
+  bool _onKey(KeyEvent event) {
+    if (event is! KeyDownEvent || event.logicalKey != LogicalKeyboardKey.keyK) return false;
+    final keys = HardwareKeyboard.instance;
+    if (!keys.isControlPressed && !keys.isMetaPressed) return false;
+    if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return false;
+    // Nada por encima del bloqueo con PIN ni fuera del horario de acceso
+    if (AppLock.instance.locked.value || _outOfHours) return false;
+    _openSearch();
+    return true;
+  }
+
   void _openSearch() => GlobalSearchDialog.show(
         context,
         businessId: _activeBusiness?.id,
@@ -464,8 +481,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   void _openNotifications() => NotificationsModal.show(context: context, onNavigateToTab: _navigateToTab);
 
-  /// «Nueva venta» del encabezado: lleva a Vender
-  void _newSale() => _navigateToTab(AppPlace.vender);
+  /// «Nueva venta» del encabezado: lleva a Vender. Si ya se está cobrando algo, esa
+  /// cuenta pasa a En espera y queda una vacía (0.16.6, decisión D2, hallazgo 22).
+  void _newSale() {
+    final cart = SellCart.instance;
+    if (_currentIndex == AppPlace.vender && !cart.isEmpty) {
+      cart.hold();
+      AppToast.showInfo(context, 'La cuenta anterior quedó en espera. Esta es una venta nueva.');
+      return;
+    }
+    _navigateToTab(AppPlace.vender);
+  }
 
   /// El lugar con ese número. Todos se identifican con el número de [AppPlace].
   Widget _placeBody(int id) => switch (id) {
@@ -580,11 +606,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
           },
         );
 
-    return CallbackShortcuts(
-      bindings: <ShortcutActivator, VoidCallback>{
-        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _openSearch,
-      },
-      child: Focus(
+    return Focus(
         autofocus: true,
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -647,7 +669,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
             );
           },
         ),
-      ),
     );
   }
 }

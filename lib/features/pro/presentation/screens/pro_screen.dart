@@ -172,8 +172,7 @@ class _ProScreenState extends State<ProScreen> {
           final showPricing = ProService.pricingVisible(settings);
           final plans = showPricing ? (snapshot.data?.$1 ?? const <ProPlan>[]) : const <ProPlan>[];
           final loading = snapshot.connectionState != ConnectionState.done;
-          return ContentWidth(
-            child: ListView(
+          return ContentListView(
             controller: _scroll,
             padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
             children: [
@@ -270,7 +269,6 @@ class _ProScreenState extends State<ProScreen> {
                   child: Text(settings['legal_notice']!, style: TextStyle(fontSize: AppText.sizeCaption, height: 1.4, color: c.inkFaint)),
                 ),
             ],
-          ),
           );
         },
       ),

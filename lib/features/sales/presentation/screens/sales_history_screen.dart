@@ -39,6 +39,26 @@ class SalesHistoryScreen extends StatefulWidget {
 
   const SalesHistoryScreen({super.key, this.businessId, this.userRole});
 
+  /// Una venta = un comprobante (0.16.4). Cada devolución va en su propia tarjeta.
+  static List<List<Sale>> groupByInvoice(List<Sale> lines) {
+    final groups = <String, List<Sale>>{};
+    for (final s in lines) {
+      final invoice = s.invoiceNumber ?? '';
+      final key = s.isReturn ? 'dev:${s.id}' : (invoice.isEmpty ? 'id:${s.id}' : 'inv:$invoice');
+      groups.putIfAbsent(key, () => []).add(s);
+    }
+    return groups.values.toList();
+  }
+
+  /// «4 ventas · 1 devolución»: cuenta comprobantes y las devoluciones van aparte,
+  /// sin sumarse a las ventas (0.16.6, decisión N3)
+  static String countLabel(List<List<Sale>> groups) {
+    final returns = groups.where((g) => g.isNotEmpty && g.first.isReturn).length;
+    final sales = groups.length - returns;
+    final text = '$sales ${sales == 1 ? 'venta' : 'ventas'}';
+    return returns == 0 ? text : '$text · $returns ${returns == 1 ? 'devolución' : 'devoluciones'}';
+  }
+
   @override
   State<SalesHistoryScreen> createState() => _SalesHistoryScreenState();
 }
@@ -454,21 +474,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     }).toList();
   }
 
-  /// Una venta = un comprobante (0.16.4). Cada devolución va en su propia tarjeta.
-  static List<List<Sale>> groupByInvoice(List<Sale> lines) {
-    final groups = <String, List<Sale>>{};
-    for (final s in lines) {
-      final invoice = s.invoiceNumber ?? '';
-      final key = s.isReturn ? 'dev:${s.id}' : (invoice.isEmpty ? 'id:${s.id}' : 'inv:$invoice');
-      groups.putIfAbsent(key, () => []).add(s);
-    }
-    return groups.values.toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final filtered = groupByInvoice(_filteredSales);
+    final filtered = SalesHistoryScreen.groupByInvoice(_filteredSales);
     final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
     final currentPageClamped = _currentPage.clamp(1, totalPages);
     final pagedSales = filtered.skip((currentPageClamped - 1) * _pageSize).take(_pageSize).toList();
@@ -539,8 +548,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
                       children: [
                         Text('Ventas registradas', style: AppText.title(context)),
                         const SizedBox(width: AppSpace.sm),
-                        Text('${filtered.length}', style: AppText.amount(context, size: AppText.sizeBody, weight: FontWeight.w500, color: c.inkMuted)),
-                        const Spacer(),
+                        Expanded(
+                          child: Text(SalesHistoryScreen.countLabel(filtered),
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.small(context, weight: FontWeight.w500, color: c.inkMuted)),
+                        ),
                         AppPagination(
                           currentPage: currentPageClamped,
                           totalPages: totalPages,
@@ -626,7 +638,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
   SaleCard _lineCard(Sale sale) => SaleCard(
         sale: sale,
         showProfit: canViewCosts,
-        onCancel: canCancelSale ? () => _cancelSale(sale) : null,
+        // Una devolución no se anula sola (0.16.6): si no volvió al inventario, anularla
+        // restaba una unidad que nunca entró. Se anula junto con su venta.
+        onCancel: canCancelSale && !sale.isReturn ? () => _cancelSale(sale) : null,
         onReturn: Permissions.can(_effectiveRole, Perm.refund) ? () => _returnSale(sale) : null,
         pendingUpload: _pendingIds.contains(sale.id),
       );

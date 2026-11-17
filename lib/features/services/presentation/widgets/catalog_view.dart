@@ -83,8 +83,7 @@ class _CatalogViewState extends State<CatalogView> {
 
     return Stack(
       children: [
-        ContentWidth(
-          child: ListView(
+        ContentListView(
             padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.xs, AppSpace.lg, 120),
             children: [
               Text('Toca un servicio para cambiar su precio, su comisión o quién lo hace.',
@@ -134,7 +133,6 @@ class _CatalogViewState extends State<CatalogView> {
               ],
             ],
           ),
-        ),
         Positioned(
           left: AppSpace.lg,
           bottom: MediaQuery.of(context).padding.bottom + AppSpace.lg,

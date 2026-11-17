@@ -12,6 +12,7 @@ import 'commissions_repository.dart';
 import 'service_board.dart';
 import '../models/work_schedule.dart';
 import '../models/order_extra.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Catálogo de servicios, empleados y tablero de órdenes. Todo se guarda primero
 /// en el equipo y sube a la nube con la cola, como el resto de la app.
@@ -38,7 +39,7 @@ class ServicesRepository {
   }
 
   ShopService newService(String businessId, {String name = '', double price = 0, int? durationMin, double commissionPct = 0}) {
-    final now = DateTime.now();
+    final now = appNow();
     return ShopService(
       id: const Uuid().v4(),
       businessId: businessId,
@@ -53,7 +54,7 @@ class ServicesRepository {
 
   Future<void> saveService(ShopService service) async {
     final db = await _dbProvider.database;
-    final row = service.copyWith(updatedAt: DateTime.now()).toMap();
+    final row = service.copyWith(updatedAt: appNow()).toMap();
     final updated = await db.update('services', row, where: 'id = ?', whereArgs: [service.id]);
     if (updated == 0) await db.insert('services', row);
     _cloud.upsertServiceToCloud(row);
@@ -107,13 +108,13 @@ class ServicesRepository {
   }
 
   StaffMember newStaff(String businessId, String name) {
-    final now = DateTime.now();
+    final now = appNow();
     return StaffMember(id: const Uuid().v4(), businessId: businessId, name: name.trim(), createdAt: now, updatedAt: now);
   }
 
   Future<void> saveStaff(StaffMember staff) async {
     final db = await _dbProvider.database;
-    final row = staff.copyWith(updatedAt: DateTime.now()).toMap();
+    final row = staff.copyWith(updatedAt: appNow()).toMap();
     final updated = await db.update('staff', row, where: 'id = ?', whereArgs: [staff.id]);
     if (updated == 0) await db.insert('staff', row);
     _cloud.upsertStaffToCloud(row);
@@ -134,7 +135,7 @@ class ServicesRepository {
   /// Órdenes abiertas y las que se entregaron o cancelaron hoy
   Future<List<WorkOrder>> getBoard(String businessId, {DateTime? now}) async {
     final db = await _dbProvider.database;
-    final today = now ?? DateTime.now();
+    final today = now ?? appNow();
     final start = DateTime(today.year, today.month, today.day).toIso8601String();
     final rows = await db.query(
       'work_orders',
@@ -206,7 +207,7 @@ class ServicesRepository {
     String? notes,
     DateTime? now,
   }) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final cleanPlate = plate == null ? null : WorkOrder.normalizePlate(plate);
     final order = WorkOrder(
       id: const Uuid().v4(),
@@ -244,7 +245,7 @@ class ServicesRepository {
 
   /// Cambia los datos extra de la orden (0.14.0): estado propio, presupuesto, entrega…
   Future<WorkOrder> setExtra(WorkOrder order, OrderExtra extra, {String? note}) async {
-    final at = DateTime.now();
+    final at = appNow();
     final notes = note == null
         ? order.notes
         : [if ((order.notes ?? '').trim().isNotEmpty) order.notes!.trim(), note].join('\n');
@@ -257,7 +258,7 @@ class ServicesRepository {
   Future<WorkOrder> updateOrder(WorkOrder order) async {
     final updated = order.copyWith(
       total: order.lines.fold<double>(0, (s, l) => s + l.price),
-      updatedAt: DateTime.now(),
+      updatedAt: appNow(),
     );
     await _store(updated);
     return updated;
@@ -265,7 +266,7 @@ class ServicesRepository {
 
   /// Pasa la orden a otra columna y anota la hora
   Future<WorkOrder> moveTo(WorkOrder order, String status, {DateTime? now}) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final updated = order.copyWith(
       status: status,
       statusTimes: {...order.statusTimes, status: at},
@@ -291,7 +292,7 @@ class ServicesRepository {
     double tip = 0,
     DateTime? now,
   }) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final updated = order.copyWith(
       saleIds: saleIds,
       paymentMethod: paymentMethod,
@@ -340,7 +341,7 @@ class ServicesRepository {
       final why = board.whyNotStart(order, index, id);
       if (why != null) throw StateError(why);
     }
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final lines = [...order.lines];
     lines[index] = lines[index].copyWith(staffIds: staffIds, status: WorkOrderLine.inProgress, startedAt: at);
     return _saveDerived(order.copyWith(lines: lines), at);
@@ -350,7 +351,7 @@ class ServicesRepository {
   Future<WorkOrder> finishLine(WorkOrder order, int index, {DateTime? now}) async {
     final line = order.lines[index];
     if (!line.isInProgress) throw StateError('Ese servicio no está en proceso.');
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final lines = [...order.lines];
     lines[index] = line.copyWith(status: WorkOrderLine.done, finishedAt: at);
     return _saveDerived(order.copyWith(lines: lines), at);
@@ -367,7 +368,7 @@ class ServicesRepository {
   }) async {
     if (order.isPaid) throw StateError('Ya se cobró: primero anula el cobro.');
     final line = order.lines[index];
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final lines = [...order.lines];
     final String step;
     if (line.isDone) {
@@ -418,7 +419,7 @@ class ServicesRepository {
       if (sale != null) await SalesRepository.instance.voidSale(sale, reason: note);
     }
     await CommissionsRepository.instance.onOrderReopened(order.id, now: now);
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final clean = (note ?? '').trim();
     final reopened = WorkOrder(
       id: order.id,
@@ -529,7 +530,7 @@ class ServicesRepository {
   Future<List<StaffAttendance>> getAttendance(String businessId, {DateTime? day}) async {
     final db = await _dbProvider.database;
     final rows = await db.query('staff_attendance',
-        where: 'business_id = ? AND day = ?', whereArgs: [businessId, StaffAttendance.dayOf(day ?? DateTime.now())]);
+        where: 'business_id = ? AND day = ?', whereArgs: [businessId, StaffAttendance.dayOf(day ?? appNow())]);
     return rows.map(StaffAttendance.fromMap).toList();
   }
 
@@ -562,7 +563,7 @@ class ServicesRepository {
 
   /// Marca que llegó (también corrige un «No vino» o una salida marcada por error)
   Future<StaffAttendance> markArrived(String businessId, String staffId, {DateTime? now}) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final current = await _todayOf(businessId, staffId, at);
     return _saveAttendance(current == null
         ? StaffAttendance(
@@ -587,7 +588,7 @@ class ServicesRepository {
     if (board?.activeLineOf(staffId) != null) {
       throw StateError('Está haciendo un servicio: termínalo o retrocédelo primero.');
     }
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final current = await _todayOf(businessId, staffId, at);
     return _saveAttendance(StaffAttendance(
       id: current?.id ?? const Uuid().v4(),
@@ -604,7 +605,7 @@ class ServicesRepository {
     if (board?.activeLineOf(staffId) != null) {
       throw StateError('Está haciendo un servicio: termínalo antes de marcar la salida.');
     }
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final current = await _todayOf(businessId, staffId, at);
     if (current == null || current.status != StaffAttendance.arrived) {
       throw StateError('Primero marca su llegada.');
@@ -616,7 +617,7 @@ class ServicesRepository {
 
   /// Empieza o termina una pausa
   Future<StaffAttendance> togglePause(String businessId, String staffId, {ServiceBoard? board, DateTime? now}) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final current = await _todayOf(businessId, staffId, at);
     if (current == null || current.status != StaffAttendance.arrived || current.hasLeft) {
       throw StateError('Solo puede pausar quien llegó y no se ha ido.');

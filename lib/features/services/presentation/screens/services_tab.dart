@@ -198,8 +198,7 @@ class _TemplatePickerState extends State<TemplatePicker> {
     final suggested = ServiceTemplate.suggestedFor(widget.business.icon);
     return Scaffold(
       backgroundColor: c.paper,
-      body: ContentWidth(
-        child: ListView(
+      body: ContentListView(
           padding: const EdgeInsets.all(AppSpace.lg),
           children: [
             Text('¿Qué tipo de negocio es?',
@@ -258,7 +257,6 @@ class _TemplatePickerState extends State<TemplatePicker> {
             ],
           ],
         ),
-      ),
     );
   }
 }

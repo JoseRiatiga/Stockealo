@@ -6,13 +6,14 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../business/models/business.dart';
 import '../../dashboard/data/dashboard_repository.dart';
 import '../../sales/models/payment_method.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Cierre del día por WhatsApp (0.15.0, punto 19): a mano para todos; con Pro, el aviso
 /// del resumen de la noche lo deja listo para enviar con un toque.
 abstract final class DailyClose {
   /// El texto del cierre: ventas, ganancia, cuánto entró por cada medio y qué reponer
   static Future<String> text(Business business, {DateTime? day}) async {
-    final d = day ?? DateTime.now();
+    final d = day ?? appNow();
     String money(num v) => CurrencyFormatter.formatIn(v, business.currency);
     final summary = await DashboardRepository.instance.getDashboardSummary(business.id, period: 'today');
     final count = (summary['periodCount'] as num?)?.toInt() ?? 0;

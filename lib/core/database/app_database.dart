@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 29;
+  static const int _schemaVersion = 30;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -587,6 +587,13 @@ class AppDatabase {
     if (oldVersion < 27 && newVersion >= 27) await salesGoalsV27(db);
     if (oldVersion < 28 && newVersion >= 28) await productBrandV28(db);
     if (oldVersion < 29 && newVersion >= 29) await productLotsV29(db);
+    if (oldVersion < 30 && newVersion >= 30) await businessTimeZoneV30(db);
+  }
+
+  /// 0.16.6, hora del negocio: zona elegida en países con varias (EE. UU., México).
+  /// Vacía = la del país.
+  static Future<void> businessTimeZoneV30(Database db) async {
+    await _addColumnIfMissing(db, 'businesses', 'time_zone', 'TEXT');
   }
 
   /// Re-diseño 0.13.0 (bloque 4): una venta anulada queda en el historial («Anulada»,
@@ -1089,6 +1096,7 @@ class AppDatabase {
     await salesGoalsV27(db);
     await productBrandV28(db);
     await productLotsV29(db);
+    await businessTimeZoneV30(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

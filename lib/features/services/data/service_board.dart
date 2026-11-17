@@ -1,5 +1,6 @@
 import '../models/service_models.dart';
 import '../models/work_schedule.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Estado de un empleado en el día
 enum StaffState {
@@ -230,7 +231,7 @@ class ServiceBoard {
   /// de un trabajo: lo que falta de lo que está en proceso más lo que hay antes en
   /// la cola, repartido entre quienes pueden trabajar. null si no hay nadie hoy.
   int? estimatedWait(WorkOrder order, {DateTime? now}) {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final workers = staff.where((s) => s.isActive && (attendance[s.id]?.canWork ?? false)).length;
     if (workers == 0) return null;
     final refs = queue;

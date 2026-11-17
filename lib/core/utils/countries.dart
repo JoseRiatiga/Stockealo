@@ -31,7 +31,42 @@ class Country {
 
   /// "🇨🇴 +57"
   String get dialLabel => '$flag +$dialCode';
+
+  /// Zonas horarias del país (0.16.6, hora del negocio): la primera es la de siempre.
+  /// Los países con más de una (EE. UU. y México) dejan elegirla en el negocio.
+  List<(String, String)> get timeZones => kCountryTimeZones[code] ?? const [('America/Bogota', 'Colombia')];
+
+  /// La zona del negocio: la elegida si es de este país; si no, la del país
+  String timeZone([String? chosen]) =>
+      timeZones.any((z) => z.$1 == chosen) ? chosen! : timeZones.first.$1;
 }
+
+/// Zonas horarias por país, con el nombre que se muestra al elegir
+const Map<String, List<(String, String)>> kCountryTimeZones = {
+  'CO': [('America/Bogota', 'Colombia')],
+  'MX': [
+    ('America/Mexico_City', 'Centro (Ciudad de México)'),
+    ('America/Cancun', 'Sureste (Cancún)'),
+    ('America/Chihuahua', 'Chihuahua'),
+    ('America/Hermosillo', 'Sonora'),
+    ('America/Mazatlan', 'Pacífico (Mazatlán)'),
+    ('America/Tijuana', 'Noroeste (Tijuana)'),
+  ],
+  'PE': [('America/Lima', 'Perú')],
+  'AR': [('America/Argentina/Buenos_Aires', 'Argentina')],
+  'CL': [('America/Santiago', 'Chile')],
+  'EC': [('America/Guayaquil', 'Ecuador')],
+  'US': [
+    ('America/New_York', 'Este (Nueva York, Miami)'),
+    ('America/Chicago', 'Centro (Chicago, Houston)'),
+    ('America/Denver', 'Montaña (Denver)'),
+    ('America/Phoenix', 'Arizona'),
+    ('America/Los_Angeles', 'Pacífico (Los Ángeles)'),
+    ('America/Anchorage', 'Alaska'),
+    ('Pacific/Honolulu', 'Hawái'),
+  ],
+  'ES': [('Europe/Madrid', 'España')],
+};
 
 const List<Country> kCountries = [
   Country(code: 'CO', name: 'Colombia', flag: '🇨🇴', dialCode: '57', currency: 'COP', phoneDigits: 10, paymentApps: 'Nequi o Daviplata'),

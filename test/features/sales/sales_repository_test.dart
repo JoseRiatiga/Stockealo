@@ -213,6 +213,14 @@ void main() {
       expect(active, isEmpty, reason: 'la devolución queda anulada con su venta');
     });
 
+    test('dos anulaciones al mismo tiempo reponen el stock una sola vez', () async {
+      final product = await addProduct('p4', stock: 10);
+      final sale = await repo.recordSale(product: product, quantity: 3, paymentMethod: 'FIADO', customerName: 'Iris');
+      await Future.wait([repo.voidSale(sale), repo.voidSale(sale)]);
+      expect(await stockOf('p4'), 10);
+      expect(await debtOf('Iris'), 0);
+    });
+
     test('una devolución sola no se anula (no se sabe si volvió al inventario)', () async {
       final product = await addProduct('p3', stock: 5);
       final sale = await repo.recordSale(product: product, quantity: 1, paymentMethod: 'EFECTIVO');

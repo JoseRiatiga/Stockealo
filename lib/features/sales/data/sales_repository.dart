@@ -1070,35 +1070,39 @@ class SalesRepository {
     final now = appNow().toIso8601String();
 
     final invoice = onlyThisLine || (sale.invoiceNumber ?? '').isEmpty ? null : sale.invoiceNumber;
-    final rows = await db.query(
-      'sales',
-      // Una sola línea (o venta sin comprobante): con sus devoluciones (0.16.6)
-      where: invoice == null
-          ? '(id = ? OR return_of = ?) AND business_id = ? AND voided_at IS NULL'
-          : 'invoice_number = ? AND business_id = ? AND voided_at IS NULL',
-      whereArgs: invoice == null ? [sale.id, sale.id, sale.businessId] : [invoice, sale.businessId],
-    );
-    if (rows.isEmpty) return;
-    final lines = [for (final r in rows) saleFromRow(r)];
-
     final stock = <String, int>{};
     final variants = <String, int>{};
     final debts = <String, double>{};
-
-    // Se suma todo el comprobante antes de tocar nada (0.16.6, hallazgo 63): una
-    // devolución ya hecha comparte el comprobante y resta. Así el stock y la deuda
-    // cambian una sola vez y no dependen del orden de las filas (con el tope de deuda
-    // en 0, anular la venta antes que su devolución dejaba al cliente debiendo).
-    for (final line in lines) {
-      if (line.productId.isNotEmpty) {
-        stock[line.productId] = (stock[line.productId] ?? 0) + line.quantity;
-        if (line.variantId != null) variants[line.variantId!] = (variants[line.variantId!] ?? 0) + line.quantity;
-      }
-    }
-    final businessOf = {for (final l in lines) l.productId: l.businessId};
+    var lines = <Sale>[];
+    final businessOf = <String, String>{};
 
     final missing = <String>{};
     await db.transaction((txn) async {
+      // Se leen dentro de la transacción (0.16.6): dos toques casi a la vez no anulan
+      // dos veces lo mismo ni reponen el stock dos veces
+      final rows = await txn.query(
+        'sales',
+        // Una sola línea (o venta sin comprobante): con sus devoluciones (0.16.6)
+        where: invoice == null
+            ? '(id = ? OR return_of = ?) AND business_id = ? AND voided_at IS NULL'
+            : 'invoice_number = ? AND business_id = ? AND voided_at IS NULL',
+        whereArgs: invoice == null ? [sale.id, sale.id, sale.businessId] : [invoice, sale.businessId],
+      );
+      if (rows.isEmpty) return;
+      lines = [for (final r in rows) saleFromRow(r)];
+
+      // Se suma todo el comprobante antes de tocar nada (0.16.6, hallazgo 63): una
+      // devolución ya hecha comparte el comprobante y resta. Así el stock y la deuda
+      // cambian una sola vez y no dependen del orden de las filas (con el tope de deuda
+      // en 0, anular la venta antes que su devolución dejaba al cliente debiendo).
+      for (final line in lines) {
+        if (line.productId.isNotEmpty) {
+          stock[line.productId] = (stock[line.productId] ?? 0) + line.quantity;
+          if (line.variantId != null) variants[line.variantId!] = (variants[line.variantId!] ?? 0) + line.quantity;
+        }
+      }
+      businessOf.addAll({for (final l in lines) l.productId: l.businessId});
+
       for (final e in stock.entries) {
         final rows = await txn.rawUpdate(
           'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
@@ -1157,6 +1161,7 @@ class SalesRepository {
       }
     });
 
+    if (lines.isEmpty) return;
     DataEvents.instance.salesChanged();
     for (final line in lines) {
       // Un servicio anulado no deja comisión (si ya se pagó, queda un ajuste)

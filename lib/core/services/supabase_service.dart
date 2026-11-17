@@ -889,6 +889,7 @@ class SupabaseService {
             'id', 'variant_id', 'variant_name', 'seller_name', 'invoice_number', 'product_photo_path', 'discount_amount',
             'service_id', 'work_order_id', 'staff_ids', 'voided_at', 'void_reason', 'voided_by', 'payment_split',
             'promotion_id', 'promotion_name', 'promotion_discount', 'delivery_status', 'delivery_note', 'delivered_at',
+            'return_of',
           ]))
             r['id'] as String: r,
         };
@@ -990,6 +991,9 @@ class SupabaseService {
               'delivery_status': s['delivery_status'] ?? local?['delivery_status'],
               'delivery_note': s['delivery_note'] ?? local?['delivery_note'],
               'delivered_at': s['delivered_at'] ?? local?['delivered_at'],
+              // De qué venta es una devolución (0.16.5): sin esto, al recargar la
+              // devolución se mezclaba con su venta y se podía devolver de más
+              'return_of': s['return_of'] ?? local?['return_of'],
               'seller_name': local?['seller_name'],
               'invoice_number': local?['invoice_number'],
               'product_photo_path': local?['product_photo_path'],

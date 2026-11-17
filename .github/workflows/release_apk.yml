@@ -69,7 +69,10 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### La caja y las cuentas, al día
+            ### Devoluciones en orden
+            - Las devoluciones siguen en su propia tarjeta en Ventas después de recargar la app, y no se puede devolver más de lo vendido.
+
+            ### La caja y las cuentas, al día (0.16.4)
             - La caja muestra bien la hora en que se abrió y no deja sacar más plata de la que hay.
             - Si te equivocas en una entrada o salida de caja, tócala para anularla.
             - Al devolver algo de un pago mixto, eliges si devuelves en efectivo o por otro medio.

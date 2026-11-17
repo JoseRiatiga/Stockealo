@@ -49,6 +49,18 @@ class AdminApp extends StatelessWidget {
 class _AdminGate extends StatelessWidget {
   const _AdminGate();
 
+  static String? _checkedFor;
+  static Future<bool>? _isAdmin;
+
+  /// «¿Es administradora?», una vez por cuenta (se vuelve a preguntar si cambia)
+  static Future<bool> _adminFor(String userId) {
+    if (_checkedFor != userId || _isAdmin == null) {
+      _checkedFor = userId;
+      _isAdmin = ProAdminService.instance.isAdmin();
+    }
+    return _isAdmin!;
+  }
+
   @override
   Widget build(BuildContext context) {
     final client = SupabaseService.instance.client;
@@ -62,7 +74,9 @@ class _AdminGate extends StatelessWidget {
         if (session == null) return const AdminLoginScreen();
         return FutureBuilder<bool>(
           key: ValueKey(session.user.id),
-          future: ProAdminService.instance.isAdmin(),
+          // Una sola consulta por persona: antes cada aviso de la sesión (renovar,
+          // dos pasos) volvía a preguntar, rearmaba la verificación y entraba en bucle
+          future: _adminFor(session.user.id),
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const Scaffold(body: Center(child: CircularProgressIndicator()));

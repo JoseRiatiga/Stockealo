@@ -69,12 +69,14 @@ class _IdleProductsAlertState extends State<IdleProductsAlert> {
   void initState() {
     super.initState();
     DataEvents.instance.salesVersion.addListener(_load);
+    DataEvents.instance.productsVersion.addListener(_load);
     _load();
   }
 
   @override
   void dispose() {
     DataEvents.instance.salesVersion.removeListener(_load);
+    DataEvents.instance.productsVersion.removeListener(_load);
     super.dispose();
   }
 

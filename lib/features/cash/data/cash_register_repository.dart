@@ -95,6 +95,32 @@ class CashRegisterRepository {
   // Movimientos
   // ---------------------------------------------------------------------------
 
+  /// Valor más alto que acepta una entrada o salida: protege de ceros de más
+  static const double maxMovement = 1000000000;
+
+  /// Por qué no se puede registrar ese movimiento, o null si se puede (0.16.4).
+  /// Una salida no puede pasar del efectivo que debería haber en la caja: antes
+  /// la caja quedaba en negativo («$-872.699»).
+  Future<String?> movementProblem({
+    required CashSession session,
+    required String kind,
+    required double amount,
+    String? reason,
+  }) async {
+    if (amount <= 0) return 'Escribe un valor mayor que cero.';
+    // Una anulación devuelve lo que se registró, aunque haya sido con ceros de más
+    if (amount > maxMovement && reason != CashMovement.voidReason) return 'Ese valor es demasiado alto. Revisa los ceros.';
+    if (kind == CashMovement.exit) {
+      final available = (await summarize(session)).expected;
+      if (amount > available + 0.5) {
+        return available <= 0
+            ? 'No hay efectivo en la caja para sacar.'
+            : 'En la caja hay ${CurrencyFormatter.format(available)}. No puedes sacar más que eso.';
+      }
+    }
+    return null;
+  }
+
   Future<CashMovement> addMovement({
     required CashSession session,
     required String kind,
@@ -107,7 +133,8 @@ class CashRegisterRepository {
     DateTime? now,
   }) async {
     if (!session.isOpen) throw StateError('La caja ya está cerrada.');
-    if (amount <= 0) throw StateError('Escribe un valor mayor que cero.');
+    final problem = await movementProblem(session: session, kind: kind, amount: amount, reason: reason);
+    if (problem != null) throw StateError(problem);
     final m = CashMovement(
       id: const Uuid().v4(),
       businessId: session.businessId,
@@ -127,10 +154,44 @@ class CashRegisterRepository {
       businessId: session.businessId,
       action: 'cash_movement',
       summary: '${m.isExit ? 'Sacó' : 'Metió'} ${CurrencyFormatter.format(amount)} de la caja: '
-          '${m.reasonLabel.toLowerCase()}${m.note == null ? '' : ' (${m.note})'}',
+          '${m.reasonLabel.toLowerCase()}${m.visibleNote == null ? '' : ' (${m.visibleNote})'}',
       data: {'session_id': session.id, 'movement_id': m.id},
     );
+    DataEvents.instance.cashChanged();
     return m;
+  }
+
+  /// Ids de los movimientos anulados y de sus anulaciones: no cuentan en los totales
+  static Set<String> voidedIds(List<CashMovement> moves) => {
+        for (final m in moves)
+          if (m.voidsId != null) ...[m.id, m.voidsId!],
+      };
+
+  /// Por qué no se puede anular ese movimiento, o null si se puede
+  String? voidProblem(CashSession session, CashMovement movement, List<CashMovement> moves) {
+    if (!session.isOpen) return 'La caja ya está cerrada.';
+    if (movement.reason == CashMovement.voidReason) return 'Una anulación no se puede anular.';
+    if (moves.any((m) => m.voidsId == movement.id)) return 'Ese movimiento ya está anulado.';
+    return null;
+  }
+
+  /// Anula un movimiento equivocado con el movimiento contrario (0.16.4).
+  /// Anular una entrada saca la plata: si ya no está en la caja, no se deja.
+  Future<CashMovement> voidMovement({
+    required CashSession session,
+    required CashMovement movement,
+    String? authRequestId,
+  }) async {
+    final problem = voidProblem(session, movement, await movements(session));
+    if (problem != null) throw StateError(problem);
+    return addMovement(
+      session: session,
+      kind: movement.isExit ? CashMovement.entry : CashMovement.exit,
+      reason: CashMovement.voidReason,
+      amount: movement.amount,
+      note: '${CashMovement.voidNotePrefix}${movement.id}',
+      authRequestId: authRequestId,
+    );
   }
 
   Future<List<CashMovement>> movements(CashSession session) async {
@@ -201,7 +262,11 @@ class CashRegisterRepository {
 
     // Entradas y salidas a mano
     var entries = 0.0, exits = 0.0, tipsOut = 0.0;
-    for (final m in await movements(session)) {
+    final moves = await movements(session);
+    // Un movimiento anulado y su anulación se cancelan: no suman a ningún lado (0.16.4)
+    final voided = voidedIds(moves);
+    for (final m in moves) {
+      if (voided.contains(m.id)) continue;
       if (!m.isExit) {
         entries += m.amount;
       } else if (m.reason == 'PROPINA') {

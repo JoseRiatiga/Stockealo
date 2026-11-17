@@ -11,6 +11,7 @@ import '../widgets/new_customer_sheet.dart';
 import '../widgets/record_payment_modal.dart';
 import '../../../../core/design/pro_crown.dart';
 import '../../../../core/design/app_time_picker.dart';
+import '../../../../core/services/data_events.dart';
 import '../../../../core/services/phone_alerts_service.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../pro/data/pro_service.dart';
@@ -56,10 +57,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
   void initState() {
     super.initState();
     _loadCustomers();
+    // Un fiado vendido o un abono en otra pantalla cambian las deudas (0.16.4)
+    DataEvents.instance.salesVersion.addListener(_onDataChanged);
+    DataEvents.instance.customersVersion.addListener(_onDataChanged);
     ProService.instance.status.addListener(_onProChanged);
     ProService.instance.refresh(widget.businessId);
     // refresh limpia al instante el estado si era de otro negocio
     _pro = ProService.instance.status.value.active;
+  }
+
+  void _onDataChanged() {
+    if (mounted) _loadCustomers();
   }
 
   void _onProChanged() {
@@ -68,6 +76,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   @override
   void dispose() {
+    DataEvents.instance.salesVersion.removeListener(_onDataChanged);
+    DataEvents.instance.customersVersion.removeListener(_onDataChanged);
     ProService.instance.status.removeListener(_onProChanged);
     _searchController.dispose();
     super.dispose();

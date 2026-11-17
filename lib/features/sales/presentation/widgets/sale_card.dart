@@ -34,10 +34,12 @@ class SaleCard extends StatelessWidget {
 
   String get _title {
     final variant = sale.variantName;
-    return variant == null || variant.isEmpty ? sale.productName : '${sale.productName} · $variant';
+    final name = variant == null || variant.isEmpty ? sale.productName : '${sale.productName} · $variant';
+    // Una devolución se nombra como tal (0.16.4): antes parecía otra venta en negativo
+    return sale.isReturn ? 'Devolución · $name' : name;
   }
 
-  Future<void> _showDetail(BuildContext context) async {
+  Future<void> showDetail(BuildContext context) async {
     final c = context.colors;
     final split = PaymentMethod.decodeSplit(sale.paymentSplit);
     Widget row(String label, String value, {Color? color}) => Padding(
@@ -140,7 +142,7 @@ class SaleCard extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: radius, side: BorderSide(color: c.line)),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => _showDetail(context),
+          onTap: () => showDetail(context),
           child: Opacity(
             opacity: voided ? 0.6 : 1,
             child: Padding(
@@ -159,7 +161,7 @@ class SaleCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          sale.quantity > 1 ? '$_title  ×${sale.quantity}' : _title,
+                          sale.quantity.abs() > 1 ? '$_title  ×${sale.quantity.abs()}' : _title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppText.bodyLarge(context, weight: FontWeight.w600),
@@ -186,7 +188,204 @@ class SaleCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         const StatusPill('Anulada', tone: AppTone.danger, compact: true),
                       ],
+                      if (sale.isReturn && !voided) ...[
+                        const SizedBox(height: 2),
+                        const StatusPill('Devolución', tone: AppTone.info, compact: true),
+                      ],
                       if (sale.pendingDelivery) ...[
+                        const SizedBox(height: 2),
+                        const StatusPill('Por entregar', tone: AppTone.warning, compact: true),
+                      ],
+                      if (pendingUpload) ...[
+                        const SizedBox(height: 2),
+                        const StatusPill('Pendiente de subir', tone: AppTone.warning, compact: true),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Una venta con varios productos en una sola tarjeta (0.16.4): «Arroz y 3 más».
+/// Antes cada producto salía como una venta aparte y la lista decía «9 ventas»
+/// cuando eran 4. Al tocarla se ven sus productos; cada uno abre su detalle
+/// (devolver, ganancia) y abajo están el comprobante y anular.
+class SaleGroupCard extends StatelessWidget {
+  /// Las líneas de un mismo comprobante, la primera es la más reciente
+  final List<Sale> lines;
+  final bool showProfit;
+
+  /// Arma la tarjeta de una línea para abrir su detalle (devolver, anular)
+  final SaleCard Function(Sale line) lineCard;
+
+  /// Anular toda la venta; null oculta el botón
+  final VoidCallback? onCancel;
+  final bool pendingUpload;
+
+  const SaleGroupCard({
+    super.key,
+    required this.lines,
+    required this.showProfit,
+    required this.lineCard,
+    this.onCancel,
+    this.pendingUpload = false,
+  });
+
+  Sale get _first => lines.first;
+  bool get _voided => lines.every((l) => l.isVoided);
+  double get _total => lines.where((l) => !l.isVoided || _voided).fold(0.0, (s, l) => s + l.totalAmount);
+  int get _units => lines.fold(0, (s, l) => s + l.quantity);
+  String get _title => '${_first.productName} y ${lines.length - 1} más';
+
+  String _meta() {
+    final customer = lines.map((l) => l.customerName ?? '').firstWhere((n) => n.trim().isNotEmpty, orElse: () => '');
+    return [
+      clockText(_first.date),
+      PaymentMethod.label(_first.paymentMethod),
+      if (_first.paymentMethod == PaymentMethod.credit && customer.isNotEmpty) customer,
+    ].join(' · ');
+  }
+
+  Future<void> _showDetail(BuildContext context) async {
+    final c = context.colors;
+    await AppSheet.show<void>(
+      context: context,
+      title: '${lines.length} productos · $_units unidades',
+      subtitle: '${DateFormat("d 'de' MMMM, h:mm a", 'es_CO').format(_first.date)}'
+          '${(_first.invoiceNumber ?? '').isEmpty ? '' : ' · ${_first.invoiceNumber}'}',
+      builder: (ctx) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_voided) ...[
+            AnulledNotice(sale: _first),
+            const SizedBox(height: AppSpace.md),
+          ],
+          Text('Toca un producto para ver su detalle o devolverlo.', style: AppText.caption(ctx)),
+          const SizedBox(height: AppSpace.sm),
+          for (final l in lines)
+            InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.control),
+              onTap: () {
+                Navigator.pop(ctx);
+                lineCard(l).showDetail(context);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${l.productName}${(l.variantName ?? '').isEmpty ? '' : ' · ${l.variantName}'}'
+                        '${l.quantity > 1 ? '  ×${l.quantity}' : ''}',
+                        style: AppText.body(ctx, color: l.isVoided ? c.inkMuted : null),
+                      ),
+                    ),
+                    Text(CurrencyFormatter.format(l.totalAmount), style: AppText.amount(ctx, size: AppText.sizeBody, weight: FontWeight.w600)),
+                    const SizedBox(width: AppSpace.xs),
+                    Icon(Icons.chevron_right_outlined, size: 18, color: c.inkFaint),
+                  ],
+                ),
+              ),
+            ),
+          Divider(height: AppSpace.xl, color: c.line),
+          Row(
+            children: [
+              Expanded(child: Text('Total', style: AppText.title(ctx))),
+              Text(
+                CurrencyFormatter.format(_total),
+                style: AppText.amount(ctx, size: AppText.sizeHeading).copyWith(decoration: _voided ? TextDecoration.lineThrough : null),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.xl),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              DigitalTicketModal.show(context, salesList: lines);
+            },
+            icon: const Icon(Icons.receipt_long_outlined),
+            label: const Text('Ver comprobante'),
+          ),
+          if (onCancel != null && !_voided) ...[
+            const SizedBox(height: AppSpace.sm),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: c.danger),
+              onPressed: () {
+                Navigator.pop(ctx);
+                onCancel!();
+              },
+              child: const Text('Anular venta'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final voided = _voided;
+    final isFiado = _first.paymentMethod == PaymentMethod.credit;
+    final meta = _meta();
+    final radius = BorderRadius.circular(AppRadius.control + 2);
+    return Semantics(
+      button: true,
+      label: '$_title, ${CurrencyFormatter.format(_total)}, $meta${voided ? ', anulada' : ''}',
+      excludeSemantics: true,
+      child: Material(
+        color: c.surface,
+        shape: RoundedRectangleBorder(borderRadius: radius, side: BorderSide(color: c.line)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _showDetail(context),
+          child: Opacity(
+            opacity: voided ? 0.6 : 1,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpace.md),
+              child: Row(
+                children: [
+                  ProductImageView(
+                    imagePath: _first.productPhotoPath,
+                    width: 44,
+                    height: 44,
+                    borderRadius: BorderRadius.circular(AppRadius.tile),
+                  ),
+                  const SizedBox(width: AppSpace.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyLarge(context, weight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text(
+                          meta,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.small(context, color: isFiado && !voided ? c.warning : c.inkMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.sm),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        CurrencyFormatter.format(_total),
+                        style: AppText.amount(context).copyWith(decoration: voided ? TextDecoration.lineThrough : null),
+                      ),
+                      if (voided) ...[
+                        const SizedBox(height: 2),
+                        const StatusPill('Anulada', tone: AppTone.danger, compact: true),
+                      ],
+                      if (lines.any((l) => l.pendingDelivery)) ...[
                         const SizedBox(height: 2),
                         const StatusPill('Por entregar', tone: AppTone.warning, compact: true),
                       ],

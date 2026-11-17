@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/services/data_events.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/countries.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -194,6 +195,9 @@ class CustomerRepository {
           '(${PaymentMethod.label(paymentMethod).toLowerCase()}; ${remainingDebt > 0 ? 'debe ${CurrencyFormatter.format(remainingDebt)}' : 'quedó al día'})',
       data: {'customer_id': customerId, 'amount': amount},
     );
+    // La caja suma el abono y las deudas cambian (0.16.4: antes había que recargar)
+    DataEvents.instance.cashChanged();
+    DataEvents.instance.customersChanged();
 
     return PaymentResult(
       customer: updatedCustomer,

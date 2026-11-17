@@ -119,6 +119,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     _loadData();
     _syncSilently();
     DataEvents.instance.salesVersion.addListener(_onSalesChanged);
+    DataEvents.instance.productsVersion.addListener(_onSalesChanged);
     NotificationService.instance.remoteSalesVersion.addListener(_onSalesChanged);
   }
 
@@ -161,6 +162,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   @override
   void dispose() {
     DataEvents.instance.salesVersion.removeListener(_onSalesChanged);
+    DataEvents.instance.productsVersion.removeListener(_onSalesChanged);
     NotificationService.instance.remoteSalesVersion.removeListener(_onSalesChanged);
     _searchController.dispose();
     _scrollController.dispose();

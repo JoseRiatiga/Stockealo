@@ -17,14 +17,17 @@ class CurrencyFormatter {
   static String format(num amount, {bool includeSymbol = true, int decimalDigits = 0}) {
     final pattern = decimalDigits > 0 ? '#,##0.${'0' * decimalDigits}' : '#,##0';
     final numberFormatter = NumberFormat(pattern, 'es_CO');
-    final formattedNumber = numberFormatter.format(amount);
-    return includeSymbol ? '$currencySymbol$formattedNumber' : formattedNumber;
+    // El signo va antes del símbolo: «-$4.500», no «$-4.500» (0.16.4)
+    final sign = amount < 0 ? '-' : '';
+    final formattedNumber = numberFormatter.format(amount.abs());
+    return includeSymbol ? '$sign$currencySymbol$formattedNumber' : '$sign$formattedNumber';
   }
 
   /// Formatea con una moneda concreta sin cambiar la del negocio activo (vista previa)
   static String formatIn(num amount, String currencyCode) {
     final symbol = _symbols[currencyCode] ?? r'$';
-    return '$symbol${format(amount, includeSymbol: false)}';
+    final sign = amount < 0 ? '-' : '';
+    return '$sign$symbol${format(amount.abs(), includeSymbol: false)}';
   }
 
   /// Alias de formato

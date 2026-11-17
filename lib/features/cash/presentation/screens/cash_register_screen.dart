@@ -218,6 +218,13 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
     amount.dispose();
     note.dispose();
     if (ok != true || !mounted) return;
+    // Antes de pedir autorización: sin valor, con ceros de más o más de lo que hay (0.16.4)
+    final problem = await _repo.movementProblem(session: session, kind: kind, amount: value ?? 0);
+    if (problem != null) {
+      if (mounted) AppToast.showWarning(context, problem);
+      return;
+    }
+    if (!mounted) return;
     // Sin permiso o una salida por encima del límite: pide autorización (0.15.0)
     final needs = <String>[
       if (!Permissions.mine(Perm.cashMoves)) 'Tu rol no permite registrar entradas o salidas de dinero.',
@@ -522,12 +529,97 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
             children: [
               Text('Entradas y salidas', style: AppText.title(context)),
               const SizedBox(height: AppSpace.sm),
-              for (final m in _movements) _row('${_hour(m.date)} · ${m.reasonLabel}${m.note == null ? '' : ' (${m.note})'}', m.signed),
+              for (final m in _movements) _movementRow(m),
+              if (_open != null && _movements.any((m) => m.voidsId == null && !_voided.contains(m.id)))
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpace.xs),
+                  child: Text('¿Te equivocaste? Toca un movimiento para anularlo.', style: AppText.caption(context)),
+                ),
             ],
           ),
         ],
       ],
     );
+  }
+
+  /// Movimientos anulados y sus anulaciones (0.16.4)
+  Set<String> get _voided => CashRegisterRepository.voidedIds(_movements);
+
+  Widget _movementRow(CashMovement m) {
+    final c = context.colors;
+    final voided = _voided.contains(m.id);
+    final original = m.voidsId == null ? null : _movements.where((o) => o.id == m.voidsId).firstOrNull;
+    final label = m.voidsId != null
+        ? '${_hour(m.date)} · Anula ${original == null ? 'un movimiento' : '«${original.reasonLabel}» de las ${_hour(original.date)}'}'
+        : '${_hour(m.date)} · ${m.reasonLabel}${m.visibleNote == null ? '' : ' (${m.visibleNote})'}';
+    final canVoid = _open != null && !voided && m.voidsId == null;
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.control),
+      onTap: canVoid ? () => _voidMovement(m) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: AppText.body(context, color: voided ? c.inkMuted : null)
+                    .copyWith(decoration: voided && m.voidsId == null ? TextDecoration.lineThrough : null),
+              ),
+            ),
+            if (voided && m.voidsId == null) ...[
+              const StatusPill('Anulado', tone: AppTone.neutral, compact: true),
+              const SizedBox(width: AppSpace.sm),
+            ],
+            Text(
+              CurrencyFormatter.format(m.signed),
+              style: AppText.amount(context, size: AppText.sizeBody, weight: FontWeight.w600, color: voided ? c.inkMuted : (m.signed < 0 ? c.danger : c.ink))
+                  .copyWith(decoration: voided && m.voidsId == null ? TextDecoration.lineThrough : null),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Anula un movimiento equivocado: queda el contrario y los dos se ven tachados (0.16.4)
+  Future<void> _voidMovement(CashMovement m) async {
+    final session = _open;
+    if (session == null) return;
+    final problem = _repo.voidProblem(session, m, _movements);
+    if (problem != null) {
+      AppToast.showWarning(context, problem);
+      return;
+    }
+    final ok = await AppDialog.confirm(
+      context: context,
+      title: 'Anular este movimiento',
+      message: '${m.isExit ? 'Salida' : 'Entrada'} de ${CurrencyFormatter.format(m.amount)} '
+          '(${m.reasonLabel.toLowerCase()}) de las ${_hour(m.date)}. '
+          '${m.isExit ? 'La plata vuelve a contar en la caja.' : 'La plata deja de contar en la caja.'} '
+          'Queda anotado quién lo anuló.',
+      confirmText: 'Anular',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    String? authId;
+    if (!Permissions.mine(Perm.cashMoves)) {
+      authId = await AuthorizationGate.allow(
+        context,
+        businessId: widget.businessId,
+        action: 'Anular un movimiento de caja de ${CurrencyFormatter.format(m.amount)}',
+        reasons: const ['Tu rol no permite registrar entradas o salidas de dinero.'],
+        amount: m.amount,
+      );
+      if (authId == null || !mounted) return;
+    }
+    try {
+      await _repo.voidMovement(session: session, movement: m, authRequestId: authId);
+      await _load();
+      if (mounted) AppToast.showSuccess(context, 'Movimiento anulado');
+    } on StateError catch (e) {
+      if (mounted) AppToast.showWarning(context, e.message);
+    }
   }
 
   Widget _row(String label, double amount, {bool bold = false}) {

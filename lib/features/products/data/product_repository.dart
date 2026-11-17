@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/utils/image_helper.dart';
+import '../../../core/services/data_events.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../team/data/activity_repository.dart';
@@ -206,6 +207,7 @@ class ProductRepository {
       summary: 'Creó ${product.name}: ${CurrencyFormatter.format(product.salePrice)}, ${product.stock} en stock',
       data: {'product_id': product.id},
     );
+    DataEvents.instance.productsChanged();
   }
 
   /// Actualizar producto (y sincronizar variantes)
@@ -264,6 +266,7 @@ class ProductRepository {
       summary: changes.isEmpty ? 'Editó ${product.name}' : 'Cambió ${product.name}: ${changes.join(', ')}',
       data: {'product_id': product.id},
     );
+    DataEvents.instance.productsChanged();
   }
 
   /// Eliminar producto
@@ -292,6 +295,7 @@ class ProductRepository {
         summary: 'Eliminó ${product.name} (tenía ${product.stock} en stock)',
         data: {'product_id': id},
       );
+      DataEvents.instance.productsChanged();
     }
   }
 
@@ -338,6 +342,7 @@ class ProductRepository {
           : 'Agregó $diff × ${product.name} al stock (queda $newStock)$why',
       data: {'product_id': productId, 'diff': diff},
     );
+    DataEvents.instance.productsChanged();
   }
 
   /// Ajuste manual de un producto con tallas y colores: fija la cantidad de cada
@@ -390,6 +395,7 @@ class ProductRepository {
       summary: 'Ajustó ${product.name}: ${changed.join(', ')} (queda $newTotal)$why',
       data: {'product_id': product.id, 'diff': diff},
     );
+    DataEvents.instance.productsChanged();
   }
 
   /// Obtener categorías de la empresa
@@ -421,6 +427,7 @@ class ProductRepository {
 
     // Sincronizar en tiempo real a Supabase
     SupabaseService.instance.upsertCategoryToCloud(category.toMap());
+    DataEvents.instance.productsChanged();
 
     return category;
   }
@@ -469,6 +476,7 @@ class ProductRepository {
     } catch (e) {
       debugPrint('No se pudo renombrar la categoría en los productos de la nube: $e');
     }
+    DataEvents.instance.productsChanged();
   }
 
   /// Eliminar categoría y reasignar productos a 'General'
@@ -507,6 +515,7 @@ class ProductRepository {
     } catch (e) {
       debugPrint('No se pudo mover los productos a "General" en la nube: $e');
     }
+    DataEvents.instance.productsChanged();
   }
 
   /// Contar cuántos productos pertenecen a una categoría

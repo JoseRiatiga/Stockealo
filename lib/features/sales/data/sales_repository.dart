@@ -875,8 +875,20 @@ class SalesRepository {
   /// con el mismo medio de pago, así la caja, los reportes y los totales por medio se
   /// ajustan solos (efectivo: la caja espera menos; fiado: baja la deuda). Si [restock],
   /// las unidades vuelven al inventario; si no (llegó dañado), queda anotado como baja.
-  Future<Sale> returnSale(Sale line, {required int quantity, required bool restock, String? reason, DateTime? now}) async {
+  ///
+  /// Venta mixta (0.16.4): se devuelve por un solo medio, [refundMethod] (por
+  /// defecto, efectivo si se pagó parte en efectivo). Antes quedaba «Mixto» en
+  /// negativo y la caja no bajaba.
+  Future<Sale> returnSale(
+    Sale line, {
+    required int quantity,
+    required bool restock,
+    String? reason,
+    String? refundMethod,
+    DateTime? now,
+  }) async {
     if (line.isVoided || line.isReturn || line.isService) throw StateError('Esa venta no se puede devolver.');
+    final method = refundMethodFor(line, refundMethod);
     final left = line.quantity - await returnedQuantity(line.id);
     if (quantity < 1 || quantity > left) throw StateError('Solo quedan $left por devolver.');
     final db = await _dbProvider.database;
@@ -904,7 +916,7 @@ class SalesRepository {
         'total': -amount,
         'total_cost': -cost,
         'net_profit': -(amount - cost),
-        'payment_method': line.paymentMethod,
+        'payment_method': method,
         'payment_status': 'PAGADO',
         'notes': 'Devolución${cleanReason.isEmpty ? '' : ': $cleanReason'}${restock ? '' : ' (no volvió al inventario)'}',
         'invoice_number': line.invoiceNumber,
@@ -934,7 +946,7 @@ class SalesRepository {
         });
       }
       // Fiado: lo devuelto baja la deuda
-      if (line.paymentMethod == PaymentMethod.credit && customerId != null) {
+      if (method == PaymentMethod.credit && customerId != null) {
         await txn.rawUpdate('UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE id = ?', [amount, customerId]);
       }
     });
@@ -949,7 +961,7 @@ class SalesRepository {
       unitCost: line.unitCost,
       totalAmount: -amount,
       netProfit: -(amount - cost),
-      paymentMethod: line.paymentMethod,
+      paymentMethod: method,
       customerName: line.customerName,
       sellerName: by,
       date: at,
@@ -964,7 +976,7 @@ class SalesRepository {
       await cloud.adjustProductStockInCloud(line.productId, quantity);
       if (line.variantId != null) await cloud.adjustVariantStockInCloud(line.variantId!, quantity);
     }
-    if (line.paymentMethod == PaymentMethod.credit && customerId != null) {
+    if (method == PaymentMethod.credit && customerId != null) {
       await cloud.adjustCustomerDebtInCloud(customerId, -amount);
     }
     ActivityRepository.instance.log(
@@ -976,6 +988,20 @@ class SalesRepository {
     );
     DataEvents.instance.salesChanged();
     return sale;
+  }
+
+  /// Medios por los que se puede devolver una línea: el suyo, o los del pago mixto
+  static List<String> refundMethods(Sale line) {
+    if (line.paymentMethod.toUpperCase() != PaymentMethod.mixed) return [line.paymentMethod];
+    final parts = PaymentMethod.decodeSplit(line.paymentSplit).keys.toList();
+    return parts.isEmpty ? [PaymentMethod.cash] : [for (final m in PaymentMethod.forMixed) if (parts.contains(m)) m];
+  }
+
+  /// El medio de la devolución: el pedido si es válido; si no, efectivo o el primero
+  static String refundMethodFor(Sale line, String? wanted) {
+    final options = refundMethods(line);
+    if (wanted != null && options.contains(wanted)) return wanted;
+    return options.contains(PaymentMethod.cash) ? PaymentMethod.cash : options.first;
   }
 
   static double _round(double v) => (v * 100).roundToDouble() / 100;

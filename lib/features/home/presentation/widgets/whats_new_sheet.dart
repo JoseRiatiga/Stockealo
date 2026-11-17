@@ -21,6 +21,17 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.16.4',
+      title: 'La caja y las cuentas, al día',
+      items: [
+        'La caja muestra bien la hora en que se abrió y no deja sacar más plata de la que hay.',
+        'Si te equivocas en una entrada o salida de caja, tócala para anularla.',
+        'Al devolver algo de un pago mixto, eliges si devuelves en efectivo o por otro medio.',
+        'Ventas muestra una tarjeta por venta, y Reportes, Caja y Stocky dan las mismas cifras.',
+        'Lo que cambias en una pantalla (productos, abonos, mercancía) se ve al instante en las demás.',
+      ],
+    ),
+    (
       version: '0.16.3',
       title: 'Arreglos y detalles',
       items: [

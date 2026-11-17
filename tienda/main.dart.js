@@ -104134,7 +104134,7 @@ h=k.length>500?B.c.a3(k,0,500):k
 if(j==null)g=null
 else g=j.length>4000?B.c.a3(j,0,4000):j
 f=t.z
-m=A.ad(["p_app",d,"p_version","0.16.4+52","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
+m=A.ad(["p_app",d,"p_version","0.16.5+53","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
 l=null
 p=4
 s=l!=null?7:9

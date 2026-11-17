@@ -21,6 +21,19 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.16.6',
+      title: 'Vender más fácil y la hora de tu negocio',
+      items: [
+        'En Vender tienes a mano las ventas en espera y las cotizaciones, también en el celular.',
+        '«Cobrar» queda siempre a la vista y los descuentos avisan si pasan el valor o dejan pérdida.',
+        '«Nueva venta» guarda la cuenta que tenías en espera y abre una vacía.',
+        'El buscador encuentra clientes y más funciones, y Ctrl K funciona en toda la app.',
+        'La hora de recibos, caja y reportes es la del país de tu negocio; en EE. UU. y México eliges la zona.',
+        'El comprobante, el vendedor y el descuento de cada venta se ven en todos tus equipos.',
+        'En el computador puedes hacer scroll en toda la pantalla.',
+      ],
+    ),
+    (
       version: '0.16.5',
       title: 'Devoluciones en orden',
       items: [

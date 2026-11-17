@@ -39,10 +39,9 @@ class GoalBar extends StatelessWidget {
     final c = context.colors;
     final p = progress;
     final color = p.onPace ? c.success : c.warning;
-    // La barra es un semáforo (verde al día, ámbar atrás) y debe verse igual en los dos
-    // modos. El ámbar de texto del modo claro es un naranja oscuro que junto al color
-    // de un negocio rojo parecía rojo (0.16.6): la barra usa un ámbar de relleno
-    final bar = p.onPace || Theme.of(context).brightness == Brightness.dark ? color : const Color(0xFFF59E0B);
+    // La barra es un semáforo (verde al día, ámbar atrás) y se ve igual en los dos
+    // modos: usa el relleno de aviso, no el ámbar oscuro de texto (0.16.6)
+    final bar = p.onPace ? c.success : c.warningFill;
     final detail = p.reached
         ? '¡Meta cumplida! ${_money(p.sold)} de ${_money(p.goal)}'
         : p.isOver

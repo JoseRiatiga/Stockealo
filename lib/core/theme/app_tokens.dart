@@ -34,6 +34,9 @@ class AppPalette {
   static const Color info = Color(0xFF1D4ED8);
   static const Color successSoft = Color(0xFFDCFCE7);
   static const Color warningSoft = Color(0xFFFEF3C7);
+  /// Relleno de aviso (barras, semáforos): el ámbar de texto es oscuro y junto a un
+  /// negocio rojo parecía rojo (0.16.6)
+  static const Color warningFill = Color(0xFFF59E0B);
   static const Color dangerSoft = Color(0xFFFEE2E2);
   static const Color infoSoft = Color(0xFFDBEAFE);
 
@@ -52,6 +55,7 @@ class AppPalette {
   static const Color infoDark = Color(0xFF60A5FA);
   static const Color successSoftDark = Color(0xFF14281D);
   static const Color warningSoftDark = Color(0xFF2E2614);
+  static const Color warningFillDark = Color(0xFFFBBF24);
   static const Color dangerSoftDark = Color(0xFF351B1C);
   static const Color infoSoftDark = Color(0xFF172539);
 
@@ -181,6 +185,9 @@ class StockealoColors extends ThemeExtension<StockealoColors> {
   final Color info;
   final Color successSoft;
   final Color warningSoft;
+
+  /// Relleno de aviso: barras y semáforos (el texto usa [warning])
+  final Color warningFill;
   final Color dangerSoft;
   final Color infoSoft;
 
@@ -208,6 +215,7 @@ class StockealoColors extends ThemeExtension<StockealoColors> {
     required this.info,
     required this.successSoft,
     required this.warningSoft,
+    required this.warningFill,
     required this.dangerSoft,
     required this.infoSoft,
     required this.glass,
@@ -234,6 +242,7 @@ class StockealoColors extends ThemeExtension<StockealoColors> {
         info: AppPalette.info,
         successSoft: AppPalette.successSoft,
         warningSoft: AppPalette.warningSoft,
+        warningFill: AppPalette.warningFill,
         dangerSoft: AppPalette.dangerSoft,
         infoSoft: AppPalette.infoSoft,
         // Sin cristal en el diseño nuevo: el encabezado es una superficie sólida
@@ -261,6 +270,7 @@ class StockealoColors extends ThemeExtension<StockealoColors> {
         info: AppPalette.infoDark,
         successSoft: AppPalette.successSoftDark,
         warningSoft: AppPalette.warningSoftDark,
+        warningFill: AppPalette.warningFillDark,
         dangerSoft: AppPalette.dangerSoftDark,
         infoSoft: AppPalette.infoSoftDark,
         glass: AppPalette.surfaceDark,
@@ -287,6 +297,7 @@ class StockealoColors extends ThemeExtension<StockealoColors> {
       info: info,
       successSoft: successSoft,
       warningSoft: warningSoft,
+      warningFill: warningFill,
       dangerSoft: dangerSoft,
       infoSoft: infoSoft,
       glass: glass,
@@ -316,6 +327,7 @@ class StockealoColors extends ThemeExtension<StockealoColors> {
       info: l(info, other.info),
       successSoft: l(successSoft, other.successSoft),
       warningSoft: l(warningSoft, other.warningSoft),
+      warningFill: l(warningFill, other.warningFill),
       dangerSoft: l(dangerSoft, other.dangerSoft),
       infoSoft: l(infoSoft, other.infoSoft),
       glass: l(glass, other.glass),

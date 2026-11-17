@@ -39,12 +39,27 @@ class AppFunction {
 const kAppFunctions = <AppFunction>[
   AppFunction(id: 'new_sale', title: 'Nueva venta', where: 'Vender', tab: 6, icon: Icons.point_of_sale_outlined,
       keywords: ['venta', 'vender', 'cobrar', 'factura']),
+  // Ventas en espera, a mano en Vender (0.16.6, hallazgo 47)
+  AppFunction(id: 'held_sales', title: 'Ventas en espera', where: 'Vender › En espera', tab: 6, icon: Icons.pause_circle_outline,
+      keywords: ['espera', 'pausa', 'despues', 'guardar venta', 'pendiente', 'retomar']),
+  AppFunction(id: 'sales_list', title: 'Ventas registradas', where: 'Ventas', tab: 2, icon: Icons.receipt_long_outlined,
+      keywords: ['historial', 'ventas', 'recibo', 'comprobante', 'ticket', 'vendido']),
+  AppFunction(id: 'returns', title: 'Devoluciones', where: 'Ventas › abre la venta › Devolver', tab: 2, icon: Icons.undo_outlined,
+      keywords: ['devolucion', 'devolver', 'cambio', 'reembolso', 'garantia', 'danado']),
+  AppFunction(id: 'void_sale', title: 'Anular venta', where: 'Ventas › abre la venta › Anular', tab: 2, icon: Icons.block_outlined,
+      keywords: ['anular', 'cancelar venta', 'borrar venta', 'equivocada'], perm: Perm.voidSale),
   AppFunction(id: 'customers', title: 'Clientes y fiados', where: 'Clientes y proveedores', tab: 9, icon: Icons.people_alt_outlined,
       keywords: ['cliente', 'fiado', 'deuda', 'abono', 'debe']),
   AppFunction(id: 'quotes', title: 'Cotizaciones', where: 'Ventas › Cotizaciones', tab: 2, icon: Icons.request_quote_outlined,
       keywords: ['cotizacion', 'proforma', 'presupuesto']),
   AppFunction(id: 'cash', title: 'Caja', where: 'Caja', tab: 7, icon: Icons.point_of_sale_outlined,
-      keywords: ['caja', 'arqueo', 'efectivo', 'cierre', 'base', 'turno']),
+      keywords: ['caja', 'arqueo', 'efectivo', 'cierre', 'base', 'turno', 'abrir caja']),
+  AppFunction(id: 'close_cash', title: 'Cerrar caja', where: 'Caja › Cerrar caja', tab: 7, icon: Icons.lock_clock_outlined,
+      keywords: ['cerrar caja', 'cierre', 'cuadre', 'cuadrar', 'arqueo', 'fin del dia', 'caja']),
+  AppFunction(id: 'cash_in', title: 'Entrada de dinero', where: 'Caja › Entrada', tab: 7, icon: Icons.south_west_outlined,
+      keywords: ['entrada', 'ingreso', 'meter plata', 'dinero', 'plata', 'caja', 'sencillo'], perm: Perm.cashMoves),
+  AppFunction(id: 'cash_out', title: 'Salida de dinero', where: 'Caja › Salida', tab: 7, icon: Icons.north_east_outlined,
+      keywords: ['salida', 'retiro', 'gasto', 'sacar plata', 'dinero', 'plata', 'caja', 'pago'], perm: Perm.cashMoves),
   AppFunction(id: 'new_product', title: 'Nuevo producto', where: 'Productos', tab: 1, icon: Icons.add_box_outlined,
       keywords: ['producto', 'agregar', 'nuevo', 'inventario', 'crear']),
   AppFunction(id: 'import_excel', title: 'Importar desde Excel', where: 'Productos › Importar desde Excel', tab: 1, icon: Icons.upload_file_outlined,
@@ -85,7 +100,8 @@ const kAppFunctions = <AppFunction>[
       keywords: ['nube', 'respaldo', 'copia', 'sincronizar', 'backup']),
 ];
 
-String _fold(String s) {
+/// Minúsculas y sin tildes, para buscar sin importar cómo se escribió
+String foldText(String s) {
   const from = 'áéíóúüñ';
   const to = 'aeiouun';
   final lower = s.toLowerCase();
@@ -99,12 +115,12 @@ String _fold(String s) {
 
 /// Funciones que puede ver la persona y que coinciden con lo escrito (vacío = todas)
 List<AppFunction> findFunctions(String query, {required String role, required bool services}) {
-  final q = _fold(query.trim());
+  final q = foldText(query.trim());
   return [
     for (final f in kAppFunctions)
       if ((f.perm == null || Permissions.can(role, f.perm!)) &&
           (!f.needsServices || services) &&
-          (q.isEmpty || _fold(f.title).contains(q) || f.keywords.any((k) => k.contains(q) || (k.length >= 4 && q.contains(k)))))
+          (q.isEmpty || foldText(f.title).contains(q) || f.keywords.any((k) => k.contains(q) || (k.length >= 4 && q.contains(k)))))
         f,
   ];
 }

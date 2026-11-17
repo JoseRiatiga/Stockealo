@@ -1069,10 +1069,11 @@ class SalesRepository {
     final invoice = onlyThisLine || (sale.invoiceNumber ?? '').isEmpty ? null : sale.invoiceNumber;
     final rows = await db.query(
       'sales',
+      // Una sola línea (o venta sin comprobante): con sus devoluciones (0.16.6)
       where: invoice == null
-          ? 'id = ? AND business_id = ? AND voided_at IS NULL'
+          ? '(id = ? OR return_of = ?) AND business_id = ? AND voided_at IS NULL'
           : 'invoice_number = ? AND business_id = ? AND voided_at IS NULL',
-      whereArgs: [invoice ?? sale.id, sale.businessId],
+      whereArgs: invoice == null ? [sale.id, sale.id, sale.businessId] : [invoice, sale.businessId],
     );
     if (rows.isEmpty) return;
     final lines = [for (final r in rows) saleFromRow(r)];
@@ -1081,51 +1082,69 @@ class SalesRepository {
     final variants = <String, int>{};
     final debts = <String, double>{};
 
+    // Se suma todo el comprobante antes de tocar nada (0.16.6, hallazgo 63): una
+    // devolución ya hecha comparte el comprobante y resta. Así el stock y la deuda
+    // cambian una sola vez y no dependen del orden de las filas (con el tope de deuda
+    // en 0, anular la venta antes que su devolución dejaba al cliente debiendo).
+    for (final line in lines) {
+      if (line.productId.isNotEmpty) {
+        stock[line.productId] = (stock[line.productId] ?? 0) + line.quantity;
+        if (line.variantId != null) variants[line.variantId!] = (variants[line.variantId!] ?? 0) + line.quantity;
+      }
+    }
+    final businessOf = {for (final l in lines) l.productId: l.businessId};
+
+    final missing = <String>{};
     await db.transaction((txn) async {
+      for (final e in stock.entries) {
+        final rows = await txn.rawUpdate(
+          'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
+          [e.value, e.key, businessOf[e.key]],
+        );
+        // Producto que ya no está en este equipo: tampoco se ajusta en la nube (como antes)
+        if (rows == 0) missing.add(e.key);
+        if (rows == 0 || e.value == 0) continue;
+        final p = await txn.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [e.key], limit: 1);
+        // Un solo movimiento claro: «Venta anulada #A1: vuelven 2»
+        await txn.insert('stock_movements', {
+          'id': const Uuid().v4(),
+          'business_id': businessOf[e.key],
+          'product_id': e.key,
+          'type': 'AJUSTE',
+          'quantity': e.value,
+          'resulting_stock': p.first['stock'] as int,
+          'reason': 'Venta anulada${invoice == null ? '' : ' $invoice'}: '
+              '${e.value > 0 ? 'vuelven ${e.value}' : 'salen ${-e.value}'}${cleanReason == null ? '' : ' ($cleanReason)'}',
+          'date': now,
+        });
+      }
+      for (final e in variants.entries) {
+        if (e.value == 0) continue;
+        await txn.rawUpdate('UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?', [e.value, now, e.key]);
+      }
+
+      // Fiado: la deuda baja lo que se había fiado, neto de lo ya devuelto
+      final owed = <String, double>{};
       for (final line in lines) {
-        if (line.productId.isNotEmpty) {
-          await txn.rawUpdate(
-            'UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
-            [line.quantity, line.productId, line.businessId],
-          );
-          final p = await txn.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [line.productId], limit: 1);
-          if (line.variantId != null) {
-            await txn.rawUpdate(
-              'UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ?',
-              [line.quantity, now, line.variantId],
-            );
-            variants[line.variantId!] = (variants[line.variantId!] ?? 0) + line.quantity;
-          }
-          if (p.isNotEmpty) {
-            stock[line.productId] = (stock[line.productId] ?? 0) + line.quantity;
-            await txn.insert('stock_movements', {
-              'id': const Uuid().v4(),
-              'business_id': line.businessId,
-              'product_id': line.productId,
-              'type': 'AJUSTE',
-              'quantity': line.quantity,
-              'resulting_stock': p.first['stock'] as int,
-              'reason': 'Venta anulada${invoice == null ? '' : ' $invoice'}${cleanReason == null ? '' : ': $cleanReason'}',
-              'date': now,
-            });
-          }
-        }
-
-        // Fiado: la deuda baja lo que se había fiado
         if (line.paymentMethod == PaymentMethod.credit && line.customerName != null) {
-          final c = await txn.query(
-            'customers',
-            where: 'business_id = ? AND LOWER(name) = ?',
-            whereArgs: [line.businessId, line.customerName!.toLowerCase()],
-            limit: 1,
-          );
-          if (c.isNotEmpty) {
-            final id = c.first['id'] as String;
-            await txn.rawUpdate('UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE id = ?', [line.totalAmount, id]);
-            debts[id] = (debts[id] ?? 0) + line.totalAmount;
-          }
+          final key = line.customerName!.toLowerCase();
+          owed[key] = (owed[key] ?? 0) + line.totalAmount;
         }
+      }
+      for (final e in owed.entries) {
+        final c = await txn.query(
+          'customers',
+          where: 'business_id = ? AND LOWER(name) = ?',
+          whereArgs: [sale.businessId, e.key],
+          limit: 1,
+        );
+        if (c.isEmpty || e.value == 0) continue;
+        final id = c.first['id'] as String;
+        await txn.rawUpdate('UPDATE customers SET debt_balance = MAX(0, debt_balance - ?) WHERE id = ?', [e.value, id]);
+        debts[id] = (debts[id] ?? 0) + e.value;
+      }
 
+      for (final line in lines) {
         await txn.update(
           'sales',
           {'voided_at': now, 'void_reason': cleanReason, 'voided_by': by, 'is_synced': 0},
@@ -1161,10 +1180,10 @@ class SalesRepository {
       });
     }
     for (final e in stock.entries) {
-      await cloud.adjustProductStockInCloud(e.key, e.value);
+      if (e.value != 0 && !missing.contains(e.key)) await cloud.adjustProductStockInCloud(e.key, e.value);
     }
     for (final e in variants.entries) {
-      await cloud.adjustVariantStockInCloud(e.key, e.value);
+      if (e.value != 0) await cloud.adjustVariantStockInCloud(e.key, e.value);
     }
     for (final e in debts.entries) {
       await cloud.adjustCustomerDebtInCloud(e.key, -e.value);

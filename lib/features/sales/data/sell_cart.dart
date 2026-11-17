@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -123,7 +124,8 @@ class SellCart extends ChangeNotifier {
   }
 
   void setDiscount(double value) {
-    discount = value.clamp(0, subtotal - promoDiscount).toDouble();
+    // Tope: lo que queda después de promociones y descuentos de línea (0.16.6, hallazgo 8)
+    discount = value.clamp(0, math.max(0, subtotal - promoDiscount - lineDiscounts)).toDouble();
     notifyListeners();
   }
 

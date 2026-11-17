@@ -135,8 +135,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               backgroundColor: c.paper,
               automaticallyImplyLeading: !widget.embedded,
             ),
-      body: ContentWidth(
-        child: ListView(
+      body: ContentListView(
           padding: EdgeInsets.fromLTRB(
             AppSpace.lg,
             widget.embedded && wide ? AppSpace.lg : AppSpace.sm,
@@ -247,7 +246,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
           ],
         ),
-      ),
     );
   }
 }

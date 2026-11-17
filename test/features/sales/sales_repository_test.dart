@@ -166,6 +166,52 @@ void main() {
       final reversal = (await db.query('stock_movements', where: "type = 'AJUSTE'")).single;
       expect(reversal['resulting_stock'], 10);
     });
+
+    // Hallazgo 63 (0.16.6): anular una venta fiada que ya tuvo una devolución «llegó dañado»
+    test('anular después de una devolución sin reponer: stock, deuda y un solo movimiento claro', () async {
+      final a = await addProduct('a', price: 1000, stock: 10);
+      final sold = await repo.recordMultiProductSale(
+        businessId: businessId,
+        items: [CartItem(product: a, quantity: 3)],
+        paymentMethod: 'FIADO',
+        customerName: 'Ana',
+      );
+      expect(await stockOf('a'), 7);
+      expect(await debtOf('Ana'), 3000);
+
+      // Una unidad llegó dañada: se le devuelve la plata, pero no vuelve al inventario
+      await repo.returnSale(sold.single, quantity: 1, restock: false, reason: 'Llegó dañado');
+      expect(await stockOf('a'), 7);
+      expect(await debtOf('Ana'), 2000);
+
+      await repo.voidSale(sold.single, reason: 'Se arrepintió');
+
+      // Vuelven las 2 que tenía el cliente; la dañada no regresa
+      expect(await stockOf('a'), 9);
+      expect(await debtOf('Ana'), 0, reason: 'no queda debiendo lo que ya se le descontó');
+      final db = await appDb.database;
+      final moves = await db.query('stock_movements', where: "reason LIKE 'Venta anulada%'");
+      expect(moves, hasLength(1), reason: 'un solo movimiento, no +3 y −1');
+      expect(moves.single['quantity'], 2);
+      expect(moves.single['resulting_stock'], 9);
+      expect(moves.single['reason'] as String, contains('vuelven 2'));
+    });
+
+    test('anular una venta sin comprobante que ya tuvo devolución: también se anula la devolución', () async {
+      final product = await addProduct('p2', stock: 10);
+      final sale = await repo.recordSale(product: product, quantity: 3, paymentMethod: 'FIADO', customerName: 'Eva');
+      await repo.returnSale(sale, quantity: 1, restock: true);
+      expect(await stockOf('p2'), 8);
+      expect(await debtOf('Eva'), 2000);
+
+      await repo.voidSale(sale);
+
+      expect(await stockOf('p2'), 10, reason: 'vuelven las 2 que faltaban, no las 3');
+      expect(await debtOf('Eva'), 0);
+      final db = await appDb.database;
+      final active = await db.query('sales', where: 'voided_at IS NULL');
+      expect(active, isEmpty, reason: 'la devolución queda anulada con su venta');
+    });
   });
 
   group('recordMultiProductSale', () {

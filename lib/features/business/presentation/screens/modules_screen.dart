@@ -107,10 +107,9 @@ class _ModulesScreenState extends State<ModulesScreen> {
     return Scaffold(
       backgroundColor: c.paper,
       appBar: AppBar(title: const Text('Módulos')),
-      body: ContentWidth(
-        child: ValueListenableBuilder<ProStatus>(
+      body: ValueListenableBuilder<ProStatus>(
           valueListenable: ProService.instance.status,
-          builder: (context, pro, _) => ListView(
+          builder: (context, pro, _) => ContentListView(
             padding: const EdgeInsets.all(AppSpace.lg),
             children: [
               Text('Todo lo que puedes usar en ${widget.business.name} y dónde lo encuentras.',
@@ -185,7 +184,6 @@ class _ModulesScreenState extends State<ModulesScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 }

@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/utils/clock_text.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
@@ -176,9 +177,9 @@ class TicketPaper extends StatelessWidget {
     const muted = AppPalette.inkMuted;
     const money = CurrencyFormatter.format;
     final mono = AppText.mono(context, size: AppText.sizeCaption, weight: FontWeight.w500, color: ink);
-    final date = doc.isQuotation
-        ? DateFormat('dd MMM yyyy', 'es_CO').format(doc.date).toUpperCase()
-        : DateFormat('dd MMM yyyy · HH:mm', 'es_CO').format(doc.date).toUpperCase();
+    final date = DateFormat('dd MMM yyyy', 'es_CO').format(doc.date).toUpperCase();
+    // La hora en 12 h y en su renglón, como en el resto de la app (0.16.6, hallazgo 11)
+    final time = doc.isQuotation ? null : clockText(doc.date).toUpperCase();
 
     Widget pair(String a, String b, {bool bold = false, Color color = ink}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),
@@ -251,6 +252,7 @@ class TicketPaper extends StatelessWidget {
                   const _Dashes(),
                   pair(doc.title.toUpperCase(), doc.number),
                   pair('FECHA', date),
+                  if (time != null) pair('HORA', time),
                   if (doc.validUntil != null) pair('VÁLIDA HASTA', DateFormat('dd MMM yyyy', 'es_CO').format(doc.validUntil!).toUpperCase()),
                   if (doc.customerName?.isNotEmpty == true) pair('CLIENTE', doc.customerName!),
                   if (doc.sellerName?.isNotEmpty == true) pair('ATENDIÓ', doc.sellerName!),

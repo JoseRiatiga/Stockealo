@@ -20,9 +20,9 @@ class WhereThingsMovedSheet {
 
   static const changes = <(IconData, String, String)>[
     (Icons.menu_outlined, 'Menú nuevo', 'Sigue el día: Inicio, Vender, Ventas, Caja, Productos, Stock, Clientes y proveedores, Reportes y Ajustes. En el celular se abre con ☰.'),
-    (Icons.add_outlined, 'Nueva venta', 'Siempre arriba, en el encabezado, en todas las pantallas.'),
+    (Icons.add_outlined, 'Nueva venta', 'Arriba, en el encabezado. Lleva a Vender; si ya estás cobrando algo, esa cuenta queda en espera y se abre otra vacía.'),
     (Icons.point_of_sale_outlined, 'Caja', 'Tiene su propio lugar en el menú, y su estado se ve arriba («Caja abierta desde 8:05»).'),
-    (Icons.receipt_long_outlined, 'Ventas', 'Es lo vendido y las cotizaciones.'),
+    (Icons.receipt_long_outlined, 'Ventas', 'Es lo vendido y las cotizaciones. En Vender también tienes a mano las ventas en espera y las cotizaciones.'),
     (Icons.layers_outlined, 'Stock', 'Lugar nuevo: lo que falta, el proveedor que pasa hoy y «Pedir al proveedor».'),
     (Icons.people_alt_outlined, 'Clientes y proveedores', 'Fiados, abonos y proveedores, juntos.'),
     (Icons.storefront_outlined, 'Tienda en línea', 'Tiene su propio lugar en el menú.'),

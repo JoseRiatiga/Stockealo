@@ -193,8 +193,7 @@ actions: [
       child: Scaffold(
         backgroundColor: c.paper,
         appBar: AppBar(title: Text('Entrada del ${purchaseDateLabel(p.date)}')),
-        body: ContentWidth(
-          child: ListView(
+        body: ContentListView(
             padding: const EdgeInsets.all(AppSpace.lg),
             children: [
               AppCard(
@@ -334,7 +333,6 @@ actions: [
               ),
             ],
           ),
-        ),
       ),
     );
   }
@@ -389,12 +387,11 @@ class _PayablesScreenState extends State<PayablesScreen> {
     return Scaffold(
       backgroundColor: c.paper,
       appBar: AppBar(title: const Text('Por pagar a proveedores')),
-      body: ContentWidth(
-        child: list == null
+      body: list == null
             ? const Center(child: CircularProgressIndicator())
             : list.isEmpty
                 ? Center(child: Text('No le debes nada a tus proveedores.', style: TextStyle(color: c.inkMuted)))
-                : ListView(
+                : ContentListView(
                     padding: const EdgeInsets.all(AppSpace.lg),
                     children: [
                       Text('Total por pagar', style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeSmall)),
@@ -436,7 +433,6 @@ class _PayablesScreenState extends State<PayablesScreen> {
                       ],
                     ],
                   ),
-      ),
     );
   }
 }

@@ -120,6 +120,23 @@ class AppTheme {
         ),
       ),
       dividerTheme: DividerThemeData(color: c.line, thickness: 1, space: 1),
+      // Barra de desplazamiento propia (0.16.6, hallazgo 61): delgada y redonda, más
+      // visible al pasar el puntero o al arrastrarla. Solo estilo: aparece al hacer scroll.
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.hovered) || s.contains(WidgetState.dragged) ? 10 : 6),
+        radius: const Radius.circular(AppRadius.pill),
+        thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.dragged)
+            ? c.inkMuted
+            : s.contains(WidgetState.hovered)
+                ? c.inkFaint
+                : c.lineStrong),
+        trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.hovered) ? c.surfaceMuted : Colors.transparent),
+        trackBorderColor: const WidgetStatePropertyAll(Colors.transparent),
+        crossAxisMargin: 2,
+        mainAxisMargin: 4,
+        interactive: true,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: c.surface,

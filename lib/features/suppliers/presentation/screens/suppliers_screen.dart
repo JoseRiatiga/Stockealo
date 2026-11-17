@@ -93,9 +93,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               icon: const Icon(Icons.add_outlined),
               label: const Text('Nuevo proveedor'),
             ),
-      body: ContentWidth(
-        child: widget.embedded ? Column(children: [
-          Padding(
+      body: widget.embedded ? Column(children: [
+          ContentWidth(child: Padding(
             padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, 0),
             child: Wrap(
               alignment: WrapAlignment.spaceBetween,
@@ -125,10 +124,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 ),
               ],
             ),
-          ),
+          )),
           Expanded(child: _content(list)),
         ]) : _content(list),
-      ),
     );
   }
 
@@ -153,7 +151,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     return Builder(builder: (context) {
       return _loading
             ? const Center(child: CircularProgressIndicator())
-            : ListView(
+            : ContentListView(
                 padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, 96),
                 children: [
                   AppCard(
@@ -354,8 +352,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
         title: Text(_s.name),
         actions: [IconButton(icon: const Icon(Icons.edit_outlined), tooltip: 'Editar', onPressed: _edit)],
       ),
-      body: ContentWidth(
-        child: ListView(
+      body: ContentListView(
           padding: const EdgeInsets.all(AppSpace.lg),
           children: [
             AppCard(
@@ -438,7 +435,6 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
               ],
           ],
         ),
-      ),
     );
   }
 }
@@ -486,8 +482,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
         icon: const Icon(Icons.add_outlined),
         label: const Text('Nueva entrada'),
       ),
-      body: ContentWidth(
-        child: list == null
+      body: list == null
             ? const Center(child: CircularProgressIndicator())
             : list.isEmpty
                 ? Center(
@@ -500,13 +495,12 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                       ),
                     ),
                   )
-                : ListView.separated(
+                : ContentListView.separated(
                     padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, 96),
                     itemCount: list.length,
                     separatorBuilder: (_, __) => const SizedBox(height: AppSpace.sm),
                     itemBuilder: (_, i) => PurchaseTile(purchase: list[i], showSupplier: true, onChanged: _load),
                   ),
-      ),
     );
   }
 }

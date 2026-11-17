@@ -619,11 +619,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
             ),
         ],
       ),
-      body: ContentWidth(
-        child: _isLoading
-            ? ListView(
-                padding: const EdgeInsets.all(AppSpace.lg),
-                children: const [
+      body: _isLoading
+            ? const ContentListView(
+                padding: EdgeInsets.all(AppSpace.lg),
+                children: [
                   SkeletonListTile(),
                   SkeletonListTile(),
                   SkeletonListTile(),
@@ -631,7 +630,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               )
             : RefreshIndicator(
                 onRefresh: _loadData,
-                child: ListView(
+                child: ContentListView(
                   padding: EdgeInsets.fromLTRB(
                     AppSpace.lg,
                     AppSpace.lg,
@@ -780,7 +779,6 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                   ],
                 ),
               ),
-      ),
     );
   }
 

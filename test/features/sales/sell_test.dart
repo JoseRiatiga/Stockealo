@@ -425,6 +425,17 @@ void main() {
     cart.resume(0);
     expect(cart.units, 5);
     expect(cart.discount, 20000);
+
+    // 0.16.6 (hallazgo 8): con descuento de línea, el de toda la venta no pasa lo que queda
+    cart.setDiscount(0);
+    cart.setLineDiscount(0, 30000); // huevos: 37.800
+    cart.setDiscount(1000000);
+    expect(cart.discount, cart.subtotal - cart.lineDiscounts, reason: 'tope = lo que queda después de la línea');
+    expect(cart.total, 0);
+    cart.setLineDiscount(0, 999999);
+    expect(cart.lines[0].lineDiscount, 2 * 18900, reason: 'el de línea no pasa el valor de la línea');
+    expect(cart.discount, cart.subtotal - cart.lineDiscounts, reason: 'y el de toda la venta se ajusta');
+    cart.clear();
   });
 
   Future<void> loadInter() async {

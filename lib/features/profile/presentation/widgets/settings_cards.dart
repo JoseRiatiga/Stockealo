@@ -230,12 +230,10 @@ class SettingsSubpage extends StatelessWidget {
     return Scaffold(
       backgroundColor: c.paper,
       appBar: AppBar(title: Text(title), backgroundColor: c.paper, surfaceTintColor: Colors.transparent),
-      body: ContentWidth(
-        child: ListView(
+      body: ContentListView(
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, 120),
           children: children,
         ),
-      ),
       bottomNavigationBar: const PendingChangesBar(),
     );
   }

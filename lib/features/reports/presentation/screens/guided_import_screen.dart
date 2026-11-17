@@ -163,8 +163,7 @@ actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('L
     return Scaffold(
       backgroundColor: c.paper,
       appBar: AppBar(title: const Text('Importar desde Excel')),
-      body: ContentWidth(
-        child: ListView(
+      body: ContentListView(
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
           children: [
             Text('Trae los productos que ya tienes en un Excel. Te mostramos cómo quedarán antes de guardar nada.',
@@ -330,7 +329,6 @@ initialValue: _headerRow,
             ],
           ],
         ),
-      ),
     );
   }
 }

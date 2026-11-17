@@ -76,8 +76,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     return Scaffold(
       backgroundColor: c.paper,
       appBar: AppBar(title: const Text('Sugerencias y fallos')),
-      body: ContentWidth(
-        child: ListView(
+      body: ContentListView(
           padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, AppSpace.xxl),
           children: [
             Text('Lo lee el equipo de Stockealo. Así mejoramos la app para tu negocio.',
@@ -201,7 +200,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 }

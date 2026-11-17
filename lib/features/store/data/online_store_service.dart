@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/coupons.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Dirección pública de las tiendas
 const storeBaseUrl = 'https://stockealo.online/tienda';
@@ -115,7 +116,7 @@ class StoreStats {
         days: [
           for (final d in (j['days'] as List? ?? const []))
             StoreStatsDay(
-              day: DateTime.tryParse('${(d as Map)['day']}') ?? DateTime.now(),
+              day: DateTime.tryParse('${(d as Map)['day']}') ?? appNow(),
               visits: _n(d['visits']).round(),
               adds: _n(d['adds']).round(),
               orders: _n(d['orders']).round(),

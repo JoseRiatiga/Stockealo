@@ -125,6 +125,7 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
         userId: widget.userId,
         currency: data.currency,
         country: data.country,
+        timeZone: data.timeZone,
         icon: data.icon,
         color: data.color,
       );

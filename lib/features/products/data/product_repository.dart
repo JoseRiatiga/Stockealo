@@ -10,6 +10,7 @@ import '../../team/data/activity_repository.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 import '../models/product_variant.dart';
+import '../../../core/utils/business_clock.dart';
 
 class ProductRepository {
   static final ProductRepository instance = ProductRepository();
@@ -187,7 +188,7 @@ class ProductRepository {
           'quantity': product.stock,
           'resulting_stock': product.stock,
           'reason': 'Inventario inicial de creación',
-          'date': DateTime.now().toIso8601String(),
+          'date': appNow().toIso8601String(),
         });
       }
     });
@@ -281,7 +282,7 @@ class ProductRepository {
         'products',
         {
           'is_active': 0,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': appNow().toIso8601String(),
         },
         where: 'id = ? AND business_id = ?',
         whereArgs: [id, businessId],
@@ -313,7 +314,7 @@ class ProductRepository {
         'products',
         {
           'stock': newStock,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': appNow().toIso8601String(),
         },
         where: 'id = ? AND business_id = ?',
         whereArgs: [productId, businessId],
@@ -327,7 +328,7 @@ class ProductRepository {
         'quantity': diff.abs(),
         'resulting_stock': newStock,
         'reason': reason,
-        'date': DateTime.now().toIso8601String(),
+        'date': appNow().toIso8601String(),
       });
     });
 
@@ -351,7 +352,7 @@ class ProductRepository {
     final db = await _dbProvider.database;
     final variants = await getVariantsForProduct(product.id);
     if (variants.isEmpty) return;
-    final now = DateTime.now().toIso8601String();
+    final now = appNow().toIso8601String();
     final updated = [
       for (final v in variants) v.copyWith(stock: newStockByVariant[v.id] ?? v.stock),
     ];

@@ -9,6 +9,7 @@ import '../../sales/data/sales_repository.dart';
 import '../../../core/utils/countries.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Lo que el usuario quiso preguntar, según las reglas de Stocky
 enum StockyIntent {
@@ -218,7 +219,7 @@ class StockyAssistantService {
   /// Periodo de ventas pedido en la pregunta; null significa "hoy"
   @visibleForTesting
   SalesPeriod? salesPeriodFor(String text, {DateTime? now}) {
-    final clock = now ?? DateTime.now();
+    final clock = now ?? appNow();
     final today = DateTime(clock.year, clock.month, clock.day);
     final tomorrow = today.add(const Duration(days: 1));
     final monday = today.subtract(Duration(days: today.weekday - 1));
@@ -453,20 +454,20 @@ class StockyAssistantService {
 
   StockyAssistantMessage _buildFarewellResponse(String bizName) {
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: '¡Hasta luego! 👋 Que descanses y que la próxima jornada esté llena de ventas y prosperidad en **$bizName**.\n\n¡Aquí estaré listo cuando vuelvas! 🚀',
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
     );
   }
 
   StockyAssistantMessage _buildGratitudeResponse() {
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: '¡Con todo el gusto! 🌟 ¡Para eso estoy aquí!\n\nSiempre que necesites consultar cualquier número, producto o deuda de tu negocio, estaré a solo un toque de distancia.\n\n¡A seguir vendiendo con toda! 💪',
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
       actions: const [
         StockyAction(label: 'Ir a Vender', actionType: 'quick_sale'),
@@ -477,10 +478,10 @@ class StockyAssistantService {
 
   StockyAssistantMessage _buildPraiseResponse() {
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: '¡Muchas gracias por la buena energía! 💚🤖\n\nMe encanta hacer equipo contigo. Mi misión es que tu negocio crezca todos los días, que nunca te quedes sin stock y que tus cuentas estén 100% claras.\n\n¿Qué miramos ahora?',
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
       actions: const [
         StockyAction(label: '📊 Ventas hoy', actionType: 'query_sales'),
@@ -491,7 +492,7 @@ class StockyAssistantService {
 
   StockyAssistantMessage _buildIdentityResponse(String bizName) {
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: '¡Mucho gusto! Soy **Stocky** 🤖, el asistente comercial inteligente de **Stockealo** creado para ser tu mano derecha en **$bizName**.\n\n'
           '🔒 **100% Offline & Seguro:** Vivo directamente en tu teléfono, por lo que nunca dependes de internet ni pagas mensualidades por consultarme.\n\n'
@@ -501,7 +502,7 @@ class StockyAssistantService {
           '• **Fiados y Cobros:** Recordarte quién te debe y ayudarte a cobrar por WhatsApp en 1 tap.\n'
           '• **Diagnóstico de Negocio:** Analizar tu inventario comercial y darte consejos para vender más.\n\n'
           '¡Pregúntame lo que necesites como si habláramos por chat!',
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
       actions: const [
         StockyAction(label: '📊 Ventas de hoy', actionType: 'query_sales'),
@@ -514,12 +515,12 @@ class StockyAssistantService {
   StockyAssistantMessage _buildCasualCheckInResponse(String? userName, String bizName) {
     final nameStr = userName != null && userName.isNotEmpty ? ' $userName' : '';
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: '¡Excelente y con toda la energía$nameStr! 🤖⚡\n\n'
           'Estoy al 100% monitoreando las operaciones de **$bizName**. Tenemos todo listo para vender, revisar stock y cuidar tus cuentas.\n\n'
           '¿Cómo va la jornada? ¿Quieres que revisemos cómo van las ventas de hoy o el inventario?',
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
       actions: const [
         StockyAction(label: '📊 Ventas de hoy', actionType: 'query_sales'),
@@ -564,10 +565,10 @@ class StockyAssistantService {
     buffer.writeln('\n¿Deseas profundizar en alguna de estas áreas?');
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: buffer.toString(),
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
       actions: [
         if (outOfStock > 0 || lowStock > 0)
@@ -607,10 +608,10 @@ class StockyAssistantService {
         '💡 Este es el capital comercial que tienes activo en tus estantes listo para monetizar.';
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: text,
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
       actions: const [
         StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
@@ -647,10 +648,10 @@ class StockyAssistantService {
         '¿Deseas revisar los que necesitan reposición?';
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: text,
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
       actions: [
         if (outOfStock > 0 || lowStock > 0)
@@ -688,10 +689,10 @@ class StockyAssistantService {
     }
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: text,
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
       actions: const [
         StockyAction(label: 'Ir a Clientes y proveedores', actionType: 'navigate_customers'),
@@ -707,7 +708,7 @@ class StockyAssistantService {
   StockyAssistantMessage _buildHowToResponse(String query) {
     if (query.contains('venta') || query.contains('vender') || query.contains('factur') || query.contains('cobrar en caja')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '🛍️ **Cómo registrar una venta en Stockealo:**\n\n'
             '1. Toca el botón **+ Venta Rápida** o ve al módulo de **Ventas**.\n'
@@ -717,7 +718,7 @@ class StockyAssistantService {
             '   • **Transferencia** ($_localPaymentApps, etc.)\n'
             '   • **Fiado** (asócialo a un cliente para cobrar luego)\n'
             '4. Toca **Confirmar Venta**. El stock se descontará al instante y podrás compartir el ticket digital.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.text,
         actions: const [
           StockyAction(label: 'Ir a Vender', actionType: 'quick_sale'),
@@ -728,7 +729,7 @@ class StockyAssistantService {
 
     if (query.contains('producto') || query.contains('articulo') || query.contains('inventario') || query.contains('mercaderia') || query.contains('agregar') || query.contains('crear')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '📦 **Cómo agregar un nuevo producto:**\n\n'
             '1. Ve a la pestaña **Inventario** en la barra inferior.\n'
@@ -737,7 +738,7 @@ class StockyAssistantService {
             '4. Ingresa el stock actual y el stock mínimo para recibir alertas.\n'
             '5. Puedes tomarle una foto o asignarle código de barras.\n'
             '6. Guarda y ¡listo para vender!',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.text,
         actions: const [
           StockyAction(label: 'Ir a Productos', actionType: 'navigate_inventory'),
@@ -747,14 +748,14 @@ class StockyAssistantService {
 
     if (query.contains('fiado') || query.contains('cobrar') || query.contains('deuda') || query.contains('whatsapp')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '👥 **Cómo cobrar y gestionar fiados:**\n\n'
             '1. Ve a **Ventas** -> Botón **Clientes / Fiados** (o pregúntame * "¿Quién me debe dinero?" *).\n'
             '2. Verás la lista de personas con saldo pendiente.\n'
             '3. Toca **"Recordar por WhatsApp"** para enviar un mensaje cordial prediseñado con el monto exacto.\n'
             '4. Cuando te abonen o paguen, toca **Abonar / Liquidar** para actualizar su saldo a cero.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.text,
         actions: const [
           StockyAction(label: 'Ver Fiados Pendientes', actionType: 'query_debts'),
@@ -765,14 +766,14 @@ class StockyAssistantService {
 
     if (query.contains('excel') || query.contains('export') || query.contains('reporte') || query.contains('informe') || query.contains('descargar')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '📊 **Cómo exportar tus reportes a Excel:**\n\n'
             '1. Abre la pestaña **Reportes** del menú.\n'
             '2. Elige qué descargar: inventario, ventas, clientes, movimientos o ganancias.\n'
             '3. Selecciona el periodo (hoy, este mes, rango personalizado).\n'
             '4. Se genera un archivo de Excel (.xlsx) listo para compartir o abrir.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.text,
         actions: const [
           StockyAction(label: 'Ir a Ventas', actionType: 'navigate_sales'),
@@ -786,10 +787,10 @@ class StockyAssistantService {
   StockyAssistantMessage _buildGreetingResponse(String? userName, String bizName) {
     final nameStr = userName != null && userName.isNotEmpty ? ' $userName' : '';
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: '¡Hola$nameStr! 👋 Soy **Stocky**, tu asistente comercial para **$bizName**.\n\nEstoy aquí para darte respuestas al instante sobre tus ventas, alertas de stock, cuentas por cobrar y consejos de negocio en tiempo real.\n\n¿Qué te gustaría revisar hoy?',
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.text,
       actions: const [
         StockyAction(label: '📊 Ventas de hoy', actionType: 'query_sales'),
@@ -802,7 +803,7 @@ class StockyAssistantService {
 
   StockyAssistantMessage _buildHelpResponse() {
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: '🤖 **Esto es todo lo que puedo hacer por ti al instante:**\n\n'
           '• **📊 Ventas y Caja:** "¿Cuánto vendimos hoy?", "¿Cuál es mi ganancia?"\n'
@@ -813,7 +814,7 @@ class StockyAssistantService {
           '• **🔍 Consulta Directa:** "Precio de Coca Cola", "Stock de Arroz"\n'
           '• **💡 Consejos:** "¿Qué me recomiendas para vender más hoy?"\n\n'
           'Estas respuestas salen de tus datos, sin internet. Lo que no sepa responder se lo puedo preguntar a la IA (botón **IA** arriba).',
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.help,
       actions: const [
         StockyAction(label: 'Ventas de hoy', actionType: 'query_sales'),
@@ -836,11 +837,11 @@ class StockyAssistantService {
 
     if (count == 0) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: 'Aún no has registrado ventas hoy en **$bizName**.\n\n'
             '💡 **Tip para activar el día:** Comparte tus productos en tus estados de WhatsApp o registra tu primera venta rápida con el botón de abajo.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.salesSummary,
         actions: const [
           StockyAction(label: 'Ir a Vender', actionType: 'quick_sale'),
@@ -858,10 +859,10 @@ class StockyAssistantService {
         '$methods';
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: text,
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.salesSummary,
       actions: const [
         StockyAction(label: 'Ver el historial', actionType: 'navigate_sales'),
@@ -905,10 +906,10 @@ class StockyAssistantService {
         '$methods';
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: text,
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.salesSummary,
       actions: const [
         StockyAction(label: 'Ver el historial', actionType: 'navigate_sales'),
@@ -941,11 +942,11 @@ class StockyAssistantService {
 
     if (total == 0) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: 'Aún no registras ventas hoy, por lo que la ganancia de hoy es **${CurrencyFormatter.formatCOP(0)}**.\n\n'
             'En cuanto comiences a facturar, calcularé en tiempo real la utilidad descontando el costo de compra de cada artículo.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.text,
         actions: const [
           StockyAction(label: 'Ir a Vender', actionType: 'quick_sale'),
@@ -960,10 +961,10 @@ class StockyAssistantService {
         '${double.parse(margin) >= 30 ? "🚀 ¡Excelente margen comercial! Tu negocio opera con muy buena rentabilidad." : "💡 Tip: Para elevar tu margen, intenta negociar mejores precios por volumen con proveedores en tus productos de alta rotación."}';
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: text,
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.salesSummary,
       actions: const [
         StockyAction(label: 'Ver el historial', actionType: 'navigate_sales'),
@@ -979,10 +980,10 @@ class StockyAssistantService {
 
     if (totalCritical == 0) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '🎉 **¡Excelente noticia!**\n\nTodos tus **${products.length} productos** cuentan con stock suficiente por encima de su mínimo de seguridad. No tienes faltantes urgentes.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.lowStockAlert,
         actions: const [
           StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
@@ -1020,10 +1021,10 @@ class StockyAssistantService {
     buffer.writeln('\n¿Deseas generar el pedido a tus proveedores de una vez?');
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: buffer.toString(),
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.lowStockAlert,
       actions: const [
         StockyAction(label: 'Ir a Stock', actionType: 'restock_modal'),
@@ -1046,10 +1047,10 @@ class StockyAssistantService {
 
     if (debtors.isEmpty) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '🥳 **¡Cuentas al día!**\n\nNo tienes saldos pendientes por cobrar en fiados. Todos tus clientes están 100% al día.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.debtList,
         actions: const [
           StockyAction(label: 'Ir a Clientes y proveedores', actionType: 'navigate_customers'),
@@ -1091,10 +1092,10 @@ class StockyAssistantService {
     actions.add(const StockyAction(label: 'Ir a Clientes y proveedores', actionType: 'navigate_customers'));
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: buffer.toString(),
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.debtList,
       actions: actions,
       data: {
@@ -1120,10 +1121,10 @@ class StockyAssistantService {
 
     if (res.isEmpty) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: 'Aún no hay suficientes ventas registradas para generar el ranking de productos estrella.\n\nEn cuanto realices ventas, aquí verás tus productos más rentables y solicitados.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.topProducts,
         actions: const [
           StockyAction(label: 'Ir a Vender', actionType: 'quick_sale'),
@@ -1147,10 +1148,10 @@ class StockyAssistantService {
     buffer.writeln('💡 **Estrategia:** Asegúrate de mantener siempre stock de estos productos, ya que son el motor principal de tus ingresos.');
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: buffer.toString(),
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.topProducts,
       actions: const [
         StockyAction(label: 'Ver Catálogo', actionType: 'navigate_inventory'),
@@ -1161,7 +1162,7 @@ class StockyAssistantService {
 
   Future<StockyAssistantMessage> _buildStagnantProductsResponse(String businessId) async {
     final db = await AppDatabase.instance.database;
-    final fourteenDaysAgo = DateTime.now().subtract(const Duration(days: 14)).toIso8601String();
+    final fourteenDaysAgo = appNow().subtract(const Duration(days: 14)).toIso8601String();
 
     final res = await db.rawQuery('''
       SELECT p.id, p.name, p.stock, p.sale_price, p.purchase_price
@@ -1176,10 +1177,10 @@ class StockyAssistantService {
 
     if (res.isEmpty) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '✨ **¡Excelente rotación de catálogo!**\n\nNo tienes mercadería estancada con más de 14 días sin ventas. Todo tu inventario activo se está moviendo con normalidad.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.stagnantProducts,
         actions: const [
           StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
@@ -1204,10 +1205,10 @@ class StockyAssistantService {
         '3. **Ubicación visible:** Muévelo al mostrador o zona frontal de tu negocio.');
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: buffer.toString(),
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.stagnantProducts,
       actions: const [
         StockyAction(label: 'Ver en Productos', actionType: 'navigate_inventory'),
@@ -1221,7 +1222,7 @@ class StockyAssistantService {
     // Respuestas a temas específicos de asesoría empresarial
     if (cleanPrompt.contains('impulso') || cleanPrompt.contains('caja') || cleanPrompt.contains('mostrador')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '💡 **Venta por Impulso en Caja:**\n\n'
             'El mostrador y la caja registradora son los metros cuadrados más valiosos de tu negocio. El 30% de las decisiones de compra se toman mientras el cliente espera para pagar.\n\n'
@@ -1229,7 +1230,7 @@ class StockyAssistantService {
             '1. **Coloca productos de bajo costo:** Chicles, snacks, pilas, fósforos o accesorios pequeños que no requieran pensar.\n'
             '2. **La pregunta mágica:** Al cobrar, di siempre: *"¿Llevas el paquete de fósforos/dulce por solo \$1.000 más?"*\n'
             '3. **Carteles de antojo:** Un producto visible en caja con precio redondo se vende 4 veces más rápido.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.businessAdvice,
         actions: const [
           StockyAction(label: 'Ir a Vender', actionType: 'quick_sale'),
@@ -1240,7 +1241,7 @@ class StockyAssistantService {
 
     if (cleanPrompt.contains('estancad') || cleanPrompt.contains('liquidar') || cleanPrompt.contains('combo') || cleanPrompt.contains('lento')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '💡 **Estrategia para Mercadería Detenida:**\n\n'
             'Tener productos quietos es tener dinero congelado que pierde valor con el tiempo y ocupa espacio valioso en tus estantes.\n\n'
@@ -1248,7 +1249,7 @@ class StockyAssistantService {
             '1. **Arma Combos Ganadores:** Combina un producto estancado con uno de tus más vendidos con un descuento del 10% en el combo.\n'
             '2. **Llévalos al frente:** Muchos productos no se venden simplemente porque el cliente no sabe que los tienes. Cambia su exhibición.\n'
             '3. **Oferta Flash por WhatsApp:** Publica una historia con *"Solo por hoy: últimas 5 unidades a precio especial"*.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.businessAdvice,
         actions: const [
           StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
@@ -1259,7 +1260,7 @@ class StockyAssistantService {
 
     if (cleanPrompt.contains('recuperar') || cleanPrompt.contains('fiado') || cleanPrompt.contains('cobrar') || cleanPrompt.contains('cartera')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '💡 **Estrategia de Cobranza Asertiva:**\n\n'
             'Cobrar fiados da pena a muchos comerciantes, pero el dinero es el sustento de tu negocio y familia. La clave es la constancia y la cordialidad.\n\n'
@@ -1267,7 +1268,7 @@ class StockyAssistantService {
             '1. **Cobra temprano:** Entre 8:00 AM y 10:00 AM las personas suelen tener mayor disposición mental y liquidez en sus cuentas.\n'
             '2. **Usa mensajes cordiales:** Nunca acuses; saluda, desea bendiciones y comparte el saldo con gentileza.\n'
             '3. **Facilita medios de pago:** Ofrece pagar por $_localPaymentApps o pasar a recogerlo.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.businessAdvice,
         actions: const [
           StockyAction(label: 'Ir a Clientes y proveedores', actionType: 'navigate_customers'),
@@ -1277,7 +1278,7 @@ class StockyAssistantService {
 
     if (cleanPrompt.contains('8020') || cleanPrompt.contains('80 20') || cleanPrompt.contains('pareto')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '💡 **La Ley de Pareto (80/20) en tu Negocio:**\n\n'
             'En el 90% de los comercios, el **80% de las ventas proviene de solo el 20% de tus productos** (tus "productos estrella").\n\n'
@@ -1285,7 +1286,7 @@ class StockyAssistantService {
             '• Identifica cuáles son esos 5 o 10 productos más vendidos y **NUNCA** permitas que se te agoten.\n'
             '• Negocia mejores precios por volumen con tus proveedores para esos productos clave.\n'
             '• Si tienes poco capital para invertir, dedícalo prioritariamente a este 20% ganador.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.businessAdvice,
         actions: const [
           StockyAction(label: '⭐ Productos Más Vendidos', actionType: 'query_top_products'),
@@ -1296,7 +1297,7 @@ class StockyAssistantService {
 
     if (cleanPrompt.contains('fideliz') || cleanPrompt.contains('retener') || cleanPrompt.contains('clientes')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '💡 **Fidelización de Clientes:**\n\n'
             'Conseguir un cliente nuevo cuesta 5 veces más caro que retener a uno que ya te compró.\n\n'
@@ -1304,7 +1305,7 @@ class StockyAssistantService {
             '1. **Aprende sus nombres:** Llamar a alguien por su nombre activa una conexión de confianza inmediata.\n'
             '2. **Recuerda sus gustos:** *"¿Lo de siempre, don Carlos?"* hace que el cliente sienta que el negocio es suyo.\n'
             '3. **Guarda sus contactos:** Registra a tus clientes frecuentes en Stockealo para tener su WhatsApp listo y avisarles cuando lleguen novedades.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.businessAdvice,
         actions: const [
           StockyAction(label: 'Ir a Clientes y proveedores', actionType: 'navigate_customers'),
@@ -1315,7 +1316,7 @@ class StockyAssistantService {
 
     if (cleanPrompt.contains('precio') || cleanPrompt.contains('psicolog') || cleanPrompt.contains('margen')) {
       return StockyAssistantMessage(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        id: appNow().microsecondsSinceEpoch.toString(),
         isUser: false,
         text: '💡 **Psicología de Precios y Márgenes:**\n\n'
             'El precio no solo indica costo, también comunica valor y calidad a tus clientes.\n\n'
@@ -1323,7 +1324,7 @@ class StockyAssistantService {
             '1. **Precios en .900:** \$9.900 se percibe subconscientemente más cercano a \$9.000 que a \$10.000.\n'
             '2. **Regla del 30%:** Como regla general en comercio al detal, busca márgenes brutos iguales o superiores al 30%.\n'
             '3. **No compitas solo por precio bajo:** Compite por atención rápida, amabilidad y tener siempre el producto que el cliente busca.',
-        timestamp: DateTime.now(),
+        timestamp: appNow(),
         type: StockyMessageType.businessAdvice,
         actions: const [
           StockyAction(label: 'Ver Inventario', actionType: 'navigate_inventory'),
@@ -1376,10 +1377,10 @@ class StockyAssistantService {
     }
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: advice,
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.businessAdvice,
       actions: actions,
     );
@@ -1426,10 +1427,10 @@ class StockyAssistantService {
         '• **Mínimo configurado:** ${p.minStock} unidades';
 
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: text,
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.productLookup,
       actions: const [
         StockyAction(label: 'Ver en Productos', actionType: 'navigate_inventory'),
@@ -1441,7 +1442,7 @@ class StockyAssistantService {
 
   StockyAssistantMessage _buildFallbackResponse(String prompt, String bizName) {
     return StockyAssistantMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: appNow().microsecondsSinceEpoch.toString(),
       isUser: false,
       text: 'Entendí tu mensaje: *"$prompt"*, pero aún no tengo una respuesta programada para esa consulta. 🤖\n\n'
           'Recuerda que puedo darte información en vivo sobre **$bizName** si me preguntas:\n'
@@ -1451,7 +1452,7 @@ class StockyAssistantService {
           '• **"¿Qué productos tienen poco stock?"** o **"¿Quién me debe?"**\n'
           '• **"¿Cómo hago una venta?"** o **"¿Cómo agrego un producto?"**\n\n'
           'O toca una de estas opciones rápidas:',
-      timestamp: DateTime.now(),
+      timestamp: appNow(),
       type: StockyMessageType.fallback,
       data: {'prompt': prompt},
       actions: const [

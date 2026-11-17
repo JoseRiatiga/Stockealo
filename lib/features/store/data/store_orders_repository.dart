@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../sales/models/quotation.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Un pedido que acaba de llegar
 typedef NewStoreOrder = ({String id, String code, String? name, double total});
@@ -38,7 +39,7 @@ class StoreOrdersRepository {
   Future<int> refreshUnseen(String businessId) async {
     final db = await AppDatabase.instance.database;
     final seen = await AppDatabase.instance.getSetting(_seenKey(businessId)) ?? '';
-    final now = DateTime.now().toIso8601String();
+    final now = appNow().toIso8601String();
     final n = Sqflite.firstIntValue(await db.rawQuery(
           "SELECT COUNT(*) FROM quotations WHERE business_id = ? AND source = ? AND status = 'PENDIENTE' "
           'AND created_at > ? AND (valid_until IS NULL OR valid_until > ?)',
@@ -51,14 +52,14 @@ class StoreOrdersRepository {
 
   /// Se abrió Cotizaciones: el número se quita (los pedidos siguen «Por confirmar»)
   Future<void> markAllSeen(String businessId) async {
-    await AppDatabase.instance.setSetting(_seenKey(businessId), DateTime.now().toIso8601String());
+    await AppDatabase.instance.setSetting(_seenKey(businessId), appNow().toIso8601String());
     unseen.value = 0;
   }
 
   /// Se abrió un pedido: se quita su marca «Nuevo»
   Future<void> markOpened(String quotationId) async {
     final db = await AppDatabase.instance.database;
-    await db.update('quotations', {'opened_at': DateTime.now().toIso8601String()},
+    await db.update('quotations', {'opened_at': appNow().toIso8601String()},
         where: 'id = ? AND opened_at IS NULL', whereArgs: [quotationId]);
   }
 
@@ -66,7 +67,7 @@ class StoreOrdersRepository {
   /// Se marcan como recordados (una sola vez cada uno).
   Future<List<({String id, String code, String? name})>> dueReminders(String businessId, {DateTime? now}) async {
     final db = await AppDatabase.instance.database;
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final rows = await db.rawQuery(
       "SELECT id, quotation_number, customer_name FROM quotations WHERE business_id = ? AND source = ? AND status = 'PENDIENTE' "
       'AND opened_at IS NULL AND created_at <= ? AND (valid_until IS NULL OR valid_until > ?)',
@@ -113,7 +114,7 @@ class StoreOrdersRepository {
         final id = o['id'] as String;
         final exists = await db.query('quotations', columns: ['id'], where: 'id = ?', whereArgs: [id], limit: 1);
         if (exists.isNotEmpty) continue;
-        final created = (DateTime.tryParse('${o['created_at']}') ?? DateTime.now()).toLocal();
+        final created = (DateTime.tryParse('${o['created_at']}') ?? appNow()).toLocal();
         await db.transaction((txn) async {
           await txn.insert(
             'quotations',
@@ -176,7 +177,7 @@ class StoreOrdersRepository {
   /// Cuántos pedidos de la tienda esperan confirmación (sin vencer)
   Future<int> pendingCount(String businessId) async {
     final db = await AppDatabase.instance.database;
-    final now = DateTime.now().toIso8601String();
+    final now = appNow().toIso8601String();
     return Sqflite.firstIntValue(await db.rawQuery(
           "SELECT COUNT(*) FROM quotations WHERE business_id = ? AND source = ? AND status = 'PENDIENTE' "
           'AND (valid_until IS NULL OR valid_until > ?)',

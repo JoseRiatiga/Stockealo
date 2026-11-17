@@ -10,6 +10,7 @@ import '../models/business_member.dart';
 import 'activity_repository.dart';
 import '../../../core/permissions/permissions.dart';
 import '../../services/models/work_schedule.dart';
+import '../../../core/utils/business_clock.dart';
 
 String _roleLabel(String role) => Permissions.labelOf(role).toLowerCase();
 
@@ -124,7 +125,7 @@ class TeamRepository {
       name: memberName,
       role: role,
       status: 'ACTIVE',
-      createdAt: DateTime.now(),
+      createdAt: appNow(),
     );
 
     await db.insert('business_members', member.toMap());
@@ -279,7 +280,7 @@ class TeamRepository {
               'name': cloudMember['user_name'] ?? cleanEmail.split('@').first,
               'role': cloudRole,
               'status': 'ACTIVE',
-              'created_at': cloudMember['created_at'] ?? DateTime.now().toIso8601String(),
+              'created_at': cloudMember['created_at'] ?? appNow().toIso8601String(),
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
@@ -390,7 +391,7 @@ class TeamRepository {
       userId: (joined['owner_user_id'] as String?) ?? 'remote_owner',
       name: cloudBiz['name'] as String,
       currency: (cloudBiz['currency'] as String?) ?? 'COP',
-      createdAt: DateTime.tryParse((cloudBiz['created_at'] as String?) ?? '') ?? DateTime.now(),
+      createdAt: DateTime.tryParse((cloudBiz['created_at'] as String?) ?? '') ?? appNow(),
     );
     await db.insert('businesses', business.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
 
@@ -409,7 +410,7 @@ class TeamRepository {
       name: (cloudMember['user_name'] as String?) ?? userName ?? cleanEmail.split('@').first,
       role: (cloudMember['role'] as String?) ?? 'CASHIER',
       status: 'ACTIVE',
-      createdAt: DateTime.tryParse((cloudMember['created_at'] as String?) ?? '') ?? DateTime.now(),
+      createdAt: DateTime.tryParse((cloudMember['created_at'] as String?) ?? '') ?? appNow(),
     );
     await db.insert('business_members', member.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
 

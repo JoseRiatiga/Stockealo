@@ -15,6 +15,7 @@ import '../models/sale.dart';
 import '../models/cart_item.dart';
 import '../models/quotation.dart';
 import '../../sales/models/payment_method.dart';
+import '../../../core/utils/business_clock.dart';
 
 class SalesRepository {
   static final SalesRepository instance = SalesRepository();
@@ -50,7 +51,7 @@ class SalesRepository {
     final totalCost = product.purchasePrice * quantity;
     final netProfit = total - totalCost;
     final newStock = product.stock - quantity;
-    final now = DateTime.now();
+    final now = appNow();
     final saleId = const Uuid().v4();
     final businessId = product.businessId;
 
@@ -241,7 +242,7 @@ class SalesRepository {
       }
     }
 
-    final now = DateTime.now();
+    final now = appNow();
     final invoiceNumber = '#INV-${now.millisecondsSinceEpoch.toString().substring(5)}';
 
     final currentUser = AuthRepository.instance.currentUser;
@@ -469,7 +470,7 @@ class SalesRepository {
     final subtotal = lines.fold(0.0, (s, l) => s + l.price);
     final discount = discountAmount.clamp(0.0, subtotal).toDouble();
     final finalTotal = subtotal - discount;
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final invoiceNumber = '#INV-${at.millisecondsSinceEpoch.toString().substring(5)}';
     final currentUser = AuthRepository.instance.currentUser;
     final seller = (currentUser?.name ?? '').trim().isNotEmpty
@@ -626,7 +627,7 @@ class SalesRepository {
     }
 
     final db = await _dbProvider.database;
-    final now = DateTime.now();
+    final now = appNow();
     final quotationId = const Uuid().v4();
     final quotationNumber = 'COT-${now.millisecondsSinceEpoch.toString().substring(6)}';
     final validUntil = now.add(Duration(days: validDays));
@@ -738,7 +739,7 @@ class SalesRepository {
   /// «Entregado»: guarda la fecha y lo sube a la nube
   Future<void> markDelivered(List<Sale> lines) async {
     final db = await _dbProvider.database;
-    final now = DateTime.now().toIso8601String();
+    final now = appNow().toIso8601String();
     for (final s in lines) {
       await db.update('sales', {'delivery_status': Sale.delivered, 'delivered_at': now}, where: 'id = ?', whereArgs: [s.id]);
       final row = await db.query('sales', where: 'id = ?', whereArgs: [s.id], limit: 1);
@@ -892,7 +893,7 @@ class SalesRepository {
     final left = line.quantity - await returnedQuantity(line.id);
     if (quantity < 1 || quantity > left) throw StateError('Solo quedan $left por devolver.');
     final db = await _dbProvider.database;
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final user = AuthRepository.instance.currentUser;
     final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
     final amount = _round(line.totalAmount / line.quantity * quantity);
@@ -1008,7 +1009,7 @@ class SalesRepository {
 
   /// Obtiene el resumen de ventas del día actual de la empresa
   Future<Map<String, dynamic>> getTodaySummary(String businessId) {
-    final now = DateTime.now();
+    final now = appNow();
     final today = DateTime(now.year, now.month, now.day);
     return getSalesSummary(businessId, from: today, to: today.add(const Duration(days: 1)));
   }
@@ -1064,7 +1065,7 @@ class SalesRepository {
     final user = AuthRepository.instance.currentUser;
     final by = (user?.name ?? '').trim().isNotEmpty ? user!.name!.trim() : (user?.email.split('@').first ?? 'Alguien');
     final cleanReason = (reason ?? '').trim().isEmpty ? null : reason!.trim();
-    final now = DateTime.now().toIso8601String();
+    final now = appNow().toIso8601String();
 
     final invoice = onlyThisLine || (sale.invoiceNumber ?? '').isEmpty ? null : sale.invoiceNumber;
     final rows = await db.query(

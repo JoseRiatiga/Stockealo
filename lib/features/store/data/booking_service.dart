@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
 import '../../services/models/work_schedule.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Un servicio que se puede reservar en línea
 class BookableService {
@@ -49,7 +50,7 @@ class PublicBooking {
   /// [staffId] (null = con cualquiera: libre si alguien está libre). Sin horario del
   /// negocio se usa de 8:00 a. m. a 6:00 p. m.
   List<DateTime> freeSlots(DateTime day, int minutes, {String? staffId, DateTime? now, int step = 30}) {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final shift = schedule == null || schedule!.isEmpty ? const ShiftTime(480, 1080) : schedule!.on(day);
     if (shift == null) return const [];
     final people = staffId != null ? [staffId] : (staff.isEmpty ? <String?>[null] : [for (final s in staff) s.id]);

@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../backup/data/auto_backup_service.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Importador guiado de Excel (0.12.0), para quien ya lleva sus productos en un
 /// Excel hecho a mano: encuentra la hoja y la fila de los títulos, propone qué es
@@ -352,7 +353,7 @@ class GuidedImport {
         whereArgs: [businessId, if (r.code != null) r.code, r.name.toLowerCase()],
         limit: 1,
       );
-      final now = DateTime.now().toIso8601String();
+      final now = appNow().toIso8601String();
       if (existing.isNotEmpty) {
         if (!updateExisting) {
           skipped++;

@@ -6,6 +6,7 @@ import '../../../core/services/supabase_service.dart';
 import '../models/appointment.dart';
 import '../models/service_models.dart';
 import 'services_repository.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// La agenda de citas (0.14.0). Se guarda en el equipo y se sube a la nube
 /// (tabla `appointments`). Cuando el cliente llega, la cita pasa al tablero.
@@ -46,7 +47,7 @@ class AppointmentsRepository {
   }
 
   Appointment newAppointment(String businessId, {required DateTime startsAt}) {
-    final now = DateTime.now();
+    final now = appNow();
     return Appointment(
       id: const Uuid().v4(),
       businessId: businessId,
@@ -91,7 +92,7 @@ class AppointmentsRepository {
 
   Future<void> save(Appointment a) async {
     final db = await _db.database;
-    final row = a.copyWith(updatedAt: DateTime.now()).toMap();
+    final row = a.copyWith(updatedAt: appNow()).toMap();
     await db.insert('appointments', row, conflictAlgorithm: ConflictAlgorithm.replace);
     await SupabaseService.instance.upsertAppointmentToCloud(row);
   }

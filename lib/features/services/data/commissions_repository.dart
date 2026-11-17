@@ -15,6 +15,7 @@ import '../../team/data/activity_repository.dart';
 import '../models/commission_models.dart';
 import '../models/service_models.dart';
 import 'services_repository.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Un servicio cobrado: su venta, lo cobrado después del descuento y la línea del trabajo
 typedef ChargedLine = ({String saleId, double total, WorkOrderLine line});
@@ -68,7 +69,7 @@ class CommissionsRepository {
     double tip = 0,
     DateTime? now,
   }) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final created = <Commission>[];
     // Quien alquila la silla se queda con todo lo de sus servicios (0.14.0)
     final renters = {
@@ -121,7 +122,7 @@ class CommissionsRepository {
   Future<void> onSaleCancelled(String saleId, {DateTime? now}) async {
     final db = await _dbProvider.database;
     final rows = await db.query('commissions', where: 'sale_id = ?', whereArgs: [saleId]);
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     for (final c in rows.map(Commission.fromMap)) {
       if (!c.isPaid) {
         await _delete(c.id);
@@ -146,7 +147,7 @@ class CommissionsRepository {
     final db = await _dbProvider.database;
     final rows = await db.query('commissions',
         where: 'work_order_id = ? AND kind = ?', whereArgs: [workOrderId, Commission.kindTip]);
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     for (final c in rows.map(Commission.fromMap)) {
       if (!c.isPaid) {
         await _delete(c.id);
@@ -224,7 +225,7 @@ class CommissionsRepository {
   Future<StaffEarnings> withChairRent(String businessId, StaffEarnings earnings, StaffMember staff, {DateTime? now}) async {
     final rent = chairRentFor(staff, earnings);
     if (rent.amount <= 0) return earnings;
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final adj = Commission(
       id: const Uuid().v4(),
       businessId: businessId,
@@ -241,7 +242,7 @@ class CommissionsRepository {
 
   Future<StaffPayout> pay(String businessId, StaffEarnings earnings, {String? staffName, DateTime? now}) async {
     if (earnings.items.isEmpty) throw StateError('No hay nada pendiente por pagar.');
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final dates = earnings.items.map((c) => c.date).toList()..sort();
     final payout = StaffPayout(
       id: const Uuid().v4(),

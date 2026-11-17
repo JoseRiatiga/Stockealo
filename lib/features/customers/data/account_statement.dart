@@ -13,6 +13,7 @@ import '../../business/models/business.dart';
 import '../../reports/data/catalog_pdf_service.dart';
 import '../models/customer.dart';
 import '../../sales/models/payment_method.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Un renglón del estado de cuenta: una venta fiada (cargo) o un abono
 class StatementEntry {
@@ -58,13 +59,13 @@ class AccountStatement {
     final raw = <StatementEntry>[
       for (final s in fiadoSales)
         StatementEntry(
-          date: DateTime.tryParse(s['date'] as String? ?? '') ?? DateTime.now(),
+          date: DateTime.tryParse(s['date'] as String? ?? '') ?? appNow(),
           description: _saleDescription(s),
           charge: (s['total'] as num?)?.toDouble() ?? 0,
         ),
       for (final p in payments)
         StatementEntry(
-          date: DateTime.tryParse(p['date'] as String? ?? '') ?? DateTime.now(),
+          date: DateTime.tryParse(p['date'] as String? ?? '') ?? appNow(),
           description: _paymentDescription(p),
           payment: (p['amount'] as num?)?.toDouble() ?? 0,
         ),
@@ -140,7 +141,7 @@ class AccountStatementService {
     final line = PdfColor.fromHex('#ECE7DC');
     String money(num v) => CurrencyFormatter.formatIn(v, business.currency);
     final dateFmt = DateFormat('dd/MM/yyyy');
-    final now = DateTime.now();
+    final now = appNow();
 
     final doc = pw.Document(
       title: 'Estado de cuenta · ${customer.name}',

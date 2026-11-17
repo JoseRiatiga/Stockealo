@@ -15,6 +15,7 @@ import '../../services/models/service_models.dart';
 import '../../team/data/team_repository.dart';
 import '../../sales/models/payment_method.dart';
 import '../../../core/permissions/permissions.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Partes que se pueden descargar desde Reportes
 enum ReportSection {
@@ -56,20 +57,20 @@ class ReportPeriod {
   static const all = ReportPeriod(label: 'Todo');
 
   static ReportPeriod today([DateTime? now]) {
-    final n = now ?? DateTime.now();
+    final n = now ?? appNow();
     final start = DateTime(n.year, n.month, n.day);
     return ReportPeriod(from: start, to: start.add(const Duration(days: 1)), label: 'Hoy');
   }
 
   /// Semana de lunes a domingo
   static ReportPeriod thisWeek([DateTime? now]) {
-    final n = now ?? DateTime.now();
+    final n = now ?? appNow();
     final start = DateTime(n.year, n.month, n.day).subtract(Duration(days: n.weekday - 1));
     return ReportPeriod(from: start, to: start.add(const Duration(days: 7)), label: 'Esta semana');
   }
 
   static ReportPeriod thisMonth([DateTime? now]) {
-    final n = now ?? DateTime.now();
+    final n = now ?? appNow();
     return ReportPeriod(from: DateTime(n.year, n.month), to: DateTime(n.year, n.month + 1), label: 'Este mes');
   }
 
@@ -143,7 +144,7 @@ class ReportExportService {
   }) async {
     final biz = business.name.replaceAll(RegExp(r'[^\w\s-]'), '').trim().replaceAll(RegExp(r'\s+'), '_');
     final tag = period.fileTag;
-    final stamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+    final stamp = DateFormat('yyyyMMdd_HHmm').format(appNow());
     String fileName(String what, {bool dated = true}) =>
         '${what}_$biz${dated && tag.isNotEmpty ? '_$tag' : ''}${tag.isEmpty || !dated ? '_$stamp' : ''}.xlsx';
 

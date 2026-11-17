@@ -10,6 +10,7 @@ import '../../products/models/product.dart';
 import '../../products/models/product_variant.dart';
 import '../models/cart_item.dart';
 import '../models/promotion.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Una venta que se dejó «para después» (el cliente fue por algo y se atiende a otro)
 class HeldSale {
@@ -50,7 +51,7 @@ class SellCart extends ChangeNotifier {
   }
 
   void _applyPromotions() {
-    final now = DateTime.now();
+    final now = appNow();
     for (final l in lines) {
       l.promotion = Promotion.best(promotions,
           productId: l.product.id, category: l.product.category, unitPrice: l.unitPrice, quantity: l.quantity, at: now);
@@ -155,7 +156,7 @@ class SellCart extends ChangeNotifier {
   /// «Guardar para después»: la cuenta pasa a En espera y Vender queda libre
   void hold() {
     if (lines.isEmpty) return;
-    held.add(HeldSale(lines: List.of(lines), discount: discount, customer: customer, at: DateTime.now()));
+    held.add(HeldSale(lines: List.of(lines), discount: discount, customer: customer, at: appNow()));
     lines.clear();
     discount = 0;
     customer = '';
@@ -226,7 +227,7 @@ class SellCart extends ChangeNotifier {
             lines: saved,
             discount: (h['discount'] as num?)?.toDouble() ?? 0,
             customer: h['customer'] as String? ?? '',
-            at: DateTime.tryParse('${h['at']}') ?? DateTime.now(),
+            at: DateTime.tryParse('${h['at']}') ?? appNow(),
           ));
         }
       }
@@ -241,7 +242,7 @@ class SellCart extends ChangeNotifier {
     if (index < 0 || index >= held.length) return;
     final h = held.removeAt(index);
     if (lines.isNotEmpty) {
-      held.add(HeldSale(lines: List.of(lines), discount: discount, customer: customer, at: DateTime.now()));
+      held.add(HeldSale(lines: List.of(lines), discount: discount, customer: customer, at: appNow()));
     }
     lines
       ..clear()

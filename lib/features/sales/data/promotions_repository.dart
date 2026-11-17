@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/supabase_service.dart';
 import '../models/promotion.dart';
+import '../../../core/utils/business_clock.dart';
 
 /// Las promociones del negocio: se guardan en el equipo y se suben a la nube
 /// (tabla `promotions`). Vender las aplica solas mientras están vigentes.
@@ -14,7 +15,7 @@ class PromotionsRepository {
   final _dbProvider = AppDatabase.instance;
 
   Promotion newPromotion(String businessId, {required String name, required String kind}) {
-    final now = DateTime.now();
+    final now = appNow();
     final start = DateTime(now.year, now.month, now.day);
     return Promotion(
       id: const Uuid().v4(),
@@ -34,7 +35,7 @@ class PromotionsRepository {
     final db = await _dbProvider.database;
     final rows = await db.query('promotions', where: 'business_id = ?', whereArgs: [businessId], orderBy: 'ends_at DESC');
     final list = [for (final r in rows) Promotion.fromMap(r)];
-    final now = DateTime.now();
+    final now = appNow();
     list.sort((a, b) {
       int rank(Promotion p) => p.isLiveAt(now) ? 0 : (p.isOverAt(now) ? 2 : 1);
       final r = rank(a).compareTo(rank(b));
@@ -45,13 +46,13 @@ class PromotionsRepository {
 
   /// Las que valen ahora
   Future<List<Promotion>> live(String businessId, {DateTime? at}) async {
-    final now = at ?? DateTime.now();
+    final now = at ?? appNow();
     return [for (final p in await all(businessId)) if (p.isLiveAt(now)) p];
   }
 
   Future<void> save(Promotion p) async {
     final db = await _dbProvider.database;
-    final row = p.copyWith(updatedAt: DateTime.now()).toMap();
+    final row = p.copyWith(updatedAt: appNow()).toMap();
     await db.insert('promotions', row, conflictAlgorithm: ConflictAlgorithm.replace);
     await SupabaseService.instance.upsertPromotionToCloud(row);
   }

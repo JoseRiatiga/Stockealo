@@ -83,7 +83,8 @@ void main() {
         containsAll(['is_deleted', 'deleted_at', 'description', 'country', 'icon', 'color', 'logo_url', 'cash_register_enabled']),
       );
       expect(await columnsOf('app_settings'), isNotEmpty);
-      expect(await db.getVersion(), 29);
+      expect(await db.getVersion(), 30);
+      expect(await columnsOf('businesses'), contains('time_zone'), reason: 'hora del negocio (0.16.6)');
       expect(await columnsOf('staff'), containsAll(['chair_rent', 'rent_period']));
       expect(await columnsOf('work_orders'), contains('extra'));
       expect(await columnsOf('appointments'), containsAll(['customer_name', 'service_ids', 'staff_id', 'starts_at', 'status', 'work_order_id']));

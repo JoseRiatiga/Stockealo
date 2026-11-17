@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import '../../sales/data/sales_repository.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/business_clock.dart';
 
 class DashboardRepository {
   static final DashboardRepository instance = DashboardRepository._internal();
@@ -13,7 +14,7 @@ class DashboardRepository {
     String period = 'today',
   }) async {
     final db = await _dbProvider.database;
-    final now = DateTime.now();
+    final now = appNow();
 
     // 1. Configuración de filtros según el periodo seleccionado
     String periodWhereSql = '';

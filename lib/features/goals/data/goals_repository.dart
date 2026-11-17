@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/utils/business_clock.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
@@ -49,7 +50,7 @@ class GoalsRepository {
     String? memberName,
     DateTime? now,
   }) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final start = period.startOf(at);
     final id = SalesGoal.idFor(businessId, period, memberUserId, start);
     final db = await _db;
@@ -101,7 +102,7 @@ class GoalsRepository {
 
   /// Cómo va la meta del negocio en el periodo que contiene [now]
   Future<GoalProgress?> businessProgress(String businessId, GoalPeriod period, {DateTime? now, List<SalesGoal>? goals}) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final from = period.startOf(at);
     final goal = goalFor(goals ?? await list(businessId), period, from);
     if (goal == null) return null;
@@ -112,7 +113,7 @@ class GoalsRepository {
 
   /// Historial de la meta del negocio (Pro): los [count] periodos anteriores que tenían meta
   Future<List<GoalProgress>> businessHistory(String businessId, GoalPeriod period, {int count = 6, DateTime? now}) async {
-    final at = now ?? DateTime.now();
+    final at = now ?? appNow();
     final goals = await list(businessId);
     final out = <GoalProgress>[];
     var start = period.previous(period.startOf(at));
@@ -136,8 +137,10 @@ class GoalsRepository {
     try {
       final rows = await client.rpc('member_sales', params: {
         'p_business_id': businessId,
-        'p_from': from.toUtc().toIso8601String(),
-        'p_to': to.toUtc().toIso8601String(),
+        // La nube guarda la hora del reloj del negocio: el periodo va en ese mismo
+        // marco (con toUtc las ventas después de las 7 p. m. caían al día siguiente)
+        'p_from': BusinessClock.cloudIso(from),
+        'p_to': BusinessClock.cloudIso(to),
       });
       return {
         for (final r in (rows as List))

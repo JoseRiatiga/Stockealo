@@ -37,6 +37,14 @@ class _AdminMfaGateState extends State<AdminMfaGate> {
   String? _error;
   bool _working = false;
 
+  /// Una inscripción a la vez en toda la app: si la pantalla se arma de nuevo mientras
+  /// otra está inscribiendo, espera esa en vez de borrarla y empezar otra (antes eso
+  /// hacía un bucle de «borrar y crear» hasta que la nube frenaba la sesión)
+  static Future<AuthMFAEnrollResponse>? _enrolling;
+
+  /// De qué cuenta es [_enrolling]: nunca se muestra el QR de una cuenta a otra
+  static String? _enrollingFor;
+
   @override
   void initState() {
     super.initState();
@@ -62,13 +70,24 @@ class _AdminMfaGateState extends State<AdminMfaGate> {
         if (mounted) setState(() => (_factorId = ready.id, _loading = false));
         return;
       }
-      // Sin factor: limpia los a medias y empieza uno nuevo
-      for (final f in factors.all.where((f) => f.status != FactorStatus.verified)) {
-        await _mfa.unenroll(f.id);
+      // Sin factor: limpia los a medias y empieza uno nuevo (solo uno a la vez, por cuenta)
+      final userId = SupabaseService.instance.client!.auth.currentUser?.id;
+      if (userId == null) throw StateError('Sin sesión');
+      if (_enrollingFor != userId) {
+        _enrolling = null;
+        _enrollingFor = userId;
       }
-      final enroll = await _mfa.enroll(factorType: FactorType.totp, issuer: 'Stockealo', friendlyName: 'Panel Stockealo');
+      final enroll = await (_enrolling ??= () async {
+        for (final f in factors.all.where((f) => f.status != FactorStatus.verified)) {
+          await _mfa.unenroll(f.id);
+        }
+        return _mfa.enroll(factorType: FactorType.totp, issuer: 'Stockealo', friendlyName: 'Panel Stockealo');
+      }());
+      // Si mientras tanto cambió la cuenta, ese QR no es de quien está ahora
+      if (SupabaseService.instance.client!.auth.currentUser?.id != userId) return;
       if (mounted) setState(() => (_enroll = enroll, _loading = false));
     } catch (e) {
+      _enrolling = null;
       if (mounted) setState(() => (_error = 'No se pudo preparar la verificación. Recarga la página.', _loading = false));
     }
   }
@@ -84,6 +103,7 @@ class _AdminMfaGateState extends State<AdminMfaGate> {
     setState(() => (_working = true, _error = null));
     try {
       await _mfa.challengeAndVerify(factorId: factorId, code: code);
+      _enrolling = null;
       if (mounted) setState(() => _verified = true);
     } catch (_) {
       if (mounted) setState(() => _error = 'Ese código no sirve. Revisa la hora del celular y escribe el que sale ahora.');
@@ -162,7 +182,13 @@ class _AdminMfaGateState extends State<AdminMfaGate> {
                           child: Text(_working ? 'Revisando…' : (enroll != null ? 'Activar' : 'Entrar')),
                         ),
                         const SizedBox(height: AppSpace.xs),
-                        TextButton(onPressed: widget.onSignOut, child: const Text('Cerrar sesión')),
+                        TextButton(
+                            onPressed: () {
+                              _enrolling = null;
+                              _enrollingFor = null;
+                              widget.onSignOut();
+                            },
+                            child: const Text('Cerrar sesión')),
                       ],
                     ),
             ),

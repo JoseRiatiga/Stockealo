@@ -104161,7 +104161,7 @@ h=k.length>500?B.c.a3(k,0,500):k
 if(j==null)g=null
 else g=j.length>4000?B.c.a3(j,0,4000):j
 f=t.z
-m=A.ad(["p_app",d,"p_version","0.16.6+54","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
+m=A.ad(["p_app",d,"p_version","0.16.7+55","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
 l=null
 p=4
 s=l!=null?7:9
@@ -105551,7 +105551,7 @@ if(o)s=q
 else{r=a.w
 r=A.mc(new A.a2(r,new A.aIG(b),A.W(r).i("a2<1>")))
 s=r==null?q:r.e}r=s==null?q:new A.Nn(new A.rh(s,1,q,B.S9),q)
-return new A.aS(B.tc,A.q7(r,A.ag(o?"Todo":b,q,q,q,q,q,q),new A.aIH(this,b),p==b,!1),q)},
+return new A.aS(B.tc,A.q7(r,A.ag(o?"Todas":b,q,q,q,q,q,q),new A.aIH(this,b),p==b,!1),q)},
 WO(a,b){var s,r,q,p,o,n,m,l=null,k=a.as.d
 if(k==null)return B.au
 s=new A.bR(Date.now(),0,!1)
@@ -105788,7 +105788,7 @@ HJ(a,b,c){return new A.J3(b,a.r,this.Xl(b),c,new A.aIy(this,b),new A.aIz(this,b)
 Ux(a,b,c,d){var s,r=null,q=A.c_(a),p=c?24:110,o=t.p,n=A.b([],o)
 if(d)n.push(A.adZ(q.d,24))
 s=q.w
-n.push(A.hh(B.Sd,A.b([A.ag("Pedidos por WhatsApp \xb7 el negocio te confirma la entrega",r,r,r,A.e3(a,s,B.p),r,r),A.ag("Al pedir recibes tu tiquete \xabPor confirmar\xbb",r,r,r,A.e3(a,s,B.p),r,r)],o),B.cf,8,16))
+n.push(A.hh(B.Sd,A.b([A.ag("Pedidos por WhatsApp \xb7 el negocio te confirma la entrega",r,r,r,A.e3(a,s,B.p),r,r),A.ag("Al pedir recibes tu comprobante \xabPor confirmar\xbb",r,r,r,A.e3(a,s,B.p),r,r)],o),B.cf,8,16))
 n.push(B.ce)
 n.push(A.ag("Tienda hecha con Stockealo",r,r,r,A.ee(a,s,B.P),B.af,r))
 return new A.aS(new A.a3(b,24,b,p),A.c4(n,B.H,B.t,B.D),r)},
@@ -106692,7 +106692,7 @@ j=A.b([A.qx(B.YP,A.ag(b.x?"Guardando tu pedido\u2026":"Hacer el pedido \xb7 "+A.
 i=b.a.c.as.e
 if(i!=null)B.b.N(j,A.b([B.bK,new A.Hj(B.YG,B.rg,"C\xf3mo pagar",i,a)],o))
 j.push(B.bK)
-j.push(A.ag("Te mostramos tu tiquete y lo env\xedas por WhatsApp. La tienda te confirma el precio final y la entrega.",a,a,a,A.ee(a3,a,B.P),B.af,a))
+j.push(A.ag("Te mostramos tu comprobante y lo env\xedas por WhatsApp. La tienda te confirma el precio final y la entrega.",a,a,a,A.ee(a3,a,B.P),B.af,a))
 k.sea(j)}if(!b.a.r){j=A.b([l.b7()],o)
 if(a2.gco(a1)){a2=A.b([B.cR],o)
 B.b.N(a2,k.b7())

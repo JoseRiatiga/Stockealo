@@ -260,6 +260,9 @@ class ReportsTab extends StatefulWidget {
   /// Solo el dueño y los administradores ven reportes (tienen costos y ganancias)
   static bool allowed(String role) => Permissions.can(role, Perm.reportsSales);
 
+  /// Pestaña que pidió otra pantalla (1 = Metas, desde Inicio; 0.16.7, hallazgo 27)
+  static final showView = ValueNotifier<int?>(null);
+
   @override
   State<ReportsTab> createState() => _ReportsTabState();
 }
@@ -267,6 +270,26 @@ class ReportsTab extends StatefulWidget {
 class _ReportsTabState extends State<ReportsTab> {
   /// 0 Ganancias, 1 Metas (0.16.0), 2 Descargar Excel
   int _view = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _applyRequest();
+    ReportsTab.showView.addListener(_applyRequest);
+  }
+
+  @override
+  void dispose() {
+    ReportsTab.showView.removeListener(_applyRequest);
+    super.dispose();
+  }
+
+  void _applyRequest() {
+    final v = ReportsTab.showView.value;
+    if (v == null) return;
+    ReportsTab.showView.value = null;
+    if (mounted) setState(() => _view = v);
+  }
 
   String get userRole => widget.userRole;
   static bool allowed(String role) => ReportsTab.allowed(role);
@@ -323,7 +346,9 @@ class _ReportsTabState extends State<ReportsTab> {
                       selected: {_view},
                       onSelectionChanged: (v) => setState(() => _view = v.first),
                     ),
-                    // Cierre del día por WhatsApp (0.15.0)
+                    // Cierre del día por WhatsApp (0.15.0): es de Ganancias, no de Metas ni
+                    // Excel (0.16.7, hallazgo 58)
+                    if (_view == 0)
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(

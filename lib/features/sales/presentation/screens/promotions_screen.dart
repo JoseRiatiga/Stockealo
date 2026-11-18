@@ -12,6 +12,7 @@ import '../../../products/models/product.dart';
 import '../../data/promotions_repository.dart';
 import '../../data/sell_cart.dart';
 import '../../models/promotion.dart';
+import '../../../home/navigation/app_pane.dart';
 
 /// Productos › Promociones (0.13.4, para todos los planes): % de descuento o lleva X,
 /// paga Y, con nombre libre y fechas. Vender las aplica solas; con Pro la tienda en
@@ -25,7 +26,7 @@ class PromotionsScreen extends StatefulWidget {
   const PromotionsScreen({super.key, required this.business, this.canEdit = true});
 
   static Future<void> open(BuildContext context, {required Business business, bool canEdit = true}) =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => PromotionsScreen(business: business, canEdit: canEdit)));
+      AppPane.push(context, MaterialPageRoute(builder: (_) => PromotionsScreen(business: business, canEdit: canEdit)));
 
   @override
   State<PromotionsScreen> createState() => _PromotionsScreenState();

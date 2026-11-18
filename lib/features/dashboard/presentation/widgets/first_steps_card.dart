@@ -8,6 +8,7 @@ import '../../../business/models/business.dart';
 import '../../../home/navigation/app_places.dart';
 import '../../../store/data/online_store_service.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
+import '../../../home/navigation/app_pane.dart';
 
 /// Un paso de «Primeros pasos»
 class FirstStep {
@@ -102,7 +103,7 @@ class _FirstStepsCardState extends State<FirstStepsCard> {
       FirstStep(
         'Invita a alguien de tu equipo',
         done: team > 1,
-        go: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EmployeesScreen(business: b))),
+        go: () => AppPane.open(context, (_) => EmployeesScreen(business: b)),
       ),
       FirstStep('Publica tu tienda en línea', done: published, go: () => AppPlace.go(AppPlace.tienda)),
     ];

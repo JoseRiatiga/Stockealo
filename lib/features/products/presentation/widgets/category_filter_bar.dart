@@ -30,17 +30,15 @@ class CategoryFilterBar extends StatelessWidget {
         itemBuilder: (context, index) {
           final cat = allCategories[index];
           final isSelected = cat == selectedCategory;
+          // Como los chips de Vender (0.16.7, hallazgo 15): el elegido en tinta con la
+          // letra clara del tema. Antes, en modo oscuro, era letra blanca sobre fondo
+          // blanco y «Todas» no se leía. Se muestra «Todas», como en el resto de la app
           return ChoiceChip(
-            label: Text(cat),
+            label: Text(cat == 'Todos' ? 'Todas' : cat),
             selected: isSelected,
             showCheckmark: false,
             onSelected: (_) => onCategorySelected(cat),
-            labelStyle: TextStyle(
-              color: isSelected ? c.onAccent : c.ink,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              fontSize: AppText.sizeBody,
-            ),
-            side: BorderSide(color: isSelected ? c.accent : c.line),
+            side: BorderSide(color: isSelected ? c.ink : c.line),
           );
         },
       ),

@@ -8,14 +8,12 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
-import '../../../legal/presentation/screens/legal_document_screen.dart';
 import '../../../team/data/team_repository.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/permissions/permissions.dart';
-import '../../../auth/presentation/logout_confirm.dart';
 
 class BusinessSelectorModal extends StatefulWidget {
   final String userId;
@@ -414,28 +412,8 @@ actions: [
               trailing: Icon(Icons.chevron_right_outlined, color: c.inkMuted),
               onTap: () => BusinessTrash.show(context, userId: widget.userId, onChanged: _loadBusinesses),
             ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.shield_outlined, color: c.inkMuted),
-            title: const Text('Términos y privacidad'),
-            trailing: Icon(Icons.chevron_right_outlined, color: c.inkMuted),
-            onTap: () {
-              Navigator.pop(context);
-              LegalDocumentScreen.show(context);
-            },
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.logout_outlined, color: c.danger),
-            title: Text('Cerrar sesión', style: TextStyle(color: c.danger, fontWeight: FontWeight.w600)),
-            onTap: () async {
-              if (!await LogoutConfirm.ask(context) || !context.mounted) return;
-              Navigator.pop(context);
-              AuthRepository.instance.logout();
-              BusinessRepository.instance.setActiveBusiness(null);
-              widget.onLogout?.call();
-            },
-          ),
+          // «Términos» vive en Ajustes y «Cerrar sesión» en «Salir» del menú lateral
+          // (0.16.7, decisión D5, hallazgo 50)
         ],
       ),
     );

@@ -206,16 +206,18 @@ actions: [
                             ),
                             child: Row(
                               children: [
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: context.colors.successSoft,
+                                // Diseño nuevo (0.16.7, hallazgo 23): inicial en gris, sin verde
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: context.colors.surfaceMuted,
+                                    borderRadius: BorderRadius.circular(AppRadius.tile),
+                                  ),
                                   child: Text(
                                     cat.name.isNotEmpty ? cat.name[0].toUpperCase() : '?',
-                                    style: TextStyle(
-                                      color: context.colors.accent,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: AppText.sizeBody,
-                                    ),
+                                    style: AppText.body(context, weight: FontWeight.w700, color: context.colors.ink),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -241,13 +243,14 @@ actions: [
                                     ],
                                   ),
                                 ),
+                                // Íconos grises de acción, como en el resto de la app
                                 IconButton(
-                                  icon: Icon(Icons.edit_outlined, size: 20, color: context.colors.info),
+                                  icon: Icon(Icons.edit_outlined, size: 20, color: context.colors.inkMuted),
                                   tooltip: 'Editar nombre',
                                   onPressed: () => _showEditCategoryDialog(cat),
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.delete_outline_outlined, size: 20, color: context.colors.danger),
+                                  icon: Icon(Icons.delete_outline_outlined, size: 20, color: context.colors.inkMuted),
                                   tooltip: 'Eliminar categoría',
                                   onPressed: () => _confirmDeleteCategory(cat),
                                 ),

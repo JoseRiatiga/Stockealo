@@ -647,7 +647,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
 
   /// Lee el código de barras de un tiquete (su número) y abre esa venta
   Future<void> _scanTicket() async {
-    final code = await CodeReader.scan(context, title: 'Escanear un tiquete', caption: 'Ventas');
+    final code = await CodeReader.scan(context, title: 'Escanear un recibo', caption: 'Ventas');
     if (code == null || !mounted) return;
     final clean = code.trim().replaceFirst('#', '').toUpperCase();
     final match = _sales.where((s) => (s.invoiceNumber ?? '').replaceFirst('#', '').toUpperCase() == clean).toList();
@@ -764,7 +764,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
         const SizedBox(width: AppSpace.sm),
         // Escanear el código de un tiquete abre esa venta
         IconButton.outlined(
-          tooltip: 'Escanear un tiquete',
+          tooltip: 'Escanear un recibo',
           onPressed: _scanTicket,
           icon: const Icon(Icons.qr_code_scanner_outlined, size: 20),
         ),

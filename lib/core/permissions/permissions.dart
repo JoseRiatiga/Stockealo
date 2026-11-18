@@ -70,7 +70,7 @@ enum Perm {
   activity(PermGroup.settings, 'Actividad del equipo', 'Quién vendió, cambió precios o ajustó el stock'),
   authorize(PermGroup.settings, 'Autorizar a otros', 'Aprobar una acción que el rol de otra persona no permite'),
   modules(PermGroup.settings, 'Módulos', 'Encender o apagar módulos'),
-  businessInfo(PermGroup.settings, 'Datos del negocio', 'Nombre, logo, dirección y tiquete'),
+  businessInfo(PermGroup.settings, 'Datos del negocio', 'Nombre, logo, dirección y recibo'),
   store(PermGroup.settings, 'Tienda en línea', 'Configurar la tienda y su diseño'),
   cloud(PermGroup.settings, 'Nube y respaldo', 'Sincronizar y hacer copias');
 

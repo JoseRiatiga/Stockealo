@@ -100,7 +100,11 @@ void main() {
       expect(find.text('Tienda Olinda'), findsOneWidget);
       // 0.16.3: el nombre y el buscador se leen enteros
       _expectWhole(tester, 'Minimercado La Esperanza');
-      _expectWhole(tester, 'Busca producto, cliente o función');
+      // 0.16.7: el título va primero; el buscador dice la frase o «Buscar», sin cortarse
+      final phrase = find.text('Busca producto, cliente o función').evaluate().isNotEmpty;
+      _expectWhole(tester, phrase ? 'Busca producto, cliente o función' : 'Buscar');
+      _expectWhole(tester, 'Ctrl K');
+      _expectWhole(tester, 'Clientes y proveedores');
       expect(tester.takeException(), isNull);
       await _save(tester, key, 'computador_${brightness.name}');
     });

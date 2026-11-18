@@ -21,6 +21,18 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.16.7',
+      title: 'Todo más ordenado',
+      items: [
+        'En el computador, el detalle y la edición de productos, la entrada de mercancía, Promociones y Equipo se abren a la derecha con el menú a la vista.',
+        'Stock es una lista con lo agotado y lo bajo arriba, y «Ajustar» en cada producto.',
+        'El stock ya no se cambia en Editar producto: se ajusta y queda en el historial.',
+        'Registrar un abono usa los mismos medios de pago que Vender, con atajos de valor.',
+        'Equipo tiene un solo botón «Invitar» y los permisos del Dueño muestran un candado.',
+        'Los textos ya no se cortan al achicar la ventana y Escape cierra el menú.',
+      ],
+    ),
+    (
       version: '0.16.6',
       title: 'Vender más fácil y la hora de tu negocio',
       items: [

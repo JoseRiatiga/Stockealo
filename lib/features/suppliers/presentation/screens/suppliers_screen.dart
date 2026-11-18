@@ -17,6 +17,9 @@ import 'supplier_form_screen.dart';
 
 /// Clientes y proveedores › Proveedores: la lista, con acceso a las entradas de mercancía
 class SuppliersScreen extends StatefulWidget {
+  /// Ancho de la pestaña Proveedores: el mismo de «Clientes y fiados»
+  static const double width = 960;
+
   final Business business;
   final String? userName;
 
@@ -94,7 +97,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               label: const Text('Nuevo proveedor'),
             ),
       body: widget.embedded ? Column(children: [
-          ContentWidth(child: Padding(
+          // Mismo ancho que «Clientes y fiados», la pestaña de al lado (0.16.7, hallazgo 37)
+          ContentWidth(maxWidth: SuppliersScreen.width, child: Padding(
             padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, 0),
             child: Wrap(
               alignment: WrapAlignment.spaceBetween,
@@ -152,6 +156,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       return _loading
             ? const Center(child: CircularProgressIndicator())
             : ContentListView(
+                maxWidth: widget.embedded ? SuppliersScreen.width : ContentWidth.max,
                 padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, 96),
                 children: [
                   AppCard(

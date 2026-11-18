@@ -46,7 +46,7 @@ import '../../data/personal_data_export.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/security/app_lock.dart';
 import '../../../home/presentation/widgets/whats_new_sheet.dart';
-import '../../../auth/presentation/logout_confirm.dart';
+import '../../../home/navigation/app_pane.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -852,10 +852,7 @@ actions: [
                           icon: Icons.groups_2_outlined,
                           title: 'Equipo',
                           subtitle: 'Miembros, permisos e invitación',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => EmployeesScreen(business: _activeBusiness!)),
-                          ),
+                          onTap: () => AppPane.open(context, (_) => EmployeesScreen(business: _activeBusiness!)),
                         ),
                         if (Permissions.can(_currentBusinessRole, Perm.activity))
                           SettingsRow(
@@ -945,7 +942,8 @@ actions: [
                       SettingsRow(
                         icon: Icons.pin_outlined,
                         title: 'Bloquear la app',
-                        subtitle: _lockOn ? 'Pide tu PIN al abrirla' : 'Pide PIN o huella al abrirla',
+                        // En la web no hay huella (0.16.7, hallazgo 59)
+                        subtitle: _lockOn ? 'Pide tu PIN al abrirla' : (kIsWeb ? 'Pide PIN al abrirla' : 'Pide PIN o huella al abrirla'),
                         trailing: Switch(value: _lockOn, onChanged: _toggleLock),
                         onTap: () => _toggleLock(!_lockOn),
                       ),
@@ -988,10 +986,12 @@ actions: [
                       ),
                       SettingsRow(
                         icon: Icons.delete_outline_outlined,
-                        title: 'Borrar datos',
+                        // Dice claro qué se borra (0.16.7, hallazgo 54). En la web la única
+                        // opción es eliminar la cuenta con todos sus datos
+                        title: SupabaseService.cloudSyncForced ? 'Eliminar mi cuenta' : 'Borrar datos',
                         subtitle: SupabaseService.cloudSyncForced
-                            ? 'Eliminar la cuenta'
-                            : 'Purgar la nube o eliminar la cuenta',
+                            ? 'Borra tu cuenta y todos tus datos para siempre'
+                            : 'Borrar la copia de la nube o eliminar tu cuenta',
                         danger: true,
                         onTap: _openDeletion,
                       ),
@@ -1027,14 +1027,7 @@ actions: [
                         subtitle: 'Dónde está cada función en el menú',
                         onTap: () => WhereThingsMovedSheet.show(context),
                       ),
-                      SettingsRow(
-                        icon: Icons.logout_outlined,
-                        title: 'Cerrar sesión',
-                        danger: true,
-                        onTap: () async {
-                          if (await LogoutConfirm.ask(context)) widget.onLogout();
-                        },
-                      ),
+                      // «Cerrar sesión» queda solo en «Salir» del menú lateral (decisión D5)
                     ]),
                     Center(
                       child: Text(
@@ -1516,7 +1509,7 @@ actions: [
   }
 
   void _openDeletion() {
-    SettingsSubpage.open(context, title: 'Borrar datos', children: () {
+    SettingsSubpage.open(context, title: SupabaseService.cloudSyncForced ? 'Eliminar mi cuenta' : 'Borrar datos', children: () {
       return [
         SettingsGroup(children: [
           // En la web la nube es la copia principal: purgarla dejaría los datos solo en el navegador

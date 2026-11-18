@@ -11,6 +11,7 @@ import '../../data/roles_repository.dart';
 import '../../models/business_role.dart';
 import '../../../../core/design/status_pill.dart';
 import 'package:flutter/services.dart';
+import '../../../home/navigation/app_pane.dart';
 
 /// Ajustes › Equipo › Roles y permisos (0.15.0, etapa 2 de `docs/plan-roles.md`).
 ///
@@ -26,7 +27,7 @@ class RolesScreen extends StatefulWidget {
   const RolesScreen({super.key, required this.business, required this.canEdit});
 
   static Future<void> open(BuildContext context, {required Business business, required bool canEdit}) =>
-      Navigator.push(context, MaterialPageRoute(builder: (_) => RolesScreen(business: business, canEdit: canEdit)));
+      AppPane.push(context, MaterialPageRoute(builder: (_) => RolesScreen(business: business, canEdit: canEdit)));
 
   @override
   State<RolesScreen> createState() => _RolesScreenState();
@@ -340,6 +341,13 @@ class _RolesScreenState extends State<RolesScreen> {
               padding: EdgeInsets.fromLTRB(wide ? AppSpace.xl : AppSpace.lg, AppSpace.lg, wide ? AppSpace.xl : AppSpace.lg, 120),
               children: [
                 _header(c),
+                // Quien solo mira sabe por qué no puede crear ni cambiar (0.16.7, hallazgo 51)
+                if (!widget.canEdit)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpace.sm),
+                    child: Text('Solo el dueño crea roles y cambia permisos. Aquí ves lo que puede hacer cada uno.',
+                        style: AppText.small(context, color: c.inkMuted)),
+                  ),
                 if (_note != null)
                   Padding(
                     padding: const EdgeInsets.only(top: AppSpace.sm),
@@ -534,6 +542,14 @@ class _RolesScreenState extends State<RolesScreen> {
       );
 
   Widget _switch(StockealoColors c, _Col col, Perm p) {
+    // El dueño siempre tiene todo: un candado, no un interruptor que parece que se
+    // puede cambiar (0.16.7, hallazgo 51)
+    if (col.locked) {
+      return Tooltip(
+        message: '${col.name}: siempre tiene todo',
+        child: SizedBox(width: 52, height: 32, child: Icon(Icons.lock_outline, size: 18, color: c.inkFaint)),
+      );
+    }
     final on = _draft[col.key]!.contains(p);
     final sw = Semantics(
       label: '${col.name}: ${p.label}',

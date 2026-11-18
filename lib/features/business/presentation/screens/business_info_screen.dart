@@ -102,8 +102,8 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
     final footer = TextEditingController(text: info.footer ?? '');
     final ok = await AppSheet.show<bool>(
       context: context,
-      title: 'Datos del tiquete',
-      subtitle: 'Salen debajo del nombre del negocio en cada tiquete. Todo es opcional.',
+      title: 'Datos del recibo',
+      subtitle: 'Salen debajo del nombre del negocio en cada recibo. Todo es opcional.',
       builder: (ctx) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -139,7 +139,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
     final saved = await BusinessRepository.instance.updateBusiness(id: _business.id, ticketInfo: next.encode() ?? '');
     if (!mounted) return;
     if (saved != null) setState(() => _business = saved);
-    AppToast.showSuccess(context, 'Datos del tiquete guardados.');
+    AppToast.showSuccess(context, 'Datos del recibo guardados.');
   }
 
   Future<void> _switchBusiness() async {
@@ -220,27 +220,20 @@ actions: [
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    // El mismo encabezado que el resto de la app (0.16.7, hallazgo 56)
     return Scaffold(
       backgroundColor: c.paper,
+      appBar: AppBar(
+        title: const Text('Tu negocio'),
+        actions: [
+          IconButton(tooltip: 'Cambiar de negocio', onPressed: _switchBusiness, icon: const Icon(Icons.swap_horiz_outlined)),
+          const SizedBox(width: AppSpace.sm),
+        ],
+      ),
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.sm, AppSpace.md, AppSpace.md),
-              child: Row(
-                children: [
-                  _RoundButton(icon: Icons.chevron_left_outlined, label: 'Atrás', onTap: () => Navigator.pop(context)),
-                  Expanded(
-                    child: Text(
-                      'Tu negocio',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, color: c.ink),
-                    ),
-                  ),
-                  _RoundButton(icon: Icons.swap_horiz_outlined, label: 'Cambiar de negocio', onTap: _switchBusiness),
-                ],
-              ),
-            ),
             Expanded(
               child: _isLoadingMetrics
                   ? const Center(child: CircularProgressIndicator())
@@ -255,10 +248,10 @@ actions: [
                               _identityCard(c),
                               const SizedBox(height: AppSpace.xl),
                               // Datos del tiquete (0.15.0): NIT, dirección, teléfono y despedida
-                              SettingsGroup(label: 'Tiquete', children: [
+                              SettingsGroup(label: 'Recibo', children: [
                                 SettingsRow(
                                   icon: Icons.receipt_long_outlined,
-                                  title: 'Datos del tiquete',
+                                  title: 'Datos del recibo',
                                   subtitle: () {
                                     final info = TicketInfo.of(_business);
                                     if (info.isEmpty) return 'NIT, dirección, teléfono y tu despedida';
@@ -396,33 +389,3 @@ actions: [
   }
 }
 
-/// Botón redondo de la barra superior (atrás, cambiar de negocio)
-class _RoundButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _RoundButton({required this.icon, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Tooltip(
-      message: label,
-      child: Semantics(
-        button: true,
-        label: label,
-        child: InkResponse(
-          onTap: onTap,
-          radius: 24,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: c.surface, shape: BoxShape.circle, border: Border.all(color: c.line)),
-            child: Icon(icon, color: c.ink, size: 22),
-          ),
-        ),
-      ),
-    );
-  }
-}

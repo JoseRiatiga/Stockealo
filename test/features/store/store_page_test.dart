@@ -102,7 +102,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Arroz'), findsNothing);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Todo'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Todas'));
     await tester.pumpAndSettle();
     final add = find.byTooltip('Agregar al pedido');
     await tester.tap(add.first); // arroz

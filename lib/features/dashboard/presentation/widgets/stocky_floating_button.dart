@@ -106,7 +106,12 @@ class StockyFloatingButton extends StatefulWidget {
     this.businessId,
     this.onNavigateToTab,
     this.compact = false,
+    this.tips = true,
   });
+
+  /// Sin consejos que se abran solos (0.16.7, hallazgos 18 y 60): en Caja tapaban
+  /// los montos de «Entradas y salidas» y «Abonos en efectivo»
+  final bool tips;
 
   @override
   State<StockyFloatingButton> createState() => _StockyFloatingButtonState();
@@ -214,6 +219,7 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
   }
 
   void _showNextTip() {
+    if (!widget.tips) return;
     if (!mounted || _isTipVisible || _isExploding) return;
 
     _tipsShownThisSession++;
@@ -229,6 +235,13 @@ class _StockyFloatingButtonState extends State<StockyFloatingButton>
     _autoDismissTimer = Timer(_tipVisibleFor, () {
       _dismissTip();
     });
+  }
+
+  @override
+  void didUpdateWidget(StockyFloatingButton old) {
+    super.didUpdateWidget(old);
+    // Al llegar a Caja, el consejo abierto se cierra
+    if (!widget.tips && _isTipVisible) _dismissTip();
   }
 
   Future<void> _dismissTip() async {

@@ -14,6 +14,7 @@ import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../../products/presentation/widgets/stock_status_badge.dart';
 import '../../../sales/presentation/screens/sell_screen.dart';
 import '../../navigation/app_places.dart';
+import '../../navigation/app_pane.dart';
 
 class GlobalSearchDialog extends StatefulWidget {
   final String? businessId;
@@ -398,7 +399,8 @@ class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
   Future<void> _openProduct(Product product) async {
     final nav = Navigator.of(context);
     nav.pop();
-    await nav.push(MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)));
+    // En el computador, en el panel con el menú a la vista (0.16.7)
+    await AppPane.open(nav.context, (_) => ProductDetailScreen(product: product));
   }
 
   Future<void> _sellProduct(Product product) async {

@@ -350,8 +350,7 @@ actions: [
                             _buildPhotoCard(),
                             const SizedBox(height: 14),
                             _buildBarcodeCard(),
-                            const SizedBox(height: 14),
-                            _buildQuickActionsCard(),
+                            if (canEdit) ...[const SizedBox(height: 14), _buildQuickActionsCard()],
                           ],
                         ),
                       ),
@@ -481,31 +480,18 @@ actions: [
     );
   }
 
+  /// «Ajustar stock físico». Vender ya está junto al stock: aquí no se repite
+  /// (0.16.7, hallazgo 9: «Vender» y «Registrar venta» hacían lo mismo)
   Widget _buildQuickActionsCard() {
     return _card(
       padding: const EdgeInsets.all(14),
-      child: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _sell,
-              icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
-              label: const Text('Registrar venta'),
-            ),
-          ),
-          if (canEdit) ...[
-            const SizedBox(height: AppSpace.sm),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _showAdjustStockDialog,
-                icon: const Icon(Icons.tune_outlined, size: 17),
-                label: const Text('Ajustar stock físico'),
-              ),
-            ),
-          ],
-        ],
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _showAdjustStockDialog,
+          icon: const Icon(Icons.tune_outlined, size: 17),
+          label: const Text('Ajustar stock físico'),
+        ),
       ),
     );
   }

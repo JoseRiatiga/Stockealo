@@ -1,3 +1,4 @@
+import '../../../../core/design/app_dialog.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
@@ -27,16 +28,12 @@ class RecordPaymentModal extends StatefulWidget {
     required Customer customer,
     required VoidCallback onPaymentRecorded,
   }) {
-    return showModalBottomSheet(
-      showDragHandle: false,
+    // La hoja del diseño nuevo (0.16.7, hallazgo 33)
+    return AppSheet.show<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => RecordPaymentModal(
-        customer: customer,
-        onPaymentRecorded: onPaymentRecorded,
-      ),
+      title: 'Registrar abono',
+      subtitle: customer.name,
+      builder: (_) => RecordPaymentModal(customer: customer, onPaymentRecorded: onPaymentRecorded),
     );
   }
 
@@ -49,7 +46,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
   final _amountController = TextEditingController();
   final _notesController = TextEditingController();
 
-  String _paymentMethod = 'EFECTIVO';
+  String _paymentMethod = PaymentMethod.cash;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -169,242 +166,91 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
   @override
   Widget build(BuildContext context) {
     final customer = widget.customer;
-    final cardBg = context.colors.surface;
-    final textMain = context.colors.ink;
-    final textMuted = context.colors.inkMuted;
+    final c = context.colors;
+    final debt = customer.debtBalance;
+    final quick = <(String, double)>[
+      ('Todo (${CurrencyFormatter.format(debt)})', debt),
+      if (debt > 2000) ('La mitad', (debt / 2).roundToDouble()),
+      for (final v in const [10000.0, 20000.0, 50000.0])
+        if (v < debt) (CurrencyFormatter.format(v), v),
+    ];
 
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 20,
-        top: 24,
-        left: 20,
-        right: 20,
-      ),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Lo que debe
+        Container(
+          padding: const EdgeInsets.all(AppSpace.md),
+          decoration: BoxDecoration(color: c.warningSoft, borderRadius: BorderRadius.circular(AppRadius.control)),
+          child: Row(
             children: [
-              // Cabecera
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Registrar Abono a Fiado',
-                        style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.bold, color: textMain),
-                      ),
-                      Text(
-                        'Cliente: ${customer.name}',
-                        style: TextStyle(fontSize: AppText.sizeSmall, color: textMuted, fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close_outlined, color: textMuted),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const Divider(height: 20),
-
-              // Tarjeta de Deuda Actual
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: context.colors.warningSoft,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: context.colors.warningSoft,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Deuda Pendiente Actual',
-                          style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.warning),
-                        ),
-                        Text(
-                          'Saldo por cobrar',
-                          style: TextStyle(fontSize: AppText.sizeCaption, color: context.colors.warning),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      CurrencyFormatter.formatCOP(customer.debtBalance),
-                      style: TextStyle(
-                        fontSize: AppText.sizeHeading,
-                        fontWeight: FontWeight.bold,
-                        color: context.colors.warning,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              if (_errorMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: context.colors.dangerSoft,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: context.colors.dangerSoft,
-                    ),
-                  ),
-                  child: Text(
-                    _errorMessage!,
-                    style: TextStyle(color: context.colors.danger, fontSize: AppText.sizeCaption),
-                  ),
-                ),
-              ],
-
-              // Campo de Monto a Abonar
-              TextField(
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  labelText: 'Monto a Abonar (\$)',
-                  hintText: 'Ej. 20000',
-                  prefixIcon: Icon(Icons.attach_money_outlined, color: context.colors.accent),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Chips de Acceso Rápido al monto
-              Wrap(
-                spacing: 8,
-                children: [
-                  ActionChip(
-                    avatar: Icon(Icons.done_all_outlined, size: 16, color: context.colors.accent),
-                    label: const Text('Pagar Todo', style: TextStyle(fontSize: AppText.sizeCaption)),
-                    onPressed: () => _setAmount(customer.debtBalance),
-                  ),
-                  if (customer.debtBalance > 2000)
-                    ActionChip(
-                      label: const Text('50%', style: TextStyle(fontSize: AppText.sizeCaption)),
-                      onPressed: () => _setAmount(customer.debtBalance / 2),
-                    ),
-                  if (customer.debtBalance >= 10000)
-                    ActionChip(
-                      label: const Text('\$10.000', style: TextStyle(fontSize: AppText.sizeCaption)),
-                      onPressed: () => _setAmount(10000),
-                    ),
-                  if (customer.debtBalance >= 20000)
-                    ActionChip(
-                      label: const Text('\$20.000', style: TextStyle(fontSize: AppText.sizeCaption)),
-                      onPressed: () => _setAmount(20000),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Medio de Pago
-              Text('Medio de Pago:', style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.bold, color: textMain)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: ChoiceChip(
-                      label: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.payments_outlined,
-                            size: 14,
-                            color: _paymentMethod == 'EFECTIVO' ? (context.colors.accent) : textMuted,
-                          ),
-                          const SizedBox(width: 4),
-                          const Text('Efectivo'),
-                        ],
-                      ),
-                      selected: _paymentMethod == 'EFECTIVO',
-                      selectedColor: context.colors.successSoft,
-                      labelStyle: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _paymentMethod == 'EFECTIVO' ? (context.colors.accent) : textMuted,
-                      ),
-                      onSelected: (val) {
-                        if (val) setState(() => _paymentMethod = 'EFECTIVO');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ChoiceChip(
-                      label: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.account_balance_outlined,
-                            size: 14,
-                            color: _paymentMethod == 'TRANSFERENCIA' ? (context.colors.info) : textMuted,
-                          ),
-                          const SizedBox(width: 4),
-                          const Text('Transferencia'),
-                        ],
-                      ),
-                      selected: _paymentMethod == 'TRANSFERENCIA',
-                      selectedColor: context.colors.infoSoft,
-                      labelStyle: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _paymentMethod == 'TRANSFERENCIA' ? (context.colors.info) : textMuted,
-                      ),
-                      onSelected: (val) {
-                        if (val) setState(() => _paymentMethod = 'TRANSFERENCIA');
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Notas opcionales
-              TextField(
-                controller: _notesController,
-                decoration: InputDecoration(
-                  labelText: 'Notas / Observaciones (Opcional)',
-                  hintText: 'Ej. Pagó por ${_firstPaymentApp(context)} / Dejó abono en efectivo',
-                  prefixIcon: const Icon(Icons.note_alt_outlined),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Botón Guardar Abono
-              SizedBox(
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _submitPayment,
-                  icon: _isLoading
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.check_circle_outline_outlined, size: 20),
-                  label: const Text('Registrar Abono y Generar Recibo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppText.sizeBody)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.colors.accent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
+              Expanded(child: Text('Debe', style: AppText.body(context, weight: FontWeight.w600, color: c.ink))),
+              Text(CurrencyFormatter.format(debt), style: AppText.amount(context, size: AppText.sizeHeading, weight: FontWeight.w800)),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: AppSpace.md),
+        if (_errorMessage != null) ...[
+          Text(_errorMessage!, style: AppText.small(context, weight: FontWeight.w600, color: c.danger)),
+          const SizedBox(height: AppSpace.sm),
+        ],
+        TextField(
+          controller: _amountController,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            labelText: 'Cuánto abona',
+            prefixText: '\$ ',
+            // El ejemplo nunca pasa la deuda (antes decía «Ej. 20000» aunque debiera menos)
+            hintText: CurrencyFormatter.format(debt).replaceAll(RegExp(r'[^0-9.]'), ''),
+          ),
+          onChanged: (_) {
+            if (_errorMessage != null) setState(() => _errorMessage = null);
+          },
+        ),
+        const SizedBox(height: AppSpace.sm),
+        Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          children: [for (final (label, value) in quick) ActionChip(label: Text(label), onPressed: () => _setAmount(value))],
+        ),
+        const SizedBox(height: AppSpace.lg),
+        Text('Cómo pagó', style: AppText.small(context, weight: FontWeight.w600)),
+        const SizedBox(height: AppSpace.sm),
+        // Los mismos medios que Vender (Nequi y Tarjeta incluidos)
+        Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          children: [
+            for (final m in PaymentMethod.forMixed)
+              ChoiceChip(
+                avatar: Icon(PaymentMethod.icon(m), size: 16),
+                label: Text(PaymentMethod.label(m)),
+                selected: _paymentMethod == m,
+                showCheckmark: false,
+                onSelected: (_) => setState(() => _paymentMethod = m),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpace.lg),
+        TextField(
+          controller: _notesController,
+          decoration: InputDecoration(
+            labelText: 'Nota (opcional)',
+            hintText: 'Ej. pagó por ${_firstPaymentApp(context)}',
+          ),
+        ),
+        const SizedBox(height: AppSpace.lg),
+        SizedBox(
+          height: 52,
+          child: FilledButton(
+            onPressed: _isLoading ? null : _submitPayment,
+            child: Text(_isLoading ? 'Registrando…' : 'Registrar abono'),
+          ),
+        ),
+      ],
     );
   }
 }

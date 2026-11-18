@@ -82,7 +82,8 @@ class _AppMenuState extends State<AppMenu> {
     return AnimatedContainer(
       duration: AppMotion.of(context, AppMotion.normal),
       curve: AppMotion.curve,
-      width: widget.inDrawer ? 304 : (collapsed ? 80 : 256),
+      // 272: «Clientes y proveedores» y «Salir» caben enteros (0.16.7, hallazgos 12 y 38)
+      width: widget.inDrawer ? 304 : (collapsed ? 80 : 272),
       decoration: BoxDecoration(color: c.surface, border: widget.inDrawer ? null : Border(right: BorderSide(color: c.line))),
       child: SafeArea(
         right: false,
@@ -256,8 +257,9 @@ class _BusinessButton extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Hasta dos renglones: el nombre del negocio se lee entero
                               Text(business?.name ?? 'Elegir negocio',
-                                  maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w700)),
+                                  maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w700)),
                               Text('Cambiar negocio', style: AppText.caption(context)),
                             ],
                           ),

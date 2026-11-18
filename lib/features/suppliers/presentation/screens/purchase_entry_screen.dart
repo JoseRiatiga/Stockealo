@@ -29,6 +29,8 @@ import '../widgets/supplier_picker.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/design/app_dialog.dart';
 import 'package:intl/intl.dart';
+import '../../../home/navigation/app_pane.dart';
+import '../../../products/presentation/widgets/lots_widgets.dart';
 
 /// Un producto en la entrada, con su cantidad (o una por talla y color) y su costo
 class _Line {
@@ -131,7 +133,7 @@ class PurchaseEntryScreen extends StatefulWidget {
   /// true si se registró la entrada
   static Future<bool?> open(BuildContext context,
           {required Business business, Supplier? supplier, SupplierOrder? order}) =>
-      Navigator.of(context).push<bool>(MaterialPageRoute(
+      AppPane.push<bool>(context, MaterialPageRoute(
         builder: (_) => PurchaseEntryScreen(business: business, supplier: supplier, order: order),
       ));
 
@@ -997,20 +999,20 @@ actions: [
                           overflow: TextOverflow.ellipsis,
                         ),
                         onPressed: () async {
-                          final now = DateTime.now();
-                          final d = await showDatePicker(
-                            context: context,
-                            initialDate: l.expiresOn ?? DateTime(now.year + 1, now.month, now.day),
-                            firstDate: DateTime(now.year - 2),
-                            lastDate: DateTime(now.year + 10),
-                            helpText: 'Fecha de vencimiento',
-                          );
+                          final d = await pickExpiryDate(context, current: l.expiresOn);
                           if (d != null) setState(() => l.expiresOn = d);
                         },
                       ),
                     ),
                   ],
                 ),
+              ),
+            // Se avisa aquí, no solo al guardar (0.16.7, hallazgo 34)
+            if (l.tracksExpiry && l.units > 0 && l.expiresOn == null)
+              Padding(
+                padding: const EdgeInsets.only(left: 52, top: AppSpace.xs),
+                child: Text('Falta la fecha de vencimiento: este producto la pide.',
+                    style: TextStyle(color: c.warning, fontSize: AppText.sizeCaption, fontWeight: FontWeight.w600)),
               ),
             if (_costHint(l.product) case final hint?)
               Padding(

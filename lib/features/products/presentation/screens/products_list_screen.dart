@@ -41,7 +41,7 @@ import '../widgets/idle_products_alert.dart';
 import '../../../home/navigation/app_pane.dart';
 
 /// Productos (el catálogo) y, en [ProductsListMode.stock], el lugar Stock: la
-/// misma lista arrancando en «por reponer», con el aviso del proveedor que pasa
+/// misma lista ordenada con lo agotado y lo bajo arriba, el aviso del proveedor que pasa
 /// hoy y «Pedir al proveedor». Cada cosa tiene un solo lugar (re-diseño 0.13.0).
 enum ProductsListMode { catalog, stock }
 
@@ -81,7 +81,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   List<Category> _categories = [];
   String _selectedCategory = 'Todos';
   String _sortOption = 'name_asc';
-  late String _stockFilterOption = widget.mode == ProductsListMode.stock ? 'to_restock' : 'all';
+  // Stock arranca con todo: lo agotado y lo bajo ya van arriba (0.16.7, E2)
+  String _stockFilterOption = 'all';
 
   /// Lugar Stock: lo que falta y lo que llega
   bool get _stockMode => widget.mode == ProductsListMode.stock;

@@ -145,6 +145,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       });
     }
     if (p != null) {
+      // Editar: las cantidades guardadas se cambian con «Ajustar stock físico» (0.16.7)
+      _variants.lockExistingStock = true;
       _selectedCategory = p.category;
       _hasVariants = p.hasVariants;
       if (p.hasVariants) {
@@ -413,9 +415,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       );
     }
 
+    // Al editar, el stock sale de la base (no se escribe aquí y pudo cambiar con una
+    // venta mientras el formulario estaba abierto)
+    final saved = isEditing ? await _repository.getProductById(productId, widget.productToEdit!.businessId) : null;
+    // Variantes ya guardadas: su cantidad de la base, no la del formulario
+    if (saved != null && _hasVariants) {
+      final current = {for (final v in saved.variants) v.id: v.stock};
+      variants = [for (final v in variants) current.containsKey(v.id) ? v.copyWith(stock: current[v.id]) : v];
+    }
     final totalStock = _hasVariants
         ? variants.fold(0, (sum, v) => sum + v.stock)
-        : (int.tryParse(_stockController.text.trim()) ?? 0);
+        : (saved?.stock ?? int.tryParse(_stockController.text.trim()) ?? 0);
 
     final product = Product(
       id: productId,
@@ -483,7 +493,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Editar Producto' : 'Nuevo Producto'),
+        title: Text(isEditing ? 'Editar producto' : 'Nuevo producto'),
         actions: [
           // Compartir el producto con el link de la tienda (0.16.0, fase 3)
           if (isEditing)
@@ -542,7 +552,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                       Icon(Icons.add_a_photo_outlined, size: 40, color: context.colors.accent),
                                       const SizedBox(height: 6),
                                       Text(
-                                        'Agregar Foto',
+                                        'Agregar foto',
                                         style: TextStyle(
                                           fontSize: AppText.sizeCaption,
                                           fontWeight: FontWeight.bold,
@@ -587,7 +597,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   TextFormField(
                     controller: _nameController,
                     decoration: InputDecoration(
-                      labelText: 'Nombre del Producto *',
+                      labelText: 'Nombre del producto *',
                       hintText: 'Ej. Café Colombiano 500g, Llavero Acrílico...',
                       prefixIcon: Icon(Icons.shopping_bag_outlined, color: context.colors.inkMuted),
                     ),
@@ -692,7 +702,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           controller: _purchasePriceController,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Precio de Compra',
+                            labelText: 'Precio de compra',
                             prefixText: r'$ ',
                             hintText: '0',
                           ),
@@ -705,7 +715,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           controller: _salePriceController,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Precio de Venta *',
+                            labelText: 'Precio de venta *',
                             prefixText: r'$ ',
                             hintText: '0',
                           ),
@@ -880,10 +890,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           child: TextFormField(
                             controller: _stockController,
                             keyboardType: TextInputType.number,
+                            // Al editar no se escribe aquí: «Ajustar stock físico» en el detalle
+                            // deja el motivo en el historial (0.16.7, hallazgo 10)
+                            readOnly: isEditing,
+                            enabled: !isEditing,
                             decoration: InputDecoration(
+                              helperText: isEditing ? 'Se cambia con «Ajustar stock físico» en el detalle' : null,
+                              helperMaxLines: 2,
                               labelText: isEditing
-                                  ? 'Stock Actual *'
-                                  : (widget.onCreatedForPurchase != null ? 'Cantidad que llegó *' : 'Stock Inicial *'),
+                                  ? 'Stock actual'
+                                  : (widget.onCreatedForPurchase != null ? 'Cantidad que llegó *' : 'Stock inicial *'),
                               hintText: '0',
                               prefixIcon: Icon(Icons.inventory_2_outlined, size: 20, color: context.colors.inkMuted),
                               prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
@@ -902,7 +918,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             controller: _minStockController,
                             keyboardType: TextInputType.number,
                             decoration: InputDecoration(
-                              labelText: 'Stock Mínimo',
+                              labelText: 'Stock mínimo',
                               hintText: '5',
                               prefixIcon: Icon(Icons.notifications_active_outlined, size: 20, color: context.colors.inkMuted),
                               prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
@@ -925,7 +941,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       controller: _minStockController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        labelText: 'Alerta de Stock Mínimo Global',
+                        labelText: 'Alerta de stock mínimo para todos',
                         hintText: '5',
                         prefixIcon: Icon(Icons.notifications_active_outlined, size: 20, color: context.colors.inkMuted),
                       ),
@@ -940,7 +956,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       TextFormField(
                         controller: _codeController,
                         decoration: InputDecoration(
-                          labelText: 'Código de Barras / SKU',
+                          labelText: 'Código de barras o SKU',
                           hintText: 'Ej. STK-12345',
                           prefixIcon: Icon(Icons.qr_code_2_outlined, color: context.colors.inkMuted),
                           suffixIcon: Row(
@@ -995,7 +1011,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     controller: _descriptionController,
                     maxLines: 2,
                     decoration: const InputDecoration(
-                      labelText: 'Descripción / Notas (Opcional)',
+                      labelText: 'Descripción o notas (opcional)',
                       hintText: 'Detalles adicionales, ubicación...',
                     ),
                   ),
@@ -1017,7 +1033,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       onPressed: _saveProduct,
                       icon: const Icon(Icons.save_outlined),
                       label: Text(
-                        isEditing ? 'Guardar Cambios' : 'Crear Producto',
+                        isEditing ? 'Guardar cambios' : 'Crear producto',
                         style: const TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.bold),
                       ),
                     ),

@@ -32,7 +32,7 @@ content: Column(
               keyboardType: TextInputType.number,
               autofocus: true,
               decoration: const InputDecoration(
-                labelText: 'Nuevo Stock',
+                labelText: 'Unidades que hay',
                 prefixIcon: Icon(Icons.pin_outlined),
               ),
             ),
@@ -68,7 +68,7 @@ actions: [
         product.id,
         product.businessId,
         newStock,
-        'Ajuste rápido desde catálogo',
+        'Ajuste rápido',
       );
       // Lotes (0.16.0, fase 2b): las unidades nuevas con su fecha; si no la pone, quedan «sin fecha»
       final added = newStock - product.stock;

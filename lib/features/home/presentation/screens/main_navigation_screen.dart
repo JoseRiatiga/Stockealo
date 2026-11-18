@@ -434,6 +434,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
 
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  /// El panel es el mismo en computador y celular: al cambiar el ancho de la ventana
+  /// se mueve sin perder lo abierto (una entrada de mercancía a medias, por ejemplo)
+  final _paneHostKey = GlobalKey(debugLabel: 'panel-host');
+
   /// Otra pantalla pidió ir a un lugar (por ejemplo, «Vender» desde un producto)
   void _onPlaceRequest() {
     final id = AppPlace.request.value;
@@ -654,6 +658,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                               businessId: _activeBusiness?.id,
                               onNavigateToTab: _navigateToTab,
                               compact: !isWide,
+                              tips: _currentIndex != AppPlace.caja,
                             ),
                     ),
                   ),
@@ -668,7 +673,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
                     menu(inDrawer: false),
                     // Panel (0.16.7): el detalle de un producto, Equipo, etc. se abren
                     // aquí, con el menú a la izquierda
-                    Expanded(child: AppPaneHost(home: Column(children: [header(false), Expanded(child: body)]))),
+                    Expanded(child: AppPaneHost(key: _paneHostKey, home: Column(children: [header(false), Expanded(child: body)]))),
                   ],
                 ),
               );
@@ -677,8 +682,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
             // Celular: el mismo menú, que se abre con ☰ (sin barra de pestañas abajo)
             return Scaffold(
               key: _scaffoldKey,
-              drawer: Drawer(width: 304, child: menu(inDrawer: true)),
-              body: Column(children: [header(true), Expanded(child: body)]),
+              // Escape cierra el menú (0.16.7, hallazgo 60)
+              drawer: Drawer(
+                width: 304,
+                child: CallbackShortcuts(
+                  bindings: {
+                    const SingleActivator(LogicalKeyboardKey.escape): () => _scaffoldKey.currentState?.closeDrawer(),
+                  },
+                  child: Focus(autofocus: true, child: menu(inDrawer: true)),
+                ),
+              ),
+              // En el celular lo abierto en el panel tapa el encabezado, como una
+              // pantalla completa; el menú ☰ sigue en su lugar
+              body: AppPaneHost(key: _paneHostKey, home: Column(children: [header(true), Expanded(child: body)])),
             );
           },
         ),

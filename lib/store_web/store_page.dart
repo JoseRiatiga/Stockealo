@@ -530,7 +530,7 @@ class _StorePageState extends State<StorePage> {
       child: ChoiceChip(
         avatar: thumb == null ? null : CircleAvatar(backgroundImage: NetworkImage(thumb)),
         showCheckmark: false,
-        label: Text(cat ?? 'Todo'),
+        label: Text(cat ?? 'Todas'),
         selected: selected,
         onSelected: (_) => setState(() => _filters.category = cat),
       ),
@@ -1191,7 +1191,7 @@ class _StorePageState extends State<StorePage> {
             runSpacing: AppSpace.sm,
             children: [
               Text('Pedidos por WhatsApp · el negocio te confirma la entrega', style: AppText.small(context, color: c.inkFaint)),
-              Text('Al pedir recibes tu tiquete «Por confirmar»', style: AppText.small(context, color: c.inkFaint)),
+              Text('Al pedir recibes tu comprobante «Por confirmar»', style: AppText.small(context, color: c.inkFaint)),
             ],
           ),
           const SizedBox(height: AppSpace.md),
@@ -2288,7 +2288,7 @@ class _CartFormState extends State<_CartForm> {
         ],
         const SizedBox(height: AppSpace.sm),
         Text(
-          'Te mostramos tu tiquete y lo envías por WhatsApp. La tienda te confirma el precio final y la entrega.',
+          'Te mostramos tu comprobante y lo envías por WhatsApp. La tienda te confirma el precio final y la entrega.',
           textAlign: TextAlign.center,
           style: AppText.caption(context),
         ),

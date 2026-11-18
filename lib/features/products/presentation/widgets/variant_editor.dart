@@ -43,7 +43,10 @@ class VariantCell {
   final String id;
   final TextEditingController stock;
   String? barcode;
-  VariantCell({String? id, int stock = 0, this.barcode})
+
+  /// Ya estaba guardada (al editar): su cantidad no se cambia aquí
+  final bool existing;
+  VariantCell({String? id, int stock = 0, this.barcode, this.existing = false})
       : id = id ?? const Uuid().v4(),
         stock = TextEditingController(text: '$stock');
 
@@ -63,6 +66,10 @@ class VariantEditorController extends ChangeNotifier {
 
   /// Variantes antiguas escritas como "M (ROJO)" que se pueden separar
   bool canSplitLegacy = false;
+
+  /// Al editar un producto, las cantidades de las variantes guardadas no se escriben
+  /// aquí: se cambian con «Ajustar stock físico», que deja el historial (0.16.7, #10)
+  bool lockExistingStock = false;
 
   /// Nombre de la segunda lista (0.16.0): 'Color' (con su muestra) o 'Sabor' (vapers)
   String secondName = 'Color';
@@ -156,7 +163,7 @@ class VariantEditorController extends ChangeNotifier {
         }
       }
       _putCell(cellKey(size, colorName.isEmpty ? null : colorName),
-          VariantCell(id: v.id, stock: v.stock, barcode: v.skuOrBarcode));
+          VariantCell(id: v.id, stock: v.stock, barcode: v.skuOrBarcode, existing: lockExistingStock));
     }
     canSplitLegacy = colors.isEmpty && sizes.where((s) => ProductVariant.splitLegacy(s) != null).length >= 2;
     notifyListeners();
@@ -289,7 +296,8 @@ class VariantEditorController extends ChangeNotifier {
 
   void fillAll(int value) {
     for (final c in combos) {
-      cellFor(c.key).stock.text = '$value';
+      final cell = cellFor(c.key);
+      if (!cell.existing) cell.stock.text = '$value';
     }
     notifyListeners();
   }
@@ -960,12 +968,17 @@ class _VariantEditorState extends State<VariantEditor> {
           ),
           SizedBox(
             width: 68,
-            child: TextField(
-              controller: cell.stock,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(isDense: true, hintText: '0'),
+            child: Tooltip(
+              message: cell.existing ? 'Se cambia con «Ajustar stock físico» en el detalle' : '',
+              child: TextField(
+                controller: cell.stock,
+                readOnly: cell.existing,
+                enabled: !cell.existing,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(isDense: true, hintText: '0'),
+              ),
             ),
           ),
           IconButton(

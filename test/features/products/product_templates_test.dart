@@ -121,8 +121,8 @@ void main() {
     expect(tester.widget<SwitchListTile>(lot).value, isFalse);
     final before = tester.getTopLeft(lot).dy;
     expect(find.text('Escribe el costo para ver precios sugeridos'), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextFormField, 'Precio de Compra'), '2000');
-    await tester.enterText(find.widgetWithText(TextFormField, 'Precio de Venta *'), '3000');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Precio de compra'), '2000');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Precio de venta *'), '3000');
     await tester.pump();
     expect(find.text('Precio para ganar'), findsOneWidget);
     expect(tester.getTopLeft(lot).dy, before);

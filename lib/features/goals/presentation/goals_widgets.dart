@@ -20,6 +20,8 @@ import '../../team/data/team_repository.dart';
 import '../../team/models/business_member.dart';
 import '../data/goals_repository.dart';
 import '../models/sales_goal.dart';
+import '../../reports/presentation/screens/reports_screen.dart';
+import '../../home/navigation/app_places.dart';
 
 /// Metas de ventas (0.16.0, fase 0): tarjeta de Inicio, hoja para ponerlas y la vista
 /// de Reportes › Metas con la gráfica, el equipo (Pro) y el historial (Pro).
@@ -467,7 +469,18 @@ class GoalsView extends StatefulWidget {
   final bool embedded;
   const GoalsView({super.key, required this.business, required this.role, this.embedded = false});
 
-  static Future<void> open(BuildContext context, {required Business business, required String role}) => Navigator.push(
+  /// Metas viven en Reportes › Metas: desde Inicio se va allá, sin abrir una copia
+  /// (0.16.7, hallazgo 27). Quien no ve Reportes la sigue viendo aparte.
+  static Future<void> open(BuildContext context, {required Business business, required String role}) async {
+    if (ReportsTab.allowed(role)) {
+      ReportsTab.showView.value = 1;
+      AppPlace.go(AppPlace.reportes);
+      return;
+    }
+    await _openAlone(context, business: business, role: role);
+  }
+
+  static Future<void> _openAlone(BuildContext context, {required Business business, required String role}) => Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => Scaffold(

@@ -19,6 +19,7 @@ import '../../models/product.dart';
 import '../widgets/category_filter_bar.dart';
 import '../widgets/manage_categories_modal.dart';
 import '../widgets/product_card.dart';
+import '../widgets/stock_row.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
 import '../../../business/data/business_repository.dart';
@@ -103,12 +104,11 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
 
   List<Product> get _pagedProducts {
     if (_products.isEmpty) return [];
+    // Stock (0.16.7, E2): lo agotado y lo bajo arriba
+    final list = _stockMode ? StockRow.sorted(_products) : _products;
     final startIndex = (_currentPage - 1) * _pageSize;
-    if (startIndex >= _products.length) {
-      return _products.take(_pageSize).toList();
-    }
-    final endIndex = math.min(startIndex + _pageSize, _products.length);
-    return _products.sublist(startIndex, endIndex);
+    if (startIndex >= list.length) return list.take(_pageSize).toList();
+    return list.sublist(startIndex, math.min(startIndex + _pageSize, list.length));
   }
 
   @override
@@ -669,6 +669,22 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                   )
                 else if (_products.isEmpty)
                   SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
+                else if (_stockMode)
+                  // Stock como lista: cantidad, mínimo y «Ajustar» (0.16.7, decisión E2)
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: hPadding),
+                    sliver: SliverList.separated(
+                      itemCount: pagedList.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: AppSpace.sm),
+                      itemBuilder: (_, i) => StockRow(
+                        product: pagedList[i],
+                        onTap: () => _openProduct(pagedList[i]),
+                        onAdjust: canEditProducts && Permissions.mine(Perm.stockAdjust)
+                            ? () => QuickStockDialog.show(context, product: pagedList[i], onSaved: _loadData)
+                            : null,
+                      ),
+                    ),
+                  )
                 else if (columns == 1)
                   SliverPadding(
                     padding: EdgeInsets.symmetric(horizontal: hPadding),
@@ -687,7 +703,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                               crossAxisCount: columns,
                               crossAxisSpacing: AppSpace.sm,
                               mainAxisSpacing: AppSpace.sm,
-                              childAspectRatio: 0.74,
+                              // Alto justo: la foto (ancho / 1,25) y el texto debajo, sin el
+                              // espacio vacío de antes en columnas anchas (0.16.7, hallazgo 16)
+                              mainAxisExtent: (constraints.maxWidth - 2 * hPadding - AppSpace.sm * (columns - 1)) / columns / 1.25 +
+                                  ProductCard.gridTextHeight,
                             )
                           : SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: columns,
@@ -731,6 +750,18 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     final outOfStock = _stats['outOfStock'] ?? 0;
     final lowStock = _stats['lowStock'] ?? 0;
     final totalValue = _stats['totalValue'] ?? 0.0;
+
+    // Stock no repite las tarjetas de Productos (0.16.7, hallazgo 36): una línea
+    if (_stockMode) {
+      final parts = [
+        if (outOfStock > 0) '$outOfStock ${outOfStock == 1 ? 'agotado' : 'agotados'}',
+        if (lowStock > 0) '$lowStock con stock bajo',
+      ];
+      return Text(
+        parts.isEmpty ? 'Todo tu inventario está por encima del mínimo.' : '${parts.join(' · ')}. Están arriba en la lista.',
+        style: AppText.body(context, weight: FontWeight.w600, color: parts.isEmpty ? c.success : c.ink),
+      );
+    }
 
     // Re-diseño 0.13.4 (segunda pasada): las cifras en tarjetas, como en Inicio y Clientes
     final openStock = (lowStock > 0 || outOfStock > 0) ? (widget.onOpenStock ?? _showToRestock) : null;

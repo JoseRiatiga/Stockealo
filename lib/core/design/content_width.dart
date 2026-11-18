@@ -14,16 +14,19 @@ class ContentWidth extends StatelessWidget {
 
   final Widget child;
 
-  const ContentWidth({super.key, required this.child});
+  /// Ancho máximo; [max] salvo pantallas que van junto a otras más anchas
+  final double maxWidth;
 
-  /// Lo que sobra a cada lado para que el contenido mida como mucho [max]
-  static double gutter(double width) => math.max(0, (width - max) / 2);
+  const ContentWidth({super.key, required this.child, this.maxWidth = max});
+
+  /// Lo que sobra a cada lado para que el contenido mida como mucho [limit]
+  static double gutter(double width, [double limit = max]) => math.max(0, (width - limit) / 2);
 
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.topCenter,
-      child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: max), child: child),
+      child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxWidth), child: child),
     );
   }
 }
@@ -37,6 +40,9 @@ class ContentListView extends StatelessWidget {
   final ScrollPhysics? physics;
   final List<Widget> children;
 
+  /// Ancho máximo del contenido
+  final double maxWidth;
+
   /// Para listas largas: se arman los elementos a medida que se ven
   final int? itemCount;
   final IndexedWidgetBuilder? itemBuilder;
@@ -47,6 +53,7 @@ class ContentListView extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.controller,
     this.physics,
+    this.maxWidth = ContentWidth.max,
     required this.children,
   })  : itemCount = null,
         itemBuilder = null,
@@ -57,6 +64,7 @@ class ContentListView extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.controller,
     this.physics,
+    this.maxWidth = ContentWidth.max,
     required int this.itemCount,
     required IndexedWidgetBuilder this.itemBuilder,
     required IndexedWidgetBuilder this.separatorBuilder,
@@ -66,7 +74,7 @@ class ContentListView extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, box) {
-        final side = ContentWidth.gutter(box.maxWidth);
+        final side = ContentWidth.gutter(box.maxWidth, maxWidth);
         final pad = padding.copyWith(left: padding.left + side, right: padding.right + side);
         if (itemBuilder != null) {
           return ListView.separated(

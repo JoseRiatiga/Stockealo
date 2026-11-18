@@ -69,7 +69,14 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Vender más fácil y la hora de tu negocio
+            ### Todo más ordenado
+            - Stock es una lista con lo agotado y lo bajo arriba, y «Ajustar» en cada producto.
+            - El stock ya no se cambia en Editar producto: se ajusta y queda en el historial.
+            - Registrar un abono usa los mismos medios de pago que Vender, con atajos de valor.
+            - El detalle del producto, «Tu negocio» y Gestionar categorías tienen el diseño nuevo.
+            - Equipo tiene un solo botón «Invitar» y Stocky no muestra consejos en Caja.
+
+            ### Vender más fácil y la hora de tu negocio (0.16.6)
             - En Vender tienes a mano las ventas en espera y las cotizaciones, también en el celular.
             - «Cobrar» queda siempre a la vista y los descuentos avisan si pasan el valor o dejan pérdida.
             - «Nueva venta» guarda la cuenta que tenías en espera y abre una vacía.

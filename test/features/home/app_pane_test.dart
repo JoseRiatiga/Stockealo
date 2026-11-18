@@ -105,4 +105,34 @@ void main() {
     expect(find.text('Lugar'), findsNothing, reason: 'tapa la pantalla, como antes');
     expect(AppPane.depth.value, 0);
   });
+
+  testWidgets('al pasar de computador a celular, lo abierto en el panel no se pierde', (tester) async {
+    final hostKey = GlobalKey();
+    var wideLayout = true;
+    late StateSetter setLayout;
+    late BuildContext placeContext;
+    Widget host() => AppPaneHost(
+          key: hostKey,
+          home: Builder(builder: (c) {
+            placeContext = c;
+            return const Text('Lugar');
+          }),
+        );
+    await tester.pumpWidget(MaterialApp(
+      home: StatefulBuilder(builder: (context, setState) {
+        setLayout = setState;
+        return Scaffold(
+          body: wideLayout ? Row(children: [const SizedBox(width: 200), Expanded(child: host())]) : host(),
+        );
+      }),
+    ));
+    AppPane.open(placeContext, (_) => const Scaffold(body: Text('Entrada a medias')));
+    await tester.pumpAndSettle();
+    setLayout(() => wideLayout = false);
+    await tester.pumpAndSettle();
+    expect(find.text('Entrada a medias'), findsOneWidget);
+    expect(AppPane.depth.value, 1);
+    AppPane.clear();
+    await tester.pumpAndSettle();
+  });
 }

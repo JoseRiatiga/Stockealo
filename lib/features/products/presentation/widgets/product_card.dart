@@ -153,6 +153,10 @@ class ProductCard extends StatelessWidget {
     );
   }
 
+  /// Alto del texto bajo la foto en la cuadrícula (nombre en 2 renglones, precio,
+  /// stock y márgenes), para que la cuadrícula no deje espacio vacío
+  static const double gridTextHeight = 124;
+
   Widget _buildGrid(BuildContext context) {
     final c = context.colors;
     return AppCard(

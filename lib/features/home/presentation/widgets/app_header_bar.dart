@@ -140,40 +140,65 @@ class AppHeaderBar extends StatelessWidget {
       );
     }
 
-    return Container(
-      constraints: const BoxConstraints(minHeight: 76),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpace.xl + 4, vertical: AppSpace.md),
-      decoration: BoxDecoration(color: c.paper, border: Border(bottom: BorderSide(color: c.line))),
-      child: Row(
-        children: [
-          // El nombre tiene prioridad; el buscador toma lo que sobre (0.16.3)
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.page(context)),
-                if (subtitle != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.small(context)),
-                  ),
-              ],
+    // Computador: el título tiene prioridad (0.16.7, hallazgos 12 y 38: se cortaban
+    // el título y el buscador). Bajo 1150 px la nube queda como ícono; bajo 820 px
+    // (una ventana de 1024) también el buscador, y «Nueva venta» pasa a «+»
+    return LayoutBuilder(builder: (context, box) {
+      final roomy = box.maxWidth >= 1150;
+      final medium = box.maxWidth >= 820;
+      return Container(
+        constraints: const BoxConstraints(minHeight: 76),
+        padding: EdgeInsets.symmetric(horizontal: medium ? AppSpace.xl + 4 : AppSpace.lg, vertical: AppSpace.md),
+        decoration: BoxDecoration(color: c.paper, border: Border(bottom: BorderSide(color: c.line))),
+        child: Row(
+          children: [
+            // El título se lleva el doble que el buscador: se lee entero
+            Expanded(
+              flex: 2,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.page(context)),
+                  if (subtitle != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.small(context)),
+                    ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpace.lg),
-          if (cash != null) ...[cash, const SizedBox(width: AppSpace.md - 2)],
-          Flexible(child: _SearchBox(onTap: onSearchTap)),
-          const SizedBox(width: AppSpace.md - 2),
-          const SyncPill(),
-          const SizedBox(width: AppSpace.sm),
-          bell,
-          const SizedBox(width: AppSpace.xs),
-          const ThemeModeButton(size: 20),
-          if (newSale != null) ...[const SizedBox(width: AppSpace.md - 2), newSale],
-        ],
-      ),
-    );
+            const SizedBox(width: AppSpace.lg),
+            if (business != null) ...[
+              CashPill(business: business!, onTap: onCashTap, short: !medium),
+              const SizedBox(width: AppSpace.md - 2),
+            ],
+            if (medium)
+              Flexible(child: _SearchBox(onTap: onSearchTap))
+            else
+              IconButton(
+                tooltip: 'Buscar producto, cliente o función (Ctrl K)',
+                onPressed: onSearchTap,
+                style: IconButton.styleFrom(side: BorderSide(color: c.lineStrong)),
+                icon: Icon(Icons.search_outlined, size: 20, color: c.inkMuted),
+              ),
+            const SizedBox(width: AppSpace.md - 2),
+            SyncPill(iconOnly: !roomy),
+            const SizedBox(width: AppSpace.sm),
+            bell,
+            const SizedBox(width: AppSpace.xs),
+            const ThemeModeButton(size: 20),
+            if (onNewSale != null) ...[
+              const SizedBox(width: AppSpace.md - 2),
+              if (medium)
+                newSale!
+              else
+                IconButton.filled(tooltip: 'Nueva venta', onPressed: onNewSale, icon: const Icon(Icons.add_outlined)),
+            ],
+          ],
+        ),
+      );
+    });
   }
 }
 
@@ -244,7 +269,10 @@ class CashPill extends StatefulWidget {
   final Business business;
   final VoidCallback? onTap;
 
-  const CashPill({super.key, required this.business, this.onTap});
+  /// Sin la hora («Caja abierta»): para encabezados angostos
+  final bool short;
+
+  const CashPill({super.key, required this.business, this.onTap, this.short = false});
 
   @override
   State<CashPill> createState() => _CashPillState();
@@ -291,15 +319,26 @@ class _CashPillState extends State<CashPill> {
   Widget build(BuildContext context) {
     if (!_loaded || !widget.business.cashRegisterEnabled) return const SizedBox.shrink();
     final open = _open;
-    final label = open == null ? 'Caja cerrada' : 'Caja abierta desde ${clockText(open.openedAt)}';
+    final full = open == null ? 'Caja cerrada' : 'Caja abierta desde ${clockText(open.openedAt)}';
+    // En el celular o con poco ancho, sin la hora para que no se corte (0.16.7, hallazgo 60)
+    return LayoutBuilder(builder: (context, box) {
+      final label = widget.short || box.maxWidth < 210 ? (open == null ? 'Caja cerrada' : 'Caja abierta') : full;
+      return _pill(label, full, open != null);
+    });
+  }
+
+  Widget _pill(String label, String full, bool isOpen) {
     return Semantics(
       button: widget.onTap != null,
-      label: label,
+      label: full,
       excludeSemantics: true,
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        child: StatusPill(label, tone: open == null ? AppTone.warning : AppTone.success, dot: true),
+      child: Tooltip(
+        message: label == full ? '' : full,
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: StatusPill(label, tone: isOpen ? AppTone.success : AppTone.warning, dot: true),
+        ),
       ),
     );
   }

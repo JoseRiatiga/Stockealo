@@ -139,6 +139,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         _look = saved?.look ?? StoreLook(adult: suggested?.adult ?? false);
         _paymentController.text = _look.payment ?? '';
         _hashtagsController.text = _look.hashtags.join(' ');
+        _cleanSignature = _signature;
       });
     } catch (e) {
       if (mounted) setState(() => _loadError = '$e');
@@ -216,7 +217,10 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         if (mounted) AppToast.show(context, message: '$e', type: ToastType.warning);
       }
       if (!mounted) return;
-      setState(() => _saved = saved);
+      setState(() {
+        _saved = saved;
+        _cleanSignature = _signature;
+      });
       if (lookSaved) {
         AppToast.show(context,
             message: saved.enabled ? 'Tu tienda está publicada.' : 'Guardado. La tienda está apagada.', type: ToastType.success);
@@ -491,6 +495,18 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
     );
   }
 
+  /// Lo que se ve en la vista previa, para saber si hay cambios sin guardar
+  String get _signature {
+    final l = _lookToSave;
+    return [
+      _template, _heroController.text.trim(), _welcomeController.text.trim(), _cover, _coverUrl, _heroPhotos,
+      l.accent, l.dark, l.featured.join(','), l.payment, l.adult, l.hashtags.join(','),
+    ].join('|');
+  }
+
+  /// Cómo estaba al cargar o al guardar por última vez
+  String? _cleanSignature;
+
   StoreLook get _lookToSave {
     final pay = _paymentController.text.trim();
     final look = _look.copyWith(hashtags: StoreLook.parseHashtags(_hashtagsController.text));
@@ -633,6 +649,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
     } catch (_) {}
     base ??= await _localStore(slug);
     if (!mounted) return;
+    final unsaved = _signature != _cleanSignature;
     final store = base.copyWith(
       template: _template,
       heroTitle: _heroController.text.trim().isEmpty ? null : _heroController.text.trim(),
@@ -646,8 +663,12 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Vista previa'), actions: const [
-            Padding(padding: EdgeInsets.only(right: AppSpace.md), child: StatusPill('Sin guardar', tone: AppTone.warning)),
+          // «Sin guardar» solo si de verdad cambió algo (0.16.7, hallazgo 40)
+          appBar: AppBar(title: const Text('Vista previa'), actions: [
+            if (_saved == null)
+              const Padding(padding: EdgeInsets.only(right: AppSpace.md), child: StatusPill('Sin publicar', tone: AppTone.warning))
+            else if (unsaved)
+              const Padding(padding: EdgeInsets.only(right: AppSpace.md), child: StatusPill('Sin guardar', tone: AppTone.warning)),
           ]),
           body: StorePage(slug: store.slug, loader: (_) async => store, maintenanceLoader: () async => MaintenanceState.none),
         ),

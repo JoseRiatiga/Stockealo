@@ -20,6 +20,23 @@ import '../../models/product_lot.dart';
 
 String _date(DateTime d) => DateFormat("d MMM y", 'es_CO').format(d);
 
+/// El calendario del vencimiento, el mismo en toda la app (0.16.7, hallazgo 34): abre
+/// en el mes de hoy (antes abría un año adelante, aunque fueran huevos), con el título
+/// corto y los botones con las palabras de la app
+Future<DateTime?> pickExpiryDate(BuildContext context, {DateTime? current}) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  return showDatePicker(
+    context: context,
+    initialDate: current ?? today,
+    firstDate: DateTime(now.year - 2),
+    lastDate: DateTime(now.year + 10),
+    helpText: 'Vence el',
+    confirmText: 'Elegir',
+    cancelText: 'Cancelar',
+  );
+}
+
 /// La pastilla de un lote: «Vencido», «En 18 días», «Al día», «Con el proveedor»…
 StatusPill lotPill(ProductLot lot, {DateTime? now}) {
   final at = now ?? DateTime.now();
@@ -51,14 +68,7 @@ class LotDatePrompt {
               icon: const Icon(Icons.event_outlined),
               label: Text(picked == null ? 'Elegir la fecha de vencimiento' : 'Vence: ${_date(picked!)}'),
               onPressed: () async {
-                final now = DateTime.now();
-                final d = await showDatePicker(
-                  context: ctx,
-                  initialDate: picked ?? DateTime(now.year + 1, now.month, now.day),
-                  firstDate: DateTime(now.year - 2),
-                  lastDate: DateTime(now.year + 10),
-                  helpText: 'Fecha de vencimiento',
-                );
+                final d = await pickExpiryDate(ctx, current: picked);
                 if (d != null) setLocal(() => picked = d);
               },
             ),

@@ -605,18 +605,22 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         title: const Text('Equipo'),
         actions: [
           // Roles y permisos (0.15.0): el dueño los cambia; el administrador los ve
-          if (canInvite)
-            IconButton(
-              tooltip: 'Roles y permisos',
-              onPressed: () => RolesScreen.open(context, business: widget.business, canEdit: isOwner).then((_) => _loadData()),
-              icon: const Icon(Icons.tune_outlined),
-            ),
+          // Con su nombre a la vista, no solo un ícono (0.16.7, hallazgo 51)
           if (canInvite)
             TextButton.icon(
+              onPressed: () => RolesScreen.open(context, business: widget.business, canEdit: isOwner).then((_) => _loadData()),
+              icon: const Icon(Icons.tune_outlined, size: 18),
+              label: const Text('Roles'),
+            ),
+          if (canInvite) ...[
+            const SizedBox(width: AppSpace.xs),
+            FilledButton.icon(
               onPressed: _checkAndShowInviteModal,
-              icon: const Icon(Icons.qr_code_2_outlined, size: 18),
+              icon: const Icon(Icons.person_add_alt_outlined, size: 18),
               label: const Text('Invitar'),
             ),
+            const SizedBox(width: AppSpace.md),
+          ],
         ],
       ),
       body: _isLoading
@@ -649,40 +653,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                     ),
                     const SizedBox(height: AppSpace.lg),
 
-                    // Código de invitación (solo dueño o administrador)
-                    if (canInvite) ...[
-                      AppCard(
-                        onTap: _checkAndShowInviteModal,
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: c.successSoft,
-                                borderRadius: BorderRadius.circular(AppRadius.control),
-                              ),
-                              child: Icon(Icons.qr_code_scanner_outlined, color: c.success),
-                            ),
-                            const SizedBox(width: AppSpace.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Código ${widget.business.inviteCode}',
-                                      style: TextStyle(color: c.ink, fontWeight: FontWeight.w600)),
-                                  Text('Compártelo con tu equipo para que se unan',
-                                      style: TextStyle(color: c.inkMuted, fontSize: AppText.sizeCaption)),
-                                ],
-                              ),
-                            ),
-                            Text('Ver QR', style: TextStyle(color: c.accent, fontWeight: FontWeight.w600)),
-                            Icon(Icons.chevron_right_outlined, color: c.inkFaint),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: AppSpace.xl),
-                    ],
-
+                    // Se invita solo con «Invitar» de arriba: abre el QR, el código y
+                    // «Compartir invitación» (0.16.7, decisión E3, hallazgo 52)
                     Text(
                       'Miembros (${employeesList.length + 1})',
                       style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink),

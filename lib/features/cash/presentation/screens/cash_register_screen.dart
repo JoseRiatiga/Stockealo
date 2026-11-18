@@ -23,6 +23,7 @@ import '../../../sales/presentation/widgets/sale_document.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../../core/permissions/permission_guard.dart';
 import '../../../team/presentation/widgets/authorization_gate.dart';
+import '../../../dashboard/presentation/widgets/stocky_floating_button.dart';
 
 /// Caja (lugar del menú): abrir el turno con una base, registrar entradas y
 /// salidas, ver lo cobrado por forma de pago y cerrar contando el dinero (también
@@ -348,7 +349,8 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(AppSpace.md + 2, AppSpace.lg, AppSpace.md + 2, AppSpace.xxl),
+              // Abajo, espacio para el botón de Stocky: no tapa los últimos montos (0.16.7)
+              padding: const EdgeInsets.fromLTRB(AppSpace.md + 2, AppSpace.lg, AppSpace.md + 2, StockyFloatingButton.clearance + AppSpace.lg),
               children: [
                 Center(
                   child: ConstrainedBox(

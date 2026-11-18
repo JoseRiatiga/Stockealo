@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/utils/clock_text.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import '../../../../core/utils/money_input.dart';
 
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -61,9 +60,9 @@ class _OpenCashFormState extends State<OpenCashForm> {
     super.dispose();
   }
 
-  double get _amount => double.tryParse(_base.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  double get _amount => MoneyInput.parse(_base.text);
 
-  void _set(double v) => _base.text = NumberFormat.decimalPattern('es_CO').format(v.round());
+  void _set(double v) => _base.text = MoneyInput.text(v);
 
   Future<void> _open() async {
     if (!PermissionGuard.check(context, Perm.cashOwn)) return;
@@ -98,7 +97,7 @@ class _OpenCashFormState extends State<OpenCashForm> {
           controller: _base,
           autofocus: true,
           keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly, _ThousandsFormatter()],
+          inputFormatters: MoneyInput.formatters,
           style: AppText.heading(context).copyWith(fontSize: AppText.sizePage - 2),
           onChanged: (_) => setState(() {}),
           onSubmitted: (_) => _saving ? null : _open(),
@@ -165,17 +164,6 @@ class _OpenCashFormState extends State<OpenCashForm> {
         ),
       ],
     );
-  }
-}
-
-/// Puntos de mil mientras se escribe («100.000»)
-class _ThousandsFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) return const TextEditingValue();
-    final text = NumberFormat.decimalPattern('es_CO').format(int.parse(digits));
-    return TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
   }
 }
 

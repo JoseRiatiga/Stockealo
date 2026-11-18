@@ -9,6 +9,7 @@ import 'package:stockealo/features/business/models/business.dart';
 import 'package:stockealo/features/products/models/product.dart';
 import 'package:stockealo/features/sales/data/sales_repository.dart';
 import 'package:stockealo/features/sales/models/cart_item.dart';
+import 'package:stockealo/features/sales/models/payment_method.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -275,6 +276,59 @@ void main() {
       );
 
       expect(await debtOf('Luis'), 1500);
+    });
+
+    // 0.16.8 (#19): pago mixto con una parte fiada
+    test('mixto con una parte fiada: solo esa parte va a la deuda y anular la quita', () async {
+      final a = await addProduct('a', price: 1000);
+      final c = await addProduct('c', price: 500);
+      // Ya debía 500 de antes
+      await repo.recordMultiProductSale(
+        businessId: businessId,
+        items: [CartItem(product: c, quantity: 1)],
+        paymentMethod: 'FIADO',
+        customerName: 'Marta',
+      );
+      final lines = await repo.recordMultiProductSale(
+        businessId: businessId,
+        items: [CartItem(product: a, quantity: 3)],
+        paymentMethod: PaymentMethod.mixed,
+        customerName: 'Marta',
+        paymentSplit: {PaymentMethod.cash: 1000, PaymentMethod.credit: 2000},
+      );
+      expect(await debtOf('Marta'), 2500);
+      expect(PaymentMethod.creditPart(lines.single.paymentMethod, lines.single.totalAmount, lines.single.paymentSplit), 2000);
+      final row = (await (await appDb.database).query('sales', where: 'id = ?', whereArgs: [lines.single.id])).single;
+      expect(row['payment_status'], 'PENDIENTE');
+      expect(SalesRepository.refundMethods(lines.single), [PaymentMethod.cash, PaymentMethod.credit]);
+
+      await repo.voidSale(lines.single);
+      expect(await debtOf('Marta'), 500, reason: 'la deuda de antes se queda');
+    });
+
+    // 0.16.8 (D1): la lista con el nombre de hoy; el recibo con el de ese día
+    test('producto renombrado: Ventas muestra el nombre nuevo y el recibo el de ese día', () async {
+      final a = await addProduct('a');
+      await repo.recordMultiProductSale(businessId: businessId, items: [CartItem(product: a, quantity: 1)], paymentMethod: 'EFECTIVO');
+      await (await appDb.database).update('products', {'name': 'Gaseosa 400 ml'}, where: 'id = ?', whereArgs: ['a']);
+      final sale = (await repo.getSales(businessId: businessId)).single;
+      expect(sale.listName, 'Gaseosa 400 ml');
+      expect(sale.productName, 'Producto a');
+      expect((await repo.linesOf(sale)).single.listName, 'Gaseosa 400 ml');
+    });
+
+    test('mixto con una parte fiada pide el cliente', () async {
+      final a = await addProduct('a', price: 1000);
+      await expectLater(
+        repo.recordMultiProductSale(
+          businessId: businessId,
+          items: [CartItem(product: a, quantity: 1)],
+          paymentMethod: PaymentMethod.mixed,
+          paymentSplit: {PaymentMethod.cash: 400, PaymentMethod.credit: 600},
+        ),
+        throwsA(isA<Exception>()),
+      );
+      expect(await stockOf('a'), 10);
     });
 
     test('si un producto no alcanza, no se registra ninguna venta del carrito', () async {

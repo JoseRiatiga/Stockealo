@@ -21,6 +21,18 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.16.8',
+      title: 'Íconos, fiado en el pago mixto y más',
+      items: [
+        'Cada categoría tiene su ícono en la tienda, Vender y Productos; tócalo en Categorías para cambiarlo.',
+        'En el pago mixto puedes dejar una parte fiada: se suma a lo que debe el cliente.',
+        'Reportes resta los gastos que registras en Caja de la ganancia neta.',
+        'Los valores se ven con puntos de mil mientras escribes.',
+        'Las fechas de Promociones y Ventas se eligen con atajos como «Esta semana» o «Este mes».',
+        'Ventas y Reportes muestran el nombre actual de cada producto; el recibo, el del día de la venta.',
+      ],
+    ),
+    (
       version: '0.16.7',
       title: 'Todo más ordenado',
       items: [

@@ -270,17 +270,19 @@ class SupabaseService {
       try {
         final localCategories = await rowsOf('categories', managedIds);
         if (localCategories.isNotEmpty) {
-          final formattedCategories = localCategories.map((c) => {
-            'id': c['id'],
-            'business_id': c['business_id'],
-            'name': c['name'],
-            'color_hex': c['color_hex'] ?? '0xFF059669',
-          }).toList();
-
-          await client!.from('categories').upsert(
-            formattedCategories,
-            onConflict: 'id',
-          );
+          // El ícono sube solo si el equipo lo tiene: un equipo que viene de antes de la
+          // 0.16.8 no borra el que ya se eligió en otro (dos tandas, cada una con sus columnas)
+          Map<String, dynamic> row(Map<String, dynamic> c, {bool icon = false}) => {
+                'id': c['id'],
+                'business_id': c['business_id'],
+                'name': c['name'],
+                'color_hex': c['color_hex'] ?? '0xFF059669',
+                if (icon) 'icon': c['icon'],
+              };
+          final withIcon = [for (final c in localCategories) if ((c['icon'] as String? ?? '').isNotEmpty) row(c, icon: true)];
+          final withoutIcon = [for (final c in localCategories) if ((c['icon'] as String? ?? '').isEmpty) row(c)];
+          if (withIcon.isNotEmpty) await client!.from('categories').upsert(withIcon, onConflict: 'id');
+          if (withoutIcon.isNotEmpty) await client!.from('categories').upsert(withoutIcon, onConflict: 'id');
         }
       } catch (e) {
         debugPrint('Nota: error o tabla categories no configurada en Supabase: $e');
@@ -502,8 +504,38 @@ class SupabaseService {
     }
   }
 
+  /// La descarga en curso: al abrir la app varias pantallas la piden a la vez y cada
+  /// una bajaba y escribía todo al mismo tiempo, compitiendo con lo que se ve primero
+  /// (0.16.8, #42). Ahora van una tras otra: si ya hay una, queda UNA más en fila (por
+  /// si algo cambió en la nube mientras tanto) y las demás esperan esa.
+  Future<SyncResult>? _syncing;
+  Future<SyncResult>? _syncQueued;
+  String? _syncingUser;
+
   /// Descarga todos los datos desde Supabase hacia la base de datos local SQLite
-  Future<SyncResult> syncFromCloud(String userId, [String? userEmail]) async {
+  Future<SyncResult> syncFromCloud(String userId, [String? userEmail]) {
+    final running = _syncing;
+    if (running != null) {
+      // Otra cuenta (cambio de sesión): espera su turno; nunca dos escribiendo a la vez
+      if (_syncingUser != userId) return running.then((_) => syncFromCloud(userId, userEmail));
+      return _syncQueued ??= running.then((_) {
+        _syncQueued = null;
+        return syncFromCloud(userId, userEmail);
+      });
+    }
+    final next = _syncFromCloud(userId, userEmail);
+    _syncing = next;
+    _syncingUser = userId;
+    next.whenComplete(() {
+      if (identical(_syncing, next)) {
+        _syncing = null;
+        _syncingUser = null;
+      }
+    }).ignore();
+    return next;
+  }
+
+  Future<SyncResult> _syncFromCloud(String userId, [String? userEmail]) async {
     if (MaintenanceService.instance.cloudPaused) {
       return const SyncResult(success: false, errorMessage: 'La nube está en mantenimiento. Tus datos se guardan en este equipo.');
     }
@@ -619,6 +651,7 @@ class SupabaseService {
               'business_id': c['business_id'],
               'name': c['name'],
               'color_hex': c['color_hex'] ?? '0xFF059669',
+              'icon': c['icon'],
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
@@ -1385,6 +1418,7 @@ class SupabaseService {
           'business_id': p['business_id'],
           'name': p['name'],
           'color_hex': p['color_hex'] ?? '0xFF059669',
+          if (p.containsKey('icon')) 'icon': p['icon'],
           if (editedAt != null) 'updated_at': editedAt,
         }, onConflict: 'id');
       case 'delete_category':

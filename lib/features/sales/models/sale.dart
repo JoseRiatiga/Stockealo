@@ -59,6 +59,13 @@ class Sale {
   bool get pendingDelivery => deliveryStatus == toDeliver && !isVoided;
 
   bool get isService => serviceId != null || productId.isEmpty;
+
+  /// Nombre de hoy del producto (0.16.8, decisión D1): solo se llena al leer de la
+  /// base con el producto; no se guarda
+  final String? currentName;
+
+  /// Para listas y reportes: el nombre de hoy. El recibo usa [productName], el del día
+  String get listName => (currentName ?? '').trim().isNotEmpty ? currentName!.trim() : productName;
   bool get isVoided => voidedAt != null;
 
   Sale({
@@ -94,6 +101,7 @@ class Sale {
     this.deliveryNote,
     this.deliveredAt,
     this.returnOf,
+    this.currentName,
   });
 
   Map<String, dynamic> toMap() {

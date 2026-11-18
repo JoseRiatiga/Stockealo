@@ -11,14 +11,25 @@ abstract final class PaymentMethod {
   static const card = 'TARJETA';
   static const credit = 'FIADO';
 
-  /// Parte en una forma y parte en otra (no incluye fiado)
+  /// Parte en una forma y parte en otra. En Vender, una parte puede quedar fiada
+  /// (0.16.8, #19): esa parte se suma a la deuda del cliente
   static const mixed = 'MIXTO';
 
   /// En el orden en que se ofrecen al cobrar
   static const forSale = [cash, nequi, transfer, card, credit, mixed];
 
-  /// Las que se pueden combinar en un pago mixto
+  /// Las que se pueden combinar en un pago mixto (abonos y servicios: sin fiado)
   static const forMixed = [cash, nequi, transfer, card];
+
+  /// El pago mixto de Vender: además, una parte fiada (0.16.8, #19)
+  static const forMixedSale = [...forMixed, credit];
+
+  /// Lo que una venta deja fiado: todo si es fiado, la parte fiada si es mixto
+  static double creditPart(String method, double total, String? split) => switch (method.toUpperCase()) {
+        credit => total,
+        mixed => decodeSplit(split)[credit] ?? 0,
+        _ => 0,
+      };
 
   static String label(String? code) => switch ((code ?? '').toUpperCase()) {
         cash || '' => 'Efectivo',

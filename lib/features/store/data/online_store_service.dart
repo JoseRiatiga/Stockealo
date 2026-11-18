@@ -280,6 +280,9 @@ class StoreLook {
   /// Hashtags propios del negocio para Instagram (fase 3): «#VariedadesRosita»
   final List<String> hashtags;
 
+  /// Íconos en los filtros de categoría (0.16.8, #28); apagado = solo el nombre
+  final bool icons;
+
   const StoreLook({
     this.accent,
     this.dark = false,
@@ -288,6 +291,7 @@ class StoreLook {
     this.payment,
     this.adult = false,
     this.hashtags = const [],
+    this.icons = true,
   });
 
   static const maxHashtags = 10;
@@ -333,6 +337,7 @@ class StoreLook {
       schedule: StoreSchedule.fromJson(raw['schedule']),
       payment: payment.isEmpty ? null : payment,
       adult: raw['adult'] == true,
+      icons: raw['icons'] != false,
       hashtags: [
         for (final h in (raw['hashtags'] as List? ?? const []))
           if (h is String && cleanHashtag(h) != null) cleanHashtag(h)!,
@@ -347,11 +352,12 @@ class StoreLook {
         if (schedule != null) 'schedule': schedule!.toJson(),
         if (payment != null) 'payment': payment,
         'adult': adult,
+        'icons': icons,
         if (hashtags.isNotEmpty) 'hashtags': hashtags.take(maxHashtags).toList(),
       };
 
   StoreLook copyWith({String? accent, bool clearAccent = false, bool? dark, List<String>? featured, StoreSchedule? schedule,
-          bool clearSchedule = false, String? payment, bool clearPayment = false, bool? adult, List<String>? hashtags}) =>
+          bool clearSchedule = false, String? payment, bool clearPayment = false, bool? adult, List<String>? hashtags, bool? icons}) =>
       StoreLook(
         accent: clearAccent ? null : accent ?? this.accent,
         dark: dark ?? this.dark,
@@ -360,6 +366,7 @@ class StoreLook {
         payment: clearPayment ? null : payment ?? this.payment,
         adult: adult ?? this.adult,
         hashtags: hashtags ?? this.hashtags,
+        icons: icons ?? this.icons,
       );
 }
 
@@ -564,6 +571,9 @@ class PublicStore {
   /// Personalizar tienda (0.16.0)
   final StoreLook look;
 
+  /// Ícono de cada categoría, por nombre en minúscula (0.16.8, #28)
+  final Map<String, String> categoryIcons;
+
   const PublicStore({
     required this.slug,
     required this.whatsapp,
@@ -578,7 +588,11 @@ class PublicStore {
     this.heroPhotos = true,
     this.heroImageUrl,
     this.look = StoreLook.none,
+    this.categoryIcons = const {},
   });
+
+  /// El ícono de una categoría de la tienda; null si no tiene o están apagados
+  String? iconOf(String category) => look.icons ? categoryIcons[category.trim().toLowerCase()] : null;
 
   /// La misma tienda con otro diseño (la vista previa de «Personalizar»)
   PublicStore copyWith({String? template, String? heroTitle, bool? heroPhotos, String? heroImageUrl, StoreLook? look, String? welcome}) =>
@@ -596,6 +610,7 @@ class PublicStore {
         heroPhotos: heroPhotos ?? this.heroPhotos,
         heroImageUrl: heroImageUrl ?? this.heroImageUrl,
         look: look ?? this.look,
+        categoryIcons: categoryIcons,
       );
 
   /// El color de la tienda: el propio o el del negocio
@@ -626,6 +641,10 @@ class PublicStore {
       heroPhotos: j['hero_photos'] != false,
       heroImageUrl: (j['hero_image_url'] as String?)?.startsWith('https://') == true ? j['hero_image_url'] as String : null,
       look: StoreLook.fromJson(j['look']),
+      categoryIcons: {
+        for (final e in (j['category_icons'] as Map? ?? const {}).entries)
+          if (e.value is String && (e.value as String).isNotEmpty) '${e.key}': e.value as String,
+      },
       products: [
         for (final p in (j['products'] as List? ?? const [])) StoreProduct.fromJson(Map<String, dynamic>.from(p as Map)),
       ],

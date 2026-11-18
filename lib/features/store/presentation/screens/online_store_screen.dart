@@ -424,6 +424,14 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
+          title: Text('Mostrar íconos de categoría', style: AppText.body(context)),
+          subtitle: Text('Cada categoría con su dibujo. Apagado: solo el nombre. Se cambian en Productos › Categorías.',
+              style: AppText.small(context)),
+          value: _look.icons,
+          onChanged: (v) => setState(() => _look = _look.copyWith(icons: v)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
           title: Text('Aviso +18', style: AppText.body(context)),
           subtitle: Text('Al entrar pregunta «¿Tienes 18 años o más?». Para licores y vapers.', style: AppText.small(context)),
           value: _look.adult,
@@ -678,7 +686,13 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
 
   Future<PublicStore> _localStore(String slug) async {
     final products = await ProductRepository.instance.getAllProducts(widget.business.id);
+    final categories = await ProductRepository.instance.getCategories(widget.business.id);
     return PublicStore(
+      // Los íconos de las categorías, como los trae la tienda publicada (0.16.8)
+      categoryIcons: {
+        for (final c in categories)
+          if ((c.icon ?? '').isNotEmpty) c.name.trim().toLowerCase(): c.icon!,
+      },
       slug: slug.isEmpty ? 'mi-tienda' : slug,
       whatsapp: _whatsapp?.replaceAll('+', '') ?? '',
       businessName: widget.business.name,
@@ -814,6 +828,21 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
                 const StatusPill('Publicada', tone: AppTone.success, dot: true),
               ],
             ),
+            // Una tienda vieja pudo quedar publicada sin número (0.16.8, #39)
+            if (store.whatsapp.trim().isEmpty) ...[
+              const SizedBox(height: AppSpace.sm),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_outlined, size: 18, color: c.warning),
+                  const SizedBox(width: AppSpace.xs),
+                  Expanded(
+                    child: Text('Sin WhatsApp no te llegan los pedidos. Escribe el número abajo y guarda.',
+                        style: AppText.small(context, weight: FontWeight.w600, color: c.warning)),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: AppSpace.md),
             Wrap(
               spacing: AppSpace.sm,

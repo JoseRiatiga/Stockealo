@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/utils/clock_text.dart';
 import '../../../../core/design/qty_stepper.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/design/app_dialog.dart';
@@ -9,6 +8,7 @@ import '../../../../core/design/stat_card.dart';
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/services/data_events.dart';
 import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/utils/money_input.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../business/presentation/active_business_scope.dart';
@@ -162,7 +162,7 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
 
   static double? _amount(String text) {
     final clean = text.replaceAll(RegExp(r'[^0-9]'), '');
-    return clean.isEmpty ? null : double.parse(clean);
+    return clean.isEmpty ? null : MoneyInput.parse(clean);
   }
 
   String _hour(DateTime d) => clockText(d);
@@ -199,7 +199,7 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
               controller: amount,
               autofocus: true,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              inputFormatters: MoneyInput.formatters,
               decoration: const InputDecoration(labelText: 'Valor', prefixText: '\$ '),
             ),
             const SizedBox(height: AppSpace.sm),
@@ -794,7 +794,7 @@ class _CloseFormState extends State<_CloseForm> {
             controller: _counted,
             autofocus: true,
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: MoneyInput.formatters,
             onChanged: (_) => setState(() {}),
             style: AppText.heading(context),
             decoration: const InputDecoration(labelText: 'Efectivo contado', prefixText: '\$ '),

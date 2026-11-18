@@ -229,17 +229,24 @@ class SalesRepository {
         : (discountPercent > 0 ? (totalSubtotal * (discountPercent / 100.0)) : 0.0);
     final double finalTotal = (totalSubtotal - finalDiscount).clamp(0.0, double.infinity);
 
-    // Pago mixto: los medios tienen que sumar el total (sin fiado)
+    // Pago mixto: los medios tienen que sumar el total; una parte puede quedar fiada (0.16.8)
     final mixed = paymentMethod == PaymentMethod.mixed;
     if (mixed) {
       final split = paymentSplit ?? const {};
       final paid = split.values.fold<double>(0, (a, b) => a + b);
-      if (split.keys.any((k) => !PaymentMethod.forMixed.contains(k))) {
-        throw Exception('El pago mixto solo combina efectivo, Nequi, transferencia y tarjeta.');
+      if (split.keys.any((k) => !PaymentMethod.forMixedSale.contains(k))) {
+        throw Exception('El pago mixto solo combina efectivo, Nequi, transferencia, tarjeta y fiado.');
       }
       if ((paid - finalTotal).abs() > 0.5) {
         throw Exception('Las partes del pago mixto suman ${CurrencyFormatter.format(paid)} y el total es ${CurrencyFormatter.format(finalTotal)}.');
       }
+    }
+    // Lo que queda debiendo el cliente: todo si es fiado, la parte fiada si es mixto
+    final double creditTotal = paymentMethod == PaymentMethod.credit
+        ? finalTotal
+        : (mixed ? (paymentSplit?[PaymentMethod.credit] ?? 0) : 0);
+    if (creditTotal > 0 && (customerName ?? '').trim().isEmpty) {
+      throw Exception('Para fiar escribe el nombre del cliente.');
     }
 
     final now = appNow();
@@ -258,7 +265,7 @@ class SalesRepository {
 
     await db.transaction((txn) async {
       // Registrar o actualizar deuda de fiado si corresponde
-      if (paymentMethod == 'FIADO' && customerName != null && customerName.trim().isNotEmpty) {
+      if (creditTotal > 0 && customerName != null && customerName.trim().isNotEmpty) {
         final cleanName = customerName.trim();
         final List<Map<String, dynamic>> existingCustomer = await txn.query(
           'customers',
@@ -272,7 +279,7 @@ class SalesRepository {
           final currentDebt = (existingCustomer.first['debt_balance'] as num).toDouble();
           await txn.update(
             'customers',
-            {'debt_balance': currentDebt + finalTotal},
+            {'debt_balance': currentDebt + creditTotal},
             where: 'id = ? AND business_id = ?',
             whereArgs: [customerId, businessId],
           );
@@ -283,7 +290,7 @@ class SalesRepository {
             'id': customerId,
             'business_id': businessId,
             'name': cleanName,
-            'debt_balance': finalTotal,
+            'debt_balance': creditTotal,
             'created_at': now.toIso8601String(),
             'is_synced': 0,
           });
@@ -357,7 +364,7 @@ class SalesRepository {
           'total_cost': item.totalCost,
           'net_profit': itemProfit,
           'payment_method': paymentMethod,
-          'payment_status': paymentMethod == 'FIADO' ? 'PENDIENTE' : 'PAGADO',
+          'payment_status': creditTotal > 0 ? 'PENDIENTE' : 'PAGADO',
           'notes': notes,
           'invoice_number': invoiceNumber,
           'discount_amount': itemDiscount + item.lineDiscount + (promo == null ? 0 : item.promoDiscount),
@@ -416,7 +423,7 @@ class SalesRepository {
     });
 
     // Sincronización a la nube fuera de la transacción: cliente, ventas y stock final
-    await _syncCustomer(db, customerId, customerIsNew, finalTotal, authRequestId: authRequestId);
+    await _syncCustomer(db, customerId, customerIsNew, creditTotal, authRequestId: authRequestId);
     for (final sale in createdSales) {
       SupabaseService.instance.insertSaleToCloud({...sale.toMap(), if (authRequestId != null) 'auth_request_id': authRequestId});
     }
@@ -782,7 +789,7 @@ class SalesRepository {
   }) async {
     final db = await _dbProvider.database;
     String sql = '''
-      SELECT s.*, COALESCE(s.product_photo_path, p.photo_path) AS resolved_photo
+      SELECT s.*, COALESCE(s.product_photo_path, p.photo_path) AS resolved_photo, p.name AS current_name
       FROM sales s
       LEFT JOIN products p ON s.product_id = p.id
       WHERE s.business_id = ?
@@ -805,8 +812,11 @@ class SalesRepository {
   Future<List<Sale>> linesOf(Sale sale) async {
     if ((sale.invoiceNumber ?? '').isEmpty) return [sale];
     final db = await _dbProvider.database;
-    final rows = await db.query('sales',
-        where: 'business_id = ? AND invoice_number = ?', whereArgs: [sale.businessId, sale.invoiceNumber], orderBy: 'rowid');
+    // Con el nombre de hoy de cada producto, para la lista (0.16.8, D1)
+    final rows = await db.rawQuery(
+        'SELECT s.*, p.name AS current_name FROM sales s LEFT JOIN products p ON p.id = s.product_id '
+        'WHERE s.business_id = ? AND s.invoice_number = ? ORDER BY s.rowid',
+        [sale.businessId, sale.invoiceNumber]);
     return rows.isEmpty ? [sale] : [for (final r in rows) saleFromRow(r)];
   }
 
@@ -859,6 +869,7 @@ class SalesRepository {
       deliveryNote: map['delivery_note'] as String?,
       deliveredAt: DateTime.tryParse('${map['delivered_at'] ?? ''}'),
       returnOf: map['return_of'] as String?,
+      currentName: map['current_name'] as String?,
     );
   }
 
@@ -995,7 +1006,7 @@ class SalesRepository {
   static List<String> refundMethods(Sale line) {
     if (line.paymentMethod.toUpperCase() != PaymentMethod.mixed) return [line.paymentMethod];
     final parts = PaymentMethod.decodeSplit(line.paymentSplit).keys.toList();
-    return parts.isEmpty ? [PaymentMethod.cash] : [for (final m in PaymentMethod.forMixed) if (parts.contains(m)) m];
+    return parts.isEmpty ? [PaymentMethod.cash] : [for (final m in PaymentMethod.forMixedSale) if (parts.contains(m)) m];
   }
 
   /// El medio de la devolución: el pedido si es válido; si no, efectivo o el primero
@@ -1133,9 +1144,11 @@ class SalesRepository {
       // Fiado: la deuda baja lo que se había fiado, neto de lo ya devuelto
       final owed = <String, double>{};
       for (final line in lines) {
-        if (line.paymentMethod == PaymentMethod.credit && line.customerName != null) {
+        // También la parte fiada de un pago mixto (0.16.8)
+        final credit = PaymentMethod.creditPart(line.paymentMethod, line.totalAmount, line.paymentSplit);
+        if (credit != 0 && line.customerName != null) {
           final key = line.customerName!.toLowerCase();
-          owed[key] = (owed[key] ?? 0) + line.totalAmount;
+          owed[key] = (owed[key] ?? 0) + credit;
         }
       }
       for (final e in owed.entries) {

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../business/presentation/business_identity.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/design/app_date_range_picker.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../products/presentation/widgets/product_image_view.dart';
 import '../../../../core/design/filter_tabs.dart';
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -98,7 +101,8 @@ class _PromotionsScreenState extends State<PromotionsScreen> {
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: AppSpace.xxl),
                             child: Text(
-                              'Aún no tienes promociones. Crea una: «20 % en camisetas», «2×1 en gaseosas», «Fin de mes»…',
+                              'Aún no tienes promociones. Crea una: '
+                              '${promotionExamplesFor(widget.business.icon).map((e) => '«$e»').join(', ')}…',
                               textAlign: TextAlign.center,
                               style: AppText.body(context, color: c.inkMuted),
                             ),
@@ -177,6 +181,25 @@ class _PromotionsScreenState extends State<PromotionsScreen> {
       };
 }
 
+/// Ejemplos de promociones según el tipo de negocio (0.16.8, #21): un minimercado
+/// no ve «camisetas». Los tres primeros van en el texto de la lista vacía; los dos
+/// primeros, en la pista del nombre.
+List<String> promotionExamplesFor(String? businessIcon) {
+  final kind = businessIcon == null ? null : kBusinessKinds.where((k) => k.key == businessIcon).firstOrNull;
+  if (kind?.key == 'drogueria' || kind?.key == 'medicamentos') {
+    return const ['10 % en vitaminas', '2×1 en protector solar', 'Fin de mes'];
+  }
+  return switch (kind?.group) {
+    'Comida' => const ['2×1 en postres', 'Combo almuerzo con jugo', 'Hora feliz'],
+    'Moda y belleza' => const ['20 % en camisetas', 'Lleva 3, paga 2 en medias', 'Cambio de temporada'],
+    'Salud' => const ['10 % en vitaminas', '2×1 en protector solar', 'Fin de mes'],
+    'Hogar y ferretería' => const ['15 % en pinturas', '10 % en herramientas', 'Fin de mes'],
+    'Tecnología' => const ['10 % en accesorios', 'Lleva 2 cables, paga 1', 'Fin de mes'],
+    'Tiendas' => const ['2×1 en gaseosas', '10 % en aseo', 'Fin de mes'],
+    _ => const ['10 % en todo', '2×1 en productos marcados', 'Fin de mes'],
+  };
+}
+
 /// LA hoja para crear o cambiar una promoción
 class PromotionEditor extends StatefulWidget {
   final Business business;
@@ -245,13 +268,12 @@ class _PromotionEditorState extends State<PromotionEditor> {
 
   Future<void> _pickRange() async {
     final now = DateTime.now();
-    final picked = await showDateRangePicker(
-      context: context,
+    final picked = await showAppDateRangePicker(
+      context,
+      initial: _range,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 2),
-      initialDateRange: _range,
-      helpText: '¿De qué día a qué día?',
-      saveText: 'Listo',
+      ahead: true,
     );
     if (picked != null) setState(() => _range = picked);
   }
@@ -268,6 +290,14 @@ class _PromotionEditorState extends State<PromotionEditor> {
             for (final p in _allProducts)
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
+                // Con su foto, como en Vender (0.16.8, #24)
+                secondary: ProductImageView(
+                  imagePath: p.photoPath,
+                  width: 40,
+                  height: 40,
+                  iconSize: 18,
+                  borderRadius: BorderRadius.circular(AppRadius.tile),
+                ),
                 value: chosen.contains(p.id),
                 title: Text(p.name),
                 subtitle: p.category.isEmpty ? null : Text(p.category),
@@ -359,7 +389,8 @@ class _PromotionEditorState extends State<PromotionEditor> {
           controller: _name,
           maxLength: 60,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Ej.: Fin de mes, 2×1 en camisetas'),
+          decoration: InputDecoration(
+              labelText: 'Nombre', hintText: 'Ej.: ${promotionExamplesFor(widget.business.icon).take(2).join(', ')}'),
         ),
         const SizedBox(height: AppSpace.sm),
         Text('Tipo', style: AppText.small(context, weight: FontWeight.w700)),

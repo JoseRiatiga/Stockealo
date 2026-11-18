@@ -1109,12 +1109,12 @@ class StockyAssistantService {
     final db = await AppDatabase.instance.database;
     final res = await db.rawQuery('''
       SELECT 
-        s.product_name, 
-        SUM(s.quantity) as qty, 
-        SUM(s.total) as revenue 
-      FROM sales_ok s
+        COALESCE(MAX(p.name), MAX(s.product_name)) AS product_name,
+        SUM(s.quantity) as qty,
+        SUM(s.total) as revenue
+      FROM sales_ok s LEFT JOIN products p ON p.id = s.product_id
       WHERE s.business_id = ?
-      GROUP BY s.product_name 
+      GROUP BY CASE WHEN s.product_id IS NULL OR s.product_id = '' THEN 'n:' || s.product_name ELSE s.product_id END 
       ORDER BY qty DESC 
       LIMIT 5
     ''', [businessId]);

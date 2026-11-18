@@ -210,6 +210,35 @@ void main() {
     expect(empty.change, isNull);
   });
 
+  // 0.16.8 (#43): la ganancia neta resta los gastos de caja que nadie anuló
+  test('gastos de caja: restan de la neta; retiros y anulados no', () async {
+    final db = await appDb.database;
+    Future<void> move(String id, String kind, String reason, double amount, {String? note}) => db.insert('cash_movements', {
+          'id': id,
+          'business_id': businessId,
+          'session_id': 's1',
+          'kind': kind,
+          'reason': reason,
+          'amount': amount,
+          'note': note,
+          'date': DateTime(2026, 12, 5, 10).toIso8601String(),
+        });
+    await move('g1', 'SALIDA', 'GASTO', 3000);
+    await move('g2', 'SALIDA', 'GASTO', 1000);
+    await move('v2', 'ENTRADA', 'ANULA', 1000, note: 'anula:g2');
+    await move('r1', 'SALIDA', 'RETIRO', 50000);
+    final r = await ProfitReportRepository.instance.buildRange(
+      businessId,
+      DateTime(2026, 12, 1),
+      DateTime(2027, 1, 1),
+      prevFrom: DateTime(2026, 11, 1),
+      prevTo: DateTime(2026, 12, 1),
+    );
+    expect(r.cashExpenses, 3000);
+    expect(r.netProfit, -3000);
+    expect(r.isEmpty, isFalse);
+  });
+
   test('los rangos de cada periodo', () {
     final r = ReportPeriod.lastMonth.range(DateTime(2026, 1, 15));
     expect(r.from, DateTime(2025, 12));

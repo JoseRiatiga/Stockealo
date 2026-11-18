@@ -1,4 +1,5 @@
 import '../widgets/sales_summary_card.dart';
+import '../../../../core/design/app_date_range_picker.dart';
 import '../widgets/quotations_list_modal.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/app_pagination.dart';
@@ -232,7 +233,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
     final ok = await AppSheet.show<bool>(
       context: context,
       title: 'Devolver',
-      subtitle: '${sale.productName} · se vendieron ${sale.quantity}${left < sale.quantity ? ', quedan $left por devolver' : ''}',
+      subtitle: '${sale.listName} · se vendieron ${sale.quantity}${left < sale.quantity ? ', quedan $left por devolver' : ''}',
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) {
           final amount = sale.totalAmount / sale.quantity * qty;
@@ -382,7 +383,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
             children: [
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: Text('Solo «${sale.productName}»'),
+                child: Text('Solo «${sale.listName}»'),
               ),
               const SizedBox(height: AppSpace.sm),
               OutlinedButton(
@@ -403,15 +404,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> with ActiveBusi
 
   Future<void> _pickCustomDateRange() async {
     final now = DateTime.now();
-    final picked = await showDateRangePicker(
-      context: context,
+    final picked = await showAppDateRangePicker(
+      context,
+      initial: _customDateRange,
       firstDate: DateTime(2020),
       lastDate: now.add(const Duration(days: 1)),
-      initialDateRange: _customDateRange ??
-          DateTimeRange(
-            start: now.subtract(const Duration(days: 7)),
-            end: now,
-          ),
     );
     if (picked != null) {
       setState(() {

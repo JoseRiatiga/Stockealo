@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../../core/utils/money_input.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/design/app_card.dart';
@@ -233,8 +233,8 @@ class GoalSheet {
       final now = DateTime.now();
       final w = GoalsRepository.goalFor(goals, GoalPeriod.week, GoalPeriod.week.startOf(now), member: who);
       final m = GoalsRepository.goalFor(goals, GoalPeriod.month, GoalPeriod.month.startOf(now), member: who);
-      week.text = w == null ? '' : '${w.amount.round()}';
-      month.text = m == null ? '' : '${m.amount.round()}';
+      week.text = w == null ? '' : MoneyInput.text(w.amount);
+      month.text = m == null ? '' : MoneyInput.text(m.amount);
     }
 
     fill();
@@ -280,20 +280,20 @@ class GoalSheet {
             TextField(
               controller: week,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(labelText: 'Meta semanal', hintText: 'Ej.: 2000000', prefixText: '\$ '),
+              inputFormatters: MoneyInput.formatters,
+              decoration: const InputDecoration(labelText: 'Meta semanal', hintText: 'Ej.: 2.000.000', prefixText: '\$ '),
             ),
             const SizedBox(height: AppSpace.md),
             TextField(
               controller: month,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(labelText: 'Meta mensual', hintText: 'Ej.: 8000000', prefixText: '\$ ', errorText: error),
+              inputFormatters: MoneyInput.formatters,
+              decoration: InputDecoration(labelText: 'Meta mensual', hintText: 'Ej.: 8.000.000', prefixText: '\$ ', errorText: error),
             ),
             const SizedBox(height: AppSpace.lg),
             FilledButton(
               onPressed: () {
-                final w = double.tryParse(week.text) ?? 0, m = double.tryParse(month.text) ?? 0;
+                final w = MoneyInput.parse(week.text), m = MoneyInput.parse(month.text);
                 if (w > 0 && m > 0 && m < w) {
                   setLocal(() => error = 'La meta del mes no puede ser menor que la de la semana.');
                   return;
@@ -306,7 +306,7 @@ class GoalSheet {
         ),
       ),
     );
-    final w = double.tryParse(week.text) ?? 0, m = double.tryParse(month.text) ?? 0;
+    final w = MoneyInput.parse(week.text), m = MoneyInput.parse(month.text);
     week.dispose();
     month.dispose();
     if (ok != true) return false;

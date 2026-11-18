@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_tokens.dart';
 import 'category_name_dialog.dart';
+import '../category_icons.dart';
 import '../../data/product_repository.dart';
 import '../../models/category.dart';
 import '../../../../core/design/app_dialog.dart';
@@ -78,6 +79,49 @@ class _ManageCategoriesModalState extends State<ManageCategoriesModal> {
       newName: result,
     );
     _hasChanges = true;
+    await _loadCategories();
+  }
+
+  /// Elegir el ícono de la categoría (0.16.8, #28)
+  Future<void> _pickIcon(Category category) async {
+    final picked = await AppDialog.show<String>(
+      context: context,
+      icon: Icons.category_outlined,
+      title: 'Ícono de ${category.name}',
+      subtitle: 'Se ve en la tienda, Vender y Productos.',
+      maxWidth: 480,
+      content: Builder(builder: (ctx) {
+        final c = ctx.colors;
+        return Wrap(
+          spacing: AppSpace.xs,
+          runSpacing: AppSpace.xs,
+          children: [
+            for (final ic in kCategoryIcons)
+              Tooltip(
+                message: ic.label,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AppRadius.tile),
+                  onTap: () => Navigator.pop(ctx, ic.key),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: ic.key == category.icon ? c.accent.withValues(alpha: 0.10) : c.surfaceMuted,
+                      border: Border.all(color: ic.key == category.icon ? c.accent : c.line),
+                      borderRadius: BorderRadius.circular(AppRadius.tile),
+                    ),
+                    child: Icon(ic.icon, color: ic.key == category.icon ? c.accent : c.ink, semanticLabel: ic.label),
+                  ),
+                ),
+              ),
+          ],
+        );
+      }),
+      actions: [Builder(builder: (ctx) => TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')))],
+    );
+    if (picked == null || picked == category.icon) return;
+    await _repository.setCategoryIcon(category, picked);
     await _loadCategories();
   }
 
@@ -206,18 +250,27 @@ actions: [
                             ),
                             child: Row(
                               children: [
-                                // Diseño nuevo (0.16.7, hallazgo 23): inicial en gris, sin verde
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: context.colors.surfaceMuted,
+                                // Su ícono en el color del negocio (0.16.8, #28); se toca para cambiarlo
+                                Tooltip(
+                                  message: 'Cambiar el ícono',
+                                  child: InkWell(
                                     borderRadius: BorderRadius.circular(AppRadius.tile),
-                                  ),
-                                  child: Text(
-                                    cat.name.isNotEmpty ? cat.name[0].toUpperCase() : '?',
-                                    style: AppText.body(context, weight: FontWeight.w700, color: context.colors.ink),
+                                    onTap: () => _pickIcon(cat),
+                                    child: Container(
+                                      width: 40,
+                                      height: 40,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: context.colors.accent.withValues(alpha: 0.10),
+                                        borderRadius: BorderRadius.circular(AppRadius.tile),
+                                      ),
+                                      child: CategoryIcon.of(cat.icon) != null
+                                          ? Icon(CategoryIcon.of(cat.icon), size: 22, color: context.colors.accent)
+                                          : Text(
+                                              cat.name.isNotEmpty ? cat.name[0].toUpperCase() : '?',
+                                              style: AppText.body(context, weight: FontWeight.w700, color: context.colors.accent),
+                                            ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),

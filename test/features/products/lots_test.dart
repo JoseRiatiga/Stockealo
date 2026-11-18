@@ -171,16 +171,17 @@ void main() {
     });
     final biz = Business(id: businessId, userId: 'u1', name: 'Droguería Rosita', createdAt: DateTime(2026));
     await tester.pumpWidget(MaterialApp(theme: AppTheme.lightTheme, home: Scaffold(body: ExpiryAlert(business: biz))));
-    for (var i = 0; i < 10; i++) {
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    // Espera a que cargue (hasta 5 s): en GitHub la base va más lenta y fallaba a veces
+    for (var i = 0; i < 100 && find.text('1 lote vence en los próximos 30 días').evaluate().isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
     }
     expect(find.text('1 lote vence en los próximos 30 días'), findsOneWidget);
     expect(find.text('Y 1 ya venció'), findsOneWidget);
     expect(await tester.runAsync(() => stockOf('dolex')), 10, reason: 'lo vencido salió del stock');
     await tester.tap(find.text('Ver'));
-    for (var i = 0; i < 10; i++) {
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    for (var i = 0; i < 100 && find.text('VENCEN PRONTO').evaluate().isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
     }
     await tester.pumpAndSettle();

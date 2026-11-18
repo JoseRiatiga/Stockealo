@@ -10,10 +10,12 @@ import '../../../pro/presentation/screens/pro_screen.dart';
 import '../../data/business_repository.dart';
 import '../../models/business.dart';
 import '../../../home/navigation/app_pane.dart';
+import '../../../home/navigation/app_places.dart';
+import '../../../../core/permissions/permissions.dart';
 
 /// Ajustes › Tu negocio › Módulos: todo lo que ofrece Stockealo, qué hace, si
 /// está encendido y en qué pestaña está. Es el único lugar donde se enciende el
-/// arqueo de caja. No repite las funciones de cada módulo: solo dice dónde viven.
+/// arqueo de caja. No repite las funciones de cada módulo: solo dice dónde viven y, al tocar la fila, lleva allá.
 class ModulesScreen extends StatefulWidget {
   final Business business;
   final bool canEdit;
@@ -57,6 +59,13 @@ class _ModulesScreenState extends State<ModulesScreen> {
     }
   }
 
+  /// Tocar la fila lleva a la función (0.16.8, #57), si la persona puede verla
+  VoidCallback? _go(int place) {
+    final role = Permissions.viewAs.value ?? Permissions.current;
+    if (!AppPlace.byId(place).visibleFor(role: role, services: true)) return null;
+    return () => AppPlace.go(place);
+  }
+
   Widget _module({
     required IconData icon,
     required String title,
@@ -95,7 +104,13 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 ],
               ),
             ),
-            if (trailing != null) trailing,
+            if (trailing != null)
+              trailing
+            else if (onTap != null)
+              Padding(
+                padding: const EdgeInsets.only(left: AppSpace.sm, top: 2),
+                child: Icon(Icons.chevron_right, color: c.inkFaint),
+              ),
           ],
         ),
       ),
@@ -123,6 +138,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 where: 'Caja, en el menú',
                 status: _cash ? 'Encendida' : 'Apagada',
                 on: _cash,
+                onTap: _cash ? _go(AppPlace.caja) : null,
                 trailing: Switch(
                   value: _cash,
                   onChanged: widget.canEdit && !_saving ? _setCash : null,
@@ -136,7 +152,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 status: pro.services ? 'Activo' : 'No incluido en tu plan',
                 on: pro.services,
                 pro: true,
-                onTap: pro.services ? null : () => ProScreen.open(context, widget.business),
+                onTap: pro.services ? _go(AppPlace.servicios) : () => ProScreen.open(context, widget.business),
               ),
               _module(
                 icon: Icons.storefront_outlined,
@@ -146,7 +162,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 status: pro.active ? 'Incluida en tu plan' : 'Con Stockealo Pro',
                 on: pro.active,
                 pro: true,
-                onTap: pro.active ? null : () => ProScreen.open(context, widget.business),
+                onTap: pro.active ? _go(AppPlace.tienda) : () => ProScreen.open(context, widget.business),
               ),
               _module(
                 icon: Icons.move_to_inbox_outlined,
@@ -154,6 +170,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 what: 'Pedidos por WhatsApp, mercancía que llega y lo que debes a cada proveedor.',
                 where: 'Clientes y proveedores, en el menú',
                 status: 'Siempre disponible',
+                onTap: _go(AppPlace.personas),
               ),
               _module(
                 icon: Icons.menu_book_outlined,
@@ -161,6 +178,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 what: 'Catálogo en PDF e historias para compartir tus productos.',
                 where: 'Productos › Catálogo',
                 status: 'Siempre disponible',
+                onTap: _go(AppPlace.productos),
               ),
               _module(
                 icon: Icons.request_quote_outlined,
@@ -168,13 +186,15 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 what: 'Proformas para tus clientes que luego conviertes en venta.',
                 where: 'Ventas › Cotizaciones',
                 status: 'Siempre disponible',
+                onTap: _go(AppPlace.ventas),
               ),
               _module(
                 icon: Icons.insert_chart_outlined_outlined,
                 title: 'Reportes',
                 what: 'Ganancias del periodo y descargas en Excel.',
-                where: 'pestaña Reportes',
+                where: 'Reportes, en el menú',
                 status: 'Dueño y administradores',
+                onTap: _go(AppPlace.reportes),
               ),
               if (!widget.canEdit)
                 Padding(

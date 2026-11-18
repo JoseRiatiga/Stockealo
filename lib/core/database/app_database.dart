@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 30;
+  static const int _schemaVersion = 31;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -588,6 +588,12 @@ class AppDatabase {
     if (oldVersion < 28 && newVersion >= 28) await productBrandV28(db);
     if (oldVersion < 29 && newVersion >= 29) await productLotsV29(db);
     if (oldVersion < 30 && newVersion >= 30) await businessTimeZoneV30(db);
+    if (oldVersion < 31 && newVersion >= 31) await categoryIconsV31(db);
+  }
+
+  /// 0.16.8, íconos de categoría (#28): clave del dibujo; vacío = sin elegir
+  static Future<void> categoryIconsV31(Database db) async {
+    await _addColumnIfMissing(db, 'categories', 'icon', 'TEXT');
   }
 
   /// 0.16.6, hora del negocio: zona elegida en países con varias (EE. UU., México).
@@ -885,6 +891,7 @@ class AppDatabase {
         business_id TEXT NOT NULL,
         name TEXT NOT NULL,
         color_hex TEXT,
+        icon TEXT,
         FOREIGN KEY (business_id) REFERENCES businesses (id) ON DELETE CASCADE
       )
     ''');

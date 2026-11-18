@@ -69,7 +69,14 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Todo más ordenado
+            ### Íconos, fiado en el pago mixto y más
+            - Cada categoría tiene su ícono en la tienda, Vender y Productos; se cambia en Categorías.
+            - En el pago mixto puedes dejar una parte fiada: se suma a lo que debe el cliente.
+            - Reportes resta los gastos que registras en Caja de la ganancia neta.
+            - Los valores se ven con puntos de mil mientras escribes.
+            - Las fechas de Promociones y Ventas se eligen con atajos.
+
+            ### Todo más ordenado (0.16.7)
             - Stock es una lista con lo agotado y lo bajo arriba, y «Ajustar» en cada producto.
             - El stock ya no se cambia en Editar producto: se ajusta y queda en el historial.
             - Registrar un abono usa los mismos medios de pago que Vender, con atajos de valor.

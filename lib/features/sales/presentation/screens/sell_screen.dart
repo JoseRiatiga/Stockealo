@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import '../../../products/presentation/category_icons.dart';
+import '../../../../core/utils/money_input.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -73,7 +75,7 @@ class _Payment extends ChangeNotifier {
   /// Efectivo recibido (null = exacto)
   double? received;
   final Map<String, TextEditingController> mixed = {
-    for (final m in PaymentMethod.forMixed) m: TextEditingController(),
+    for (final m in PaymentMethod.forMixedSale) m: TextEditingController(),
   };
 
   void set(String m) {
@@ -89,10 +91,17 @@ class _Payment extends ChangeNotifier {
 
   Map<String, double> get split => {
         for (final e in mixed.entries)
-          e.key: double.tryParse(e.value.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+          e.key: MoneyInput.parse(e.value.text),
       };
 
   double get mixedPaid => split.values.fold<double>(0, (a, b) => a + b);
+
+  /// Lo que queda fiado: todo si es fiado, la parte «Fiado» si es mixto (0.16.8)
+  double creditOf(double total) => switch (method) {
+        PaymentMethod.credit => total,
+        PaymentMethod.mixed => split[PaymentMethod.credit] ?? 0,
+        _ => 0,
+      };
 
   void reset() {
     method = PaymentMethod.cash;
@@ -199,6 +208,7 @@ class _SellScreenState extends State<SellScreen> {
   Future<void> _load() async {
     final products = await ProductRepository.instance.searchProducts('', businessId: widget.business.id);
     final customers = await CustomerRepository.instance.getCustomers(widget.business.id);
+    final categories = await ProductRepository.instance.getCategories(widget.business.id);
     final closed = await isCashClosedFor(widget.business);
     // Agotados que el dueño pidió ocultar en Vender (0.16.0): vuelven solos con el stock
     final hidden = await SoldOutPrefs.hidden(widget.business.id);
@@ -208,6 +218,7 @@ class _SellScreenState extends State<SellScreen> {
     setState(() {
       _products = products.where((p) => p.isActive && !(p.stock <= 0 && hidden.contains(p.id))).toList();
       _customers = [for (final c in customers) c.name];
+      _categoryIcons = {for (final c in categories) c.name.trim().toLowerCase(): c.icon};
       _cashClosed = closed;
       _loading = false;
     });
@@ -225,6 +236,9 @@ class _SellScreenState extends State<SellScreen> {
   // ---------------------------------------------------------------------------
   // Productos
   // ---------------------------------------------------------------------------
+
+  /// Ícono de cada categoría por nombre en minúscula (0.16.8, #28)
+  Map<String, String?> _categoryIcons = const {};
 
   List<String> get _categories {
     final set = <String>{for (final p in _products) if (p.category.trim().isNotEmpty) p.category.trim()};
@@ -290,7 +304,8 @@ class _SellScreenState extends State<SellScreen> {
     final method = _pay.method;
     final customer = _customer.text.trim();
 
-    if (method == PaymentMethod.credit && customer.isEmpty) {
+    final fiado = _pay.creditOf(total);
+    if (fiado > 0 && customer.isEmpty) {
       AppToast.showWarning(context, 'Para fiar escribe a quién le fías.');
       return;
     }
@@ -306,7 +321,7 @@ class _SellScreenState extends State<SellScreen> {
       return;
     }
     // Lo que el rol no permite o pasa su límite pide autorización (0.15.0)
-    final reasons = await _needsApproval(method, customer, total);
+    final reasons = await _needsApproval(fiado, customer);
     if (!mounted) return;
     String? authId;
     if (reasons.isNotEmpty) {
@@ -349,7 +364,7 @@ class _SellScreenState extends State<SellScreen> {
       final change = method == PaymentMethod.cash && received != null ? received - total : 0.0;
       // Fiado: lo que queda debiendo, para el tiquete
       double? debtAfter;
-      if (method == PaymentMethod.credit) {
+      if (fiado > 0) {
         final all = await CustomerRepository.instance.getCustomers(widget.business.id);
         debtAfter = all.where((c) => c.name.toLowerCase() == customer.toLowerCase()).firstOrNull?.debtBalance;
       }
@@ -379,7 +394,7 @@ class _SellScreenState extends State<SellScreen> {
   }
 
   /// Por qué esta venta necesita autorización; vacío = puede seguir
-  Future<List<String>> _needsApproval(String method, String customer, double total) async {
+  Future<List<String>> _needsApproval(double fiado, String customer) async {
     final reasons = <String>[];
     if (_cart.manualDiscount > 0) {
       final base = _cart.subtotal - _cart.promoDiscount;
@@ -391,14 +406,14 @@ class _SellScreenState extends State<SellScreen> {
         reasons.add('El descuento es de ${pct.toStringAsFixed(pct % 1 == 0 ? 0 : 1)} % y tu límite es ${limit.round()} %.');
       }
     }
-    if (method == PaymentMethod.credit) {
+    if (fiado > 0) {
       final limit = Permissions.myLimit(RoleLimit.creditMax);
       if (!Permissions.mine(Perm.credit)) {
         reasons.add('Tu rol no permite fiar.');
       } else if (limit != null && customer.isNotEmpty) {
         final current = (await CustomerRepository.instance.findByName(widget.business.id, customer))?.debtBalance ?? 0;
-        if (current + total > limit + 0.5) {
-          reasons.add('$customer quedaría debiendo ${CurrencyFormatter.format(current + total)} y el límite de fiado es '
+        if (current + fiado > limit + 0.5) {
+          reasons.add('$customer quedaría debiendo ${CurrencyFormatter.format(current + fiado)} y el límite de fiado es '
               '${CurrencyFormatter.format(limit)}.');
         }
       }
@@ -475,7 +490,7 @@ class _SellScreenState extends State<SellScreen> {
     required double current,
     required double maxSafe,
   }) async {
-    final field = TextEditingController(text: current > 0 ? current.round().toString() : '');
+    final field = TextEditingController(text: MoneyInput.text(current));
     final value = await AppSheet.show<double>(
       context: context,
       title: title,
@@ -487,9 +502,9 @@ class _SellScreenState extends State<SellScreen> {
             controller: field,
             autofocus: true,
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: MoneyInput.formatters,
             decoration: const InputDecoration(labelText: 'Descuento en pesos', prefixText: '\$ '),
-            onSubmitted: (t) => Navigator.pop(ctx, double.tryParse(t.trim()) ?? 0),
+            onSubmitted: (t) => Navigator.pop(ctx, MoneyInput.parse(t)),
           ),
           const SizedBox(height: AppSpace.md),
           Wrap(
@@ -512,7 +527,7 @@ class _SellScreenState extends State<SellScreen> {
               const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: FilledButton(
-                  onPressed: () => Navigator.pop(ctx, double.tryParse(field.text.trim()) ?? 0),
+                  onPressed: () => Navigator.pop(ctx, MoneyInput.parse(field.text)),
                   child: const Text('Aplicar'),
                 ),
               ),
@@ -756,9 +771,12 @@ class _SellScreenState extends State<SellScreen> {
     if (cats.length < 2) return const SizedBox.shrink();
     Widget chip(String label, String? value) {
       final selected = _category == value;
+      final icon = value == null ? CategoryIcon.all : CategoryIcon.of(_categoryIcons[value.toLowerCase()]);
+      final c = context.colors;
       return Padding(
         padding: const EdgeInsets.only(right: AppSpace.sm),
         child: ChoiceChip(
+          avatar: icon == null ? null : Icon(icon, size: 18, color: selected ? c.surface : c.accent),
           label: Text(label),
           selected: selected,
           showCheckmark: false,
@@ -1100,7 +1118,7 @@ class _SellScreenState extends State<SellScreen> {
         _methods(),
         if (method == PaymentMethod.cash) ...[const SizedBox(height: AppSpace.md), _cashBox(total)],
         if (method == PaymentMethod.mixed) ...[const SizedBox(height: AppSpace.md), _mixedBox(total)],
-        if (method == PaymentMethod.credit && _customer.text.trim().isEmpty)
+        if (_pay.creditOf(total) > 0 && _customer.text.trim().isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: AppSpace.sm),
             child: Text('Para fiar, escribe arriba a quién.', style: AppText.small(context, color: c.warning)),
@@ -1187,7 +1205,7 @@ class _SellScreenState extends State<SellScreen> {
   }
 
   Widget _customerField() {
-    final credit = _pay.method == PaymentMethod.credit;
+    final credit = _pay.creditOf(_cart.total) > 0;
     return Autocomplete<String>(
       optionsBuilder: (v) {
         final q = v.text.trim().toLowerCase();
@@ -1301,8 +1319,8 @@ class _SellScreenState extends State<SellScreen> {
                 width: 110,
                 child: TextField(
                   keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (t) => _pay.receive(t.isEmpty ? null : double.tryParse(t)),
+                  inputFormatters: MoneyInput.formatters,
+                  onChanged: (t) => _pay.receive(t.isEmpty ? null : MoneyInput.parse(t)),
                   style: AppText.small(context),
                   decoration: const InputDecoration(isDense: true, hintText: 'Otro valor', contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 9)),
                 ),
@@ -1337,7 +1355,7 @@ class _SellScreenState extends State<SellScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final m in PaymentMethod.forMixed)
+          for (final m in PaymentMethod.forMixedSale)
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpace.sm),
               child: Row(
@@ -1350,7 +1368,7 @@ class _SellScreenState extends State<SellScreen> {
                     child: TextField(
                       controller: _pay.mixed[m],
                       keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: MoneyInput.formatters,
                       onChanged: (_) => _pay.changed(),
                       textAlign: TextAlign.right,
                       decoration: InputDecoration(
@@ -1362,8 +1380,8 @@ class _SellScreenState extends State<SellScreen> {
                                 tooltip: 'Poner aquí lo que falta',
                                 iconSize: 16,
                                 onPressed: () {
-                                  final current = double.tryParse(_pay.mixed[m]!.text) ?? 0;
-                                  _pay.mixed[m]!.text = (current + left).round().toString();
+                                  final current = MoneyInput.parse(_pay.mixed[m]!.text);
+                                  _pay.mixed[m]!.text = MoneyInput.text(current + left);
                                   _pay.changed();
                                 },
                                 icon: const Icon(Icons.add_outlined),

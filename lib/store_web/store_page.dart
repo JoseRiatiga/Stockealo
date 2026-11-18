@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../features/products/presentation/category_icons.dart';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -524,11 +525,14 @@ class _StorePageState extends State<StorePage> {
 
   Widget _categoryChip(PublicStore store, String? cat) {
     final selected = _filters.category == cat;
-    final thumb = cat == null ? null : store.products.where((p) => p.category == cat && p.imageUrl != null).firstOrNull?.imageUrl;
+    // Ícono de la categoría (0.16.8, #28): antes, la foto de un producto y «Todas» con
+    // un cuadro gris. Si el negocio los apagó, solo el nombre
+    final c = context.colors;
+    final icon = !store.look.icons ? null : (cat == null ? CategoryIcon.all : CategoryIcon.of(store.iconOf(cat)));
     return Padding(
       padding: const EdgeInsets.only(right: AppSpace.sm),
       child: ChoiceChip(
-        avatar: thumb == null ? null : CircleAvatar(backgroundImage: NetworkImage(thumb)),
+        avatar: icon == null ? null : Icon(icon, size: 18, color: selected ? c.surface : c.accent),
         showCheckmark: false,
         label: Text(cat ?? 'Todas'),
         selected: selected,

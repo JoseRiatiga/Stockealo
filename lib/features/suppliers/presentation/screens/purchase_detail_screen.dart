@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../../../core/utils/money_input.dart';
 
 import '../../../../core/design/app_card.dart';
 import '../../../../core/design/content_width.dart';
@@ -78,7 +78,7 @@ content: Column(
                 controller: amount,
                 autofocus: true,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: MoneyInput.formatters,
                 decoration: const InputDecoration(labelText: 'Valor del abono', prefixText: '\$ '),
               ),
               const SizedBox(height: AppSpace.md),
@@ -95,7 +95,7 @@ actions: [
 );
       },
     );
-    final value = double.tryParse(amount.text.trim()) ?? 0;
+    final value = MoneyInput.parse(amount.text);
     final text = note.text.trim();
     amount.dispose();
     note.dispose();

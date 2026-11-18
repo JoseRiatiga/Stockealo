@@ -67,7 +67,8 @@ class DigitalTicketModal {
             ? first.invoiceNumber!.replaceFirst('#', '')
             : (first.id.length >= 8 ? first.id.substring(0, 8) : first.id).toUpperCase());
     final day = DateFormat('dd MMM yyyy', 'es_CO').format(first.date).toUpperCase();
-    final credit = first.paymentMethod == PaymentMethod.credit;
+    // También el pago mixto con una parte fiada (0.16.8)
+    final credit = items.any((s) => PaymentMethod.creditPart(s.paymentMethod, s.totalAmount, s.paymentSplit) > 0);
     final stamp = first.isVoided
         ? TicketStamp('ANULADA', detail: DateFormat('dd MMM yyyy', 'es_CO').format(first.voidedAt!).toUpperCase(), tone: AppTone.danger)
         : credit

@@ -4,11 +4,15 @@ class Category {
   final String name;
   final String? colorHex;
 
+  /// Clave del ícono (0.16.8, ver category_icons.dart); null = sin elegir
+  final String? icon;
+
   Category({
     required this.id,
     this.businessId = 'default_business',
     required this.name,
     this.colorHex,
+    this.icon,
   });
 
   Map<String, dynamic> toMap() {
@@ -17,6 +21,7 @@ class Category {
       'business_id': businessId,
       'name': name,
       'color_hex': colorHex,
+      'icon': icon,
     };
   }
 
@@ -26,6 +31,7 @@ class Category {
       businessId: map['business_id'] as String? ?? 'default_business',
       name: map['name'] as String,
       colorHex: map['color_hex'] as String?,
+      icon: map['icon'] as String?,
     );
   }
 }

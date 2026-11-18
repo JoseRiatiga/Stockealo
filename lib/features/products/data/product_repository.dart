@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show debugPrint;
+import '../presentation/category_icons.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
@@ -408,7 +409,27 @@ class ProductRepository {
       whereArgs: [businessId],
       orderBy: 'name ASC',
     );
-    return maps.map((map) => Category.fromMap(map)).toList();
+    final list = maps.map((map) => Category.fromMap(map)).toList();
+    // Las de antes de la 0.16.8 reciben su ícono sugerido una vez (si alguno coincide)
+    for (var i = 0; i < list.length; i++) {
+      final c = list[i];
+      if ((c.icon ?? '').isNotEmpty) continue;
+      final suggested = CategoryIcon.suggest(c.name);
+      if (suggested == null) continue;
+      list[i] = Category(id: c.id, businessId: c.businessId, name: c.name, colorHex: c.colorHex, icon: suggested);
+      await db.update('categories', {'icon': suggested}, where: 'id = ?', whereArgs: [c.id]);
+      SupabaseService.instance.upsertCategoryToCloud(list[i].toMap());
+    }
+    return list;
+  }
+
+  /// Cambia el ícono de una categoría (0.16.8, #28)
+  Future<void> setCategoryIcon(Category category, String icon) async {
+    final db = await _dbProvider.database;
+    await db.update('categories', {'icon': icon}, where: 'id = ? AND business_id = ?', whereArgs: [category.id, category.businessId]);
+    SupabaseService.instance.upsertCategoryToCloud(
+        Category(id: category.id, businessId: category.businessId, name: category.name, colorHex: category.colorHex, icon: icon).toMap());
+    DataEvents.instance.productsChanged();
   }
 
   /// Crear categoría al vuelo para la empresa
@@ -419,6 +440,8 @@ class ProductRepository {
       businessId: businessId,
       name: name.trim(),
       colorHex: '0xFF059669',
+      // El ícono se sugiere por el nombre; se cambia en Gestionar categorías
+      icon: CategoryIcon.suggest(name),
     );
     await db.insert(
       'categories',
@@ -461,12 +484,14 @@ class ProductRepository {
       );
     });
 
-    // 3. Sincronizar a Supabase
+    // 3. Sincronizar a Supabase (con su ícono: renombrar no lo borra)
+    final row = await db.query('categories', columns: ['icon'], where: 'id = ?', whereArgs: [id], limit: 1);
     SupabaseService.instance.upsertCategoryToCloud({
       'id': id,
       'business_id': businessId,
       'name': cleanNewName,
       'color_hex': '0xFF059669',
+      'icon': row.isEmpty ? null : row.first['icon'],
     });
     try {
       await SupabaseService.instance.client

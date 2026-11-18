@@ -9,6 +9,7 @@ import '../widgets/settings_cards.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/design/app_time_picker.dart';
@@ -921,6 +922,14 @@ actions: [
                             if (_summaryAlerts) 'Resumen a las ${_hourLabel(_summaryHour)}',
                           ].join(' · ').ifEmpty('Apagados'),
                           onTap: _openAlerts,
+                        )
+                      // En la web no hay avisos al celular (0.16.8, #53, E1 a): dónde llegan
+                      else if (kIsWeb)
+                        SettingsRow(
+                          icon: Icons.notifications_none_outlined,
+                          title: 'Avisos',
+                          subtitle: 'Pedidos, stock bajo y resumen del día llegan en la app del celular. Toca para instalarla.',
+                          onTap: () => launchUrl(Uri.parse('https://stockealo.online/instalar'), mode: LaunchMode.externalApplication),
                         ),
                     ]),
                     SettingsGroup(label: 'Datos', children: [

@@ -141,6 +141,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
               _divider(),
               _line('Ganancia bruta', _money(r.grossProfit), strong: true),
               if (r.shrinkageLoss > 0) _line('Mermas', '− ${_money(r.shrinkageLoss)}', color: c.danger),
+              if (r.cashExpenses > 0) _line('Gastos de caja', '− ${_money(r.cashExpenses)}', color: c.danger),
               _divider(),
               _line('Ganancia neta', _money(r.netProfit), strong: true, color: r.netProfit < 0 ? c.danger : c.success),
               if (r.discounts > 0)
@@ -224,7 +225,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
           child: Text(
-            'No incluye gastos como arriendo, servicios o sueldos. Las mermas se calculan con el costo actual de cada producto.',
+            'Resta los gastos que registras en Caja. Arriendo, servicios o sueldos cuentan solo si los sacas de la caja como gasto. Las mermas se calculan con el costo actual de cada producto.',
             style: TextStyle(fontSize: AppText.sizeCaption, height: 1.4, color: c.inkFaint),
           ),
         ),

@@ -1,8 +1,8 @@
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/utils/money_input.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/utils/countries.dart';
@@ -59,14 +59,13 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
 
   void _setAmount(double amount) {
     setState(() {
-      _amountController.text = amount.toStringAsFixed(0);
+      _amountController.text = MoneyInput.text(amount);
       _errorMessage = null;
     });
   }
 
   Future<void> _submitPayment() async {
-    final rawAmount = _amountController.text.trim().replaceAll('\$', '').replaceAll('.', '').replaceAll(',', '');
-    final amount = double.tryParse(rawAmount);
+    final amount = _amountController.text.trim().isEmpty ? null : MoneyInput.parse(_amountController.text);
 
     if (amount == null || amount <= 0) {
       setState(() => _errorMessage = 'Ingresa un monto válido mayor a 0');
@@ -199,7 +198,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
           controller: _amountController,
           keyboardType: TextInputType.number,
           autofocus: true,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          inputFormatters: MoneyInput.formatters,
           decoration: InputDecoration(
             labelText: 'Cuánto abona',
             prefixText: '\$ ',

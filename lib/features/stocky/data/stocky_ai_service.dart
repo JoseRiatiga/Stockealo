@@ -175,9 +175,10 @@ class StockyAiService {
 
     final db = await AppDatabase.instance.database;
     final top = await db.rawQuery('''
-      SELECT product_name, SUM(quantity) AS qty
-      FROM sales_ok WHERE business_id = ? AND date >= ?
-      GROUP BY product_name ORDER BY qty DESC LIMIT 5
+      SELECT COALESCE(MAX(p.name), MAX(s.product_name)) AS product_name, SUM(s.quantity) AS qty
+      FROM sales_ok s LEFT JOIN products p ON p.id = s.product_id
+      WHERE s.business_id = ? AND s.date >= ?
+      GROUP BY CASE WHEN s.product_id IS NULL OR s.product_id = '' THEN 'n:' || s.product_name ELSE s.product_id END ORDER BY qty DESC LIMIT 5
     ''', [businessId, appNow().subtract(const Duration(days: 30)).toIso8601String()]);
     final stagnant = await db.rawQuery('''
       SELECT name FROM products

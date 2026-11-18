@@ -34,7 +34,7 @@ class SaleCard extends StatelessWidget {
 
   String get _title {
     final variant = sale.variantName;
-    final name = variant == null || variant.isEmpty ? sale.productName : '${sale.productName} · $variant';
+    final name = variant == null || variant.isEmpty ? sale.listName : '${sale.listName} · $variant';
     // Una devolución se nombra como tal (0.16.4): antes parecía otra venta en negativo
     return sale.isReturn ? 'Devolución · $name' : name;
   }
@@ -124,7 +124,7 @@ class SaleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final isFiado = sale.paymentMethod == PaymentMethod.credit;
+    final isFiado = PaymentMethod.creditPart(sale.paymentMethod, sale.totalAmount, sale.paymentSplit) != 0;
     final voided = sale.isVoided;
     final meta = [
       clockText(sale.date),
@@ -241,14 +241,14 @@ class SaleGroupCard extends StatelessWidget {
   bool get _voided => lines.every((l) => l.isVoided);
   double get _total => lines.where((l) => !l.isVoided || _voided).fold(0.0, (s, l) => s + l.totalAmount);
   int get _units => lines.fold(0, (s, l) => s + l.quantity);
-  String get _title => '${_first.productName} y ${lines.length - 1} más';
+  String get _title => '${_first.listName} y ${lines.length - 1} más';
 
   String _meta() {
     final customer = lines.map((l) => l.customerName ?? '').firstWhere((n) => n.trim().isNotEmpty, orElse: () => '');
     return [
       clockText(_first.date),
       PaymentMethod.label(_first.paymentMethod),
-      if (_first.paymentMethod == PaymentMethod.credit && customer.isNotEmpty) customer,
+      if (PaymentMethod.creditPart(_first.paymentMethod, _first.totalAmount, _first.paymentSplit) != 0 && customer.isNotEmpty) customer,
     ].join(' · ');
   }
 
@@ -281,7 +281,7 @@ class SaleGroupCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '${l.productName}${(l.variantName ?? '').isEmpty ? '' : ' · ${l.variantName}'}'
+                        '${l.listName}${(l.variantName ?? '').isEmpty ? '' : ' · ${l.variantName}'}'
                         '${l.quantity > 1 ? '  ×${l.quantity}' : ''}',
                         style: AppText.body(ctx, color: l.isVoided ? c.inkMuted : null),
                       ),
@@ -332,7 +332,7 @@ class SaleGroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final voided = _voided;
-    final isFiado = _first.paymentMethod == PaymentMethod.credit;
+    final isFiado = PaymentMethod.creditPart(_first.paymentMethod, _first.totalAmount, _first.paymentSplit) != 0;
     final meta = _meta();
     final radius = BorderRadius.circular(AppRadius.control + 2);
     return Semantics(

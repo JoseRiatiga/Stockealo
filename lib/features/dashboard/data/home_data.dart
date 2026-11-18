@@ -265,7 +265,12 @@ class HomeRepository {
 
     // Lo más vendido en los últimos 7 días
     final top = await db.rawQuery(
-      'SELECT product_name AS name, SUM(quantity) AS u FROM sales_ok WHERE business_id = ? AND date >= ? GROUP BY product_name ORDER BY u DESC LIMIT 5',
+      // Con el nombre de hoy: un producto renombrado no sale dos veces (0.16.8, D1)
+      'SELECT COALESCE(MAX(p.name), MAX(s.product_name)) AS name, SUM(s.quantity) AS u '
+      'FROM sales_ok s LEFT JOIN products p ON p.id = s.product_id '
+      'WHERE s.business_id = ? AND s.date >= ? '
+      "GROUP BY CASE WHEN s.product_id IS NULL OR s.product_id = '' THEN 'n:' || s.product_name ELSE s.product_id END "
+      'ORDER BY u DESC LIMIT 5',
       [businessId, weekAgo.toIso8601String()],
     );
 

@@ -109,6 +109,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   @override
   void initState() {
     super.initState();
+    _startClock.elapsedMilliseconds; // empieza a contar al abrir el marco
     // Ctrl K escucha el teclado de toda la app, no un foco que se pierde al volver
     // de otras pantallas (0.16.6, hallazgo 46)
     HardwareKeyboard.instance.addHandler(_onKey);
@@ -323,6 +324,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     super.dispose();
   }
 
+  /// Cuánto tarda en verse el negocio al abrir (0.16.8, #42): sale en la consola
+  static final _startClock = Stopwatch()..start();
+  static bool _startLogged = false;
+
   Future<void> _loadNavigationContext() async {
     final user = _authRepo.currentUser;
     if (user != null) {
@@ -352,6 +357,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         // Horario de acceso (0.15.0)
         _watchAccess(await _teamRepo.myAccessSchedule(businessId: biz.id, userId: user.id, userEmail: user.email));
         AppointmentsRepository.instance.pullOnline(biz.id);
+      }
+      if (!_startLogged && biz != null) {
+        _startLogged = true;
+        debugPrint('Arranque: negocio listo en ${_startClock.elapsedMilliseconds} ms');
       }
       if (mounted) {
         // Otro negocio: lo abierto en el panel era del anterior

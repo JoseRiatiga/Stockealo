@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockealo/features/sales/models/promotion.dart';
+import 'package:stockealo/features/sales/presentation/screens/promotions_screen.dart';
 import 'package:stockealo/features/store/data/online_store_service.dart';
 
 /// Promociones 0.13.4: % de descuento y lleva X, paga Y, con fechas.
@@ -96,5 +97,14 @@ void main() {
     expect(gift.price, 3000);
     expect(CartLine(gift, 3).subtotal, 6000, reason: 'lleva 3, paga 2');
     expect(StoreProduct.fromJson({'id': 'c', 'name': 'x', 'price': 1}).promo, isNull);
+  });
+
+  // 0.16.8 (#21): un minimercado no ve «camisetas»
+  test('ejemplos de promociones según el tipo de negocio', () {
+    expect(promotionExamplesFor('miscelanea'), contains('2×1 en gaseosas'));
+    expect(promotionExamplesFor('ropa'), contains('20 % en camisetas'));
+    expect(promotionExamplesFor('drogueria').first, '10 % en vitaminas');
+    expect(promotionExamplesFor(null), contains('Fin de mes'));
+    expect(promotionExamplesFor('miscelanea').join(), isNot(contains('camisetas')));
   });
 }

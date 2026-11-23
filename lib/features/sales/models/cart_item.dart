@@ -23,6 +23,10 @@ class CartItem {
   /// Se está cobrando con precio por mayor (lo pone [SellCart])
   bool wholesale = false;
 
+  /// Sin Pro (0.17.1): el precio por mayor que tendría esta línea con Pro, para mostrarlo
+  /// en gris; no se cobra. Null si no llega a ningún escalón.
+  double? wholesalePreview;
+
   CartItem({
     required this.product,
     this.variant,

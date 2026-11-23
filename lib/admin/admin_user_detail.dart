@@ -113,17 +113,18 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
       builder: (ctx) => SimpleDialog(
         title: Text('Dar Pro a ${b.name}'),
         children: [
-          for (final d in const <int?>[7, 30, 90, 365, -1])
+          // Sin permanente (0.17.0): lo más largo es 1 año
+          for (final d in const <int>[7, 30, 90, 365])
             SimpleDialogOption(
               onPressed: () => Navigator.pop(ctx, d),
-              child: Text(switch (d) { 7 => '1 semana', 30 => '1 mes', 90 => '3 meses', 365 => '1 año', _ => 'Permanente' }),
+              child: Text(switch (d) { 7 => '1 semana', 30 => '1 mes', 90 => '3 meses', _ => '1 año' }),
             ),
         ],
       ),
     );
     if (days == null || !mounted) return;
     try {
-      await ProAdminService.instance.grantPro(b.id, days == -1 ? null : days);
+      await ProAdminService.instance.grantPro(b.id, days);
       if (!mounted) return;
       AppToast.show(context, message: '${b.name} ahora tiene Pro', type: ToastType.success);
       _load();

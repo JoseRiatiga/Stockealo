@@ -73,9 +73,48 @@ class ProCode {
 
   bool canDisable([DateTime? now]) => !exhausted && !isExpired(now);
 
-  /// Mensaje para mandarle el código al cliente por WhatsApp
-  String shareMessage() => 'Hola, este es tu código de Stockealo Pro ($kindLabel · $durationLabel): $code\n\n'
-      'Canjéalo en la app: Ajustes › Stockealo Pro › "¿Tienes un código?". ¡Gracias por tu compra!';
+  /// «1 mes», «1 semana», «15 días»
+  String get _durationText => switch (days) {
+        null => 'tiempo sin límite',
+        1 => '1 día',
+        7 => '1 semana',
+        30 => '1 mes',
+        90 => '3 meses',
+        365 => '1 año',
+        _ => '$days días',
+      };
+
+  /// Lo que se activa con el plan del código
+  List<String> get _benefits => kind == 'services'
+      ? const ['Tablero de trabajos y comisiones', 'Agenda y reservas en línea', 'Todo lo de Pro: tienda en línea, precio por mayor y más']
+      : const ['Tienda en línea con pedidos por WhatsApp', 'Precio por mayor', 'Cobro automático de fiados'];
+
+  /// Mensaje para mandarle el código al cliente por WhatsApp (0.17.1): uno si lo compró
+  /// y otro si es un regalo. Los asteriscos salen en negrita en WhatsApp.
+  String shareMessage({bool gift = false, DateTime? now}) {
+    final plan = 'Stockealo $kindLabel';
+    final until = expiresAt != null && !isExpired(now)
+        ? '📅 Úsalo antes del ${expiresAt!.day.toString().padLeft(2, '0')}/${expiresAt!.month.toString().padLeft(2, '0')}/${expiresAt!.year}.\n'
+        : '';
+    final list = _benefits.map((b) => '• $b').join('\n');
+    if (gift) {
+      return '¡Hola! 🎁 Te regalo *$_durationText de $plan* para que lo pruebes en tu negocio.\n\n'
+          '🎟️ Tu código: *$code*\n\n'
+          '✨ *Con $kindLabel tienes:*\n$list\n\n'
+          '📲 Actívalo en: Ajustes › Stockealo Pro › «¿Ya tienes un código?»\n\n'
+          '$until'
+          'Si te sirve, me cuentas y te ayudo a dejarlo listo 🙌';
+    }
+    return '¡Hola! 👋 Gracias por elegir *$plan*.\n\n'
+        '🎟️ Tu código: *$code*\n'
+        '⏳ Te da *$_durationText* de $kindLabel\n\n'
+        '✨ *Lo que se activa:*\n$list\n\n'
+        '📲 *Para activarlo:*\n'
+        '1. Abre Stockealo › Ajustes › Stockealo Pro\n'
+        '2. Baja a «¿Ya tienes un código?» y escríbelo\n\n'
+        '$until'
+        '¿Dudas? Escríbeme por aquí y te ayudo 🙌';
+  }
 }
 
 /// Cifras de la portada del panel

@@ -1085,6 +1085,13 @@ class _SellScreenState extends State<SellScreen> {
                 if (l.lineDiscount > 0 && l.netSubtotal < l.totalCost - 0.5)
                   Text('Con este descuento pierdes ${CurrencyFormatter.format(l.totalCost - l.netSubtotal)}.',
                       style: AppText.caption(context, weight: FontWeight.w600, color: c.danger)),
+                // Sin Pro, solo el dueño ve lo que ahorraría con el precio por mayor (0.17.1)
+                if (!l.wholesale && l.wholesalePreview != null && widget.role == Permissions.owner)
+                  Text(
+                    'Con Pro: ${CurrencyFormatter.format(l.wholesalePreview!)} c/u por mayor '
+                    '(ahorra ${CurrencyFormatter.format((l.basePrice - l.wholesalePreview!) * l.quantity)})',
+                    style: AppText.caption(context, color: c.inkFaint),
+                  ),
                 if (l.wholesale)
                   Text(
                     'Precio por mayor: ${CurrencyFormatter.format(l.unitPrice)} c/u (antes ${CurrencyFormatter.format(l.basePrice)})',

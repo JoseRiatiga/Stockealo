@@ -20,14 +20,34 @@ const proSupportEmail = 'byjosealbert@gmail.com';
 const proBenefits = [
   (Icons.storefront_outlined, 'Tienda en línea', 'Tu catálogo con carrito; los pedidos te llegan por WhatsApp.'),
   (Icons.notifications_active_outlined, 'Cobro automático de fiados', 'Recordatorios programados y estado de cuenta en PDF.'),
-  (Icons.auto_awesome_mosaic_outlined, 'Catálogos personalizados', 'Más plantillas y colores, sin el pie "Hecho con Stockealo".'),
+  (Icons.auto_awesome_mosaic_outlined, 'Catálogos sin marca de agua', 'Más plantillas y colores, sin la marca de agua de Stockealo.'),
   (Icons.auto_awesome_outlined, 'Más preguntas a Stocky', '50 preguntas a la IA al día en vez de 10.'),
+  // El quinto va con ProBenefit.staff (el orden importa: la ventana de Pro resalta por posición)
+  (Icons.admin_panel_settings_outlined, 'Roles y límites del equipo', 'Roles sin límite y topes por rol: descuento, anular, fiar.'),
+  (Icons.sell_outlined, 'Precio por mayor', 'Desde cierta cantidad, un precio más bajo; Vender y la tienda lo aplican solos.'),
+  (Icons.flag_outlined, 'Metas por persona', 'Metas de ventas de cada persona del equipo, con su historial.'),
+  (Icons.local_offer_outlined, 'Cupones de la tienda', 'Varios cupones activos a la vez para tus clientes.'),
+];
+
+/// Lo que ya trae el plan gratis (0.17.0: comparación de los tres planes)
+const freeBenefits = [
+  'Inventario, Vender y Caja',
+  'Fiados y abonos',
+  'Reportes y Excel',
+  'Contar inventario',
+  'Pedido sugerido',
+  'Equipo, 1 rol propio',
+  'Catálogo con marca de agua de Stockealo',
+  'Stocky: 10 preguntas al día',
 ];
 
 /// Lo que suma Pro Servicios además de todo Pro
 const proServicesBenefits = [
   (Icons.view_kanban_outlined, 'Módulo Servicios', 'Tablero de trabajos, cola por orden de llegada y asistencia del equipo.'),
+  (Icons.groups_outlined, 'Empleados sin límite', 'Gratis y con Pro son hasta 3.'),
   (Icons.payments_outlined, 'Comisiones y liquidaciones', 'Lo que gana cada empleado por servicio, para pagar por día, semana o mes.'),
+  (Icons.event_available_outlined, 'Agenda y reservas en línea', 'Tus clientes reservan desde tu tienda con la hora de tu negocio.'),
+  (Icons.schedule_outlined, 'Horario de acceso', 'Cada persona entra a la app solo en sus días y horas.'),
   (Icons.support_agent_outlined, 'Soporte incluido', 'Te ayudamos a configurarlo para tu negocio.'),
 ];
 
@@ -52,8 +72,10 @@ class _ProScreenState extends State<ProScreen> {
   final _codeFocus = FocusNode();
   final _scroll = ScrollController();
   late final Future<(List<ProPlan>, Map<String, String>)> _data = _load();
-  String _kind = 'business';
   String? _selectedPlanId;
+
+  /// Selector Mensual / Anual de la comparación (0.17.1)
+  bool _annual = false;
   bool _redeeming = false;
 
   /// Pago en línea con Wompi en curso / mostrar el pago manual por Nequi
@@ -184,46 +206,13 @@ class _ProScreenState extends State<ProScreen> {
                 c,
                 PlanFinder(
                   pricingVisible: showPricing && plans.isNotEmpty,
-                  onChoose: (kind, needs) {
-                    if (showPricing && plans.any((p) => p.kind == kind)) {
-                      setState(() {
-                        _kind = kind;
-                        _selectedPlanId = null;
-                      });
-                      _scroll.animateTo(_scroll.position.maxScrollExtent,
-                          duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
-                    } else {
-                      _askForPro(null, settings['whatsapp'], kind: kind, needs: needs);
-                    }
-                  },
+                  onChoose: (kind, needs) => _choose(kind, needs, showPricing: showPricing, plans: plans, settings: settings),
                 ),
               ),
               const SizedBox(height: AppSpace.xl),
-              _section(c, 'Lo que suma Pro'),
-              _card(c, Column(children: [for (final b in proBenefits) _benefit(c, b.$1, b.$2, b.$3)])),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.sm, AppSpace.xs, 0),
-                child: Text(
-                  'Todo lo demás sigue gratis: inventario, ventas, fiados, reportes, equipo y respaldo.',
-                  style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
-                ),
-              ),
-              const SizedBox(height: AppSpace.xl),
-              _section(c, 'Pro Servicios'),
-              _card(
-                c,
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Para lavaderos, barberías, talleres y otros negocios de servicios: todo lo de Pro y además:',
-                      style: TextStyle(fontSize: AppText.sizeSmall, height: 1.35, color: c.inkMuted),
-                    ),
-                    const SizedBox(height: AppSpace.xs),
-                    for (final b in proServicesBenefits) _benefit(c, b.$1, b.$2, b.$3),
-                  ],
-                ),
-              ),
+              // Los tres planes lado a lado (0.17.0, boceto aprobado)
+              _section(c, 'Compara los planes'),
+              _comparePlans(c, showPricing: showPricing, plans: plans, settings: settings),
               const SizedBox(height: AppSpace.xl),
               if (loading)
                 const Padding(padding: EdgeInsets.all(AppSpace.xl), child: Center(child: CircularProgressIndicator()))
@@ -254,12 +243,8 @@ class _ProScreenState extends State<ProScreen> {
                     style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
                   ),
                 )
-              else ...[
-                _section(c, 'Planes'),
-                _plans(c, plans),
-                const SizedBox(height: AppSpace.xl),
+              else
                 _payment(c, plans, settings),
-              ],
               const SizedBox(height: AppSpace.xl),
               _section(c, '¿Ya tienes un código?'),
               _card(c, _redeemForm(c)),
@@ -272,6 +257,264 @@ class _ProScreenState extends State<ProScreen> {
           );
         },
       ),
+    );
+  }
+
+  /// Elegir un plan: con precios a la vista baja a los planes; si no, escribe por WhatsApp
+  void _choose(String kind, Set<ProNeed> needs,
+      {required bool showPricing, required List<ProPlan> plans, required Map<String, String> settings}) {
+    final plan = showPricing ? _planFor(kind, plans) : null;
+    if (plan != null) {
+      _pick(plan);
+    } else {
+      _askForPro(null, settings['whatsapp'], kind: kind, needs: needs);
+    }
+  }
+
+  /// El plan de [kind] para el periodo del selector (mensual o anual). Sin ese periodo,
+  /// null: nunca se cambia a otro periodo sin que se vea (hallazgo de la revisión)
+  ProPlan? _planFor(String kind, List<ProPlan> plans) =>
+      plans.where((p) => p.kind == kind && p.period == (_annual ? 'year' : 'month')).firstOrNull;
+
+  void _pick(ProPlan plan) {
+    setState(() => _selectedPlanId = plan.id);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
+      }
+    });
+  }
+
+  /// Precio de la tarjeta: con Anual, lo que sale por mes y debajo el total y el ahorro
+  Widget _priceBlock(StockealoColors c, ProPlan plan, List<ProPlan> plans) {
+    final monthly = plans.where((p) => p.kind == plan.kind && p.period == 'month').firstOrNull;
+    final yearly = plan.period == 'year';
+    final perMonth = yearly ? (plan.price / 12 / 10).round() * 10 : plan.price;
+    final saving = yearly && monthly != null ? monthly.price * 12 - plan.price : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(_money(perMonth), style: AppText.amount(context, size: 24, weight: FontWeight.w800)),
+            const SizedBox(width: 4),
+            Text('/mes', style: AppText.small(context, color: c.inkMuted)),
+          ],
+        ),
+        Text(
+          yearly
+              ? '${_money(plan.price)} al año${saving > 0 ? ' · ahorras ${_money(saving)}' : ''}'
+              : 'Se renueva cada mes',
+          style: AppText.caption(context, color: c.inkMuted),
+        ),
+      ],
+    );
+  }
+
+  /// Una tarjeta de la comparación de planes
+  Widget _planCard(
+    StockealoColors c, {
+    required bool current,
+    required String title,
+    required String lead,
+    required List<(IconData, String)> items,
+    required Color tint,
+    String? note,
+    String? badge,
+    String? button,
+    VoidCallback? onChoose,
+    Widget? price,
+  }) {
+    final featured = badge != null;
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.lg),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: featured ? c.accent : c.line, width: featured ? 2 : 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(title, style: AppText.title(context))),
+              if (badge != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: c.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                  child: Text(badge, style: AppText.caption(context, weight: FontWeight.w700, color: c.accent)),
+                ),
+            ],
+          ),
+          if (price != null) ...[
+            const SizedBox(height: AppSpace.sm),
+            price,
+          ],
+          const SizedBox(height: AppSpace.xs),
+          Text(lead, style: AppText.small(context, color: c.inkMuted)),
+          const SizedBox(height: AppSpace.sm),
+          for (final (icon, text) in items)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 18, color: tint),
+                  const SizedBox(width: AppSpace.sm),
+                  Expanded(child: Text(text, style: AppText.body(context))),
+                ],
+              ),
+            ),
+          if (note != null) ...[
+            const SizedBox(height: AppSpace.sm),
+            Text(note, style: AppText.small(context, color: c.inkMuted)),
+          ],
+          const Spacer(),
+          const SizedBox(height: AppSpace.md),
+          if (current) ...[
+            Text('Tu plan actual', textAlign: TextAlign.center, style: AppText.small(context, color: c.inkFaint)),
+            // Con precios a la vista, quien ya lo tiene lo puede renovar (se suma a lo que le queda)
+            if (price != null && onChoose != null) ...[
+              const SizedBox(height: AppSpace.xs),
+              OutlinedButton(onPressed: onChoose, child: const Text('Renovar')),
+            ],
+          ]
+          else if (button != null && featured)
+            FilledButton(onPressed: onChoose, child: Text(button))
+          else if (button != null)
+            OutlinedButton(onPressed: onChoose, child: Text(button)),
+        ],
+      ),
+    );
+  }
+
+  /// Gratis, Pro (resaltado, «Recomendado») y Pro Servicios. En el celular, una debajo de otra.
+  Widget _comparePlans(StockealoColors c,
+      {required bool showPricing, required List<ProPlan> plans, required Map<String, String> settings}) {
+    return ValueListenableBuilder<ProStatus>(
+      valueListenable: ProService.instance.status,
+      builder: (context, status, _) {
+        final current = !status.active ? 'free' : (status.services ? 'services' : 'business');
+        // Con «Mostrar precios y compra» encendido: precio en cada tarjeta y se elige ahí
+        final priced = showPricing && plans.isNotEmpty;
+        final pro = priced ? _planFor('business', plans) : null;
+        final services = priced ? _planFor('services', plans) : null;
+        void choose(String kind) {
+          final plan = kind == 'business' ? pro : services;
+          if (plan != null) {
+            _pick(plan);
+          } else {
+            _choose(kind, const {}, showPricing: showPricing, plans: plans, settings: settings);
+          }
+        }
+
+        final cards = [
+          _planCard(
+            c,
+            current: current == 'free',
+            title: 'Gratis',
+            lead: 'Lo que ya tienes',
+            tint: c.success,
+            price: priced
+                ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(_money(0), style: AppText.amount(context, size: 24, weight: FontWeight.w800)),
+                    Text('Para siempre', style: AppText.caption(context, color: c.inkMuted)),
+                  ])
+                : null,
+            items: [for (final t in freeBenefits) (Icons.check_outlined, t)],
+          ),
+          _planCard(
+            c,
+            current: current == 'business',
+            title: 'Pro',
+            lead: 'Todo lo gratis, más:',
+            tint: c.accent,
+            badge: 'Recomendado',
+            button: 'Elegir',
+            onChoose: () => choose('business'),
+            price: pro == null ? null : _priceBlock(c, pro, plans),
+            items: [for (final b in proBenefits) (b.$1, b.$2)],
+          ),
+          _planCard(
+            c,
+            current: current == 'services',
+            title: 'Pro Servicios',
+            lead: 'Todo Pro, más:',
+            tint: c.accent,
+            note: 'Para lavaderos, barberías, talleres y otros servicios',
+            button: 'Elegir',
+            onChoose: () => choose('services'),
+            price: services == null ? null : _priceBlock(c, services, plans),
+            items: [for (final b in proServicesBenefits) (b.$1, b.$2)],
+          ),
+        ];
+        final hasYear = plans.any((p) => p.period == 'year');
+        final grid = LayoutBuilder(builder: (context, box) {
+          if (box.maxWidth < 720) {
+            return Column(children: [
+              for (final card in cards)
+                Padding(padding: const EdgeInsets.only(bottom: AppSpace.md), child: IntrinsicHeight(child: card)),
+            ]);
+          }
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < cards.length; i++) ...[
+                  if (i > 0) const SizedBox(width: AppSpace.md),
+                  Expanded(child: cards[i]),
+                ],
+              ],
+            ),
+          );
+        });
+        if (!priced) return grid;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (hasYear) ...[
+              Wrap(
+                spacing: AppSpace.sm,
+                runSpacing: AppSpace.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(value: false, label: Text('Mensual')),
+                      ButtonSegment(value: true, label: Text('Anual')),
+                    ],
+                    selected: {_annual},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (v) => setState(() {
+                      _annual = v.first;
+                      _selectedPlanId = null;
+                    }),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
+                    decoration: BoxDecoration(color: c.successSoft, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                    child: Text('Anual: 2 meses gratis', style: AppText.caption(context, weight: FontWeight.w700, color: c.success)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.md),
+            ],
+            grid,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.xs, 0, AppSpace.xs, 0),
+              child: Text('Precios en pesos colombianos (COP). Puedes cancelar cuando quieras.',
+                  style: AppText.caption(context, color: c.inkFaint)),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -330,113 +573,6 @@ class _ProScreenState extends State<ProScreen> {
     );
   }
 
-  Widget _benefit(StockealoColors c, IconData icon, String title, String body) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 22, color: c.accent),
-            const SizedBox(width: AppSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
-                  Text(body, style: TextStyle(fontSize: AppText.sizeSmall, height: 1.35, color: c.inkMuted)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-
-  Widget _plans(StockealoColors c, List<ProPlan> all) {
-    // Pro Servicios aparece solo si su plan está encendido para esta moneda
-    // Quedan Pro y Pro Servicios (0.15.0: Pro Global ya no se vende)
-    final kinds = [for (final k in const ['business', 'services']) if (all.any((p) => p.kind == k)) k];
-    if (!kinds.contains(_kind) && kinds.isNotEmpty) _kind = kinds.first;
-    final plans = all.where((p) => p.kind == _kind).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SegmentedButton<String>(
-          segments: [
-            for (final k in kinds) ButtonSegment(value: k, label: Text(proKindLabel(k))),
-          ],
-          selected: {_kind},
-          showSelectedIcon: false,
-          onSelectionChanged: (v) => setState(() {
-            _kind = v.first;
-            _selectedPlanId = null;
-          }),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.sm, AppSpace.xs, AppSpace.md),
-          child: Text(
-            switch (_kind) {
-              'services' => 'Para "${widget.business.name}": todo Pro más el módulo Servicios, con soporte.',
-              _ => 'Para "${widget.business.name}" y todo su equipo.',
-            },
-            style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
-          ),
-        ),
-        for (final p in plans) _planTile(c, p),
-      ],
-    );
-  }
-
-  Widget _planTile(StockealoColors c, ProPlan p) {
-    final selected = _selectedPlanId == p.id;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpace.sm),
-      child: Material(
-        color: selected ? c.accent.withValues(alpha: 0.08) : c.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          side: BorderSide(color: selected ? c.accent : c.line, width: selected ? 1.6 : 1),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          onTap: () => setState(() => _selectedPlanId = p.id),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpace.lg),
-            child: Row(
-              children: [
-                Icon(selected ? Icons.radio_button_checked_outlined : Icons.radio_button_off_outlined,
-                    color: selected ? c.accent : c.inkFaint),
-                const SizedBox(width: AppSpace.md),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Text(p.periodLabel, style: TextStyle(fontSize: AppText.sizeBodyLarge, fontWeight: FontWeight.w700, color: c.ink)),
-                      if (p.label != null) ...[
-                        const SizedBox(width: AppSpace.sm),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: c.warning.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(AppRadius.pill)),
-                          child: Text(p.label!, style: TextStyle(fontSize: AppText.sizeCaption, fontWeight: FontWeight.w700, color: c.warning)),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (p.regularPrice != null)
-                      Text(_money(p.regularPrice!),
-                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint, decoration: TextDecoration.lineThrough)),
-                    Text(_money(p.price), style: AppText.amount(context, size: 17, weight: FontWeight.w800)),
-                    Text(p.perLabel, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _payment(StockealoColors c, List<ProPlan> plans, Map<String, String> settings) {
     final nequi = settings['nequi_number'];

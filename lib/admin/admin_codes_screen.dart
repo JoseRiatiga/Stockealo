@@ -9,8 +9,8 @@ import '../core/design/app_dialog.dart';
 import '../core/design/filter_tabs.dart';
 import 'admin_coupons_section.dart';
 
-/// Duraciones que se ofrecen; null = permanente
-const _durations = <int?>[1, 7, 30, 90, 365, null];
+/// Duraciones que se ofrecen (0.17.0: sin permanente; lo más largo es 1 año)
+const _durations = <int?>[1, 7, 30, 90, 365];
 
 /// Plazos para canjear; null = sin vencimiento
 const _validities = <int?>[null, 7, 30, 90];
@@ -104,6 +104,22 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
     } finally {
       if (mounted) setState(() => _creating = false);
     }
+  }
+
+  /// ¿Lo compró o es un regalo? (0.17.1) Copia el mensaje que corresponde
+  Future<void> _copyMessage(ProCode code) async {
+    final gift = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('¿Qué mensaje copio?'),
+        children: [
+          SimpleDialogOption(onPressed: () => Navigator.pop(ctx, false), child: const Text('Lo compró')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(ctx, true), child: const Text('Es un regalo')),
+        ],
+      ),
+    );
+    if (gift == null || !mounted) return;
+    adminCopy(context, code.shareMessage(gift: gift), 'Mensaje');
   }
 
   Future<void> _disable(ProCode code) async {
@@ -304,7 +320,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
                       style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: c.ink)),
                 ),
                 TextButton.icon(
-                  onPressed: () => adminCopy(context, code.shareMessage(), 'Mensaje'),
+                  onPressed: () => _copyMessage(code),
                   icon: const Icon(Icons.chat_outlined, size: 18),
                   label: const Text('Mensaje'),
                 ),
@@ -365,7 +381,7 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
           ),
           PopupMenuButton<String>(
             tooltip: 'Más',
-            onSelected: (v) => v == 'message' ? adminCopy(context, code.shareMessage(), 'Mensaje') : _disable(code),
+            onSelected: (v) => v == 'message' ? _copyMessage(code) : _disable(code),
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'message', child: Text('Copiar mensaje para WhatsApp')),
               if (code.canDisable()) const PopupMenuItem(value: 'disable', child: Text('Desactivar')),

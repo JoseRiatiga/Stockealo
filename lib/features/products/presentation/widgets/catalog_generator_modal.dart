@@ -533,6 +533,9 @@ class _CatalogGeneratorModalState extends State<CatalogGeneratorModal> {
                 business: widget.business,
                 style: _chosenStyle,
                 accent: _accent,
+                // Probando lo de Pro sin tenerlo (0.17.1): marca de agua en diagonal, para
+                // que una captura de pantalla no sirva
+                watermark: !_pro && _chosenStyle.usesProFeatures,
                 products: _targetProducts
                     .take(_style.template == 'lista' ? 5 : (_style.itemsPerPage >= 4 ? 4 : _style.itemsPerPage))
                     .toList(),
@@ -937,8 +940,15 @@ class _CatalogPreview extends StatelessWidget {
   final CatalogStyle style;
   final Color accent;
   final List<Product> products;
+  final bool watermark;
 
-  const _CatalogPreview({required this.business, required this.style, required this.accent, required this.products});
+  const _CatalogPreview({
+    required this.business,
+    required this.style,
+    required this.accent,
+    required this.products,
+    this.watermark = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -953,6 +963,29 @@ class _CatalogPreview extends StatelessWidget {
     final columns = style.itemsPerPage >= 4 ? 2 : 1;
     final title = style.title.isNotEmpty ? style.title : 'Catálogo de productos';
 
+    final preview = _page(context, page: page, card: card, ink: ink, muted: muted, line: line, imageBg: imageBg, price: price, columns: columns, title: title);
+    if (!watermark) return preview;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        preview,
+        Positioned.fill(child: CatalogWatermark(dark: dark)),
+      ],
+    );
+  }
+
+  Widget _page(
+    BuildContext context, {
+    required Color page,
+    required Color card,
+    required Color ink,
+    required Color muted,
+    required Color line,
+    required Color imageBg,
+    required Color price,
+    required int columns,
+    required String title,
+  }) {
     return Semantics(
       label: 'Vista previa del catálogo',
       child: Center(
@@ -1262,6 +1295,39 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// «Hecho con Stockealo» en diagonal, suave, sobre la vista previa de un diseño de Pro
+/// que el negocio todavía no tiene (0.17.1). No tapa los productos: se lee todo, pero
+/// una captura no sirve para mandarla.
+class CatalogWatermark extends StatelessWidget {
+  final bool dark;
+
+  const CatalogWatermark({super.key, this.dark = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ExcludeSemantics(
+        child: Center(
+          child: Transform.rotate(
+            angle: -0.55,
+            child: Text(
+              'Hecho con Stockealo',
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                fontSize: AppText.sizeHeading,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1,
+                color: (dark ? Colors.white : Colors.black).withValues(alpha: 0.16),
+              ),
+            ),
+          ),
         ),
       ),
     );

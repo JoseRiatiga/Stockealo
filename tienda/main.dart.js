@@ -103999,7 +103999,7 @@ h=k.length>500?B.c.a1(k,0,500):k
 if(j==null)g=null
 else g=j.length>4000?B.c.a1(j,0,4000):j
 f=t.z
-m=A.aa(["p_app",d,"p_version","0.17.0+58","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
+m=A.aa(["p_app",d,"p_version","0.17.1+59","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
 l=null
 p=4
 s=l!=null?7:9

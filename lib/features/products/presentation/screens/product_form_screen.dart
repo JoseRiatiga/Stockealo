@@ -1,4 +1,5 @@
 import '../../../suppliers/presentation/widgets/supplier_picker.dart';
+import '../../../../core/utils/money_input.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -122,13 +123,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _descriptionController = TextEditingController(text: p?.description ?? '');
     _brandController = TextEditingController(text: p?.brand ?? '');
     _purchasePriceController = TextEditingController(
-      text: p != null && p.purchasePrice > 0 ? p.purchasePrice.toStringAsFixed(0) : '',
+      text: p != null && p.purchasePrice > 0 ? _priceText(p.purchasePrice) : '',
     );
     _salePriceController = TextEditingController(
-      text: p != null && p.salePrice > 0 ? p.salePrice.toStringAsFixed(0) : '',
+      text: p != null && p.salePrice > 0 ? _priceText(p.salePrice) : '',
     );
     _comparePriceController = TextEditingController(
-      text: p?.comparePrice != null && p!.comparePrice! > 0 ? p.comparePrice!.toStringAsFixed(0) : '',
+      text: p?.comparePrice != null && p!.comparePrice! > 0 ? _priceText(p.comparePrice!) : '',
     );
     _stockController = TextEditingController(text: p?.stock.toString() ?? '0');
     _minStockController = TextEditingController(text: p?.minStock.toString() ?? '5');
@@ -394,8 +395,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _isLoading = true;
     });
 
-    final purchasePrice = double.tryParse(_purchasePriceController.text.trim()) ?? 0.0;
-    final salePrice = double.tryParse(_salePriceController.text.trim()) ?? 0.0;
+    final purchasePrice = _price(_purchasePriceController.text);
+    final salePrice = _price(_salePriceController.text);
     final minStock = int.tryParse(_minStockController.text.trim()) ?? 5;
     final productId = _productId;
     final now = DateTime.now();
@@ -439,8 +440,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
       purchasePrice: purchasePrice,
       salePrice: salePrice,
-      comparePrice: (double.tryParse(_comparePriceController.text.trim()) ?? 0) > salePrice
-          ? double.tryParse(_comparePriceController.text.trim())
+      comparePrice: _price(_comparePriceController.text) > salePrice
+          ? _price(_comparePriceController.text)
           : null,
       stock: totalStock,
       minStock: minStock,
@@ -484,10 +485,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
   }
 
+  // Precios (0.16.9): con puntos de mil si la moneda no usa centavos (peso colombiano);
+  // con decimales si los usa (dólar: «2.50» es dos dólares y medio, no 250)
+  static bool get _noCents => CurrencyFormatter.noCents;
+  static List<TextInputFormatter>? get _priceFormatters => _noCents ? MoneyInput.formatters : null;
+  static TextInputType get _priceKeyboard =>
+      _noCents ? TextInputType.number : const TextInputType.numberWithOptions(decimal: true);
+
+  static double _price(String text) =>
+      _noCents ? MoneyInput.parse(text) : (double.tryParse(text.trim().replaceAll(',', '.')) ?? 0);
+
+  static String _priceText(double v) =>
+      _noCents ? MoneyInput.text(v) : (v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2));
+
   @override
   Widget build(BuildContext context) {
-    final purchasePrice = double.tryParse(_purchasePriceController.text) ?? 0.0;
-    final salePrice = double.tryParse(_salePriceController.text) ?? 0.0;
+    final purchasePrice = _price(_purchasePriceController.text);
+    final salePrice = _price(_salePriceController.text);
     final profit = salePrice - purchasePrice;
     final margin = salePrice > 0 ? (profit / salePrice) * 100 : 0.0;
 
@@ -700,7 +714,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _purchasePriceController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: _priceKeyboard,
+                          inputFormatters: _priceFormatters,
                           decoration: const InputDecoration(
                             labelText: 'Precio de compra',
                             prefixText: r'$ ',
@@ -713,7 +728,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _salePriceController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: _priceKeyboard,
+                          inputFormatters: _priceFormatters,
                           decoration: const InputDecoration(
                             labelText: 'Precio de venta *',
                             prefixText: r'$ ',
@@ -722,8 +738,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           onChanged: (_) => setState(() {}),
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'Requerido';
-                            final val = double.tryParse(v.trim());
-                            if (val == null || val <= 0) return 'Mayor a 0';
+                            if (_price(v) <= 0) return 'Mayor a 0';
                             return null;
                           },
                         ),
@@ -751,7 +766,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                       label: Text('$m % · ${CurrencyFormatter.format(Pricing.priceForMargin(purchasePrice, m))}',
                                           style: AppText.caption(context)),
                                       onPressed: () => setState(() =>
-                                          _salePriceController.text = Pricing.priceForMargin(purchasePrice, m).round().toString()),
+                                          _salePriceController.text = _priceText(Pricing.priceForMargin(purchasePrice, m).roundToDouble())),
                                     ),
                                   ),
                                 ),
@@ -767,16 +782,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   // Oferta en la tienda en línea: el precio de antes se ve tachado
                   TextFormField(
                     controller: _comparePriceController,
-                    keyboardType: TextInputType.number,
+                    keyboardType: _priceKeyboard,
+                    inputFormatters: _priceFormatters,
                     decoration: const InputDecoration(
                       labelText: 'Precio de antes (opcional)',
                       prefixText: r'$ ',
                       hintText: 'Para mostrar «Oferta» en la tienda en línea',
                     ),
                     validator: (v) {
-                      final before = double.tryParse((v ?? '').trim());
-                      final now = double.tryParse(_salePriceController.text.trim()) ?? 0;
-                      if (before != null && before > 0 && before <= now) return 'Debe ser mayor al precio de venta';
+                      final before = _price(v ?? '');
+                      final now = _price(_salePriceController.text);
+                      if (before > 0 && before <= now) return 'Debe ser mayor al precio de venta';
                       return null;
                     },
                   ),

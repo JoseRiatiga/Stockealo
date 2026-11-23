@@ -153,8 +153,9 @@ class _StorePageState extends State<StorePage> {
 
   Future<void> _loadBooking(String slug) async {
     final now = DateTime.now();
-    final from = DateTime(now.year, now.month, now.day);
-    final booking = await BookingService.instance.get(slug, from: from, to: from.add(const Duration(days: 15)));
+    // Un día de margen a cada lado: el negocio puede estar en otra zona (0.16.9)
+    final from = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    final booking = await BookingService.instance.get(slug, from: from, to: from.add(const Duration(days: 17)));
     if (mounted) setState(() => _booking = booking);
   }
 
@@ -1198,6 +1199,24 @@ class _StorePageState extends State<StorePage> {
               Text('Al pedir recibes tu comprobante «Por confirmar»', style: AppText.small(context, color: c.inkFaint)),
             ],
           ),
+          // Dónde queda el local, con «Cómo llegar» (0.16.9)
+          if (_store?.shownAddress != null) ...[
+            const SizedBox(height: AppSpace.md),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpace.xs,
+              children: [
+                Icon(Icons.place_outlined, size: 18, color: c.accent),
+                Text(_store!.shownAddress!, style: AppText.small(context, color: c.ink)),
+                TextButton(
+                  onPressed: () => launchUrl(PublicStore.mapsUrl(_store!.shownAddress!, businessName: _store!.businessName),
+                      mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank'),
+                  child: const Text('Cómo llegar'),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppSpace.md),
           Text('Tienda hecha con Stockealo', textAlign: TextAlign.center, style: AppText.caption(context, color: c.inkFaint)),
         ],
@@ -2285,6 +2304,11 @@ class _CartFormState extends State<_CartForm> {
           icon: const Icon(Icons.receipt_long_outlined),
           label: Text(_sending ? 'Guardando tu pedido…' : 'Hacer el pedido · ${money(total)}'),
         ),
+        // Dónde recoger (0.16.9): la dirección del local
+        if (widget.store.shownAddress != null) ...[
+          const SizedBox(height: AppSpace.sm),
+          _CartNotice(icon: Icons.place_outlined, tone: AppTone.info, title: 'Para recoger', text: widget.store.shownAddress!),
+        ],
         // Cómo pagarle al negocio (0.16.0)
         if (widget.store.look.payment != null) ...[
           const SizedBox(height: AppSpace.sm),

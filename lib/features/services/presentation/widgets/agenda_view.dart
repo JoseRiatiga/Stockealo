@@ -1,3 +1,6 @@
+import '../../../../core/utils/business_clock.dart';
+import '../../../business/models/ticket_info.dart';
+import '../../../store/data/online_store_service.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/clock_text.dart';
 import 'package:intl/intl.dart';
@@ -31,7 +34,7 @@ class AgendaView extends StatefulWidget {
 
 class _AgendaViewState extends State<AgendaView> {
   final _repo = AppointmentsRepository.instance;
-  DateTime _day = DateTime.now();
+  DateTime _day = appNow();
   List<Appointment>? _list;
   Map<String, StaffMember> _staff = const {};
   bool _busy = false;
@@ -79,7 +82,7 @@ class _AgendaViewState extends State<AgendaView> {
   }
 
   Future<void> _new() async {
-    final start = DateTime(_day.year, _day.month, _day.day, DateTime.now().hour + 1);
+    final start = DateTime(_day.year, _day.month, _day.day, appNow().hour + 1);
     if (await AppointmentEditor.show(context, business: widget.business, startsAt: start) == true) await _load();
   }
 
@@ -101,9 +104,12 @@ class _AgendaViewState extends State<AgendaView> {
   Future<void> _remind(Appointment a) async {
     final phone = (a.customerPhone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
     if (phone.isEmpty) return;
+    // Con la dirección y el enlace para llegar (0.16.9)
+    final address = TicketInfo.of(widget.business).address;
     final text = 'Hola ${a.customerName.split(' ').first}, te recordamos tu cita en ${widget.business.name} '
         'el ${_dayFmt.format(a.startsAt)} a las ${_hour.format(a.startsAt)}'
-        '${a.serviceNames.isEmpty ? '' : ' (${a.serviceNames})'}. ¡Te esperamos!';
+        '${a.serviceNames.isEmpty ? '' : ' (${a.serviceNames})'}. ¡Te esperamos!'
+        '${address == null ? '' : '\nDirección: $address\nCómo llegar: ${PublicStore.mapsUrl(address, businessName: widget.business.name)}'}';
     final number = phone.length == 10 ? '57$phone' : phone;
     await launchUrl(Uri.parse('https://wa.me/$number?text=${Uri.encodeComponent(text)}'), mode: LaunchMode.externalApplication);
   }

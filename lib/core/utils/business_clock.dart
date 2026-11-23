@@ -59,6 +59,24 @@ class BusinessClock {
     return DateTime(t.year, t.month, t.day, t.hour, t.minute, t.second, t.millisecond, t.microsecond);
   }
 
+  /// Citas y reservas (0.16.9): se guardan con la hora real (UTC), pero se piden y se
+  /// muestran con la hora del negocio, no con la del equipo de quien las ve.
+  /// Una hora del reloj del negocio («las 3 p. m. en Bogotá») → el instante real, en
+  /// UTC. [zone] null = la del negocio activo; sin zona, la del equipo.
+  static DateTime instantOf(DateTime wall, {String? zone}) {
+    final location = zone == null ? _location : locationOf(zone);
+    if (location == null) return wall.toUtc();
+    return tz.TZDateTime(location, wall.year, wall.month, wall.day, wall.hour, wall.minute, wall.second, wall.millisecond)
+        .toUtc();
+  }
+
+  /// Un instante real → la hora del reloj del negocio (como [instantOf], al revés)
+  static DateTime wallOf(DateTime instant, {String? zone}) {
+    final location = zone == null ? _location : locationOf(zone);
+    if (location == null) return instant.toLocal();
+    return wallAt(instant, location);
+  }
+
   /// Una hora del reloj del negocio como la guarda la nube: los mismos números
   /// escritos como UTC («17:04+00» = las 5:04 p. m. en el negocio). Para enviar
   /// rangos de fechas a la nube.

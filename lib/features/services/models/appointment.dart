@@ -1,3 +1,4 @@
+import '../../../core/utils/business_clock.dart';
 import 'dart:convert';
 
 /// Una cita de la agenda (0.14.0): para barberías, peluquerías, spa y cualquier
@@ -103,7 +104,8 @@ class Appointment {
         'service_ids': jsonEncode(serviceIds),
         'service_names': serviceNames,
         'staff_id': staffId,
-        'starts_at': startsAt.toUtc().toIso8601String(),
+        // La hora real de la cita, con la zona del negocio (0.16.9): no la del equipo
+        'starts_at': BusinessClock.instantOf(startsAt).toIso8601String(),
         'duration_min': durationMin,
         'status': status,
         'source': source,
@@ -130,7 +132,7 @@ class Appointment {
       serviceIds: ids,
       serviceNames: m['service_names'] as String? ?? '',
       staffId: m['staff_id'] as String?,
-      startsAt: when(m['starts_at']),
+      startsAt: BusinessClock.wallOf(DateTime.tryParse('${m['starts_at'] ?? ''}') ?? DateTime.now()),
       durationMin: (m['duration_min'] as num?)?.toInt() ?? 30,
       status: m['status'] as String? ?? confirmed,
       source: m['source'] as String? ?? sourceLocal,

@@ -47,6 +47,11 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Entrar con Google (0.16.0): la sesión llega por aquí cuando Google vuelve a la app
   StreamSubscription<AuthState>? _oauthSub;
   bool _googleLoading = false;
+
+  /// Al volver de Google sin entrar, el botón se libera solo (0.16.9): antes quedaba
+  /// bloqueado 2 minutos en el celular
+  late final _lifecycle = AppLifecycleListener(onResume: _onResume);
+  Timer? _googleRelease;
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _acceptTerms = false;
@@ -71,10 +76,26 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) setState(() => _googleLoading = false);
       }
     });
+    _lifecycle;
     _emailFocus.addListener(_onFocusChanged);
     _passwordFocus.addListener(_onFocusChanged);
     _confirmPasswordFocus.addListener(_onFocusChanged);
     _emailController.addListener(_onEmailChanged);
+  }
+
+  /// Volvió a la app: si Google no dejó sesión en 2 segundos, se puede volver a intentar
+  void _onResume() {
+    if (!_googleLoading) return;
+    _googleRelease?.cancel();
+    _googleRelease = Timer(const Duration(seconds: 2), () {
+      final session = SupabaseService.instance.client?.auth.currentSession;
+      if (mounted && _googleLoading && session == null) setState(() => _googleLoading = false);
+    });
+  }
+
+  void _cancelGoogle() {
+    _googleRelease?.cancel();
+    setState(() => _googleLoading = false);
   }
 
   Future<void> _google() async {
@@ -128,6 +149,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _oauthSub?.cancel();
+    _lifecycle.dispose();
+    _googleRelease?.cancel();
     _emailFocus.dispose();
     _passwordFocus.dispose();
     _confirmPasswordFocus.dispose();
@@ -517,6 +540,14 @@ actions: [
                 : Image.asset('assets/brand/google_g.png', width: 18, height: 18, filterQuality: FilterQuality.medium),
             label: Text(_googleLoading ? 'Esperando a Google…' : 'Continuar con Google'),
           ),
+          if (_googleLoading)
+            Center(
+              child: TextButton(
+                onPressed: _cancelGoogle,
+                style: TextButton.styleFrom(foregroundColor: c.inkMuted, visualDensity: VisualDensity.compact),
+                child: const Text('Cancelar'),
+              ),
+            ),
           const SizedBox(height: AppSpace.lg),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

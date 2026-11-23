@@ -23,7 +23,8 @@ class BookingPanel extends StatefulWidget {
 class _BookingPanelState extends State<BookingPanel> {
   final Set<String> _services = {};
   String? _staffId;
-  late DateTime _day = DateTime.now();
+  // Con la hora del negocio (0.16.9): «hoy» es el de allá
+  late DateTime _day = widget.booking.now;
   DateTime? _slot;
   final _name = TextEditingController();
   final _phone = TextEditingController();
@@ -61,7 +62,8 @@ class _BookingPanelState extends State<BookingPanel> {
         phone: _phone.text,
         serviceIds: _services.toList(),
         staffId: _staffId,
-        startsAt: _slot!,
+        // La hora elegida es la del negocio: se guarda la hora real con su zona
+        startsAt: widget.booking.instantOf(_slot!),
       );
       if (mounted) setState(() => _done = true);
     } on BookingException catch (e) {
@@ -77,6 +79,46 @@ class _BookingPanelState extends State<BookingPanel> {
         'a las ${_hour.format(_slot!)} ($names). Soy ${_name.text.trim()}.';
     await launchUrl(Uri.parse('https://wa.me/${widget.store.whatsapp}?text=${Uri.encodeComponent(text)}'),
         mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+  }
+
+  /// «Te esperamos en …» con «Cómo llegar» (0.16.9, dirección de «Datos del recibo»)
+  Widget _address() {
+    final address = widget.store.shownAddress;
+    if (address == null) return const SizedBox.shrink();
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpace.sm),
+      child: Row(
+        children: [
+          Icon(Icons.place_outlined, size: 18, color: c.accent),
+          const SizedBox(width: AppSpace.xs),
+          Expanded(child: Text('Te esperamos en $address', style: AppText.small(context, color: c.ink))),
+          TextButton(
+            onPressed: () => launchUrl(PublicStore.mapsUrl(address, businessName: widget.store.businessName),
+                mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank'),
+            child: const Text('Cómo llegar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// «Horas de Bogotá»: el nombre de la ciudad de la zona del negocio
+  static String? cityOf(String? zone) {
+    if (zone == null || !zone.contains('/')) return null;
+    const names = {
+      'Bogota': 'Bogotá',
+      'Mexico_City': 'Ciudad de México',
+      'Buenos_Aires': 'Buenos Aires',
+      'New_York': 'Nueva York',
+      'Los_Angeles': 'Los Ángeles',
+      'Cancun': 'Cancún',
+      'Merida': 'Mérida',
+      'Panama': 'Panamá',
+      'Asuncion': 'Asunción',
+    };
+    final last = zone.split('/').last;
+    return names[last] ?? last.replaceAll('_', ' ');
   }
 
   Widget _label(String t) => Padding(
@@ -99,6 +141,7 @@ class _BookingPanelState extends State<BookingPanel> {
           Text('${_dayLong.format(_slot!)} a las ${_hour.format(_slot!)}', textAlign: TextAlign.center, style: AppText.body(context)),
           const SizedBox(height: AppSpace.sm),
           Text('${widget.store.businessName} te confirma por WhatsApp.', textAlign: TextAlign.center, style: AppText.small(context)),
+          _address(),
           const SizedBox(height: AppSpace.lg),
           FilledButton.icon(
             onPressed: _whatsApp,
@@ -109,7 +152,8 @@ class _BookingPanelState extends State<BookingPanel> {
         ],
       );
     }
-    final days = [for (var i = 0; i < 14; i++) DateTime.now().add(Duration(days: i))]
+    final today = b.now;
+    final days = [for (var i = 0; i < 14; i++) today.add(Duration(days: i))]
         .where((d) => b.schedule == null || b.schedule!.isEmpty || b.schedule!.on(d) != null)
         .toList();
     final slots = _services.isEmpty ? const <DateTime>[] : b.freeSlots(_day, _minutes, staffId: _staffId);
@@ -161,7 +205,7 @@ class _BookingPanelState extends State<BookingPanel> {
                 Padding(
                   padding: const EdgeInsets.only(right: AppSpace.xs),
                   child: ChoiceChip(
-                    label: Text(DateUtils.isSameDay(d, DateTime.now()) ? 'Hoy' : _dayShort.format(d)),
+                    label: Text(DateUtils.isSameDay(d, today) ? 'Hoy' : _dayShort.format(d)),
                     selected: DateUtils.isSameDay(d, _day),
                     onSelected: (_) => setState(() {
                       _day = d;
@@ -172,7 +216,8 @@ class _BookingPanelState extends State<BookingPanel> {
             ],
           ),
         ),
-        _label('${b.staff.isNotEmpty ? 4 : 3}. ¿A qué hora?'),
+        _label('${b.staff.isNotEmpty ? 4 : 3}. ¿A qué hora?'
+            '${cityOf(b.zone) == null ? '' : ' (horas de ${cityOf(b.zone)})'}'),
         if (_services.isEmpty)
           Text('Primero elige el servicio.', style: AppText.small(context))
         else if (slots.isEmpty)
@@ -187,6 +232,7 @@ class _BookingPanelState extends State<BookingPanel> {
             ],
           ),
         if (_slot != null) ...[
+          _address(),
           _label('Tus datos'),
           TextField(controller: _name, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Tu nombre')),
           const SizedBox(height: AppSpace.sm),

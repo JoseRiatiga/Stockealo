@@ -39,6 +39,7 @@ import '../widgets/product_template_sheet.dart';
 import '../widgets/lots_widgets.dart';
 import '../widgets/idle_products_alert.dart';
 import '../../../home/navigation/app_pane.dart';
+import 'stock_count_screen.dart';
 
 /// Productos (el catálogo) y, en [ProductsListMode.stock], el lugar Stock: la
 /// misma lista ordenada con lo agotado y lo bajo arriba, el aviso del proveedor que pasa
@@ -488,17 +489,30 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: FilledButton.icon(
-                          onPressed: () => RestockOrderModal.show(
-                            context,
-                            business: _activeBusiness!,
-                            userName: AuthRepository.instance.currentUser?.displayName,
+                      child: Wrap(
+                        spacing: AppSpace.sm,
+                        runSpacing: AppSpace.sm,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: () => RestockOrderModal.show(
+                              context,
+                              business: _activeBusiness!,
+                              userName: AuthRepository.instance.currentUser?.displayName,
+                            ),
+                            icon: const Icon(Icons.local_shipping_outlined, size: 18),
+                            label: const Text('Pedir al proveedor'),
                           ),
-                          icon: const Icon(Icons.local_shipping_outlined, size: 18),
-                          label: const Text('Pedir al proveedor'),
-                        ),
+                          // Conteo de inventario (0.17.0, bloque C)
+                          if (Permissions.mine(Perm.stockAdjust))
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await AppPane.open(context, (_) => StockCountScreen(business: _activeBusiness!));
+                                if (mounted) _loadData(silent: true);
+                              },
+                              icon: const Icon(Icons.fact_check_outlined, size: 18),
+                              label: const Text('Contar inventario'),
+                            ),
+                        ],
                       ),
                     ),
                   ),

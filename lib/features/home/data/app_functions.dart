@@ -69,6 +69,13 @@ const kAppFunctions = <AppFunction>[
       perm: Perm.suppliers),
   AppFunction(id: 'stock', title: 'Stock por reponer', where: 'Stock', tab: 8, icon: Icons.layers_outlined,
       keywords: ['stock', 'reponer', 'agotado', 'falta', 'minimo', 'pedir', 'faltante']),
+  // 0.17.0: conteo de inventario (bloque C) y pedido sugerido (bloque D)
+  AppFunction(id: 'stock_count', title: 'Contar inventario', where: 'Stock › Contar inventario', tab: 8,
+      icon: Icons.fact_check_outlined, keywords: ['contar', 'conteo', 'inventario', 'fisico', 'diferencia', 'cuadrar'],
+      perm: Perm.stockAdjust),
+  AppFunction(id: 'restock_order', title: 'Pedido al proveedor', where: 'Stock › Pedir al proveedor', tab: 8,
+      icon: Icons.local_shipping_outlined, keywords: ['pedido', 'proveedor', 'sugerido', 'pedir', 'reponer'],
+      perm: Perm.productsEdit),
   AppFunction(id: 'catalog', title: 'Catálogo', where: 'Productos › Catálogo', tab: 1, icon: Icons.menu_book_outlined,
       keywords: ['catalogo', 'pdf', 'historia', 'compartir']),
   AppFunction(id: 'promotions', title: 'Promociones', where: 'Productos › Promociones', tab: 1, icon: Icons.local_offer_outlined,

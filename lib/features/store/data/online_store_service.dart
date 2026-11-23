@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../products/models/price_tier.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
@@ -501,6 +502,9 @@ class StoreProduct {
   /// Promoción vigente (con % el [price] ya viene rebajado y [oldPrice] es el de antes)
   final StorePromo? promo;
 
+  /// Precio por cantidad (0.17.0): «desde 12 unidades: $1.800»
+  final List<PriceTier> priceTiers;
+
   const StoreProduct({
     required this.id,
     required this.name,
@@ -514,7 +518,13 @@ class StoreProduct {
     this.variants = const [],
     this.few = false,
     this.promo,
+    this.priceTiers = const [],
   });
+
+  /// «Desde 12: $1.800 c/u · Desde 24: $1.600 c/u»
+  String? tiersText(String Function(double) money) => priceTiers.isEmpty
+      ? null
+      : priceTiers.map((t) => 'Desde ${t.minQty}: ${money(t.price)} c/u').join(' · ');
 
   /// Tallas y colores que todavía se pueden pedir
   List<StoreVariant> get available => variants.where((v) => !v.soldOut).toList();
@@ -549,6 +559,7 @@ class StoreProduct {
         oldPrice: pct ? ((before ?? 0) > base ? before : base) : before,
         few: j['few'] == true,
         promo: promo,
+        priceTiers: PriceTier.parse(j['price_tiers']),
         variants: [
           for (final v in (j['variants'] as List? ?? const [])) StoreVariant.fromJson(Map<String, dynamic>.from(v as Map)),
         ],
@@ -699,14 +710,32 @@ class CartLine {
   String get key => keyOf(product, variant);
   static String keyOf(StoreProduct p, StoreVariant? v) => v == null ? p.id : '${p.id}:${v.id}';
   String get name => variant == null ? product.name : '${product.name} (${variant!.label})';
-  double get unitPrice => product.price + (variant?.extra ?? 0);
+  double get _basePrice => product.price + (variant?.extra ?? 0);
 
   /// Con «lleva X, paga Y» se descuentan las unidades de regalo (0.13.4)
-  double get subtotal {
+  double get _promoSubtotal {
     final promo = product.promo;
-    if (promo == null || promo.isPercent || promo.buyQty <= promo.payQty) return unitPrice * quantity;
+    if (promo == null || promo.isPercent || promo.buyQty <= promo.payQty) return _basePrice * quantity;
     final free = (quantity ~/ promo.buyQty) * (promo.buyQty - promo.payQty);
-    return unitPrice * (quantity - free);
+    return _basePrice * (quantity - free);
+  }
+
+  /// Precio por mayor de la cantidad pedida (0.17.0), si sale mejor que el normal con
+  /// su promoción (no se suman los dos, igual que en Vender)
+  double? get _wholesalePrice {
+    final tier = PriceTier.forQuantity(product.priceTiers, quantity);
+    if (tier == null) return null;
+    final price = tier.price + (variant?.extra ?? 0);
+    return price * quantity < _promoSubtotal ? price : null;
+  }
+
+  bool get wholesale => _wholesalePrice != null;
+
+  double get unitPrice => _wholesalePrice ?? _basePrice;
+
+  double get subtotal {
+    final w = _wholesalePrice;
+    return w == null ? _promoSubtotal : w * quantity;
   }
   int? get stock => variant?.stock ?? product.stock;
 }

@@ -21,6 +21,16 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.17.0',
+      title: 'Precios por mayor, conteo de inventario y pedido sugerido',
+      items: [
+        'Precio por cantidad (Pro): «desde 12 unidades: \$1.800». Vender lo aplica solo y tu tienda lo muestra.',
+        'Contar inventario en Stock: cuenta por categoría, guarda a medias y al terminar ve lo que sobró y faltó.',
+        'El pedido al proveedor sugiere según lo que vendes y cuándo vuelve el proveedor, y te dice por qué.',
+        'Haz tu primera venta desde Inicio, o una venta de práctica que no guarda nada.',
+      ],
+    ),
+    (
       version: '0.16.9',
       title: 'Tu dirección y las citas a la hora correcta',
       items: [

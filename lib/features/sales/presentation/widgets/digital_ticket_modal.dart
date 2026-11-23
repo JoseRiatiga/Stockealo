@@ -27,6 +27,9 @@ class DigitalTicketModal {
     double? change,
     double? debtAfter,
     bool justSold = false,
+
+    /// Venta de práctica (0.17.0): el recibo de muestra, sin nada guardado
+    bool practice = false,
   }) {
     final items = salesList ?? [if (sale != null) sale];
     assert(items.isNotEmpty);
@@ -38,8 +41,21 @@ class DigitalTicketModal {
       received: received,
       change: change,
       debtAfter: debtAfter,
+      practice: practice,
     );
     final first = items.first;
+    if (practice) {
+      return TicketViewer.show(
+        context,
+        business: business,
+        businessName: businessName ?? business?.name ?? 'Mi negocio',
+        doc: doc,
+        headline: 'Venta de práctica',
+        headlineTone: AppTone.accent,
+        subline: 'Así se ve el recibo. No se guardó nada: el stock, la caja y Reportes no cambiaron.',
+        closeLabel: 'Listo',
+      );
+    }
     return TicketViewer.show(
       context,
       business: business,
@@ -60,6 +76,7 @@ class DigitalTicketModal {
     double? received,
     double? change,
     double? debtAfter,
+    bool practice = false,
   }) {
     final first = items.first;
     final number = invoiceNumber ??
@@ -69,7 +86,9 @@ class DigitalTicketModal {
     final day = DateFormat('dd MMM yyyy', 'es_CO').format(first.date).toUpperCase();
     // También el pago mixto con una parte fiada (0.16.8)
     final credit = items.any((s) => PaymentMethod.creditPart(s.paymentMethod, s.totalAmount, s.paymentSplit) > 0);
-    final stamp = first.isVoided
+    final stamp = practice
+        ? TicketStamp('PRÁCTICA', detail: day, tone: AppTone.accent)
+        : first.isVoided
         ? TicketStamp('ANULADA', detail: DateFormat('dd MMM yyyy', 'es_CO').format(first.voidedAt!).toUpperCase(), tone: AppTone.danger)
         : credit
             ? TicketStamp('FIADO', detail: debtAfter == null ? day : 'Debe ${CurrencyFormatter.format(debtAfter)}', tone: AppTone.warning)

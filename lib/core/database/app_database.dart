@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 31;
+  static const int _schemaVersion = 32;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -589,6 +589,12 @@ class AppDatabase {
     if (oldVersion < 29 && newVersion >= 29) await productLotsV29(db);
     if (oldVersion < 30 && newVersion >= 30) await businessTimeZoneV30(db);
     if (oldVersion < 31 && newVersion >= 31) await categoryIconsV31(db);
+    if (oldVersion < 32 && newVersion >= 32) await priceTiersV32(db);
+  }
+
+  /// 0.17.0, precios al por mayor (Pro): escalones en JSON
+  static Future<void> priceTiersV32(Database db) async {
+    await _addColumnIfMissing(db, 'products', 'price_tiers', 'TEXT');
   }
 
   /// 0.16.8, íconos de categoría (#28): clave del dibujo; vacío = sin elegir
@@ -1104,6 +1110,7 @@ class AppDatabase {
     await productBrandV28(db);
     await productLotsV29(db);
     await businessTimeZoneV30(db);
+    await priceTiersV32(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

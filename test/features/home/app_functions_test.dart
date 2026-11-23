@@ -16,7 +16,7 @@ void main() {
     final caja = findFunctions('caja', role: 'CASHIER', services: false);
     expect(caja.map((f) => f.where), contains('Caja'));
     expect(findFunctions('cotización', role: 'CASHIER', services: false).single.title, 'Cotizaciones');
-    expect(findFunctions('proveedor', role: 'OWNER', services: false).single.where, 'Clientes y proveedores › Proveedores');
+    expect(findFunctions('proveedor', role: 'OWNER', services: false).map((f) => f.where), contains('Clientes y proveedores › Proveedores'));
     expect(findFunctions('modo oscuro', role: 'CASHIER', services: false).single.title, 'Apariencia');
   });
 

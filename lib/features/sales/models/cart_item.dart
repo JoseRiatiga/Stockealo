@@ -16,13 +16,25 @@ class CartItem {
   /// la venta guarda cuánto se descontó y la nube aplica el límite de descuento del rol.
   double lineDiscount = 0;
 
+  /// El precio lo pone Vender (normal o por mayor, 0.17.0). Un precio cotizado o
+  /// guardado a mano no se toca.
+  final bool autoPrice;
+
+  /// Se está cobrando con precio por mayor (lo pone [SellCart])
+  bool wholesale = false;
+
   CartItem({
     required this.product,
     this.variant,
     this.quantity = 1,
     double? customUnitPrice,
     this.discountPercent,
-  }) : customUnitPrice = customUnitPrice ?? (product.salePrice + (variant?.additionalPrice ?? 0.0));
+    bool? autoPrice,
+  })  : autoPrice = autoPrice ?? customUnitPrice == null,
+        customUnitPrice = customUnitPrice ?? (product.salePrice + (variant?.additionalPrice ?? 0.0));
+
+  /// Precio normal de una unidad (con lo que suma la talla o el color)
+  double get basePrice => product.salePrice + (variant?.additionalPrice ?? 0.0);
 
   String get displayName => variant != null ? '${product.name} (${variant!.label})' : product.name;
 

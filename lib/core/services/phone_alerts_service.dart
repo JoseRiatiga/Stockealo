@@ -20,6 +20,7 @@ import 'data_events.dart';
 import '../../features/pro/data/pro_service.dart';
 import '../../features/cash/data/cash_register_repository.dart';
 import '../../features/reports/data/daily_close.dart';
+import '../../features/dashboard/data/first_sale.dart';
 
 /// Avisos en la barra del celular, aunque la app esté cerrada:
 /// • stock bajo: cuando un producto llega a su mínimo después de una venta
@@ -112,6 +113,8 @@ class PhoneAlertsService {
       );
       _ready = true;
       DataEvents.instance.salesVersion.addListener(_onSalesChanged);
+      // Primera venta (0.17.0): quien crea sus productos y se va también recibe el aviso
+      DataEvents.instance.productsVersion.addListener(refreshFirstSaleReminder);
       // La app se abrió tocando un aviso de cobro
       final launch = await _plugin.getNotificationAppLaunchDetails();
       final response = launch?.notificationResponse;
@@ -126,6 +129,7 @@ class PhoneAlertsService {
     refreshDailySummary();
     refreshCashReminder();
     refreshDebtReminders();
+    refreshFirstSaleReminder();
   }
 
   // ---------------------------------------------------------------------------
@@ -229,6 +233,73 @@ class PhoneAlertsService {
     }
     await refreshVisitReminders();
     return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Primera venta (0.17.0, bloque A): a los 2 días de creado el negocio, si hay
+  // productos y ninguna venta, un solo aviso «¿Te ayudamos con tu primera venta?»
+
+  static const firstSaleKey = 'alerts_first_sale';
+  static const _firstSaleId = 3;
+  static const firstSaleHour = 10;
+  static const _firstSaleChannel = AndroidNotificationDetails(
+    'first_sale',
+    'Primera venta',
+    channelDescription: 'Una sola vez, si a los 2 días aún no has hecho tu primera venta',
+  );
+
+  static String _firstSaleAtKey(String businessId) => 'alerts_first_sale_at_$businessId';
+
+  Future<bool> firstSaleReminderEnabled() => _flag(firstSaleKey);
+
+  Future<bool> setFirstSaleReminder(bool value) async {
+    if (value && !await ensurePermission()) return false;
+    await AppDatabase.instance.setSetting(firstSaleKey, value ? '1' : '0');
+    await refreshFirstSaleReminder();
+    return true;
+  }
+
+  /// Cuándo avisar: a los 2 días de creado, a las 10 a. m.; si eso ya pasó, el
+  /// siguiente día a esa hora. Null = ya se avisó (la hora guardada ya pasó).
+  @visibleForTesting
+  static DateTime? firstSaleWhen({required DateTime createdAt, required DateTime now, DateTime? scheduled}) {
+    if (scheduled != null) return scheduled.isAfter(now) ? scheduled : null;
+    final day = createdAt.add(const Duration(days: 2));
+    var when = DateTime(day.year, day.month, day.day, firstSaleHour);
+    if (!when.isAfter(now)) {
+      when = DateTime(now.year, now.month, now.day, firstSaleHour);
+      if (!when.isAfter(now)) when = when.add(const Duration(days: 1));
+    }
+    return when;
+  }
+
+  /// Se llama al abrir la app y después de cada venta (con la primera, se cancela)
+  Future<void> refreshFirstSaleReminder({DateTime? now}) async {
+    if (!_ready) return;
+    try {
+      await _plugin.cancel(_firstSaleId);
+      final business = _business;
+      if (business == null || !await firstSaleReminderEnabled()) return;
+      final at = now ?? DateTime.now();
+      // Solo para negocios nuevos
+      if (at.difference(business.createdAt).inDays > 30) return;
+      if (!await FirstSale.pending(business.id)) return;
+      final key = _firstSaleAtKey(business.id);
+      final saved = DateTime.tryParse(await AppDatabase.instance.getSetting(key) ?? '');
+      final when = firstSaleWhen(createdAt: business.createdAt, now: at, scheduled: saved);
+      if (when == null) return;
+      await AppDatabase.instance.setSetting(key, when.toIso8601String());
+      await _plugin.zonedSchedule(
+        _firstSaleId,
+        '¿Te ayudamos con tu primera venta?',
+        'En Inicio tienes «Haz tu primera venta» y una venta de práctica que no guarda nada.',
+        tz.TZDateTime.from(when.toUtc(), tz.UTC),
+        const NotificationDetails(android: _firstSaleChannel),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
+    } catch (e) {
+      debugPrint('Aviso de la primera venta: $e');
+    }
   }
 
   Future<bool> cashReminderEnabled() => _flag(cashKey);

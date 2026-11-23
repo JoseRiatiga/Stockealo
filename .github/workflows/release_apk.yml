@@ -69,7 +69,13 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Tu dirección y las citas a la hora correcta
+            ### Precios por mayor, conteo de inventario y pedido sugerido
+            - Precio por cantidad (Pro): Vender lo aplica solo y tu tienda lo muestra.
+            - Contar inventario en Stock: guarda a medias y al terminar ve lo que sobró y faltó.
+            - El pedido al proveedor sugiere según lo que vendes y cuándo vuelve el proveedor.
+            - Haz tu primera venta desde Inicio, o una venta de práctica que no guarda nada.
+
+            ### Tu dirección y las citas a la hora correcta (0.16.9)
             - Tu tienda y las reservas muestran la dirección de tu local con «Cómo llegar».
             - El recordatorio de la cita por WhatsApp lleva la dirección.
             - Las citas se ven con la hora de tu negocio, aunque te reserven desde otro país.

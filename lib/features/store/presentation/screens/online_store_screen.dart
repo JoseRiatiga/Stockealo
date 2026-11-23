@@ -730,6 +730,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
               imageUrl: (p.photoPath ?? '').startsWith('https://') ? p.photoPath : null,
               oldPrice: (p.comparePrice ?? 0) > p.salePrice ? p.comparePrice : null,
               few: p.stock <= 3,
+              priceTiers: p.priceTiers,
             ),
       ],
     );

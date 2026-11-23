@@ -182,6 +182,71 @@ class SalesRepository {
   }
 
   /// Registra una venta multi-producto (carrito) con descuento mayorista y factura unificada
+  /// Cuánto le toca a cada línea: su parte del descuento a toda la venta (según lo
+  /// que pesa la línea), lo que se cobra por ella y, con pago mixto, su parte de cada
+  /// medio (para que la caja sepa cuánto fue en efectivo).
+  static List<({double discount, double total, String? split})> lineAmounts(
+    List<CartItem> items, {
+    double discount = 0,
+    Map<String, double>? paymentSplit,
+  }) {
+    final double subtotal = items.fold(0.0, (sum, i) => sum + i.netSubtotal);
+    final double total = (subtotal - discount).clamp(0.0, double.infinity);
+    return [
+      for (final item in items)
+        () {
+          final share = subtotal > 0 ? item.netSubtotal / subtotal : 1.0 / items.length;
+          final d = discount * share;
+          final t = (item.netSubtotal - d).clamp(0.0, double.infinity).toDouble();
+          final split = paymentSplit != null && total > 0
+              ? PaymentMethod.encodeSplit({for (final e in paymentSplit.entries) e.key: e.value * t / total})
+              : null;
+          return (discount: d, total: t, split: split);
+        }(),
+    ];
+  }
+
+  /// Venta de práctica (0.17.0, bloque A): el mismo recibo de una venta, sin guardar
+  /// nada: no descuenta stock, no toca la caja, no sube a la nube ni cuenta en Reportes.
+  static List<Sale> practiceSale({
+    required String businessId,
+    required List<CartItem> items,
+    required String paymentMethod,
+    String? customerName,
+    double discountAmount = 0,
+    Map<String, double>? paymentSplit,
+    DateTime? now,
+  }) {
+    final at = now ?? appNow();
+    final amounts = lineAmounts(items,
+        discount: discountAmount, paymentSplit: paymentMethod == PaymentMethod.mixed ? paymentSplit : null);
+    return [
+      for (var i = 0; i < items.length; i++)
+        Sale(
+          id: 'practica-$i',
+          businessId: businessId,
+          productId: items[i].product.id,
+          productName: items[i].displayName,
+          productPhotoPath: items[i].product.photoPath,
+          quantity: items[i].quantity,
+          unitPrice: items[i].unitPrice,
+          unitCost: items[i].unitCost,
+          totalAmount: amounts[i].total,
+          netProfit: amounts[i].total - items[i].totalCost,
+          paymentMethod: paymentMethod,
+          customerName: (customerName ?? '').trim().isEmpty ? null : customerName!.trim(),
+          date: at,
+          variantId: items[i].variant?.id,
+          variantName: items[i].variant?.label,
+          invoiceNumber: '#PRACTICA',
+          paymentSplit: amounts[i].split,
+          promotionId: items[i].promoDiscount > 0 ? items[i].promotion?.id : null,
+          promotionName: items[i].promoDiscount > 0 ? items[i].promotion?.name : null,
+          promotionDiscount: items[i].promoDiscount,
+        ),
+    ];
+  }
+
   Future<List<Sale>> recordMultiProductSale({
     /// Autorización usada (0.15.0): la nube la exige si la venta pasa el límite del rol
     String? authRequestId,
@@ -297,21 +362,18 @@ class SalesRepository {
         }
       }
 
-      for (final item in items) {
+      final amounts = lineAmounts(items, discount: finalDiscount, paymentSplit: mixed ? paymentSplit : null);
+      for (var li = 0; li < items.length; li++) {
+        final item = items[li];
         final product = item.product;
         final newStock = product.stock - item.quantity;
         final saleId = const Uuid().v4();
 
-        // Proporción del descuento asignado a este ítem
-        final double itemProportion = totalSubtotal > 0 ? (item.netSubtotal / totalSubtotal) : (1.0 / items.length);
-        final double itemDiscount = finalDiscount * itemProportion;
-        final double itemTotal = (item.netSubtotal - itemDiscount).clamp(0.0, double.infinity);
+        final double itemDiscount = amounts[li].discount;
+        final double itemTotal = amounts[li].total;
         final promo = item.promoDiscount > 0 ? item.promotion : null;
         final double itemProfit = itemTotal - item.totalCost;
-        // Cada línea guarda su parte de cada medio, para que la caja sepa cuánto fue en efectivo
-        final String? itemSplit = mixed && finalTotal > 0
-            ? PaymentMethod.encodeSplit({for (final e in paymentSplit!.entries) e.key: e.value * itemTotal / finalTotal})
-            : null;
+        final String? itemSplit = amounts[li].split;
 
         // Descontar stock específico de la variante si aplica. Por diferencia: la
         // variante del carrito puede traer existencias de hace rato

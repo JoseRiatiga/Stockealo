@@ -2,6 +2,9 @@ import '../../../suppliers/presentation/widgets/supplier_picker.dart';
 import '../../../../core/utils/money_input.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
 import 'package:flutter/material.dart';
+import '../../models/price_tier.dart';
+import '../widgets/price_tiers_editor.dart';
+import '../../../pro/data/pro_service.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -94,6 +97,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   /// Controla vencimiento por lote (0.16.0, fase 2b)
   bool _tracksExpiry = false;
+
+  /// Precio por cantidad (0.17.0, Pro)
+  late List<PriceTier> _priceTiers = widget.productToEdit?.priceTiers ?? const [];
 
   /// Plantilla del negocio: decide si un producto nuevo viene con lote encendido
   ProductTemplate? _template;
@@ -452,6 +458,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       variants: variants,
       supplierId: _supplierId,
       tracksExpiry: _tracksExpiry && !_hasVariants,
+      priceTiers: PriceTier.clean(_priceTiers, basePrice: salePrice),
     );
 
     try {
@@ -795,6 +802,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       if (before > 0 && before <= now) return 'Debe ser mayor al precio de venta';
                       return null;
                     },
+                  ),
+                  const SizedBox(height: 12),
+                  // Precio por cantidad (0.17.0, bloque B)
+                  ValueListenableBuilder(
+                    valueListenable: ProService.instance.status,
+                    builder: (context, status, _) => PriceTiersEditor(
+                      initial: _priceTiers,
+                      salePrice: _price(_salePriceController.text),
+                      enabled: status.active,
+                      onChanged: (t) => _priceTiers = t,
+                    ),
                   ),
                   const SizedBox(height: 8),
 

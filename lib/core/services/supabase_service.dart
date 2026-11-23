@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../features/products/models/price_tier.dart';
 import '../database/app_database.dart';
 import '../../features/products/models/product_variant.dart';
 import 'maintenance_service.dart';
@@ -807,7 +808,7 @@ class SupabaseService {
         final List<dynamic> cloudProducts = await client!.from('products').select();
         // Lo que la nube no guardaba antes (variantes, descripción) no se pierde al reescribir
         final localExtras = <String, Map<String, Object?>>{
-          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description', 'supplier_id', 'compare_price', 'brand', 'tracks_expiry']))
+          for (final r in await db.query('products', columns: ['id', 'has_variants', 'description', 'supplier_id', 'compare_price', 'brand', 'tracks_expiry', 'price_tiers']))
             r['id'] as String: r,
         };
         for (final p in cloudProducts) {
@@ -826,6 +827,8 @@ class SupabaseService {
               'compare_price': p.containsKey('compare_price') ? p['compare_price'] : local?['compare_price'],
               'brand': p.containsKey('brand') ? p['brand'] : local?['brand'],
               'tracks_expiry': p.containsKey('tracks_expiry') ? (p['tracks_expiry'] == true ? 1 : 0) : (local?['tracks_expiry'] ?? 0),
+              // Precio por cantidad (0.17.0): la nube guarda la lista; sin la columna, se queda lo del celular
+              'price_tiers': p.containsKey('price_tiers') ? PriceTier.encode(PriceTier.parse(p['price_tiers'])) : local?['price_tiers'],
               'category': p['category'] ?? 'General',
               'purchase_price': (p['cost_price'] as num?)?.toDouble() ?? 0.0,
               'sale_price': (p['sale_price'] as num?)?.toDouble() ?? 0.0,
@@ -1615,13 +1618,16 @@ class SupabaseService {
       'brand': (p['brand'] as String?)?.trim().isEmpty == true ? null : (p['brand'] as String?)?.trim(),
       // Controla vencimiento por lote (0.16.0, fase 2b)
       'tracks_expiry': p['tracks_expiry'] == 1 || p['tracks_expiry'] == true,
+      // Precio por cantidad (0.17.0): una lista (vacía = sin escalones). Un celular viejo
+      // no manda la columna y la nube conserva lo que tenía.
+      if (p.containsKey('price_tiers')) 'price_tiers': [for (final t in PriceTier.parse(p['price_tiers'])) t.toJson()],
     };
     try {
       await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
     } catch (e) {
       // Nube sin la columna del proveedor o del precio de antes todavía: se guarda el resto
       if (!e.toString().contains('supplier_id') && !e.toString().contains('compare_price') && !e.toString().contains('brand') &&
-          !e.toString().contains('tracks_expiry') &&
+          !e.toString().contains('tracks_expiry') && !e.toString().contains('price_tiers') &&
           !e.toString().contains('42703') && !e.toString().contains('PGRST204')) {
         rethrow;
       }
@@ -1629,6 +1635,7 @@ class SupabaseService {
       row.remove('compare_price');
       row.remove('brand');
       row.remove('tracks_expiry');
+      row.remove('price_tiers');
       await _updateOrInsert(db, 'products', row, keepColumns: ['current_stock', 'created_at']);
     }
   }

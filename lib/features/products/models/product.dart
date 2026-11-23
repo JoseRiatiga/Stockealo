@@ -1,3 +1,4 @@
+import 'price_tier.dart';
 import 'product_variant.dart';
 
 class Product {
@@ -33,6 +34,9 @@ class Product {
   /// vencido no se vende. Solo en productos sin tallas ni colores.
   final bool tracksExpiry;
 
+  /// Precio por cantidad (0.17.0, Pro): hasta 3 escalones, de menor a mayor cantidad
+  final List<PriceTier> priceTiers;
+
   Product({
     required this.id,
     required this.businessId,
@@ -55,7 +59,12 @@ class Product {
     this.comparePrice,
     this.brand,
     this.tracksExpiry = false,
+    this.priceTiers = const [],
   });
+
+  /// Precio de una unidad al llevar [quantity] (sin tallas ni colores): el del escalón
+  /// alcanzado o el normal
+  double unitPriceFor(int quantity) => PriceTier.forQuantity(priceTiers, quantity)?.price ?? salePrice;
 
   /// Está en oferta: tiene un precio de antes mayor al de ahora
   bool get onOffer => (comparePrice ?? 0) > salePrice && salePrice > 0;
@@ -109,6 +118,7 @@ class Product {
     String? brand,
     bool clearBrand = false,
     bool? tracksExpiry,
+    List<PriceTier>? priceTiers,
   }) {
     return Product(
       id: id ?? this.id,
@@ -132,6 +142,7 @@ class Product {
       comparePrice: clearComparePrice ? null : (comparePrice ?? this.comparePrice),
       brand: clearBrand ? null : (brand ?? this.brand),
       tracksExpiry: tracksExpiry ?? this.tracksExpiry,
+      priceTiers: priceTiers ?? this.priceTiers,
     );
   }
 
@@ -157,6 +168,7 @@ class Product {
       'compare_price': comparePrice,
       'brand': brand,
       'tracks_expiry': tracksExpiry ? 1 : 0,
+      'price_tiers': PriceTier.encode(priceTiers),
     };
   }
 
@@ -183,6 +195,7 @@ class Product {
       comparePrice: (map['compare_price'] as num?)?.toDouble(),
       brand: (map['brand'] as String?)?.trim().isEmpty == true ? null : (map['brand'] as String?)?.trim(),
       tracksExpiry: map['tracks_expiry'] == 1 || map['tracks_expiry'] == true,
+      priceTiers: PriceTier.parse(map['price_tiers']),
     );
   }
 }

@@ -19,6 +19,7 @@ import '../../../../core/utils/image_helper.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../auth/models/app_user.dart';
 import '../../../business/data/business_repository.dart';
+import '../../../dashboard/data/first_sale.dart';
 import '../../../business/models/business.dart';
 import '../../../business/presentation/screens/business_info_screen.dart';
 import '../../../business/presentation/screens/modules_screen.dart';
@@ -97,6 +98,8 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
 
   /// Recordatorio para cerrar la caja (0.15.0)
   bool _cashAlerts = true;
+  bool _firstSaleAlerts = true;
+  bool _firstSalePending = false;
   int _cashHour = PhoneAlertsService.defaultCashHour;
   bool _orderAlerts = true;
 
@@ -128,12 +131,17 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
       final hour = await alerts.summaryHour();
       final orders = await alerts.ordersEnabled();
       final cash = await alerts.cashReminderEnabled();
+      final firstSale = await alerts.firstSaleReminderEnabled();
+      final biz = BusinessRepository.instance.currentActiveBusiness;
+      final firstPending = biz != null && await FirstSale.pending(biz.id);
       final cashHour = await alerts.cashHour();
       final allowed = await alerts.hasPermission();
       if (mounted) {
         setState(() {
           _orderAlerts = orders;
           _cashAlerts = cash;
+          _firstSaleAlerts = firstSale;
+          _firstSalePending = firstPending;
           _cashHour = cashHour;
           _alertsAllowed = allowed;
           _stockAlerts = stock;
@@ -262,6 +270,24 @@ class _ProfileScreenState extends State<ProfileScreen> with ActiveBusinessAware 
               title: 'Hora de cerrar la caja',
               subtitle: _hourLabel(_cashHour),
               onTap: _pickCashHour,
+            ),
+          // Mientras no haya primera venta (0.17.0)
+          if (_firstSalePending)
+            SettingsRow.toggle(
+              icon: Icons.point_of_sale_outlined,
+              title: 'Primera venta',
+              subtitle: 'Un aviso a los 2 días si aún no has vendido',
+              value: _firstSaleAlerts,
+              onChanged: (v) async {
+                final ok = await PhoneAlertsService.instance.setFirstSaleReminder(v);
+                if (!mounted) return;
+                if (!ok) {
+                  AppToast.showWarning(context, 'Android no dio permiso para mostrar avisos.');
+                  return;
+                }
+                setState(() => _firstSaleAlerts = v);
+                _refresh.value++;
+              },
             ),
         ]),
         Padding(

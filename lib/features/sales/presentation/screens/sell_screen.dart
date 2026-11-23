@@ -27,6 +27,7 @@ import '../../data/sell_cart.dart';
 import '../../models/payment_method.dart';
 import '../../models/sale.dart';
 import '../widgets/digital_ticket_modal.dart';
+import '../../../pro/data/pro_service.dart';
 import '../widgets/quotations_list_modal.dart';
 import '../widgets/variant_picker.dart';
 import '../../../../core/codes/code_reader.dart';
@@ -181,7 +182,12 @@ class _SellScreenState extends State<SellScreen> {
     DataEvents.instance.customersVersion.addListener(_reloadStock);
     DataEvents.instance.cashVersion.addListener(_checkCash);
     _cart.addListener(_onCart);
+    // Precios al por mayor solo con Pro (0.17.0)
+    ProService.instance.status.addListener(_onPro);
+    _onPro();
   }
+
+  void _onPro() => _cart.setWholesale(ProService.instance.status.value.active);
 
   @override
   void dispose() {
@@ -190,6 +196,7 @@ class _SellScreenState extends State<SellScreen> {
     DataEvents.instance.customersVersion.removeListener(_reloadStock);
     DataEvents.instance.cashVersion.removeListener(_checkCash);
     _cart.removeListener(_onCart);
+    ProService.instance.status.removeListener(_onPro);
     _pay.dispose();
     _search.dispose();
     _searchFocus.dispose();
@@ -318,6 +325,25 @@ class _SellScreenState extends State<SellScreen> {
     final received = _pay.received;
     if (method == PaymentMethod.cash && received != null && received < total) {
       AppToast.showWarning(context, 'Recibiste menos del total: faltan ${CurrencyFormatter.format(total - received)}.');
+      return;
+    }
+    // Venta de práctica (0.17.0): el recibo sin guardar nada ni pedir caja o autorización
+    if (_cart.practice) {
+      final sales = SalesRepository.practiceSale(
+        businessId: widget.business.id,
+        items: List.of(_cart.lines),
+        paymentMethod: method,
+        customerName: customer,
+        discountAmount: _cart.discount,
+        paymentSplit: method == PaymentMethod.mixed ? _pay.split : null,
+      );
+      final discount = _cart.discount;
+      final change = method == PaymentMethod.cash && received != null ? received - total : 0.0;
+      if (sheet != null && sheet.mounted) Navigator.pop(sheet);
+      _cart.clear();
+      _pay.reset();
+      await DigitalTicketModal.show(context, salesList: sales, discountAmount: discount, received: received, change: change, practice: true);
+      if (mounted) AppToast.showInfo(context, 'Listo: ya sabes vender. La próxima venta sí queda guardada.');
       return;
     }
     // Lo que el rol no permite o pasa su límite pide autorización (0.15.0)
@@ -630,7 +656,8 @@ class _SellScreenState extends State<SellScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (_cashClosed) ...[_cashNotice(), const SizedBox(height: AppSpace.md)],
+              _practiceNotice(),
+              if (_cashClosed && !_cart.practice) ...[_cashNotice(), const SizedBox(height: AppSpace.md)],
               if (_last != null && !wide) ...[_saleDone(), const SizedBox(height: AppSpace.md)],
               Row(
                 children: [
@@ -692,6 +719,39 @@ class _SellScreenState extends State<SellScreen> {
       ],
     );
   }
+
+  /// Aviso de la venta de práctica (0.17.0, bloque A)
+  Widget _practiceNotice() => ListenableBuilder(
+        listenable: _cart,
+        builder: (context, _) {
+          if (!_cart.practice) return const SizedBox.shrink();
+          final c = context.colors;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpace.md),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.sm, AppSpace.sm, AppSpace.sm),
+              decoration: BoxDecoration(
+                color: c.accent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: c.accent.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.school_outlined, color: c.accent),
+                  const SizedBox(width: AppSpace.sm),
+                  Expanded(
+                    child: Text(
+                      'Venta de práctica: agrega productos, elige cómo te pagan y cobra. Verás el recibo y no se guarda nada.',
+                      style: AppText.small(context, color: c.ink),
+                    ),
+                  ),
+                  TextButton(onPressed: _cart.endPractice, child: const Text('Salir')),
+                ],
+              ),
+            ),
+          );
+        },
+      );
 
   /// Ventas en espera y cotizaciones, en todos los tamaños (0.16.6, hallazgos 4 y 49).
   /// Escucha la cuenta: el contador baja apenas se retoma una venta (hallazgo 5).
@@ -1025,6 +1085,11 @@ class _SellScreenState extends State<SellScreen> {
                 if (l.lineDiscount > 0 && l.netSubtotal < l.totalCost - 0.5)
                   Text('Con este descuento pierdes ${CurrencyFormatter.format(l.totalCost - l.netSubtotal)}.',
                       style: AppText.caption(context, weight: FontWeight.w600, color: c.danger)),
+                if (l.wholesale)
+                  Text(
+                    'Precio por mayor: ${CurrencyFormatter.format(l.unitPrice)} c/u (antes ${CurrencyFormatter.format(l.basePrice)})',
+                    style: AppText.caption(context, weight: FontWeight.w700, color: c.success),
+                  ),
                 if (l.promotion != null)
                   Text(
                     l.promoDiscount > 0

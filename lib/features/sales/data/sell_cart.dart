@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/database/app_database.dart';
 import '../../products/data/product_repository.dart';
 
+import '../../products/models/price_tier.dart';
 import '../../products/models/product.dart';
 import '../../products/models/product_variant.dart';
 import '../models/cart_item.dart';
@@ -41,6 +42,34 @@ class SellCart extends ChangeNotifier {
   /// Descuento a toda la venta, en dinero
   double discount = 0;
 
+  /// Venta de práctica (0.17.0, bloque A): Vender muestra el recibo sin guardar nada
+  bool practice = false;
+
+  /// Empieza la primera venta con [product] ya puesto, de verdad o de práctica.
+  /// Devuelve el aviso si no se pudo agregar (sin stock).
+  String? startFirstSale(Product product, {bool practice = false, ProductVariant? variant}) {
+    if (lines.isNotEmpty && !this.practice) {
+      held.add(HeldSale(lines: List.of(lines), discount: discount, customer: customer, at: appNow()));
+      _saveHeld();
+    }
+    lines.clear();
+    discount = 0;
+    customer = '';
+    this.practice = practice;
+    final problem = add(product, variant);
+    notifyListeners();
+    return problem;
+  }
+
+  void endPractice() {
+    if (!practice) return;
+    practice = false;
+    lines.clear();
+    discount = 0;
+    customer = '';
+    notifyListeners();
+  }
+
   /// Promociones vigentes del negocio: se aplican solas a cada línea (0.13.4)
   List<Promotion> promotions = const [];
 
@@ -50,11 +79,43 @@ class SellCart extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Precios al por mayor encendidos (0.17.0: solo con Pro; Vender lo pone)
+  bool wholesaleEnabled = false;
+
+  void setWholesale(bool value) {
+    if (wholesaleEnabled == value) return;
+    wholesaleEnabled = value;
+    _applyPromotions();
+    notifyListeners();
+  }
+
+  /// Precio por cantidad y promociones (0.17.0). En una línea con escalón alcanzado se
+  /// queda lo mejor para el cliente: el precio por mayor (sin promoción) o el precio
+  /// normal con la promoción; no se suman los dos.
   void _applyPromotions() {
     final now = appNow();
     for (final l in lines) {
-      l.promotion = Promotion.best(promotions,
-          productId: l.product.id, category: l.product.category, unitPrice: l.unitPrice, quantity: l.quantity, at: now);
+      Promotion? promoAt(double price) => Promotion.best(promotions,
+          productId: l.product.id, category: l.product.category, unitPrice: price, quantity: l.quantity, at: now);
+      if (!l.autoPrice) {
+        l.wholesale = false;
+        l.promotion = promoAt(l.unitPrice);
+        continue;
+      }
+      final base = l.basePrice;
+      final tier = wholesaleEnabled ? PriceTier.forQuantity(l.product.priceTiers, l.quantity) : null;
+      final promo = promoAt(base);
+      final withPromo = l.quantity * base - (promo?.discountFor(base, l.quantity) ?? 0);
+      final tierPrice = tier == null ? null : tier.price + (l.variant?.additionalPrice ?? 0.0);
+      if (tierPrice != null && tierPrice < base && l.quantity * tierPrice <= withPromo) {
+        l.customUnitPrice = tierPrice;
+        l.wholesale = true;
+        l.promotion = null;
+      } else {
+        l.customUnitPrice = base;
+        l.wholesale = false;
+        l.promotion = promo;
+      }
     }
   }
 
@@ -147,6 +208,7 @@ class SellCart extends ChangeNotifier {
   }
 
   void clear() {
+    practice = false;
     lines.clear();
     discount = 0;
     customer = '';
@@ -155,7 +217,7 @@ class SellCart extends ChangeNotifier {
 
   /// «Guardar para después»: la cuenta pasa a En espera y Vender queda libre
   void hold() {
-    if (lines.isEmpty) return;
+    if (lines.isEmpty || practice) return;
     held.add(HeldSale(lines: List.of(lines), discount: discount, customer: customer, at: appNow()));
     lines.clear();
     discount = 0;
@@ -183,6 +245,7 @@ class SellCart extends ChangeNotifier {
                 'variant_id': l.variant?.id,
                 'quantity': l.quantity,
                 'unit_price': l.customUnitPrice,
+                'auto': l.autoPrice,
                 'discount_percent': l.discountPercent,
                 'line_discount': l.lineDiscount,
               },
@@ -219,6 +282,7 @@ class SellCart extends ChangeNotifier {
               variant: variant,
               quantity: (l['quantity'] as num).toInt(),
               customUnitPrice: (l['unit_price'] as num?)?.toDouble(),
+              autoPrice: l['auto'] as bool?,
               discountPercent: (l['discount_percent'] as num?)?.toDouble(),
             )..lineDiscount = (l['line_discount'] as num?)?.toDouble() ?? 0);
           }
@@ -241,6 +305,11 @@ class SellCart extends ChangeNotifier {
   void resume(int index) {
     if (index < 0 || index >= held.length) return;
     final h = held.removeAt(index);
+    // La práctica no pasa a En espera y la venta retomada es de verdad (0.17.0)
+    if (practice) {
+      practice = false;
+      lines.clear();
+    }
     if (lines.isNotEmpty) {
       held.add(HeldSale(lines: List.of(lines), discount: discount, customer: customer, at: appNow()));
     }
@@ -257,6 +326,7 @@ class SellCart extends ChangeNotifier {
   /// Al cambiar de negocio la cuenta y lo que estaba en espera ya no aplican (lo guardado
   /// de cada negocio sigue en el celular y vuelve al volver a ese negocio)
   void reset() {
+    practice = false;
     lines.clear();
     held.clear();
     businessId = null;

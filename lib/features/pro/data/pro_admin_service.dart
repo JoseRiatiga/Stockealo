@@ -542,7 +542,16 @@ class ProAdminService {
       AdminUserDetail.fromJson(Map<String, dynamic>.from(await _rpc('admin_user_detail', {'p_email': email}) as Map));
 
   /// A quién conviene escribirle hoy
-  Future<AdminHealth> health() async => AdminHealth.fromJson(Map<String, dynamic>.from(await _rpc('admin_health') as Map));
+  Future<AdminHealth> health() async {
+    final h = AdminHealth.fromJson(Map<String, dynamic>.from(await _rpc('admin_health') as Map));
+    // Negocios con productos y sin primera venta (0.17.0); sin la función en la nube, nada
+    try {
+      return h.withFirstSalePending(_maps(await _rpc('admin_first_sale_pending')));
+    } catch (e) {
+      debugPrint('Panel: sin lista de primera venta: $e');
+      return h;
+    }
+  }
 
   Future<List<AdminStore>> listStores() async => _rows(await _rpc('admin_list_stores')).map(AdminStore.fromRow).toList();
 
@@ -793,6 +802,9 @@ class AdminHealth {
   final int storageObjects;
   final int storageLimitBytes;
 
+  /// Negocios con productos y sin ventas de verdad (0.17.0, bloque A)
+  final List<Map<String, dynamic>> firstSalePending;
+
   const AdminHealth({
     this.noCloud = const [],
     this.expiring = const [],
@@ -803,7 +815,21 @@ class AdminHealth {
     this.storageBytes = 0,
     this.storageObjects = 0,
     this.storageLimitBytes = 0,
+    this.firstSalePending = const [],
   });
+
+  AdminHealth withFirstSalePending(List<Map<String, dynamic>> list) => AdminHealth(
+        noCloud: noCloud,
+        expiring: expiring,
+        failedPayments: failedPayments,
+        inactive30d: inactive30d,
+        dbBytes: dbBytes,
+        dbLimitBytes: dbLimitBytes,
+        storageBytes: storageBytes,
+        storageObjects: storageObjects,
+        storageLimitBytes: storageLimitBytes,
+        firstSalePending: list,
+      );
 
   double get dbUse => dbLimitBytes == 0 ? 0 : dbBytes / dbLimitBytes;
   double get storageUse => storageLimitBytes == 0 ? 0 : storageBytes / storageLimitBytes;
@@ -816,7 +842,7 @@ class AdminHealth {
     return '$bytes B';
   }
 
-  bool get allGood => noCloud.isEmpty && expiring.isEmpty && failedPayments.isEmpty;
+  bool get allGood => noCloud.isEmpty && expiring.isEmpty && failedPayments.isEmpty && firstSalePending.isEmpty;
 
   factory AdminHealth.fromJson(Map<String, dynamic> j) => AdminHealth(
         noCloud: _maps(j['no_cloud']),

@@ -9,6 +9,11 @@ import '../../../home/navigation/app_places.dart';
 import '../../../store/data/online_store_service.dart';
 import '../../../team/presentation/screens/employees_screen.dart';
 import '../../../home/navigation/app_pane.dart';
+import '../../../../core/widgets/app_toast.dart';
+import '../../../products/models/product.dart';
+import '../../../products/models/product_variant.dart';
+import '../../../sales/data/sell_cart.dart';
+import '../../data/first_sale.dart';
 
 /// Un paso de «Primeros pasos»
 class FirstStep {
@@ -41,6 +46,12 @@ class FirstStepsCard extends StatefulWidget {
 
 class _FirstStepsCardState extends State<FirstStepsCard> {
   List<FirstStep>? _steps;
+
+  /// Con productos y sin ventas (0.17.0, bloque A): el producto para la primera venta
+  /// (con stock) o null si todos están en 0
+  bool _needsFirstSale = false;
+  Product? _firstProduct;
+  ProductVariant? _firstVariant;
 
   @override
   void initState() {
@@ -81,9 +92,10 @@ class _FirstStepsCardState extends State<FirstStepsCard> {
       if (mounted) setState(() => _steps = const []);
       return;
     }
-    final products = await _count('SELECT COUNT(*) FROM products WHERE business_id = ? AND COALESCE(is_active, 1) = 1', [b.id]);
+    final products = await FirstSale.products(b.id);
     final cash = await _count('SELECT COUNT(*) FROM cash_sessions WHERE business_id = ?', [b.id]);
-    final sales = await _count('SELECT COUNT(*) FROM sales WHERE business_id = ?', [b.id]);
+    // Una venta de verdad: sin anular y no una devolución (0.17.0)
+    final sales = await FirstSale.count(b.id);
     final team = await _count('SELECT COUNT(*) FROM business_members WHERE business_id = ?', [b.id]);
     var published = widget.storePublished;
     if (published == null) {
@@ -107,12 +119,82 @@ class _FirstStepsCardState extends State<FirstStepsCard> {
       ),
       FirstStep('Publica tu tienda en línea', done: published, go: () => AppPlace.go(AppPlace.tienda)),
     ];
-    if (mounted) setState(() => _steps = steps.every((s) => s.done) ? const [] : steps);
+    final needs = products > 0 && sales == 0;
+    final pick = needs ? await FirstSale.pickProduct(b.id) : null;
+    if (mounted) {
+      setState(() {
+        _steps = steps.every((s) => s.done) ? const [] : steps;
+        _needsFirstSale = needs;
+        _firstProduct = pick?.$1;
+        _firstVariant = pick?.$2;
+      });
+    }
   }
 
   Future<void> _hide() async {
     await AppDatabase.instance.setSetting(FirstStepsCard.hiddenKey(widget.business.id), '1');
     if (mounted) setState(() => _steps = const []);
+  }
+
+  void _sell({required bool practice}) {
+    final p = _firstProduct;
+    if (p == null) return;
+    final problem = SellCart.instance.startFirstSale(p, practice: practice, variant: _firstVariant);
+    if (problem != null) {
+      AppToast.showWarning(context, problem);
+      return;
+    }
+    AppPlace.go(AppPlace.vender);
+  }
+
+  /// «Haz tu primera venta» con el producto ya puesto, o una venta de práctica
+  Widget _firstSale() {
+    final c = context.colors;
+    final p = _firstProduct;
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpace.sm),
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        color: c.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            p == null
+                ? 'Tus productos están en 0. Agrega cuántos tienes en Stock para poder venderlos.'
+                : 'Abre Vender con ${_firstVariant == null ? p.name : '${p.name} (${_firstVariant!.label})'} ya puesto. Si quieres, primero practica: verás el recibo y no se guarda nada.',
+            style: AppText.small(context, color: c.inkMuted),
+          ),
+          const SizedBox(height: AppSpace.sm),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: p == null
+                ? [
+                    FilledButton.icon(
+                      onPressed: () => AppPlace.go(AppPlace.stock),
+                      icon: const Icon(Icons.layers_outlined, size: 18),
+                      label: const Text('Ir a Stock'),
+                    ),
+                  ]
+                : [
+                    FilledButton.icon(
+                      onPressed: () => _sell(practice: false),
+                      icon: const Icon(Icons.point_of_sale_outlined, size: 18),
+                      label: const Text('Vender'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _sell(practice: true),
+                      icon: const Icon(Icons.school_outlined, size: 18),
+                      label: const Text('Venta de práctica'),
+                    ),
+                  ],
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -154,6 +236,7 @@ class _FirstStepsCardState extends State<FirstStepsCard> {
                 trailing: s.done ? null : const Icon(Icons.chevron_right),
                 onTap: s.done ? null : s.go,
               ),
+            if (_needsFirstSale) _firstSale(),
           ],
         ),
       ),

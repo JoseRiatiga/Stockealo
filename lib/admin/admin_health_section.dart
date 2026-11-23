@@ -60,6 +60,24 @@ class AdminHealthSection extends StatelessWidget {
                 ),
             ],
           ),
+        // 0.17.0: crearon productos y no han vendido (como Loliando)
+        if (h.firstSalePending.isNotEmpty)
+          _group(
+            context,
+            icon: Icons.point_of_sale_outlined,
+            title: '${h.firstSalePending.length} ${h.firstSalePending.length == 1 ? 'negocio' : 'negocios'} sin primera venta',
+            hint: 'Crearon productos y todavía no venden. Escríbeles para ayudarles con la primera venta.',
+            rows: [
+              for (final b in h.firstSalePending)
+                _Row(
+                  title: '${b['name']}',
+                  detail: '${b['owner_email'] ?? 'sin dueño'} · ${b['products']} productos · '
+                      '${_daysSince(DateTime.tryParse('${b['created_at']}'))}',
+                  email: b['owner_email'] as String?,
+                  phone: b['phone'] as String?,
+                ),
+            ],
+          ),
         if (h.expiring.isNotEmpty)
           _group(
             context,
@@ -106,6 +124,13 @@ class AdminHealthSection extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  /// «creado hace 15 días»
+  static String _daysSince(DateTime? at) {
+    if (at == null) return 'sin fecha';
+    final d = DateTime.now().difference(at.toLocal()).inDays;
+    return d <= 0 ? 'creado hoy' : (d == 1 ? 'creado hace 1 día' : 'creado hace $d días');
   }
 
   Widget _group(BuildContext context,

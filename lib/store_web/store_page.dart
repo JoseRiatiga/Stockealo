@@ -711,6 +711,10 @@ class _StorePageState extends State<StorePage> {
                     ],
                     const SizedBox(height: AppSpace.xs),
                     _RowPrice(product: p, currency: store.currency, featured: false),
+                    // Precio por cantidad (0.17.0)
+                    if (p.priceTiers.isNotEmpty)
+                      Text(p.tiersText((v) => CurrencyFormatter.formatIn(v, store.currency))!,
+                          style: AppText.caption(context, weight: FontWeight.w700, color: c.success)),
                   ],
                 ),
               ),
@@ -1755,6 +1759,11 @@ class _ProductCardState extends State<_ProductCard> {
                                 style: AppText.small(context, color: c.inkFaint).copyWith(decoration: TextDecoration.lineThrough)),
                         ],
                       ),
+                      // Precio por cantidad (0.17.0)
+                      if (p.priceTiers.isNotEmpty)
+                        Text(p.tiersText((v) => CurrencyFormatter.formatIn(v, currency))!,
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: AppText.caption(context, weight: FontWeight.w700, color: c.success)),
                       if (sizes.isNotEmpty)
                         Text(sizes.join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption(context))
                       else if (p.stock != null)
@@ -2460,7 +2469,9 @@ class _CartItem extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(money(l.subtotal), style: AppText.body(context, weight: FontWeight.w700)),
-                        if (l.quantity > 1) Text('${money(l.unitPrice)} c/u', style: AppText.caption(context)),
+                        if (l.quantity > 1)
+                          Text(l.wholesale ? 'Por mayor: ${money(l.unitPrice)} c/u' : '${money(l.unitPrice)} c/u',
+                              style: AppText.caption(context, color: l.wholesale ? context.colors.success : null)),
                       ],
                     ),
                   ],

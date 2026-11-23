@@ -9,6 +9,8 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../../core/utils/business_clock.dart';
+import '../../../suppliers/data/restock_planner.dart';
 import '../../../suppliers/data/supplier_repository.dart';
 import '../../../suppliers/data/supplier_whatsapp.dart';
 import '../../../suppliers/models/supplier_order.dart';
@@ -27,11 +29,15 @@ class RestockOrderItem {
   final Map<String, int> variantQty;
   bool isSelected;
 
+  /// Por qué se sugiere esa cantidad (0.17.0): «Vendes 4 por semana; te alcanza para 3 días»
+  final String? why;
+
   RestockOrderItem({
     required this.product,
     this.orderQty = 0,
     Map<String, int>? variantQty,
     this.isSelected = true,
+    this.why,
   }) : variantQty = variantQty ?? {};
 
   bool get withVariants => product.hasVariants && product.variants.isNotEmpty;
@@ -59,26 +65,57 @@ class RestockOrderItem {
         ]
       : [if (orderQty > 0) SupplierOrderItem(productId: product.id, productName: product.name, quantity: orderQty)];
 
-  /// Sugerencia: reponer hasta el doble del mínimo. Con tallas y colores, ese
-  /// objetivo se reparte entre las variantes y se pide lo que le falta a cada una.
-  static RestockOrderItem suggested(Product p) {
+  /// Sugerencia (0.17.0): con ventas en los últimos 30 días, lo que se venderá hasta
+  /// la próxima visita del proveedor y una semana más ([sold] y [horizon], ver
+  /// [RestockPlanner]). Sin ventas, la regla de antes: reponer hasta el doble del mínimo
+  /// (con tallas y colores, ese objetivo se reparte entre las variantes).
+  static RestockOrderItem suggested(Product p,
+      {Map<String, int> sold = const {}, int horizon = RestockPlanner.defaultHorizon, DateTime? now}) {
+    final at = now ?? DateTime.now();
+    double rate(String key) => RestockPlanner.perDay(sold[key] ?? 0, createdAt: p.createdAt, now: at);
     if (p.hasVariants && p.variants.isNotEmpty) {
       final target = ((p.minStock * 2) / p.variants.length).ceil().clamp(2, 9999);
-      final qty = {for (final v in p.variants) v.id: (target - v.stock).clamp(0, 9999)};
+      final qty = <String, int>{
+        for (final v in p.variants)
+          v.id: RestockPlanner.advise(
+            stock: v.stock,
+            minStock: 0,
+            perDay: rate(RestockPlanner.key(p.id, v.id)),
+            horizonDays: horizon,
+            fallback: (target - v.stock).clamp(0, 9999),
+          ).quantity.clamp(0, 9999),
+      };
       if (qty.values.every((q) => q == 0)) {
         for (final v in p.variants) {
           if (v.stock <= 0) qty[v.id] = 1;
         }
       }
-      return RestockOrderItem(product: p, variantQty: qty);
+      final total = rate(RestockPlanner.key(p.id));
+      return RestockOrderItem(product: p, variantQty: qty, why: total > 0 ? RestockPlanner.why(total, p.stock) : null);
     }
-    final qty = p.minStock > 0 ? (p.minStock * 2 - p.stock).clamp(1, 9999) : (p.stock <= 0 ? 10 : 5);
-    return RestockOrderItem(product: p, orderQty: qty);
+    final fallback = p.minStock > 0 ? (p.minStock * 2 - p.stock).clamp(1, 9999) : (p.stock <= 0 ? 10 : 5);
+    final advice = RestockPlanner.advise(
+      stock: p.stock,
+      minStock: p.minStock,
+      perDay: rate(RestockPlanner.key(p.id)),
+      horizonDays: horizon,
+      fallback: fallback,
+    );
+    return RestockOrderItem(product: p, orderQty: advice.quantity.clamp(1, 9999), why: advice.why);
   }
 
-  /// Hace falta pedir: el producto está bajo o alguna talla/color se agotó
-  static bool needsRestock(Product p) =>
-      p.isLowStock || p.isOutOfStock || (p.hasVariants && p.variants.any((v) => v.stock <= 0));
+  /// Hace falta pedir: el producto está bajo, alguna talla/color se agotó o, por lo que
+  /// se vende, no alcanza hasta la próxima visita (0.17.0)
+  static bool needsRestock(Product p,
+          {Map<String, int> sold = const {}, int horizon = RestockPlanner.defaultHorizon, DateTime? now}) =>
+      p.isLowStock ||
+      p.isOutOfStock ||
+      (p.hasVariants && p.variants.any((v) => v.stock <= 0)) ||
+      RestockPlanner.runsOut(
+        stock: p.stock,
+        perDay: RestockPlanner.perDay(sold[RestockPlanner.key(p.id)] ?? 0, createdAt: p.createdAt, now: now ?? DateTime.now()),
+        horizonDays: horizon,
+      );
 }
 
 /// Texto del pedido para WhatsApp, con tallas y colores por producto
@@ -180,9 +217,24 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     _allProducts = await _productRepo.searchProducts('', businessId: widget.business.id);
+    // Lo vendido en 30 días y la visita del proveedor de cada producto (0.17.0)
+    final now = appNow();
+    var sold = const <String, int>{};
+    final suppliers = <String, Supplier>{};
+    try {
+      sold = await RestockPlanner.soldLastDays(widget.business.id, now: now);
+      for (final s in await SupplierRepository.instance.getSuppliers(widget.business.id)) {
+        suppliers[s.id] = s;
+      }
+    } catch (e) {
+      debugPrint('Pedido sugerido sin ventas: $e');
+    }
+    _sold = sold;
+    _suppliers = suppliers;
     final suggested = [
       for (final p in _allProducts)
-        if (RestockOrderItem.needsRestock(p)) RestockOrderItem.suggested(p),
+        if (RestockOrderItem.needsRestock(p, sold: sold, horizon: _horizonFor(p), now: now))
+          RestockOrderItem.suggested(p, sold: sold, horizon: _horizonFor(p), now: now),
     ];
     if (mounted) {
       setState(() {
@@ -191,6 +243,12 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
       });
     }
   }
+
+  Map<String, int> _sold = const {};
+  Map<String, Supplier> _suppliers = const {};
+
+  /// Días que tiene que alcanzar el pedido de un producto: según la visita de su proveedor
+  int _horizonFor(Product p) => RestockPlanner.horizon(_suppliers[p.supplierId] ?? _supplier, appNow());
 
   /// Con proveedor elegido se ven sus productos (y los agregados a mano)
   List<RestockOrderItem> get _items => [
@@ -255,7 +313,7 @@ class _RestockOrderModalState extends State<RestockOrderModal> {
                                   subtitle: Text('Hay ${p.stock} · Cód: ${p.code}', style: TextStyle(color: c.inkMuted)),
                                   trailing: Icon(Icons.add_circle_outline_outlined, color: c.accent),
                                   onTap: () {
-                                    final item = RestockOrderItem.suggested(p);
+                                    final item = RestockOrderItem.suggested(p, sold: _sold, horizon: _horizonFor(p), now: appNow());
                                     setState(() => _manual.insert(0, item));
                                     Navigator.pop(ctx);
                                   },
@@ -692,6 +750,10 @@ actions: [
                                 style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
                         ],
                       ),
+                      if (item.why != null) ...[
+                        const SizedBox(height: 4),
+                        Text(item.why!, style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted)),
+                      ],
                     ],
                   ),
                 ),

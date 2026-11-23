@@ -22,9 +22,22 @@ class PublicBooking {
   final WorkSchedule? schedule;
   final List<({String? staffId, DateTime start, DateTime end})> busy;
 
-  const PublicBooking({required this.services, required this.staff, this.schedule, this.busy = const []});
+  /// Zona del negocio (0.16.9): las horas se muestran con la hora del negocio, no
+  /// con la del celular de quien reserva. null = la del equipo (nube sin actualizar)
+  final String? zone;
 
-  factory PublicBooking.fromJson(Map<String, dynamic> j) => PublicBooking(
+  const PublicBooking({required this.services, required this.staff, this.schedule, this.busy = const [], this.zone});
+
+  /// Ahora, con la hora del negocio
+  DateTime get now => BusinessClock.wallOf(DateTime.now(), zone: zone);
+
+  /// Una hora del negocio → la hora real, para guardar la cita
+  DateTime instantOf(DateTime wall) => BusinessClock.instantOf(wall, zone: zone);
+
+  factory PublicBooking.fromJson(Map<String, dynamic> j) {
+    final zone = j['time_zone'] as String?;
+    return PublicBooking(
+        zone: zone,
         services: [
           for (final s in (j['services'] as List? ?? const []))
             BookableService(
@@ -40,17 +53,18 @@ class PublicBooking {
           for (final b in (j['busy'] as List? ?? const []))
             (
               staffId: b['staff_id'] as String?,
-              start: DateTime.parse(b['starts_at'] as String).toLocal(),
-              end: DateTime.parse(b['ends_at'] as String).toLocal(),
+              start: BusinessClock.wallOf(DateTime.parse(b['starts_at'] as String), zone: zone),
+              end: BusinessClock.wallOf(DateTime.parse(b['ends_at'] as String), zone: zone),
             ),
         ],
       );
+  }
 
   /// Horas libres de un día, cada [step] minutos, para [minutes] de servicio con
   /// [staffId] (null = con cualquiera: libre si alguien está libre). Sin horario del
   /// negocio se usa de 8:00 a. m. a 6:00 p. m.
   List<DateTime> freeSlots(DateTime day, int minutes, {String? staffId, DateTime? now, int step = 30}) {
-    final at = now ?? appNow();
+    final at = now ?? this.now;
     final shift = schedule == null || schedule!.isEmpty ? const ShiftTime(480, 1080) : schedule!.on(day);
     if (shift == null) return const [];
     final people = staffId != null ? [staffId] : (staff.isEmpty ? <String?>[null] : [for (final s in staff) s.id]);

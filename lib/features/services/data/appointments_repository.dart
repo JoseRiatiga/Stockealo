@@ -66,7 +66,8 @@ class AppointmentsRepository {
     final rows = await db.query(
       'appointments',
       where: 'business_id = ? AND starts_at >= ? AND starts_at < ?',
-      whereArgs: [businessId, from.toUtc().toIso8601String(), to.toUtc().toIso8601String()],
+      // El día del negocio, en hora real (0.16.9)
+      whereArgs: [businessId, BusinessClock.instantOf(from).toIso8601String(), BusinessClock.instantOf(to).toIso8601String()],
       orderBy: 'starts_at ASC',
     );
     return [for (final r in rows) Appointment.fromMap(r)];

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../business/models/ticket_info.dart';
 import '../../../dashboard/presentation/widgets/stocky_floating_button.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -430,6 +431,22 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
           value: _look.icons,
           onChanged: (v) => setState(() => _look = _look.copyWith(icons: v)),
         ),
+        // La dirección del local (0.16.9): la de «Datos del recibo», sin escribirla dos veces
+        Builder(builder: (context) {
+          final address = TicketInfo.of(widget.business).address;
+          return SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('Mostrar la dirección', style: AppText.body(context)),
+            subtitle: Text(
+              address == null
+                  ? 'Agrega la dirección de tu local en Ajustes › Tu negocio › Datos del recibo.'
+                  : '$address. Sale en la tienda y al reservar, con «Cómo llegar».',
+              style: AppText.small(context, color: address == null ? c.warning : null),
+            ),
+            value: _look.address,
+            onChanged: (v) => setState(() => _look = _look.copyWith(address: v)),
+          );
+        }),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: Text('Aviso +18', style: AppText.body(context)),
@@ -688,6 +705,8 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
     final products = await ProductRepository.instance.getAllProducts(widget.business.id);
     final categories = await ProductRepository.instance.getCategories(widget.business.id);
     return PublicStore(
+      address: TicketInfo.of(widget.business).address,
+      timeZone: widget.business.zone,
       // Los íconos de las categorías, como los trae la tienda publicada (0.16.8)
       categoryIcons: {
         for (final c in categories)

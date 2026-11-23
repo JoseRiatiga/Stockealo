@@ -21,6 +21,17 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.16.9',
+      title: 'Tu dirección y las citas a la hora correcta',
+      items: [
+        'Tu tienda y las reservas muestran la dirección de tu local con «Cómo llegar» (la de Datos del recibo).',
+        'El recordatorio de la cita por WhatsApp lleva la dirección.',
+        'Las citas se ven con la hora de tu negocio, aunque te reserven desde otro país.',
+        'Los precios en Editar producto se ven con puntos de mil mientras escribes.',
+        'Si cierras Google sin entrar, el botón se libera solo y puedes cancelar.',
+      ],
+    ),
+    (
       version: '0.16.8',
       title: 'Íconos, fiado en el pago mixto y más',
       items: [

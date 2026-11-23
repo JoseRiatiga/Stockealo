@@ -283,6 +283,9 @@ class StoreLook {
   /// Íconos en los filtros de categoría (0.16.8, #28); apagado = solo el nombre
   final bool icons;
 
+  /// La dirección del local en la tienda y las reservas (0.16.9); la de «Datos del recibo»
+  final bool address;
+
   const StoreLook({
     this.accent,
     this.dark = false,
@@ -292,6 +295,7 @@ class StoreLook {
     this.adult = false,
     this.hashtags = const [],
     this.icons = true,
+    this.address = true,
   });
 
   static const maxHashtags = 10;
@@ -338,6 +342,7 @@ class StoreLook {
       payment: payment.isEmpty ? null : payment,
       adult: raw['adult'] == true,
       icons: raw['icons'] != false,
+      address: raw['address'] != false,
       hashtags: [
         for (final h in (raw['hashtags'] as List? ?? const []))
           if (h is String && cleanHashtag(h) != null) cleanHashtag(h)!,
@@ -353,11 +358,12 @@ class StoreLook {
         if (payment != null) 'payment': payment,
         'adult': adult,
         'icons': icons,
+        'address': address,
         if (hashtags.isNotEmpty) 'hashtags': hashtags.take(maxHashtags).toList(),
       };
 
   StoreLook copyWith({String? accent, bool clearAccent = false, bool? dark, List<String>? featured, StoreSchedule? schedule,
-          bool clearSchedule = false, String? payment, bool clearPayment = false, bool? adult, List<String>? hashtags, bool? icons}) =>
+          bool clearSchedule = false, String? payment, bool clearPayment = false, bool? adult, List<String>? hashtags, bool? icons, bool? address}) =>
       StoreLook(
         accent: clearAccent ? null : accent ?? this.accent,
         dark: dark ?? this.dark,
@@ -367,6 +373,7 @@ class StoreLook {
         adult: adult ?? this.adult,
         hashtags: hashtags ?? this.hashtags,
         icons: icons ?? this.icons,
+        address: address ?? this.address,
       );
 }
 
@@ -574,6 +581,12 @@ class PublicStore {
   /// Ícono de cada categoría, por nombre en minúscula (0.16.8, #28)
   final Map<String, String> categoryIcons;
 
+  /// Dirección del local (0.16.9): la nube la manda solo si se muestra
+  final String? address;
+
+  /// Zona horaria del negocio («America/Bogota»), para las horas de las citas
+  final String? timeZone;
+
   const PublicStore({
     required this.slug,
     required this.whatsapp,
@@ -589,7 +602,16 @@ class PublicStore {
     this.heroImageUrl,
     this.look = StoreLook.none,
     this.categoryIcons = const {},
+    this.address,
+    this.timeZone,
   });
+
+  /// La dirección, si el negocio la escribió y la muestra
+  String? get shownAddress => look.address && (address ?? '').trim().isNotEmpty ? address!.trim() : null;
+
+  /// «Cómo llegar»: Google Maps con la dirección (sin clave)
+  static Uri mapsUrl(String address, {String? businessName}) => Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent([if (businessName != null) businessName, address].join(', '))}');
 
   /// El ícono de una categoría de la tienda; null si no tiene o están apagados
   String? iconOf(String category) => look.icons ? categoryIcons[category.trim().toLowerCase()] : null;
@@ -611,6 +633,8 @@ class PublicStore {
         heroImageUrl: heroImageUrl ?? this.heroImageUrl,
         look: look ?? this.look,
         categoryIcons: categoryIcons,
+        address: address,
+        timeZone: timeZone,
       );
 
   /// El color de la tienda: el propio o el del negocio
@@ -641,6 +665,8 @@ class PublicStore {
       heroPhotos: j['hero_photos'] != false,
       heroImageUrl: (j['hero_image_url'] as String?)?.startsWith('https://') == true ? j['hero_image_url'] as String : null,
       look: StoreLook.fromJson(j['look']),
+      address: b['address'] as String?,
+      timeZone: b['time_zone'] as String?,
       categoryIcons: {
         for (final e in (j['category_icons'] as Map? ?? const {}).entries)
           if (e.value is String && (e.value as String).isNotEmpty) '${e.key}': e.value as String,

@@ -69,7 +69,14 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Íconos, fiado en el pago mixto y más
+            ### Tu dirección y las citas a la hora correcta
+            - Tu tienda y las reservas muestran la dirección de tu local con «Cómo llegar».
+            - El recordatorio de la cita por WhatsApp lleva la dirección.
+            - Las citas se ven con la hora de tu negocio, aunque te reserven desde otro país.
+            - Los precios en Editar producto se ven con puntos de mil mientras escribes.
+            - Si cierras Google sin entrar, el botón se libera solo.
+
+            ### Íconos, fiado en el pago mixto y más (0.16.8)
             - Cada categoría tiene su ícono en la tienda, Vender y Productos; se cambia en Categorías.
             - En el pago mixto puedes dejar una parte fiada: se suma a lo que debe el cliente.
             - Reportes resta los gastos que registras en Caja de la ganancia neta.

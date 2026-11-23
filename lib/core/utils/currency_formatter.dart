@@ -7,6 +7,13 @@ class CurrencyFormatter {
   /// Símbolo de cada moneda; las que no están aquí usan "$"
   static const Map<String, String> _symbols = {'EUR': '€', 'PEN': 'S/ '};
 
+  /// Monedas que en la práctica no usan centavos (0.16.9): sus precios se escriben con
+  /// puntos de mil. Las demás (dólar, euro, peso mexicano…) aceptan decimales
+  static const _noCents = {'COP', 'CLP', 'PYG'};
+
+  /// La moneda del negocio activo no usa centavos
+  static bool get noCents => _noCents.contains(currencyCode);
+
   /// Usa la moneda del negocio activo en todos los montos de la app
   static void useCurrency(String? code) {
     currencyCode = code ?? 'COP';

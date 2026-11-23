@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/design/pro_crown.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/money_input.dart';
@@ -12,6 +13,9 @@ class PriceTiersEditor extends StatefulWidget {
   final List<PriceTier> initial;
   final double salePrice;
   final bool enabled;
+
+  /// Sin Pro (0.17.1) se puede armar y guardar, pero se aplica solo con Pro
+  final bool pro;
   final ValueChanged<List<PriceTier>> onChanged;
 
   const PriceTiersEditor({
@@ -19,6 +23,7 @@ class PriceTiersEditor extends StatefulWidget {
     required this.initial,
     required this.salePrice,
     required this.enabled,
+    this.pro = true,
     required this.onChanged,
   });
 
@@ -91,12 +96,17 @@ class _PriceTiersEditorState extends State<PriceTiersEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Precio por cantidad (opcional)', style: AppText.body(context, weight: FontWeight.w700)),
+        Row(
+          children: [
+            Flexible(child: Text('Precio por cantidad (opcional)', style: AppText.body(context, weight: FontWeight.w700))),
+            if (!widget.pro) ...[const SizedBox(width: AppSpace.xs), const ProCrown(size: 16)],
+          ],
+        ),
         const SizedBox(height: 2),
         Text(
-          widget.enabled
+          widget.pro
               ? 'Por ejemplo, desde 12 unidades a un precio más bajo. Vender lo aplica solo y la tienda lo muestra.'
-              : 'Precio por mayor: disponible con Stockealo Pro.',
+              : 'Arma tus precios ya. Se aplican en Vender y en tu tienda cuando tengas Stockealo Pro.',
           style: AppText.small(context, color: c.inkMuted),
         ),
         for (var i = 0; i < _rows.length; i++)

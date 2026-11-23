@@ -21,6 +21,15 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.17.1',
+      title: 'Planes más claros',
+      items: [
+        'La pantalla de Stockealo Pro compara Gratis, Pro y Pro Servicios lado a lado.',
+        'Puedes armar tus precios por cantidad aunque no tengas Pro; se activan con Pro.',
+        'Prueba los diseños de catálogo de Pro y mira cómo quedan antes de tenerlo.',
+      ],
+    ),
+    (
       version: '0.17.0',
       title: 'Precios por mayor, conteo de inventario y pedido sugerido',
       items: [

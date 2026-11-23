@@ -97,13 +97,20 @@ class SellCart extends ChangeNotifier {
     for (final l in lines) {
       Promotion? promoAt(double price) => Promotion.best(promotions,
           productId: l.product.id, category: l.product.category, unitPrice: price, quantity: l.quantity, at: now);
+      l.wholesalePreview = null;
       if (!l.autoPrice) {
         l.wholesale = false;
         l.promotion = promoAt(l.unitPrice);
         continue;
       }
       final base = l.basePrice;
-      final tier = wholesaleEnabled ? PriceTier.forQuantity(l.product.priceTiers, l.quantity) : null;
+      final reached = PriceTier.forQuantity(l.product.priceTiers, l.quantity);
+      // Sin Pro: se cobra el precio normal y solo se muestra lo que pasaría con Pro
+      if (!wholesaleEnabled && reached != null) {
+        final would = reached.price + (l.variant?.additionalPrice ?? 0.0);
+        if (would < base) l.wholesalePreview = would;
+      }
+      final tier = wholesaleEnabled ? reached : null;
       final promo = promoAt(base);
       final withPromo = l.quantity * base - (promo?.discountFor(base, l.quantity) ?? 0);
       final tierPrice = tier == null ? null : tier.price + (l.variant?.additionalPrice ?? 0.0);

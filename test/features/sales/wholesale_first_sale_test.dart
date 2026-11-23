@@ -65,6 +65,11 @@ void main() {
     cart.add(gaseosa());
     cart.setQuantity(0, 12);
     expect(cart.total, 12 * 2000);
+    // 0.17.1: se muestra en gris lo que tendría con Pro, sin cobrarlo
+    expect(cart.lines.single.wholesalePreview, 1800);
+    cart.setQuantity(0, 5);
+    expect(cart.lines.single.wholesalePreview, isNull);
+    cart.setQuantity(0, 12);
     cart.setWholesale(true);
     expect(cart.total, 12 * 1800);
     final quoted = CartItem(product: gaseosa(), quantity: 12, customUnitPrice: 1900);

@@ -160,7 +160,8 @@ class _ProUpsellSheetState extends State<ProUpsellSheet> {
                 ),
                 child: Column(
                   children: [
-                    for (var i = 0; i < proBenefits.length; i++)
+                    // Los primeros (los que se pueden resaltar); el resto está en «Ver planes»
+                    for (var i = 0; i < proBenefits.length && i < ProBenefit.values.length; i++)
                       _benefit(c, proBenefits[i], highlighted: i == widget.highlight.index),
                   ],
                 ),

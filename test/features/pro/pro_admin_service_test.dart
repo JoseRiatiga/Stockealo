@@ -63,6 +63,14 @@ void main() {
     expect(expired.canDisable(now), isFalse);
     expect(code().shareMessage(), contains('STK-AAAA-BBBB'));
     expect(code().shareMessage(), contains('Ajustes › Stockealo Pro'));
+    // 0.17.1: compra o regalo, con lo que se activa y «Úsalo antes del…» solo si vence
+    expect(code().shareMessage(), contains('Gracias por elegir'));
+    expect(code().shareMessage(gift: true), contains('Te regalo'));
+    expect(code().shareMessage(gift: true), isNot(contains('Gracias por elegir')));
+    expect(code().shareMessage(), contains('«¿Ya tienes un código?»'));
+    final dated = code(expiresAt: DateTime(2026, 11, 30));
+    expect(dated.shareMessage(now: DateTime(2026, 11, 23)), contains('Úsalo antes del 30/11/2026'));
+    expect(code().shareMessage(now: now), isNot(contains('Úsalo antes')));
   });
 
   test('resumen, tiendas, suscripciones y configuración se leen del servidor', () {

@@ -69,7 +69,12 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
-            ### Precios por mayor, conteo de inventario y pedido sugerido
+            ### Planes más claros (0.17.1)
+            - La pantalla de Stockealo Pro compara Gratis, Pro y Pro Servicios lado a lado.
+            - Puedes armar tus precios por cantidad aunque no tengas Pro; se activan con Pro.
+            - Prueba los diseños de catálogo de Pro y mira cómo quedan antes de tenerlo.
+
+            ### Precios por mayor, conteo de inventario y pedido sugerido (0.17.0)
             - Precio por cantidad (Pro): Vender lo aplica solo y tu tienda lo muestra.
             - Contar inventario en Stock: guarda a medias y al terminar ve lo que sobró y faltó.
             - El pedido al proveedor sugiere según lo que vendes y cuándo vuelve el proveedor.

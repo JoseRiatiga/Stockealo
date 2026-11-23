@@ -21,8 +21,6 @@ const _fields = <String, (String, String)>{
   'nequi_number': ('Número de Nequi', 'Al que los clientes envían el pago'),
   'nequi_name': ('Nombre en Nequi', 'Para que confirmen a quién le pagan'),
   'whatsapp': ('WhatsApp de ventas', 'Con prefijo, ej.: +57 300 123 4567'),
-  'founder_slots': ('Cupos de la oferta Fundador', 'Número'),
-  'founder_until': ('Oferta Fundador hasta', 'Fecha AAAA-MM-DD'),
   'legal_notice': ('Aviso de precios', 'Se muestra debajo de los planes'),
   'wompi_public_key': ('Llave pública de Wompi', 'pub_test_… solo la ven los administradores; pub_prod_… cobra de verdad'),
 };

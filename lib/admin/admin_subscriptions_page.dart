@@ -159,7 +159,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
   }
 }
 
-/// Buscar un negocio y darle Pro por unos días o permanente
+/// Buscar un negocio y darle Pro por unos días (hasta 1 año)
 class _GrantDialog extends StatefulWidget {
   const _GrantDialog();
 
@@ -312,10 +312,10 @@ class _GrantDialogState extends State<_GrantDialog> {
               spacing: AppSpace.sm,
               runSpacing: AppSpace.sm,
               children: [
-                for (final d in const <int?>[7, 30, 90, 365, null])
+                // Sin permanente (0.17.0): lo más largo es 1 año
+                for (final d in const <int?>[7, 30, 90, 365])
                   ChoiceChip(
                     label: Text(switch (d) {
-                      null => 'Permanente',
                       7 => '1 semana',
                       30 => '1 mes',
                       90 => '3 meses',

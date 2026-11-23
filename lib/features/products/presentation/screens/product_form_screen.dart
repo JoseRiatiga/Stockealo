@@ -476,7 +476,15 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       }
 
       if (mounted) {
-        AppToast.show(context, message: isEditing ? 'Producto actualizado con éxito' : '¡Producto guardado exitosamente!', type: ToastType.success);
+        // Precio por cantidad sin Pro (0.17.1): queda guardado y se activa con Pro
+        final tiersWaiting = product.priceTiers.isNotEmpty && !ProService.instance.status.value.active;
+        AppToast.show(
+          context,
+          message: tiersWaiting
+              ? 'Producto guardado. El precio por cantidad se activa con Stockealo Pro.'
+              : (isEditing ? 'Producto actualizado con éxito' : '¡Producto guardado exitosamente!'),
+          type: tiersWaiting ? ToastType.info : ToastType.success,
+        );
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -810,7 +818,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     builder: (context, status, _) => PriceTiersEditor(
                       initial: _priceTiers,
                       salePrice: _price(_salePriceController.text),
-                      enabled: status.active,
+                      enabled: true,
+                      pro: status.active,
                       onChanged: (t) => _priceTiers = t,
                     ),
                   ),

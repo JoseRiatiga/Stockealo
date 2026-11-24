@@ -14,7 +14,10 @@ class StockRow extends StatelessWidget {
   /// null = sin permiso para ajustar
   final VoidCallback? onAdjust;
 
-  const StockRow({super.key, required this.product, required this.onTap, this.onAdjust});
+  /// «Norte 14 · Sur 6»: lo que hay en las otras sedes (0.18.1)
+  final String? elsewhere;
+
+  const StockRow({super.key, required this.product, required this.onTap, this.onAdjust, this.elsewhere});
 
   /// Lo agotado primero, luego lo bajo y después lo demás, cada grupo por nombre
   static List<Product> sorted(List<Product> products) {
@@ -63,6 +66,11 @@ class StockRow extends StatelessWidget {
                         if (state != null) StatusPill(state, tone: tone, compact: true),
                       ],
                     ),
+                    if (elsewhere != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(elsewhere!, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption(context)),
+                      ),
                   ],
                 ),
               ),

@@ -73,6 +73,10 @@ class CashRegisterRepository {
     if (openingAmount < 0) {
       throw Exception('La base inicial no puede ser negativa.');
     }
+    // «Todas las sedes» es solo para mirar (0.18.1): la caja se abre en una sede elegida
+    if (BranchRepository.instance.viewAll.value) {
+      throw Exception('Estás viendo todas las sedes. Elige una sede para abrir su caja.');
+    }
     if (await getOpenSession(businessId) != null) {
       throw Exception('Ya hay una caja abierta. Ciérrala antes de abrir otra.');
     }
@@ -314,6 +318,11 @@ class CashRegisterRepository {
     );
   }
 
+  /// Quien cierra, por su nombre (el de su perfil o lo que va antes de la @)
+  static String? _whoName() {
+    return AuthRepository.instance.currentUser?.displayName;
+  }
+
   /// Cierra el turno. Si el conteo no cuadra con lo esperado, la nota es obligatoria,
   /// salvo en el arqueo ciego ([blind]): quien cuenta no sabe cuánto debía haber.
   Future<CashSession> closeSession({
@@ -337,7 +346,8 @@ class CashRegisterRepository {
     }
     final closed = session.copyWith(
       closedAt: closedAt,
-      closedBy: AuthRepository.instance.currentUser?.email,
+      // El nombre, como al abrir (0.18.1); antes quedaba el correo
+      closedBy: _whoName(),
       expectedAmount: summary.expected,
       countedAmount: countedAmount,
       notes: cleanNotes.isEmpty ? null : cleanNotes,

@@ -9,6 +9,7 @@ import '../../../home/navigation/app_pane.dart';
 import '../../../pro/presentation/screens/pro_screen.dart';
 import '../../data/branch_repository.dart';
 import '../../models/business.dart';
+import '../widgets/branch_form_dialog.dart';
 
 /// Ajustes › Tu negocio › Módulos › Sedes (0.18.0, docs/plan-sedes.md).
 /// Solo el dueño abre, cierra y reabre sedes (cuestan un cupo). Cerrar nunca borra:
@@ -65,34 +66,9 @@ class _BranchesScreenState extends State<BranchesScreen> {
     }
   }
 
-  /// Nombre, dirección y teléfono de una sede
-  Future<({String name, String address, String phone})?> _askData({String title = 'Nueva sede', Branch? from, bool onlyName = false}) async {
-    final name = TextEditingController(text: from?.name ?? '');
-    final address = TextEditingController(text: from?.address ?? '');
-    final phone = TextEditingController(text: from?.phone ?? '');
-    final ok = await AppDialog.show<bool>(
-      context: context,
-      title: title,
-      content: Builder(builder: (ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(controller: name, autofocus: true, decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Norte, Centro, Plaza…')),
-          if (!onlyName) ...[
-            const SizedBox(height: AppSpace.sm),
-            TextField(controller: address, decoration: const InputDecoration(labelText: 'Dirección (opcional)')),
-            const SizedBox(height: AppSpace.sm),
-            TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Teléfono (opcional)')),
-          ],
-        ],
-      )),
-      actions: [
-        Builder(builder: (ctx) => TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar'))),
-        Builder(builder: (ctx) => FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar'))),
-      ],
-    );
-    if (ok != true || name.text.trim().isEmpty) return null;
-    return (name: name.text.trim(), address: address.text.trim(), phone: phone.text.trim());
-  }
+  /// Los nombres en uso (la Principal y las otras sedes), menos el de [except]
+  List<String> _taken({String? except}) =>
+      [if (except != '') _repo.mainName, for (final b in _repo.branches) if (b.id != except) b.name];
 
   Future<void> _create() async {
     if (_repo.freeSlots == 0) {
@@ -115,23 +91,43 @@ class _BranchesScreenState extends State<BranchesScreen> {
             'Un celular con la app vieja solo ve y vende en la sede Principal.',
         confirmText: 'Ya lo hicimos',
       );
-      if (!ok) return;
+      if (!ok || !mounted) return;
     }
-    final data = await _askData();
+    final used = _repo.openBranches.length + 1;
+    final data = await BranchFormDialog.show(
+      context,
+      title: 'Nueva sede',
+      actionLabel: 'Abrir sede',
+      taken: _taken(),
+      country: widget.business.country,
+      slotsNote: 'Usarás $used de ${_repo.allowance} cupos de sede.',
+    );
     if (data == null) return;
     await _run(() => _repo.create(name: data.name, address: data.address, phone: data.phone), 'Sede «${data.name}» abierta');
   }
 
   Future<void> _edit(Branch b) async {
-    final data = await _askData(title: 'Editar sede', from: b);
+    final data = await BranchFormDialog.show(
+      context,
+      title: 'Editar sede',
+      actionLabel: 'Guardar',
+      taken: _taken(except: b.id),
+      name: b.name,
+      address: b.address,
+      phone: b.phone,
+      country: widget.business.country,
+    );
     if (data == null) return;
     await _run(() => _repo.update(b, name: data.name, address: data.address, phone: data.phone), 'Sede guardada');
   }
 
   Future<void> _renameMain() async {
-    final data = await _askData(
+    final data = await BranchFormDialog.show(
+      context,
       title: 'Nombre de la sede Principal',
-      from: Branch(id: '', businessId: widget.business.id, name: _repo.mainName, createdAt: DateTime.now()),
+      actionLabel: 'Guardar',
+      taken: _taken(except: ''),
+      name: _repo.mainName,
       onlyName: true,
     );
     if (data == null) return;
@@ -141,7 +137,7 @@ class _BranchesScreenState extends State<BranchesScreen> {
   /// Cerrar: el dueño elige a qué sede pasan la mercancía y las personas
   Future<void> _close(Branch b) async {
     final targets = <String?, String>{
-      null: '${_repo.mainName} (Principal)',
+      null: _repo.mainName == BranchRepository.mainDefaultName ? _repo.mainName : '${_repo.mainName} · Principal',
       for (final o in _repo.openBranches.where((o) => o.id != b.id)) o.id: o.name,
     };
     String? target;

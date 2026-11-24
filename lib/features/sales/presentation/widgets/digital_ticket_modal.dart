@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../business/data/branch_repository.dart';
+
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../business/presentation/active_business_scope.dart';
@@ -125,6 +127,7 @@ class DigitalTicketModal {
           : (credit ? 'Venta a crédito (fiado)' : null),
       closing: '¡Gracias por tu compra!',
       stamp: stamp,
+      branch: BranchRepository.instance.ticketBranch(first.branchId),
       after: [
         for (final e in split.entries) TicketRow('  ${PaymentMethod.label(e.key)}', CurrencyFormatter.format(e.value)),
         if (received != null && received > 0) TicketRow('Recibido', CurrencyFormatter.format(received)),

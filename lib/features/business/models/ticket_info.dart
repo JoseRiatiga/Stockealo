@@ -65,3 +65,20 @@ class TicketInfo {
   String closingFor(String docClosing) =>
       footer != null && genericClosings.contains(docClosing) ? footer! : docClosing;
 }
+
+/// La sede en el tiquete (0.18.1): solo cuando el negocio tiene sedes. Con dirección y
+/// teléfono propios, reemplazan los del negocio en ese tiquete.
+class TicketBranch {
+  final String name;
+  final String? address;
+  final String? phone;
+  const TicketBranch(this.name, {this.address, this.phone});
+
+  /// [info] con la dirección y el teléfono de la sede, si los tiene
+  TicketInfo over(TicketInfo info) => TicketInfo(
+        taxId: info.taxId,
+        address: (address ?? '').trim().isEmpty ? info.address : address!.trim(),
+        phone: (phone ?? '').trim().isEmpty ? info.phone : phone!.trim(),
+        footer: info.footer,
+      );
+}

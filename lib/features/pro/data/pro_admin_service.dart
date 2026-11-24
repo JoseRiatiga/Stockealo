@@ -606,6 +606,18 @@ class ProAdminService {
       _rpc('admin_grant_pro', {'p_business_id': businessId, 'p_days': days, 'p_kind': kind});
 
   /// Cupos de sedes extra (0.18.0), hasta 1 año. Devuelve cuántas sedes extra puede tener
+  /// Cupos de sede de un negocio (0.18.1): cuántas sedes extra puede tener, cuántas
+  /// tiene abiertas y los cupos vigentes. null si la nube todavía no tiene la consulta.
+  Future<AdminBranchSlots?> branchSlots(String businessId) async {
+    try {
+      final r = await _rpc('admin_branch_slots', {'p_business_id': businessId});
+      return r is Map ? AdminBranchSlots.fromJson(Map<String, dynamic>.from(r)) : null;
+    } catch (e) {
+      debugPrint('Cupos de sede sin leer: $e');
+      return null;
+    }
+  }
+
   Future<int> grantBranchSlots(String businessId, int slots, int days) async =>
       ((await _rpc('admin_grant_branch_slots', {'p_business_id': businessId, 'p_slots': slots, 'p_days': days})) as num).toInt();
 
@@ -810,7 +822,13 @@ class AdminUserBusiness {
     this.proUntil,
     this.storeSlug,
     this.storeEnabled = false,
+    this.services = false,
   });
+
+  /// El plan es Pro Servicios (0.18.1: la tarjeta lo dice, no solo «Pro»)
+  final bool services;
+
+  String get planLabel => services ? 'Pro Servicios' : 'Pro';
 
   String get roleLabel => switch (role) {
         'OWNER' => 'Dueño',
@@ -829,8 +847,32 @@ class AdminUserBusiness {
       proUntil: _date(pro['ends_at']),
       storeSlug: j['store_slug'] as String?,
       storeEnabled: j['store_enabled'] == true,
+      services: pro['kind'] == 'services' || pro['services'] == true,
     );
   }
+}
+
+/// Cupos de sede de un negocio, vistos desde el panel (0.18.1)
+class AdminBranchSlots {
+  /// Sedes extra que puede tener (las de Pro Servicios más los cupos vigentes)
+  final int allowance;
+
+  /// Sedes extra abiertas hoy
+  final int open;
+
+  /// Cupos vigentes: cuántos y hasta cuándo
+  final List<({int slots, DateTime endsAt})> slots;
+
+  const AdminBranchSlots({required this.allowance, required this.open, this.slots = const []});
+
+  factory AdminBranchSlots.fromJson(Map<String, dynamic> j) => AdminBranchSlots(
+        allowance: (j['allowance'] as num?)?.toInt() ?? 0,
+        open: (j['open'] as num?)?.toInt() ?? 0,
+        slots: [
+          for (final s in (j['slots'] as List? ?? const []))
+            if (s is Map && _date(s['ends_at']) != null) (slots: (s['slots'] as num?)?.toInt() ?? 0, endsAt: _date(s['ends_at'])!),
+        ],
+      );
 }
 
 /// Salud de Stockealo: a quién conviene escribirle hoy

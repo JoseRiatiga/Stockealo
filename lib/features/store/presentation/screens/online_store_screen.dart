@@ -932,13 +932,22 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('Tienda encendida', style: AppText.body(context, weight: FontWeight.w600)),
-              subtitle: Text('Apágala cuando no quieras recibir pedidos', style: AppText.small(context, color: c.inkMuted)),
-              value: _enabled,
-              onChanged: (v) => setState(() => _enabled = v),
-            ),
+            // Sin guardar nunca, no hay nada encendido (0.18.1): «Publicar mi tienda» la enciende
+            if (_saved == null)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.storefront_outlined, color: c.inkMuted),
+                title: Text('Tu tienda todavía no está publicada', style: AppText.body(context, weight: FontWeight.w600)),
+                subtitle: Text('Elige la dirección y toca «Publicar mi tienda» abajo.', style: AppText.small(context, color: c.inkMuted)),
+              )
+            else
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Tienda encendida', style: AppText.body(context, weight: FontWeight.w600)),
+                subtitle: Text('Apágala cuando no quieras recibir pedidos', style: AppText.small(context, color: c.inkMuted)),
+                value: _enabled,
+                onChanged: (v) => setState(() => _enabled = v),
+              ),
             const SizedBox(height: AppSpace.md),
             TextField(
               controller: _slugController,

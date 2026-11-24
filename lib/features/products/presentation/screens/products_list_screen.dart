@@ -1,3 +1,4 @@
+import '../../../business/data/branch_repository.dart';
 import '../../../reports/presentation/screens/guided_import_screen.dart';
 import '../../../suppliers/presentation/widgets/visit_today_banner.dart';
 import '../../../../core/database/app_database.dart';
@@ -91,6 +92,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
   /// Marca dónde empieza la lista, para bajar hasta ella al filtrar desde el resumen
   final _listStartKey = GlobalKey();
   Map<String, dynamic> _stats = {};
+  Map<String, String> _elsewhere = const {};
   bool _isLoading = true;
   String _effectiveRole = 'OWNER';
 
@@ -202,6 +204,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
       businessId: businessId,
     );
     final stats = await _repository.getInventoryStats(businessId);
+    // Lo que hay en las otras sedes, en letra pequeña (0.18.1)
+    final elsewhere = await BranchRepository.instance.stockElsewhere(businessId);
 
     var filteredProducts = List<Product>.from(rawProducts);
 
@@ -258,6 +262,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
         _products = filteredProducts;
         _categories = categories;
         _stats = stats;
+        _elsewhere = elsewhere;
         _effectiveRole = role;
         _isLoading = false;
       });
@@ -694,6 +699,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                       itemBuilder: (_, i) => StockRow(
                         product: pagedList[i],
                         onTap: () => _openProduct(pagedList[i]),
+                        elsewhere: _elsewhere[pagedList[i].id],
                         onAdjust: canEditProducts && Permissions.mine(Perm.stockAdjust)
                             ? () => QuickStockDialog.show(context, product: pagedList[i], onSaved: _loadData)
                             : null,
@@ -764,7 +770,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
     final total = _stats['totalProducts'] ?? 0;
     final outOfStock = _stats['outOfStock'] ?? 0;
     final lowStock = _stats['lowStock'] ?? 0;
-    final totalValue = _stats['totalValue'] ?? 0.0;
+    // A precio de costo, como dice la tarjeta (0.18.1; antes sumaba el precio de venta)
+    final totalValue = _stats['totalCost'] ?? 0.0;
 
     // Stock no repite las tarjetas de Productos (0.16.7, hallazgo 36): una línea
     if (_stockMode) {

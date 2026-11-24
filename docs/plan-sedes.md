@@ -331,3 +331,27 @@ El dueño puso Sedes **en prioridad** el 23 nov y aceptó las recomendaciones:
 - **0.18.1:** tienda con selector de sede, y compra de plan + sedes en un solo pago con Wompi.
 - **0.18.2:** traslados con confirmación, encargado de turno y sugerencia de traslado.
 - **0.18.3:** fiados por sede, precios por sede y Servicios por sede.
+
+## 10. Prueba en la web publicada (0.18.0, 24 nov, LAVADERO)
+
+Salió bien: crear sede (contador 1 de 3), producto creado en Norte con 6 (Principal 0), caja de Norte, venta de 2 (Norte 4, venta con su sede en la nube), la Principal no ve esa venta, «Todas las sedes» suma 7 ventas, 4.ª sede bloqueada («Sin cupos libres»), cerrar sede con caja abierta bloqueado, reabrir, cerrar Norte y sus 4 unidades pasan a la Principal. Las 3 sedes de prueba quedaron cerradas; el LAVADERO tiene 1 cupo extra manual hasta el 11 dic.
+
+Para corregir (0.18.1):
+1. El formulario «Nueva sede» tiene el diseño viejo (lo vio el dueño): pasarlo al diseño nuevo.
+2. El selector dice «Principal (Principal)»: el nombre de la Principal sale repetido.
+3. En «Todas las sedes», Vender y Caja muestran «Ábrela para poder cobrar» / «Abrir caja» (abriría la de la Principal). Debe decir «Estás viendo todas las sedes. Elige una sede para vender» y no ofrecer abrir caja.
+4. Al cambiar de sede sigue el aviso «Venta registrada» de la sede anterior en Vender.
+5. El recibo de venta y el cierre de caja no dicen la sede (con varias sedes conviene que digan «LAVADERO · Norte»).
+6. Cierre de caja: «ATENDIÓ» muestra el correo y no el nombre (al abrir sí sale el nombre).
+7. Pendiente de antes: la línea «Norte 14 · Sur 6» en la lista de Stock.
+
+Otras cosas vistas en la misma prueba (no son de sedes):
+8. Productos › «Valor del inventario» dice «A precio de costo» pero suma el precio de venta (desde la primera versión; product_repository getInventoryStats usa totalValue = venta).
+9. Contar inventario: el campo dice «Conta…» (texto cortado) y al terminar sale «se ajustaron 1 productos» (debe ser «1 producto»).
+10. Tienda en línea: si nunca se guardó, la pantalla muestra «Tienda encendida» aunque no existe en la nube (Primeros pasos sí dice que falta publicarla).
+
+Revisado bien en la web: Primeros pasos (3 de 5), precio por cantidad (desde 3 a $8.000: Vender lo aplica solo y muestra «Precio por mayor»; guardado en la nube), Contar inventario (diferencia +1, motivo «Conteo del 23/11/2026», nube al día). El panel pide el código de dos pasos: lo tiene que abrir el dueño.
+
+Panel (revisado por el dueño con su código, 24 nov): «Salud» muestra a Loliando como negocio sin primera venta; Códigos ya no ofrece «Permanente»; «Cupos de sede» abre con 1/2/3 sedes por 1 mes o 1 año. Para mejorar:
+11. «Cupos de sede» no dice cuántos cupos tiene ya el negocio ni hasta cuándo, y deja dar 1 año aunque el plan venza antes (no hace daño: sin Pro el cupo no cuenta, pero confunde).
+12. La tarjeta del negocio dice «Pro» también cuando es Pro Servicios.

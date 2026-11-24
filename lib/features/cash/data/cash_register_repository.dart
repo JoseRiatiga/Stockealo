@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart' show DatabaseException;
 import '../../sales/data/sales_repository.dart';
 import 'package:uuid/uuid.dart';
+import '../../business/data/branch_repository.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/services/data_events.dart';
@@ -36,12 +37,16 @@ class CashRegisterRepository {
     if (await getOpenSession(businessId) == null) throw const CashClosedException();
   }
 
-  Future<CashSession?> getOpenSession(String businessId) async {
+  /// La caja abierta de la sede elegida (0.18.0: una caja por sede; null = Principal)
+  Future<CashSession?> getOpenSession(String businessId, {String? branchId, bool anyBranch = false}) async {
     final db = await _dbProvider.database;
+    final branch = anyBranch ? null : (branchId ?? BranchRepository.active);
     final rows = await db.query(
       'cash_sessions',
-      where: 'business_id = ? AND closed_at IS NULL',
-      whereArgs: [businessId],
+      where: anyBranch
+          ? 'business_id = ? AND closed_at IS NULL'
+          : 'business_id = ? AND closed_at IS NULL AND ${branch == null ? 'branch_id IS NULL' : 'branch_id = ?'}',
+      whereArgs: [businessId, if (!anyBranch && branch != null) branch],
       orderBy: 'opened_at DESC',
       limit: 1,
     );
@@ -75,6 +80,7 @@ class CashRegisterRepository {
     final session = CashSession(
       id: const Uuid().v4(),
       businessId: businessId,
+      branchId: BranchRepository.active,
       openedBy: openedBy,
       openedAt: at,
       openingAmount: openingAmount,
@@ -148,7 +154,7 @@ class CashRegisterRepository {
       date: now ?? appNow(),
     );
     final db = await _dbProvider.database;
-    final row = m.toMap();
+    final row = {...m.toMap(), 'branch_id': session.branchId};
     await db.insert('cash_movements', row);
     _cloud.upsertCashMovementToCloud({...row, if (authRequestId != null) 'auth_request_id': authRequestId});
     ActivityRepository.instance.log(
@@ -220,10 +226,12 @@ class CashRegisterRepository {
     var cashSalesCount = 0;
     // Un pago mixto suma a cada medio lo que entró por él; una venta es un número
     final cashInvoices = <String>{};
+    final branch = session.branchId;
+    final branchWhere = branch == null ? 'branch_id IS NULL' : 'branch_id = ?';
     final sales = await db.rawQuery('''
       SELECT payment_method AS method, total, payment_split, ${SalesRepository.saleKey} AS invoice FROM sales_ok
-      WHERE business_id = ? AND date >= ? AND date <= ?
-    ''', [biz, from, to]);
+      WHERE business_id = ? AND date >= ? AND date <= ? AND $branchWhere
+    ''', [biz, from, to, if (branch != null) branch]);
     for (final r in sales) {
       final parts = PaymentMethod.amounts('${r['method'] ?? 'OTRO'}', (r['total'] as num).toDouble(), r['payment_split'] as String?);
       for (final e in parts.entries) {
@@ -237,7 +245,7 @@ class CashRegisterRepository {
     }
     cashSalesCount = cashInvoices.length;
     var cashPayments = 0.0;
-    final payments = await db.rawQuery('''
+    final payments = branch != null ? const <Map<String, Object?>>[] : await db.rawQuery('''
       SELECT payment_method AS method, COALESCE(SUM(amount), 0) AS amount FROM customer_payments
       WHERE business_id = ? AND date >= ? AND date <= ? GROUP BY payment_method
     ''', [biz, from, to]);
@@ -250,15 +258,18 @@ class CashRegisterRepository {
 
     // Propinas cobradas en efectivo (trabajos de servicios entregados en el turno)
     var tipsIn = 0.0;
-    try {
-      final tips = await db.rawQuery('''
-        SELECT COALESCE(SUM(tip), 0) AS amount FROM work_orders
-        WHERE business_id = ? AND payment_method = ? AND status = 'ENTREGADA' AND tip > 0
-          AND updated_at >= ? AND updated_at <= ?
-      ''', [biz, _cash, from, to]);
-      tipsIn = (tips.first['amount'] as num).toDouble();
-    } on DatabaseException {
-      tipsIn = 0;
+    // Propinas de Servicios: por ahora solo en la Principal (Servicios por sede, 0.18.3)
+    if (branch == null) {
+      try {
+        final tips = await db.rawQuery('''
+          SELECT COALESCE(SUM(tip), 0) AS amount FROM work_orders
+          WHERE business_id = ? AND payment_method = ? AND status = 'ENTREGADA' AND tip > 0
+            AND updated_at >= ? AND updated_at <= ?
+        ''', [biz, _cash, from, to]);
+        tipsIn = (tips.first['amount'] as num).toDouble();
+      } on DatabaseException {
+        tipsIn = 0;
+      }
     }
 
     // Entradas y salidas a mano
@@ -282,8 +293,8 @@ class CashRegisterRepository {
     try {
       final purchases = await db.rawQuery('''
         SELECT COALESCE(SUM(total), 0) AS amount FROM purchases
-        WHERE business_id = ? AND payment_terms = 'CONTADO' AND date >= ? AND date <= ?
-      ''', [biz, from, to]);
+        WHERE business_id = ? AND payment_terms = 'CONTADO' AND date >= ? AND date <= ? AND $branchWhere
+      ''', [biz, from, to, if (branch != null) branch]);
       cashPurchases = (purchases.first['amount'] as num).toDouble();
     } on DatabaseException {
       cashPurchases = 0;
@@ -353,10 +364,11 @@ class CashRegisterRepository {
 
   Future<List<CashSession>> getClosedSessions(String businessId, {int limit = 30}) async {
     final db = await _dbProvider.database;
+    final branch = BranchRepository.active;
     final rows = await db.query(
       'cash_sessions',
-      where: 'business_id = ? AND closed_at IS NOT NULL',
-      whereArgs: [businessId],
+      where: 'business_id = ? AND closed_at IS NOT NULL AND ${branch == null ? 'branch_id IS NULL' : 'branch_id = ?'}',
+      whereArgs: [businessId, if (branch != null) branch],
       orderBy: 'closed_at DESC',
       limit: limit,
     );

@@ -53,6 +53,9 @@ class SupabaseService {
         url: supabaseUrl,
         // ignore: deprecated_member_use
         anonKey: supabaseAnonKey,
+        // 0.18.0: esta app sabe de sedes. Sin esta cabecera (app vieja) la nube solo
+        // deja ver y tocar lo de la sede Principal (supabase/migrations/…_branches.sql)
+        headers: const {'x-stockealo-branches': '1'},
       );
       _isInitialized = true;
       debugPrint('Supabase inicializado correctamente.');
@@ -692,7 +695,7 @@ class SupabaseService {
         }
         // Lotes con vencimiento y cambios con el proveedor (0.16.0, fase 2b)
         for (final (table, cols) in const [
-          ('product_lots', ['id', 'business_id', 'product_id', 'code', 'expires_on', 'quantity', 'initial_quantity', 'cost', 'source', 'purchase_id', 'status', 'created_at', 'updated_at']),
+          ('product_lots', ['id', 'business_id', 'product_id', 'code', 'expires_on', 'quantity', 'initial_quantity', 'cost', 'source', 'purchase_id', 'status', 'created_at', 'updated_at', 'branch_id']),
           ('lot_exchanges', ['id', 'business_id', 'product_id', 'product_name', 'lot_id', 'supplier_id', 'supplier_name', 'quantity', 'status', 'new_lot_id', 'created_at', 'closed_at']),
         ]) {
           try {
@@ -765,6 +768,8 @@ class SupabaseService {
               'role': memberRole,
               'role_id': m['role_id'],
               'access_schedule': m['access_schedule'],
+              // Sede donde trabaja (0.18.0); vacía = Principal
+              'branch_id': m['branch_id'],
               'status': 'ACTIVE',
               'created_at': m['created_at'] ?? DateTime.now().toIso8601String(),
             },
@@ -1036,6 +1041,8 @@ class SupabaseService {
               'seller_name': s['seller_name'] ?? local?['seller_name'],
               'invoice_number': s['invoice_number'] ?? local?['invoice_number'],
               'product_photo_path': local?['product_photo_path'],
+              // Sede (0.18.0); vacía = Principal
+              'branch_id': s['branch_id'] ?? local?['branch_id'],
               'discount_amount': (((s['discount_amount'] as num?) ?? 0) > 0 ? s['discount_amount'] : null) ??
                   local?['discount_amount'] ??
                   0.0,
@@ -1337,7 +1344,9 @@ class SupabaseService {
       case 'upsert_cash_session':
         await db.from('cash_sessions').upsert(cashSessionCloudRow(p), onConflict: 'id');
       case 'upsert_cash_movement':
-        await db.from('cash_movements').upsert(boolRow(p, const []), onConflict: 'id');
+        await db.from('cash_movements').upsert(
+            boolRow(Map<String, dynamic>.from(p)..removeWhere((k, v) => k == 'branch_id' && (v as String?)?.isEmpty != false), const []),
+            onConflict: 'id');
       case 'update_store_order':
         await db.from('store_orders').update({'status': p['status']}).eq('id', p['id'] as String);
       case 'upsert_appointment':
@@ -1368,6 +1377,22 @@ class SupabaseService {
         await db.from('work_orders').upsert(workOrderCloudRow(p), onConflict: 'id');
       case 'upsert_supplier_order':
         await db.from('supplier_orders').upsert(orderCloudRow(p), onConflict: 'id');
+      // Sedes (0.18.0): stock de una sede extra (la Principal sigue con adjust_stock)
+      case 'adjust_branch_stock':
+        await db.rpc('adjust_branch_stock', params: {
+          'p_branch_id': p['branch_id'],
+          'p_product_id': p['product_id'],
+          'p_variant_key': p['variant_key'] ?? '',
+          'p_delta': p['delta'],
+        });
+      case 'set_branch_stock':
+        await db.rpc('set_branch_stock', params: {
+          'p_branch_id': p['branch_id'],
+          'p_product_id': p['product_id'],
+          'p_variant_key': p['variant_key'] ?? '',
+          'p_stock': p['stock'],
+          if (p['min_stock'] != null) 'p_min_stock': p['min_stock'],
+        });
       case 'adjust_variant_stock':
         await db.rpc('adjust_variant_stock', params: {'p_variant_id': p['id'], 'p_delta': p['delta']});
       case 'adjust_debt':
@@ -1470,6 +1495,9 @@ class SupabaseService {
           await _createBusinessWithOwner(db, business.first);
           await db.from('business_members').upsert(row, onConflict: 'id');
         }
+      // Sedes (0.18.0): en qué sede trabaja una persona (null = Principal)
+      case 'set_member_branch':
+        await db.from('business_members').update({'branch_id': p['branch_id']}).eq('id', p['id'] as String);
       case 'delete_member':
         await db.from('business_members').delete().eq('id', p['id'] as String);
       case 'upsert_business_role':
@@ -1480,6 +1508,7 @@ class SupabaseService {
           for (final k in const ['id', 'business_id', 'product_id', 'code', 'expires_on', 'quantity', 'initial_quantity', 'cost', 'source',
             'purchase_id', 'status', 'created_at', 'updated_at'])
             k: p[k],
+          if ((p['branch_id'] as String?)?.isNotEmpty == true) 'branch_id': p['branch_id'],
         }, onConflict: 'id');
       case 'upsert_lot_exchange':
         await db.from('lot_exchanges').upsert({
@@ -1692,6 +1721,8 @@ class SupabaseService {
       // Autorización usada (0.15.0): la nube la exige si pasa el límite del rol
       if (s['auth_request_id'] != null) 'auth_request_id': s['auth_request_id'],
       if (s['void_auth_request_id'] != null) 'void_auth_request_id': s['void_auth_request_id'],
+      // Sede (0.18.0): solo si es de una sede extra
+      if ((s['branch_id'] as String?)?.isNotEmpty == true) 'branch_id': s['branch_id'],
     };
     // Comprobante, vendedor y descuento (0.16.6). El descuento no viaja en la venta:
     // se toma del equipo (también para lo que ya estaba en la cola)
@@ -1860,6 +1891,8 @@ class SupabaseService {
       'notes': r['notes'],
       'created_by': r['created_by'],
       'created_at': r['created_at'],
+      // Sede (0.18.0): solo si es de una sede extra
+      if ((r['branch_id'] as String?)?.isNotEmpty == true) 'branch_id': r['branch_id'],
     };
   }
 
@@ -1884,6 +1917,7 @@ class SupabaseService {
       'notes': r['notes'],
       'created_by': r['created_by'],
       'created_at': r['created_at'] ?? DateTime.now().toIso8601String(),
+      'branch_id': r['branch_id'],
     };
   }
 
@@ -2061,6 +2095,18 @@ class SupabaseService {
 
   /// Guarda o actualiza un pedido a proveedor
   Future<void> upsertSupplierOrderToCloud(Map<String, dynamic> row) => _write('upsert_supplier_order', row);
+
+  /// Stock de una sede extra (0.18.0): por diferencia (ventas, anulaciones, entradas)
+  Future<void> adjustBranchStockInCloud(String branchId, String productId, String? variantId, int delta) =>
+      _write('adjust_branch_stock', {'branch_id': branchId, 'product_id': productId, 'variant_key': variantId ?? '', 'delta': delta});
+
+  /// Stock exacto de una sede extra (ajuste, conteo, importar)
+  Future<void> setBranchStockInCloud(String branchId, String productId, String? variantId, int stock, {int? minStock}) => _write(
+      'set_branch_stock', {'branch_id': branchId, 'product_id': productId, 'variant_key': variantId ?? '', 'stock': stock, 'min_stock': minStock});
+
+  /// En qué sede trabaja una persona del equipo (null = Principal)
+  Future<void> setMemberBranchInCloud(String memberId, String? branchId) =>
+      _write('set_member_branch', {'id': memberId, 'branch_id': branchId});
 
   /// Venta o anulación de una variante: ajuste por diferencia
   Future<void> adjustVariantStockInCloud(String variantId, int delta) =>

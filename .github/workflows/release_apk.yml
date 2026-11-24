@@ -69,6 +69,12 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
+            ### Sedes: varios locales en un negocio (0.18.0)
+            - Abre sedes en Módulos: cada una con su stock, sus ventas y su caja.
+            - Cambia de sede desde el botón de tu negocio en el menú.
+            - Mira los reportes de una sede o de todas juntas.
+            - Asigna a cada persona de tu equipo la sede donde trabaja.
+
             ### Planes más claros (0.17.1)
             - La pantalla de Stockealo Pro compara Gratis, Pro y Pro Servicios lado a lado.
             - Puedes armar tus precios por cantidad aunque no tengas Pro; se activan con Pro.

@@ -7,7 +7,9 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../pro/data/pro_service.dart';
 import '../../../pro/presentation/screens/pro_screen.dart';
+import '../../data/branch_repository.dart';
 import '../../data/business_repository.dart';
+import 'branches_screen.dart';
 import '../../models/business.dart';
 import '../../../home/navigation/app_pane.dart';
 import '../../../home/navigation/app_places.dart';
@@ -163,6 +165,17 @@ class _ModulesScreenState extends State<ModulesScreen> {
                 on: pro.active,
                 pro: true,
                 onTap: pro.active ? _go(AppPlace.tienda) : () => ProScreen.open(context, widget.business),
+              ),
+              // Sedes (0.18.0): varios locales en un mismo negocio, con Pro
+              _module(
+                icon: Icons.place_outlined,
+                title: 'Sedes',
+                what: 'Varios locales en un mismo negocio: cada uno con su stock, sus ventas y su caja.',
+                where: 'Aquí, en Módulos',
+                status: pro.active ? 'Con tu plan' : 'Con Stockealo Pro',
+                on: BranchRepository.instance.openBranches.isNotEmpty,
+                pro: true,
+                onTap: () => BranchesScreen.open(context, business: widget.business, isOwner: widget.canEdit && Permissions.current == Permissions.owner),
               ),
               _module(
                 icon: Icons.move_to_inbox_outlined,

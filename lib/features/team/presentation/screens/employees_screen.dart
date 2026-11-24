@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../business/data/branch_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:share_plus/share_plus.dart';
@@ -825,6 +826,33 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               ],
             ),
           ),
+          // Sede donde trabaja (0.18.0): solo si el negocio tiene sedes
+          if (!member.isOwner && BranchRepository.instance.openBranches.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpace.sm, right: AppSpace.sm),
+              child: InkWell(
+                onTap: canEdit ? () => _editBranch(member) : null,
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+                  child: Row(
+                    children: [
+                      Icon(Icons.place_outlined, size: 16, color: c.inkMuted),
+                      const SizedBox(width: AppSpace.sm),
+                      Expanded(
+                        child: Text(
+                          member.role == 'ADMIN'
+                              ? 'Administra todas las sedes'
+                              : 'Trabaja en ${BranchRepository.instance.nameOf(member.branchId)}',
+                          style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
+                        ),
+                      ),
+                      if (canEdit && member.role != 'ADMIN') Icon(Icons.edit_outlined, size: 16, color: c.inkFaint),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           // Horario de acceso (0.15.0, Pro Servicios): solo entra a la app en sus días y horas
           if (!member.isOwner && (canEdit || member.accessSchedule != null))
             Padding(
@@ -853,6 +881,38 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         ],
       ),
     );
+  }
+
+  /// Trasladar a otra sede (0.18.0)
+  Future<void> _editBranch(BusinessMember member) async {
+    if (member.role == 'ADMIN') return;
+    final branches = BranchRepository.instance;
+    final options = <String?, String>{
+      null: '${branches.mainName} (Principal)',
+      for (final b in branches.openBranches) b.id: b.name,
+    };
+    String? picked = member.branchId;
+    final ok = await AppDialog.show<bool>(
+      context: context,
+      title: 'Sede de ${member.displayName}',
+      content: StatefulBuilder(
+        builder: (ctx, set) => RadioGroup<String?>(
+          groupValue: picked,
+          onChanged: (v) => set(() => picked = v),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            for (final e in options.entries) RadioListTile<String?>(value: e.key, title: Text(e.value), contentPadding: EdgeInsets.zero),
+          ]),
+        ),
+      ),
+      actions: [
+        Builder(builder: (ctx) => TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar'))),
+        Builder(builder: (ctx) => FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar'))),
+      ],
+    );
+    if (ok != true || picked == member.branchId || !mounted) return;
+    await _teamRepo.setMemberBranch(member, picked);
+    await _loadData();
+    if (mounted) AppToast.showSuccess(context, '${member.displayName} ahora trabaja en ${branches.nameOf(picked)}.');
   }
 
   Future<void> _editAccessSchedule(BusinessMember member) async {

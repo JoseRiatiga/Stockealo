@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 32;
+  static const int _schemaVersion = 33;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -590,6 +590,53 @@ class AppDatabase {
     if (oldVersion < 30 && newVersion >= 30) await businessTimeZoneV30(db);
     if (oldVersion < 31 && newVersion >= 31) await categoryIconsV31(db);
     if (oldVersion < 32 && newVersion >= 32) await priceTiersV32(db);
+    if (oldVersion < 33 && newVersion >= 33) await branchesV33(db);
+  }
+
+  /// 0.18.0, sedes (docs/plan-sedes.md): las columnas de hoy siguen siendo de la sede
+  /// Principal; branch_id vacío = Principal. branch_stock guarda solo las sedes extra.
+  static Future<void> branchesV33(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS branches (
+        id TEXT PRIMARY KEY,
+        business_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        address TEXT,
+        phone TEXT,
+        schedule TEXT,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        usable INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        closed_at TEXT
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_branches_biz ON branches(business_id)');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS branch_stock (
+        branch_id TEXT NOT NULL,
+        business_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        variant_key TEXT NOT NULL DEFAULT '',
+        stock INTEGER NOT NULL DEFAULT 0,
+        min_stock INTEGER,
+        updated_at TEXT,
+        PRIMARY KEY (branch_id, product_id, variant_key)
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_branch_stock_biz ON branch_stock(business_id)');
+    for (final table in ['sales', 'cash_sessions', 'cash_movements', 'purchases', 'product_lots', 'stock_movements', 'quotations', 'business_members']) {
+      await _addColumnIfMissing(db, table, 'branch_id', 'TEXT');
+    }
+    await _addColumnIfMissing(db, 'businesses', 'main_branch_name', 'TEXT');
+    // Sede elegida para leer (una sola fila). «sales_here» = ventas vigentes de esa sede
+    // (o de todas). Sin sedes, branch_id es vacío en todo y da lo mismo que sales_ok.
+    await db.execute('CREATE TABLE IF NOT EXISTS app_scope (id INTEGER PRIMARY KEY CHECK (id = 1), branch_id TEXT, all_branches INTEGER NOT NULL DEFAULT 0)');
+    await db.execute('INSERT OR IGNORE INTO app_scope (id, branch_id, all_branches) VALUES (1, NULL, 0)');
+    await db.execute('''
+      CREATE VIEW IF NOT EXISTS sales_here AS SELECT * FROM sales
+      WHERE voided_at IS NULL
+        AND ((SELECT all_branches FROM app_scope WHERE id = 1) = 1 OR branch_id IS (SELECT branch_id FROM app_scope WHERE id = 1))
+    ''');
   }
 
   /// 0.17.0, precios al por mayor (Pro): escalones en JSON
@@ -1111,6 +1158,7 @@ class AppDatabase {
     await productLotsV29(db);
     await businessTimeZoneV30(db);
     await priceTiersV32(db);
+    await branchesV33(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

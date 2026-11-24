@@ -99,6 +99,9 @@ const kAppFunctions = <AppFunction>[
       keywords: ['rol', 'roles', 'permiso', 'permisos', 'acceso', 'vendedor', 'bodega'], perm: Perm.team),
   AppFunction(id: 'modules', title: 'Módulos', where: 'Ajustes › Módulos', tab: 3, icon: Icons.widgets_outlined,
       keywords: ['modulo', 'activar', 'encender', 'funciones']),
+  // Sedes (0.18.0)
+  AppFunction(id: 'branches', title: 'Sedes', where: 'Ajustes › Módulos › Sedes', tab: 3, icon: Icons.place_outlined,
+      keywords: ['sede', 'sedes', 'local', 'sucursal', 'locales', 'punto'], perm: Perm.modules),
   AppFunction(id: 'pro', title: 'Stockealo Pro', where: 'Ajustes › Stockealo Pro', tab: 3, icon: Icons.workspace_premium_outlined,
       keywords: ['pro', 'plan', 'codigo', 'canjear', 'suscripcion', 'cupon pro']),
   AppFunction(id: 'appearance', title: 'Apariencia', where: 'Ajustes › Apariencia', tab: 3, icon: Icons.palette_outlined,

@@ -25,8 +25,8 @@ abstract final class DailyClose {
     final db = await AppDatabase.instance.database;
     final prefix = DateFormat('yyyy-MM-dd').format(d);
     final rows = await db.rawQuery(
-      'SELECT payment_method AS m, SUM(total) AS t FROM sales '
-      'WHERE business_id = ? AND date LIKE ? AND voided_at IS NULL GROUP BY payment_method ORDER BY t DESC',
+      'SELECT payment_method AS m, SUM(total) AS t FROM sales_here '
+      'WHERE business_id = ? AND date LIKE ? GROUP BY payment_method ORDER BY t DESC',
       [business.id, '$prefix%'],
     );
 

@@ -44,11 +44,14 @@ class PersonalDataExport {
     'sales_goals': 'Metas de ventas',
     'product_lots': 'Lotes',
     'lot_exchanges': 'Cambios con proveedores',
+    // Sedes (0.18.0)
+    'branches': 'Sedes',
+    'branch_stock': 'Stock por sede',
     'activity_log': 'Actividad',
   };
 
   /// Lo que nunca sale en el archivo
-  static const _skipTables = {'pending_sync', 'app_settings', 'sqlite_sequence', 'android_metadata'};
+  static const _skipTables = {'pending_sync', 'app_settings', 'sqlite_sequence', 'android_metadata', 'app_scope'};
   static const _skipColumns = {'password', 'password_hash', 'token', 'access_token', 'refresh_token', 'pin', 'secret'};
 
   /// Arma el libro (sin compartirlo; también para las pruebas)

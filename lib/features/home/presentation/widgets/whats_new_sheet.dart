@@ -21,6 +21,16 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.18.0',
+      title: 'Sedes: varios locales en un negocio',
+      items: [
+        'Abre sedes en Módulos: cada una con su stock, sus ventas y su caja.',
+        'Cambia de sede desde el botón de tu negocio en el menú.',
+        'Mira los reportes de una sede o de todas juntas.',
+        'Asigna a cada persona de tu equipo la sede donde trabaja.',
+      ],
+    ),
+    (
       version: '0.17.1',
       title: 'Planes más claros',
       items: [

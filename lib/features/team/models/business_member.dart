@@ -13,6 +13,9 @@ class BusinessMember {
 
   /// Horario de acceso (0.15.0, Pro Servicios): JSON de WorkSchedule; null = sin horario
   final String? accessSchedule;
+
+  /// Sede donde trabaja (0.18.0); null = Principal
+  final String? branchId;
   final String status; // 'ACTIVE' | 'PENDING'
   final DateTime createdAt;
 
@@ -25,6 +28,7 @@ class BusinessMember {
     required this.role,
     this.roleId,
     this.accessSchedule,
+    this.branchId,
     this.status = 'ACTIVE',
     required this.createdAt,
   });
@@ -103,6 +107,7 @@ class BusinessMember {
       role: map['role'] as String,
       roleId: map['role_id'] as String?,
       accessSchedule: map['access_schedule'] as String?,
+      branchId: map['branch_id'] as String?,
       status: map['status'] as String? ?? 'ACTIVE',
       createdAt: DateTime.parse(map['created_at'] as String),
     );

@@ -27,6 +27,9 @@ class ProductLot {
   /// 'ENTRADA', 'AJUSTE', 'CAMBIO' o 'SIN_FECHA' (a las unidades que no tenían fecha)
   final String source;
   final String? purchaseId;
+
+  /// Sede del lote (0.18.0); null = Principal
+  final String? branchId;
   final String status;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -42,6 +45,7 @@ class ProductLot {
     this.cost = 0,
     this.source = 'ENTRADA',
     this.purchaseId,
+    this.branchId,
     this.status = active,
     required this.createdAt,
     required this.updatedAt,
@@ -72,6 +76,7 @@ class ProductLot {
         cost: cost,
         source: source,
         purchaseId: purchaseId,
+        branchId: branchId,
         status: status ?? this.status,
         createdAt: createdAt,
         updatedAt: updatedAt ?? DateTime.now(),
@@ -88,6 +93,7 @@ class ProductLot {
         'cost': cost,
         'source': source,
         'purchase_id': purchaseId,
+        'branch_id': branchId,
         'status': status,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
@@ -106,6 +112,7 @@ class ProductLot {
       cost: (m['cost'] as num?)?.toDouble() ?? 0,
       source: m['source'] as String? ?? 'ENTRADA',
       purchaseId: m['purchase_id'] as String?,
+      branchId: m['branch_id'] as String?,
       status: m['status'] as String? ?? active,
       createdAt: DateTime.tryParse('${m['created_at']}') ?? DateTime.now(),
       updatedAt: DateTime.tryParse('${m['updated_at']}') ?? DateTime.now(),

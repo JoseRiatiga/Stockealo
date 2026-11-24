@@ -150,7 +150,7 @@ class HomeRepository {
 
     // Hoy y el mismo día de la semana pasada
     final todayRow = (await db.rawQuery(
-      'SELECT COALESCE(SUM(total), 0) AS t, COUNT(DISTINCT $_saleKey) AS n FROM sales_ok WHERE business_id = ? AND date >= ? AND date < ?',
+      'SELECT COALESCE(SUM(total), 0) AS t, COUNT(DISTINCT $_saleKey) AS n FROM sales_here WHERE business_id = ? AND date >= ? AND date < ?',
       [businessId, today.toIso8601String(), tomorrow.toIso8601String()],
     ))
         .first;
@@ -159,7 +159,7 @@ class HomeRepository {
 
     // Hoy por hora (8 a. m. a 7 p. m.)
     final hours = await db.rawQuery(
-      "SELECT CAST(substr(date, 12, 2) AS INTEGER) AS h, SUM(total) AS t FROM sales_ok WHERE business_id = ? AND date >= ? AND date < ? GROUP BY h",
+      "SELECT CAST(substr(date, 12, 2) AS INTEGER) AS h, SUM(total) AS t FROM sales_here WHERE business_id = ? AND date >= ? AND date < ? GROUP BY h",
       [businessId, today.toIso8601String(), tomorrow.toIso8601String()],
     );
     final byHour = List<double>.filled(12, 0);
@@ -212,7 +212,7 @@ class HomeRepository {
     final weekAgo = today.subtract(const Duration(days: 6));
     final stockRows = await db.rawQuery('''
       SELECT p.id, p.name, p.stock, p.min_stock, p.supplier_id,
-        (SELECT COALESCE(SUM(s.quantity), 0) FROM sales_ok s WHERE s.product_id = p.id AND s.date >= ?) AS sold_week,
+        (SELECT COALESCE(SUM(s.quantity), 0) FROM sales_here s WHERE s.product_id = p.id AND s.date >= ?) AS sold_week,
         (SELECT MAX(m.date) FROM stock_movements m WHERE m.product_id = p.id AND m.type LIKE 'ENTRADA%') AS last_entry
       FROM products p
       WHERE p.business_id = ? AND p.is_active = 1 AND p.stock <= p.min_stock
@@ -267,7 +267,7 @@ class HomeRepository {
     final top = await db.rawQuery(
       // Con el nombre de hoy: un producto renombrado no sale dos veces (0.16.8, D1)
       'SELECT COALESCE(MAX(p.name), MAX(s.product_name)) AS name, SUM(s.quantity) AS u '
-      'FROM sales_ok s LEFT JOIN products p ON p.id = s.product_id '
+      'FROM sales_here s LEFT JOIN products p ON p.id = s.product_id '
       'WHERE s.business_id = ? AND s.date >= ? '
       "GROUP BY CASE WHEN s.product_id IS NULL OR s.product_id = '' THEN 'n:' || s.product_name ELSE s.product_id END "
       'ORDER BY u DESC LIMIT 5',
@@ -305,7 +305,7 @@ class HomeRepository {
     };
     final keyLen = byMonth ? 7 : 10;
     final rows = await db.rawQuery(
-      'SELECT substr(date, 1, $keyLen) AS k, SUM(total) AS t, COUNT(DISTINCT $_saleKey) AS n FROM sales_ok WHERE business_id = ? AND date >= ? GROUP BY k',
+      'SELECT substr(date, 1, $keyLen) AS k, SUM(total) AS t, COUNT(DISTINCT $_saleKey) AS n FROM sales_here WHERE business_id = ? AND date >= ? GROUP BY k',
       [businessId, starts.first.toIso8601String()],
     );
     final map = {for (final r in rows) '${r['k']}': r};
@@ -325,7 +325,7 @@ class HomeRepository {
 
   static Future<double> _sum(Database db, String column, String businessId, DateTime from, DateTime to) async {
     final r = await db.rawQuery(
-      'SELECT COALESCE(SUM($column), 0) AS v FROM sales_ok WHERE business_id = ? AND date >= ? AND date < ?',
+      'SELECT COALESCE(SUM($column), 0) AS v FROM sales_here WHERE business_id = ? AND date >= ? AND date < ?',
       [businessId, from.toIso8601String(), to.toIso8601String()],
     );
     return (r.first['v'] as num?)?.toDouble() ?? 0;

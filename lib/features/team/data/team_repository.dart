@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../business/data/branch_repository.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../business/data/business_repository.dart';
 import '../../business/models/business.dart';
@@ -176,6 +177,19 @@ class TeamRepository {
   }
 
   /// Horario de acceso de una persona (0.15.0); null = sin horario
+  /// Sede donde trabaja la persona (0.18.0; null = Principal)
+  Future<void> setMemberBranch(BusinessMember member, String? branchId) async {
+    final db = await _dbProvider.database;
+    await db.update('business_members', {'branch_id': branchId}, where: 'id = ?', whereArgs: [member.id]);
+    SupabaseService.instance.setMemberBranchInCloud(member.id, branchId);
+    ActivityRepository.instance.log(
+      businessId: member.businessId,
+      action: ActivityAction.roleChange,
+      summary: 'Pasó a ${member.displayName} a la sede ${BranchRepository.instance.nameOf(branchId)}',
+      data: {'member_id': member.id, 'branch_id': branchId},
+    );
+  }
+
   Future<void> setAccessSchedule(BusinessMember member, WorkSchedule? schedule) async {
     final db = await _dbProvider.database;
     final value = schedule == null || schedule.isEmpty ? null : schedule.encode();

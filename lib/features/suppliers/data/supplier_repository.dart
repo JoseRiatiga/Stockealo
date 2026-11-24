@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+import '../../business/data/branch_repository.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/services/data_events.dart';
@@ -277,11 +278,18 @@ class SupplierRepository {
       byProduct[item.productId] = (byProduct[item.productId] ?? 0) + item.quantity;
     }
     final costChanged = <String, Map<String, Object?>>{};
+    // Sede de la entrada (0.18.0): en una sede extra la mercancía entra a esa sede;
+    // el costo y el proveedor son del catálogo (compartidos)
+    final branch = BranchRepository.active;
 
     await db.transaction((txn) async {
-      await txn.insert('purchases', purchase.toMap());
+      await txn.insert('purchases', {...purchase.toMap(), 'branch_id': branch});
       for (final item in purchase.items) {
-        if (item.quantity <= 0 || item.variantId == null) continue;
+        if (branch != null && item.quantity > 0) {
+          await BranchRepository.addStock(txn,
+              businessId: purchase.businessId, branchId: branch, productId: item.productId, variantId: item.variantId, delta: item.quantity);
+        }
+        if (branch != null || item.quantity <= 0 || item.variantId == null) continue;
         await txn.rawUpdate(
           'UPDATE product_variants SET stock = stock + ?, updated_at = ? WHERE id = ? AND product_id = ?',
           [item.quantity, now, item.variantId, item.productId],
@@ -290,13 +298,13 @@ class SupplierRepository {
       for (final entry in byProduct.entries) {
         final rows = await txn.query('products', columns: ['stock', 'supplier_id'], where: 'id = ?', whereArgs: [entry.key]);
         if (rows.isEmpty) continue;
-        final newStock = (rows.first['stock'] as num).toInt() + entry.value;
+        final newStock = (rows.first['stock'] as num).toInt() + (branch == null ? entry.value : 0);
         // El proveedor de la entrada queda como principal si el producto no tenía
         final takesSupplier = purchase.supplierId != null && rows.first['supplier_id'] == null;
         await txn.update(
           'products',
           {
-            'stock': newStock,
+            if (branch == null) 'stock': newStock,
             'updated_at': now,
             if (newCosts.containsKey(entry.key)) 'purchase_price': newCosts[entry.key],
             if (takesSupplier) 'supplier_id': purchase.supplierId,
@@ -321,6 +329,7 @@ class SupplierRepository {
             if ((purchase.invoiceNumber ?? '').isNotEmpty) 'factura ${purchase.invoiceNumber}',
           ].join(' · '),
           'date': purchase.date.toIso8601String(),
+          'branch_id': branch,
         });
       }
     });
@@ -328,14 +337,16 @@ class SupplierRepository {
     // Nube: la entrada, las existencias por diferencia (no pisan ventas de otros
     // equipos) y los productos con costo o proveedor nuevo
     final cloud = SupabaseService.instance;
-    cloud.upsertPurchaseToCloud(purchase.toMap());
+    cloud.upsertPurchaseToCloud({...purchase.toMap(), 'branch_id': branch});
     for (final item in purchase.items) {
-      if (item.quantity > 0 && item.variantId != null) {
+      if (branch != null && item.quantity > 0) {
+        cloud.adjustBranchStockInCloud(branch, item.productId, item.variantId, item.quantity);
+      } else if (item.quantity > 0 && item.variantId != null) {
         cloud.adjustVariantStockInCloud(item.variantId!, item.quantity);
       }
     }
     for (final entry in byProduct.entries) {
-      cloud.adjustProductStockInCloud(entry.key, entry.value);
+      if (branch == null) cloud.adjustProductStockInCloud(entry.key, entry.value);
       final row = costChanged[entry.key];
       if (row != null) cloud.upsertProductToCloud(row);
     }

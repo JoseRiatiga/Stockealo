@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../business/data/branch_repository.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../team/data/activity_repository.dart';
 import '../models/product_lot.dart';
@@ -26,13 +27,21 @@ class LotsRepository {
 
   static const soonDays = 30;
 
+  /// Filtro de la sede (0.18.0): null = Principal
+  static String _branchWhere(String? branchId) => branchId == null ? 'branch_id IS NULL' : 'branch_id = ?';
+  static List<Object?> _branchArgs(String? branchId) => [if (branchId != null) branchId];
+
   Future<List<ProductLot>> lotsFor(String productId) async {
-    final rows = await (await _db).query('product_lots', where: 'product_id = ?', whereArgs: [productId], orderBy: 'expires_on');
+    final branch = BranchRepository.active;
+    final rows = await (await _db).query('product_lots',
+        where: 'product_id = ? AND ${_branchWhere(branch)}', whereArgs: [productId, ..._branchArgs(branch)], orderBy: 'expires_on');
     return [for (final r in rows) ProductLot.fromMap(r)];
   }
 
   Future<List<ProductLot>> lotsOfBusiness(String businessId) async {
-    final rows = await (await _db).query('product_lots', where: 'business_id = ?', whereArgs: [businessId], orderBy: 'expires_on');
+    final branch = BranchRepository.active;
+    final rows = await (await _db).query('product_lots',
+        where: 'business_id = ? AND ${_branchWhere(branch)}', whereArgs: [businessId, ..._branchArgs(branch)], orderBy: 'expires_on');
     return [for (final r in rows) ProductLot.fromMap(r)];
   }
 
@@ -49,13 +58,20 @@ class LotsRepository {
   /// Unidades del producto que no tienen lote («sin fecha»)
   Future<int> undated(String productId) async {
     final db = await _db;
-    final p = await db.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [productId], limit: 1);
-    if (p.isEmpty) return 0;
+    final branch = BranchRepository.active;
+    final int stock;
+    if (branch == null) {
+      final p = await db.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [productId], limit: 1);
+      if (p.isEmpty) return 0;
+      stock = (p.first['stock'] as num).toInt();
+    } else {
+      stock = (await BranchRepository.stockIn(branch))[productId]?.stock ?? 0;
+    }
     final lots = await db.rawQuery(
-      "SELECT COALESCE(SUM(quantity), 0) AS q FROM product_lots WHERE product_id = ? AND status = 'ACTIVE'",
-      [productId],
+      "SELECT COALESCE(SUM(quantity), 0) AS q FROM product_lots WHERE product_id = ? AND status = 'ACTIVE' AND ${_branchWhere(branch)}",
+      [productId, ..._branchArgs(branch)],
     );
-    final left = (p.first['stock'] as num).toInt() - ((lots.first['q'] as num?)?.toInt() ?? 0);
+    final left = stock - ((lots.first['q'] as num?)?.toInt() ?? 0);
     return left < 0 ? 0 : left;
   }
 
@@ -88,9 +104,11 @@ class LotsRepository {
     String source = 'ENTRADA',
     String? purchaseId,
     DateTime? now,
+    String? branchId,
   }) async {
     final at = now ?? appNow();
     final lot = ProductLot(
+      branchId: branchId ?? BranchRepository.active,
       id: const Uuid().v4(),
       businessId: businessId,
       productId: productId,
@@ -113,6 +131,20 @@ class LotsRepository {
   /// Cuadra los lotes con el stock y saca del stock vendible lo que ya venció.
   /// Se llama al abrir Inicio, Stock y la ficha del producto.
   Future<void> reconcile(String businessId, {DateTime? now}) async {
+    final db = await _db;
+    // La Principal y cada sede extra con lotes (0.18.0)
+    final branches = [
+      null,
+      for (final r in await db.rawQuery(
+          'SELECT DISTINCT branch_id FROM product_lots WHERE business_id = ? AND branch_id IS NOT NULL', [businessId]))
+        r['branch_id'] as String,
+    ];
+    for (final branch in branches) {
+      await _reconcileIn(businessId, branch, now: now);
+    }
+  }
+
+  Future<void> _reconcileIn(String businessId, String? branch, {DateTime? now}) async {
     final at = now ?? appNow();
     final db = await _db;
     final products = await db.query(
@@ -121,13 +153,16 @@ class LotsRepository {
       where: 'business_id = ? AND tracks_expiry = 1 AND COALESCE(has_variants, 0) = 0 AND COALESCE(is_active, 1) = 1',
       whereArgs: [businessId],
     );
+    final branchStock = branch == null ? null : await BranchRepository.stockIn(branch);
     var changed = false;
     for (final p in products) {
       final productId = p['id'] as String;
-      var stock = (p['stock'] as num).toInt();
+      var stock = branch == null ? (p['stock'] as num).toInt() : (branchStock![productId]?.stock ?? 0);
       final lots = [
         for (final r in await db.query('product_lots',
-            where: "product_id = ? AND status = 'ACTIVE' AND quantity > 0", whereArgs: [productId], orderBy: 'expires_on, created_at'))
+            where: "product_id = ? AND status = 'ACTIVE' AND quantity > 0 AND ${_branchWhere(branch)}",
+            whereArgs: [productId, ..._branchArgs(branch)],
+            orderBy: 'expires_on, created_at'))
           ProductLot.fromMap(r),
       ];
       // 1. Lo que se vendió o se dio de baja sale del lote que vence antes
@@ -145,8 +180,12 @@ class LotsRepository {
       for (final lot in lots.where((l) => l.status == ProductLot.active && l.quantity > 0 && l.isExpiredOn(at))) {
         stock -= lot.quantity;
         await db.transaction((txn) async {
+          if (branch != null) {
+            await BranchRepository.addStock(txn, businessId: businessId, branchId: branch, productId: productId, delta: -lot.quantity);
+          } else {
           await txn.rawUpdate('UPDATE products SET stock = MAX(0, stock - ?), updated_at = ? WHERE id = ?',
               [lot.quantity, at.toIso8601String(), productId]);
+          }
           await txn.insert('stock_movements', {
             'id': const Uuid().v4(),
             'business_id': businessId,
@@ -156,11 +195,16 @@ class LotsRepository {
             'resulting_stock': stock < 0 ? 0 : stock,
             'reason': 'Lote ${lot.code ?? ''} vencido el ${ProductLot.dayText(lot.expiresOn)}'.replaceAll('  ', ' '),
             'date': at.toIso8601String(),
+            'branch_id': branch,
           });
           await _save(txn, lot.copyWith(status: ProductLot.expired, updatedAt: at));
         });
         _upload(lots: [lot.copyWith(status: ProductLot.expired, updatedAt: at)]);
-        SupabaseService.instance.adjustProductStockInCloud(productId, -lot.quantity);
+        if (branch != null) {
+          SupabaseService.instance.adjustBranchStockInCloud(branch, productId, null, -lot.quantity);
+        } else {
+          SupabaseService.instance.adjustProductStockInCloud(productId, -lot.quantity);
+        }
         changed = true;
       }
     }
@@ -222,7 +266,10 @@ class LotsRepository {
     final qty = quantity ?? exchange.quantity;
     final at = appNow();
     final db = await _db;
+    // La sede del lote que se devolvió (0.18.0)
+    final branch = (await _freshLot(exchange.lotId))?.branchId;
     final lot = ProductLot(
+      branchId: branch,
       id: const Uuid().v4(),
       businessId: exchange.businessId,
       productId: exchange.productId,
@@ -235,7 +282,11 @@ class LotsRepository {
       updatedAt: at,
     );
     await db.transaction((txn) async {
+      if (branch != null) {
+        await BranchRepository.addStock(txn, businessId: exchange.businessId, branchId: branch, productId: exchange.productId, delta: qty);
+      } else {
       await txn.rawUpdate('UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?', [qty, at.toIso8601String(), exchange.productId]);
+      }
       final p = await txn.query('products', columns: ['stock'], where: 'id = ?', whereArgs: [exchange.productId], limit: 1);
       await txn.insert('stock_movements', {
         'id': const Uuid().v4(),
@@ -251,7 +302,11 @@ class LotsRepository {
       await _saveExchange(txn, exchange.copyWith(status: LotExchange.received, newLotId: lot.id, closedAt: at));
     });
     _upload(lots: [lot], exchanges: [exchange.copyWith(status: LotExchange.received, newLotId: lot.id, closedAt: at)]);
-    SupabaseService.instance.adjustProductStockInCloud(exchange.productId, qty);
+    if (branch != null) {
+      SupabaseService.instance.adjustBranchStockInCloud(branch, exchange.productId, null, qty);
+    } else {
+      SupabaseService.instance.adjustProductStockInCloud(exchange.productId, qty);
+    }
     ActivityRepository.instance.log(
       businessId: exchange.businessId,
       action: ActivityAction.stockAdjust,

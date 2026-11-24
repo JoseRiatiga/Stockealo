@@ -1,6 +1,7 @@
 import '../../sales/models/payment_method.dart';
 import '../../cash/models/cash_session.dart';
 import '../../../core/database/app_database.dart';
+import '../../business/data/branch_repository.dart';
 import '../../sales/data/sales_repository.dart';
 import '../../../core/utils/business_clock.dart';
 
@@ -157,18 +158,18 @@ class ProfitReportRepository {
              COALESCE(SUM(discount_amount), 0) AS discounts,
              -- Las devoluciones restan ganancia, pero no son ventas por debajo del costo (0.16.4)
              COALESCE(SUM(CASE WHEN net_profit < 0 AND return_of IS NULL THEN -net_profit ELSE 0 END), 0) AS below_cost
-      FROM sales_ok WHERE $inRange
+      FROM sales_here WHERE $inRange
     ''', args)).first;
 
     final previous = (await db.rawQuery('''
       SELECT COALESCE(SUM(total), 0) - COALESCE(SUM(total_cost), 0) AS gross
-      FROM sales_ok WHERE $inRange
+      FROM sales_here WHERE $inRange
     ''', [businessId, _iso(prevFrom), _iso(prevTo)])).first;
 
     // El pago mixto se reparte entre sus medios, igual que en Caja y Ventas (0.16.4)
     final methodRows = await db.rawQuery('''
       SELECT payment_method AS method, total, payment_split, payment_status
-      FROM sales_ok WHERE $inRange
+      FROM sales_here WHERE $inRange
     ''', args);
     final byMethod = <String, double>{};
     // Fiado sin pagar: también la parte fiada de un pago mixto (0.16.8)
@@ -204,8 +205,8 @@ class ProfitReportRepository {
           SELECT 1 FROM cash_movements v
           WHERE v.business_id = m.business_id AND v.reason = '${CashMovement.voidReason}'
             AND v.note = '${CashMovement.voidNotePrefix}' || m.id
-        )
-    ''', args)).first;
+        )${BranchRepository.scope('m.branch_id')}
+    ''', [...args, ...BranchRepository.scopeArgs()])).first;
 
     final collected = (await db.rawQuery('''
       SELECT COALESCE(SUM(amount), 0) AS amount
@@ -218,7 +219,7 @@ class ProfitReportRepository {
              SUM(s.quantity) AS qty,
              SUM(s.total) AS revenue,
              SUM(s.net_profit) AS profit
-      FROM sales_ok s LEFT JOIN products p ON p.id = s.product_id
+      FROM sales_here s LEFT JOIN products p ON p.id = s.product_id
       WHERE s.business_id = ? AND s.date >= ? AND s.date < ?
       GROUP BY CASE WHEN s.product_id IS NULL OR s.product_id = '' THEN 'n:' || s.product_name ELSE s.product_id END
     ''', args);

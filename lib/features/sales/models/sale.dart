@@ -51,6 +51,9 @@ class Sale {
   /// Devolución (0.15.0): la venta de la que se devolvió; la cantidad y el total van en
   /// negativo, con el mismo medio de pago, así la caja y los reportes se ajustan solos
   final String? returnOf;
+
+  /// Sede de la venta (0.18.0); null = Principal
+  final String? branchId;
   bool get isReturn => returnOf != null;
 
   static const toDeliver = 'PENDIENTE';
@@ -101,6 +104,7 @@ class Sale {
     this.deliveryNote,
     this.deliveredAt,
     this.returnOf,
+    this.branchId,
     this.currentName,
   });
 
@@ -138,6 +142,7 @@ class Sale {
       'delivery_note': deliveryNote,
       'delivered_at': deliveredAt?.toIso8601String(),
       'return_of': returnOf,
+      'branch_id': branchId,
     };
   }
 
@@ -175,6 +180,7 @@ class Sale {
       deliveryNote: map['delivery_note'] as String?,
       deliveredAt: DateTime.tryParse('${map['delivered_at'] ?? ''}'),
       returnOf: map['return_of'] as String?,
+      branchId: map['branch_id'] as String?,
     );
   }
 }

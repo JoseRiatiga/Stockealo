@@ -328,7 +328,7 @@ class PhoneAlertsService {
       if (!await cashReminderEnabled()) return;
       final business = _business;
       if (business == null || !business.cashRegisterEnabled) return;
-      final open = await CashRegisterRepository.instance.getOpenSession(business.id);
+      final open = await CashRegisterRepository.instance.getOpenSession(business.id, anyBranch: true);
       if (open == null) return;
       final at = now ?? DateTime.now();
       final hour = await cashHour();

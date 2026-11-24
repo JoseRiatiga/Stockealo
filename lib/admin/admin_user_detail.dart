@@ -107,6 +107,33 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
     }
   }
 
+  /// Sedes (0.18.0): cupos de sedes extra para un negocio, por un mes o hasta un año
+  Future<void> _giveSlotsTo(AdminUserBusiness b) async {
+    final choice = await showDialog<(int, int)>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text('Cupos de sede para ${b.name}'),
+        children: [
+          for (final (slots, days, label) in const [
+            (1, 30, '1 sede · 1 mes'),
+            (2, 30, '2 sedes · 1 mes'),
+            (1, 365, '1 sede · 1 año'),
+            (3, 30, '3 sedes · 1 mes'),
+          ])
+            SimpleDialogOption(onPressed: () => Navigator.pop(ctx, (slots, days)), child: Text(label)),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    try {
+      final allowed = await ProAdminService.instance.grantBranchSlots(b.id, choice.$1, choice.$2);
+      if (!mounted) return;
+      AppToast.show(context, message: '${b.name} puede tener $allowed sedes extra', type: ToastType.success);
+    } catch (e) {
+      if (mounted) AppToast.show(context, message: 'No se pudo: $e', type: ToastType.error);
+    }
+  }
+
   Future<void> _giveProTo(AdminUserBusiness b) async {
     final days = await showDialog<int?>(
       context: context,
@@ -292,6 +319,7 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
                   ),
                   if (b.role == 'OWNER' && ProAdminService.instance.isOwner)
                     TextButton(onPressed: () => _giveProTo(b), child: const Text('Dar Pro')),
+                    TextButton(onPressed: () => _giveSlotsTo(b), child: const Text('Cupos de sede')),
                 ],
               ),
             ),

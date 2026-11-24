@@ -1,6 +1,6 @@
 # Plan: sedes (un negocio con varios locales)
 
-> **Estado (23 nov): EN PRIORIDAD.** Las preguntas de la sección 9 están resueltas. Falta el boceto y la aprobación final; no se toca código hasta entonces.
+> **Estado (23 nov): EN PRIORIDAD. Etapa 1 APROBADA, con el ajuste «la Principal se queda donde está».** Las preguntas de la sección 9 están resueltas. Falta el boceto y la aprobación final; no se toca código hasta entonces.
 > Pedido del dueño el 10 nov 2026, después de publicar la 0.12.0. El mismo día eligió la **opción A** (sedes dentro del mismo negocio) y respondió dos rondas de preguntas (secciones 2 y 6). Antes de decidir cómo se entrega, quiere seguir afinando el plan.
 
 ## 1. El problema
@@ -171,6 +171,54 @@ Esto también resuelve **qué plan da sedes**: la sugerencia muestra qué planes
 
 **Columna `branch_id`** en: ventas, cotizaciones, movimientos, entradas de mercancía, cajas y sus movimientos, fiados y abonos, trabajos y asistencia de Servicios, comisiones, miembros del equipo y pedidos de la tienda (sede de recogida).
 
+**Cambio de diseño (23 nov, antes de programar): la Principal se queda donde está**
+- Lo que había antes era que el stock de todas las sedes iba a `branch_stock` y `products.stock` era la suma. Eso es frágil: un celular con la app vieja escribe el stock completo (no por sede) y descuadra la suma. Además obliga a cambiar los ~51 lugares que tocan el stock en todos los negocios.
+- **Nuevo:** las columnas de hoy (`products.current_stock`, `product_variants.stock`, ventas, cajas…) siguen siendo **de la sede Principal**. `branch_stock` guarda **solo las sedes extra**. En ventas, cajas y movimientos, `branch_id` vacío quiere decir **Principal**.
+- **Así:**
+  - un negocio con una sola sede funciona exactamente igual que hoy;
+  - no hay que mover datos;
+  - una app vieja que escriba sin sede escribe en la Principal, que es lo correcto.
+- **Regla:** antes de crear la segunda sede, la pantalla Sedes pide que todos los celulares del equipo actualicen la app. Una app vieja solo ve y vende en la Principal.
+
+**Decisiones de la Etapa 1 (propuestas)**
+- **Lotes y vencimientos (respuesta del dueño, 23 nov):** **en todas las sedes desde la Etapa 1.** Cada sede puede tener productos distintos que vencen; los lotes son de la sede donde entraron.
+- **Contar inventario, pedido sugerido y avisos de stock bajo:** de la sede elegida (aprobado).
+- **Importar Excel:** carga a la sede elegida (aprobado).
+- **Tienda en línea (respuesta del dueño, 23 nov):** una sola tienda con todas las sedes. Quien compra **elige qué sede ver** (por cercanía o comodidad) y ve el stock de esa sede. Por confirmar si entra en la Etapa 1 o en la 3.
+- **Pro sin conexión:** se guarda el último estado de Pro en el celular, para que una sede no se bloquee al abrir la app sin internet.
+- **Si vence el plan:** las sedes extra quedan inactivas desde la Etapa 1. El límite (Principal + 2 + extra) lo hace cumplir la nube, no solo la app.
+- **Caja:** una caja abierta por sede, no por negocio.
+- **Cajero:** la nube revisa que venda y abra caja solo en su sede. En la Etapa 1, **ver** lo de otras sedes se filtra en la app; la nube lo cierra del todo en la Etapa 2.
+- **Copias y datos:** las tablas nuevas entran en la copia diaria, en «Descargar todos mis datos» y en el borrado de cuenta.
+
+**Orden de trabajo de la Etapa 1:**
+1. ~~Ordenar todo el código del stock en un solo lugar~~ **Cambio (23 nov):** lo de la Principal se deja **intacto** y solo se agrega el camino de las sedes extra (con una prueba que vigila que no se escape ninguna escritura a la Principal).
+2. Tablas nuevas en la nube y en el celular, sin tocar lo de hoy.
+3. Pantalla Sedes en Módulos y selector.
+4. Stock, ventas y caja por sede.
+5. Reportes por sede y «Todas las sedes».
+
+**Avance (23 nov, rama feat/0.18.0, sin commit):**
+- Migración `20261210000000_branches.sql` **ensayada OK y SIN APLICAR**:
+  - tablas `branches`, `branch_stock` y `branch_slots`;
+  - columna `branch_id` en ventas, cajas, entradas, lotes y equipo;
+  - límite de cupos en la nube y regla de que el cajero solo venda en su sede;
+  - cierre de sede en un solo paso.
+- **La app vieja no ve nada de las sedes extra:** solo las ve una app que manda la cabecera `x-stockealo-branches` (0.18.0).
+- Pro guardado en el celular para cuando se abre sin internet. Base local versión 33.
+
+**0.18.0 hecha en código (24 nov, rama feat/0.18.0, sin commit), versión 0.18.0+60:**
+- **Celular:** sedes (`BranchRepository`); stock, lotes, ventas, devoluciones, anulaciones, entradas, ajustes, conteo, importar y caja por sede; vista `sales_here` para Inicio, reportes, cierre del día y Stocky (el Excel de Reportes trae todas las sedes).
+- **Pantallas:** selector en el botón del negocio (sedes, «Todas las sedes» para ver, «Otro negocio…»); Módulos › Sedes (abrir con cupo, editar, cerrar eligiendo a dónde pasa la mercancía, reabrir, renombrar la Principal); sede de cada persona en Equipo; «Cupos de sede» en el panel; «Sedes» en el buscador.
+- **Pruebas:** 697 pasan, con una prueba de sedes (venta, devolución, anulación, entrada y ajuste en una sede extra sin tocar la Principal) y un candado que cuenta dónde se escribe el stock de la Principal.
+- **Codex: 2 hallazgos corregidos:**
+  - las funciones de stock por sede ahora revisan que la sede esté en uso y sea la de la persona;
+  - los movimientos de caja revisan la sede de la persona y la de su caja.
+- Migración ensayada completa (cerrar una sede pasó 4 unidades a la Principal) y **SIN APLICAR**.
+- **Falta:**
+  - en Stock, la línea pequeña «Norte 14 · Sur 6» del boceto;
+  - probar con el negocio LAVADERO en la web publicada.
+
 **Migración y seguridad**
 - **Sin pérdida de datos:** todo lo que existe queda en la sede «Principal».
 - **El stock es lo más delicado:** hoy es una sola cifra por producto. `products.stock` se mantiene como la suma de todas las sedes, para que la app vieja siga funcionando mientras la gente actualiza.
@@ -236,4 +284,50 @@ El dueño puso Sedes **en prioridad** el 23 nov y aceptó las recomendaciones:
       - tienda con stock por sede y recogida en la sede, horario por sede;
       - compra de sedes extra.
 
-**Falta:** el boceto de cómo se ve y cómo se cambia de sede, y la aprobación final antes de programar la Etapa 1.
+**Respuestas del 23 nov (noche):**
+- **Tienda por sede en la Etapa 1, solo el stock:**
+  - quien compra elige la sede y ve lo que hay ahí, con su dirección, su horario y «Cómo llegar»;
+  - la tienda recuerda la sede elegida;
+  - los precios por sede llegan en la Etapa 3.
+- **Pro también puede tener sedes:**
+  - con Pro ($24.900) cada sede extra se paga aparte ($29.900, o $24.900 cada una desde 3), sin sedes incluidas;
+  - Pro Servicios sigue trayendo la Principal + 2.
+- **Solo el dueño** crea, cierra y reabre sedes. Los administradores las manejan, pero no las crean.
+- **Cupos de sede:**
+  - se paga un cupo, no una sede;
+  - al cerrar una sede el cupo queda libre y pagado hasta que termine el mes, y ahí se puede abrir otra sede o reabrir la misma;
+  - si no se renueva, el cupo desaparece.
+- **Cerrar, nunca borrar:** la sede cerrada conserva su historial (se ve y se descarga) y se puede reabrir con todo. La Principal no se cierra; solo se renombra.
+- **Al cerrar una sede, la app pide:**
+  - cerrar su caja;
+  - pasar las personas a otra sede;
+  - pasar la mercancía: **el dueño elige si va a la Principal o a otra sede**.
+
+  Los fiados pendientes se cobran desde la Principal.
+
+**Precio de cada sede extra (corregido y aprobado el 23 nov):** una sede debe costar bastante menos que el plan; si no, conviene abrir otro negocio.
+
+| Plan | Sede extra al mes | Al año | Desde 3 extra (cada una, al mes) |
+|---|---|---|---|
+| Pro ($24.900, solo Principal) | $14.900 | $149.000 | $12.900 |
+| Pro Servicios ($79.900, Principal + 2) | $24.900 | $249.000 | $21.900 |
+
+(Reemplaza a los $29.900/$24.900 de antes.)
+
+**Cobro de los cupos (aprobado el 23 nov):**
+- **Un solo pago:** en la pantalla Pro, «Sedes extra – 1 +» bajo cada plan. Ejemplo: Pro + 1 sede = $39.800 al mes. La nube calcula el precio.
+- **Todo vence el mismo día:** los cupos vencen con el plan (mensual o anual) y se renuevan juntos.
+- **Agregar a mitad de periodo:** se pagan solo los días que faltan (precio × días que faltan / días del periodo, redondeado a $100). Si faltan **menos de 7 días**, se suma el periodo siguiente.
+- **Cupo anual** = 10 meses.
+
+**Entregas:**
+- **0.18.0:**
+  - sedes en Módulos: crear, cerrar, reabrir y cupos;
+  - selector;
+  - stock, lotes, ventas, caja y equipo por sede;
+  - reportes por sede y «Todas las sedes»;
+  - los cupos se dan desde el panel;
+  - se prueba con el negocio de prueba LAVADERO.
+- **0.18.1:** tienda con selector de sede, y compra de plan + sedes en un solo pago con Wompi.
+- **0.18.2:** traslados con confirmación, encargado de turno y sugerencia de traslado.
+- **0.18.3:** fiados por sede, precios por sede y Servicios por sede.

@@ -84,4 +84,44 @@ void main() {
       expect(plan.periodLabel, 'Mensual');
     });
   });
+
+  group('Pro y Pro Servicios a la vez (24 nov)', () {
+    final services = DateTime(2026, 12, 11);
+    final pro = DateTime(2027, 1, 10);
+
+    test('se ve la fecha de Pro Servicios y el Pro que sigue', () {
+      final s = ProStatus(active: true, kind: 'services', services: true, endsAt: pro, servicesEndsAt: services);
+      expect(s.planEndsAt, services);
+      expect(s.proAfterServices, pro);
+      expect(proUntilText(s), 'Pro Servicios hasta el 11/12/2026 · después Pro hasta el 10/1/2027');
+    });
+
+    test('solo Pro Servicios: sin «después»', () {
+      final s = ProStatus(active: true, kind: 'services', services: true, endsAt: services, servicesEndsAt: services);
+      expect(s.proAfterServices, isNull);
+      expect(proUntilText(s), 'Pro Servicios hasta el 11/12/2026');
+    });
+
+    test('solo Pro: igual que antes', () {
+      final s = ProStatus(active: true, kind: 'business', endsAt: pro);
+      expect(s.planEndsAt, pro);
+      expect(proUntilText(s), 'Pro hasta el 10/1/2027');
+    });
+  });
+
+  test('sin conexión, Pro Servicios vencido con Pro que sigue queda solo Pro (Codex, 24 nov)', () {
+    final m = {
+      'active': true,
+      'kind': 'services',
+      'ends_at': DateTime(2027, 1, 10).toIso8601String(),
+      'services': true,
+      'services_ends_at': DateTime(2026, 12, 11).toIso8601String(),
+    };
+    final before = ProService.decodeCached(m, now: DateTime(2026, 12, 1))!;
+    expect(before.services, isTrue);
+    final after = ProService.decodeCached(m, now: DateTime(2026, 12, 20))!;
+    expect(after.services, isFalse);
+    expect(after.kindLabel, 'Pro');
+    expect(ProService.decodeCached(m, now: DateTime(2027, 2, 1)), isNull);
+  });
 }

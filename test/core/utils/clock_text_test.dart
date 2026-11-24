@@ -15,4 +15,12 @@ void main() {
       expect(clockText(d), DateFormat('h:mm a', 'es_CO').format(d));
     }
   });
+
+  test('whenText: hoy, ayer o el día (24 nov)', () {
+    final now = DateTime(2026, 11, 24, 12);
+    expect(whenText(DateTime(2026, 11, 24, 17, 4), now: now), startsWith('hoy 5:04'));
+    expect(whenText(DateTime(2026, 11, 23, 23, 30), now: now), startsWith('ayer 11:30'));
+    expect(whenText(DateTime(2026, 11, 11, 18, 26), now: now), startsWith('11 nov · 6:26'));
+    expect(whenText(DateTime(2025, 12, 31, 9), now: now), startsWith('31 dic 2025 · 9:00'));
+  });
 }

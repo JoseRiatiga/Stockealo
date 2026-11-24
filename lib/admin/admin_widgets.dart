@@ -301,7 +301,12 @@ class AdminInfoRow extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: c.inkMuted),
           const SizedBox(width: AppSpace.sm),
-          SizedBox(width: 92, child: Text(label, style: AppText.small(context, color: c.inkMuted))),
+          // Ancho para «Última entrada» en una sola línea (con 92 se partía en dos)
+          SizedBox(
+            width: 120,
+            child: Text(label, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis,
+                style: AppText.small(context, color: c.inkMuted)),
+          ),
           Expanded(
             child: Text(value, textAlign: TextAlign.right, style: AppText.small(context, color: valueColor ?? c.ink)),
           ),
@@ -460,3 +465,9 @@ class AdminSearchField extends StatelessWidget {
   final old = createdAt != null && (now ?? DateTime.now()).difference(createdAt) > const Duration(hours: 24);
   return old ? (label: 'Sin terminar', tone: AdminTone.warn) : (label: 'Pendiente', tone: AdminTone.warn);
 }
+
+/// Filtro de Pagos «Ocultar sin terminar y de prueba» (aprobado el 24 nov): se oculta
+/// un pago sin terminar y uno «de prueba», que es el que hizo alguien del equipo del
+/// panel ([team], correos en minúscula), aunque haya sido con plata real.
+bool adminPaymentHidden(String status, DateTime? createdAt, String userEmail, Set<String> team, {DateTime? now}) =>
+    team.contains(userEmail.trim().toLowerCase()) || adminPaymentState(status, createdAt, now: now).label == 'Sin terminar';

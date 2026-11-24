@@ -548,7 +548,7 @@ actions: [
     if (res.success) {
       AppToast.show(context, message: 'Respaldo al día: ${res.productsCount} productos y ${res.salesCount} ventas.', type: ToastType.success);
     } else {
-      AppToast.show(context, message: 'Aviso: ${res.errorMessage ?? "No se pudo sincronizar"}', type: ToastType.warning);
+      AppToast.show(context, message: res.errorMessage ?? syncFailedMessage, type: ToastType.warning);
     }
   }
 
@@ -912,10 +912,8 @@ actions: [
                               ),
                               child: const ProCrown(size: 22),
                             ),
-                            title: pro.active ? 'Stockealo Pro · activo' : 'Stockealo Pro',
-                            subtitle: pro.active
-                                ? (pro.lifetime ? '${pro.kindLabel} permanente' : '${pro.kindLabel} hasta el ${pro.endsAt!.day}/${pro.endsAt!.month}/${pro.endsAt!.year}')
-                                : 'Tienda en línea, cobro de fiados y más',
+                            title: pro.active ? 'Stockealo ${pro.kindLabel} · activo' : 'Stockealo Pro',
+                            subtitle: pro.active ? proUntilText(pro) : 'Tienda en línea, cobro de fiados y más',
                             onTap: () => ProScreen.open(context, _activeBusiness!),
                           ),
                         ),

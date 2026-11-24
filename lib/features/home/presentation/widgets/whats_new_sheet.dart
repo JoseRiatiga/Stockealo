@@ -21,6 +21,17 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.18.2',
+      title: 'Arreglos de cuentas y planes',
+      items: [
+        '«Sincronizar ahora» ya no falla cuando tienes un negocio con servicios y otro sin ellos.',
+        'Si tienes Pro y Pro Servicios, ves la fecha de cada uno y el aviso llega a tiempo.',
+        'Cada venta dice de qué día es, no solo la hora.',
+        'Con sedes cerradas puedes ver su historial en «Todas las sedes».',
+        'Antes de mandar un negocio con Pro a la papelera, te avisamos lo que pierdes.',
+      ],
+    ),
+    (
       version: '0.18.1',
       title: 'Sedes más claras',
       items: [

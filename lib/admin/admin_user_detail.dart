@@ -108,6 +108,14 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
   }
 
   Future<void> _deleteNote(int id) async {
+    final ok = await AppDialog.confirm(
+      context: context,
+      title: '¿Borrar esta nota?',
+      message: 'La nota se borra para todo el equipo y no se puede deshacer.',
+      confirmText: 'Borrar',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
     try {
       await ProAdminService.instance.deleteNote(id);
       await _loadNotes();

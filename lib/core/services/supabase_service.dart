@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/products/models/price_tier.dart';
 import '../database/app_database.dart';
 import '../../features/products/models/product_variant.dart';
+import 'error_reporter.dart';
 import 'maintenance_service.dart';
 import 'sync_queue.dart';
 import 'package:sqflite/sqflite.dart';
@@ -29,6 +30,10 @@ class SyncResult {
     this.errorMessage,
   });
 }
+
+/// Lo que ve el cliente cuando «Sincronizar ahora» no puede subir todo
+const syncFailedMessage = 'No se pudo subir todo a la nube. Lo que haces cada día sigue guardado; '
+    'intenta de nuevo en un rato. Si sigue pasando, escríbenos.';
 
 class SupabaseService {
   SupabaseService._();
@@ -264,10 +269,7 @@ class SupabaseService {
         for (final b in localBusinesses.where((b) => ownedIds.contains(b['id']))) {
           await _createBusinessWithOwner(client!, b);
         }
-        await client!.from('businesses').upsert(
-          formattedBusinesses,
-          onConflict: 'id',
-        );
+        await _upsertGrouped(client!, 'businesses', formattedBusinesses);
       }
 
       // 1.1 Sincronizar Categories
@@ -455,10 +457,7 @@ class SupabaseService {
         }).toList();
 
         try {
-          await client!.from('sales').upsert(
-            formattedSales,
-            onConflict: 'id',
-          );
+          await _upsertGrouped(client!, 'sales', formattedSales);
         } catch (e) {
           if (e.toString().contains('product_name') ||
               e.toString().contains('customer_name') ||
@@ -477,10 +476,7 @@ class SupabaseService {
               _saleV13Columns.forEach(copy.remove);
               return copy;
             }).toList();
-            await client!.from('sales').upsert(
-              fallbackSales,
-              onConflict: 'id',
-            );
+            await _upsertGrouped(client!, 'sales', fallbackSales);
           } else {
             rethrow;
           }
@@ -495,16 +491,10 @@ class SupabaseService {
         salesCount: localSales.length,
         membersCount: localMembersCount,
       );
-    } on PostgrestException catch (e) {
-      return SyncResult(
-        success: false,
-        errorMessage: 'Error en Supabase: ${e.message}',
-      );
-    } catch (e) {
-      return SyncResult(
-        success: false,
-        errorMessage: 'Error al sincronizar: $e',
-      );
+    } catch (e, st) {
+      // El detalle técnico va al panel (Errores); al cliente, un mensaje claro (24 nov)
+      unawaited(ErrorReporter.instance.report(e, st, kind: 'sync'));
+      return const SyncResult(success: false, errorMessage: syncFailedMessage);
     }
   }
 
@@ -1543,6 +1533,28 @@ class SupabaseService {
         }
       default:
         throw ArgumentError('Operación de sincronización desconocida: $operation');
+    }
+  }
+
+  /// Filas en tandas con las mismas columnas (24 nov). En una subida de varias filas,
+  /// Supabase manda vacío (null) lo que a una fila le falta y otra sí trae: un negocio
+  /// sin servicios mandaba `services_enabled` vacío y la nube lo rechazaba («Sincronizar
+  /// ahora»). Agrupadas así, a ninguna fila le falta nada y lo que no se manda queda
+  /// como estaba en la nube.
+  @visibleForTesting
+  static List<List<Map<String, dynamic>>> groupByColumns(List<Map<String, dynamic>> rows) {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final r in rows) {
+      final key = (r.keys.toList()..sort()).join(',');
+      groups.putIfAbsent(key, () => []).add(r);
+    }
+    return groups.values.toList();
+  }
+
+  static Future<void> _upsertGrouped(SupabaseClient db, String table, List<Map<String, dynamic>> rows,
+      {bool ignoreDuplicates = false}) async {
+    for (final group in groupByColumns(rows)) {
+      await db.from(table).upsert(group, onConflict: 'id', ignoreDuplicates: ignoreDuplicates);
     }
   }
 

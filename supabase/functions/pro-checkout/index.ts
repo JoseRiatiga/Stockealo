@@ -104,6 +104,15 @@ Deno.serve(async (req) => {
   const allowed = plan.kind === "global" ? role === "OWNER" : role === "OWNER" || role === "ADMIN";
   if (!allowed) return json({ error: "not_allowed" }, 403);
 
+  // Pro Servicios trae todo Pro: con Pro Servicios vigente no se compra Pro encima
+  // (se pagaría algo que ya tiene y empezaría cuando venza Pro Servicios). 24 nov.
+  if (plan.kind === "business") {
+    const { data: pro } = await admin.rpc("business_pro_until", { p_business_id: businessId });
+    if ((pro as { services?: boolean } | null)?.services === true) {
+      return json({ error: "included_in_plan" }, 409);
+    }
+  }
+
   const { data: setting } = await admin.from("pro_settings").select("value").eq("key", "wompi_public_key").maybeSingle();
   const publicKey = (setting?.value as string | null)?.trim();
   if (!publicKey) return json({ error: "payments_not_configured" }, 503);

@@ -16,6 +16,8 @@ class AdminPaymentsPage extends StatefulWidget {
 
 class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
   List<AdminPayment> _payments = const [];
+  Set<String> _team = const {};
+  bool _hideNoise = true;
   bool _loading = true;
   String? _error;
 
@@ -32,7 +34,22 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
     });
     try {
       final payments = await ProAdminService.instance.listPayments();
-      if (mounted) setState(() => _payments = payments);
+      // Correos del equipo del panel: sus pagos son de prueba. Si la lista no carga,
+      // se muestran todos los pagos (mejor de más que esconder uno de un cliente)
+      var team = <String>{};
+      try {
+        team = {
+          for (final a in await ProAdminService.instance.listAdmins()) '${a['email'] ?? ''}'.trim().toLowerCase(),
+        }..remove('');
+      } catch (e) {
+        debugPrint('Pagos: sin lista del equipo: $e');
+      }
+      if (mounted) {
+        setState(() {
+          _payments = payments;
+          _team = team;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
@@ -43,7 +60,13 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final approved = _payments.where((p) => p.status == 'APPROVED');
+    final now = DateTime.now();
+    final shown = _hideNoise
+        ? _payments.where((p) => !adminPaymentHidden(p.status, p.createdAt, p.userEmail, _team, now: now)).toList()
+        : _payments;
+    final hidden = _payments.length - shown.length;
+    // El total suma solo lo que se ve: con el filtro, no se infla con las pruebas
+    final approved = shown.where((p) => p.status == 'APPROVED');
     final total = approved.fold<double>(0, (s, p) => s + p.amount);
     final state = AdminLoadState(
       loading: _loading,
@@ -63,8 +86,30 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
       children: [
         if (state.blocking)
           state
-        else
-          for (final p in _payments) _row(c, p),
+        else ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: AppSpace.sm),
+              child: FilterChip(
+                label: Text(_hideNoise && hidden > 0
+                    ? 'Ocultar sin terminar y de prueba ($hidden)'
+                    : 'Ocultar sin terminar y de prueba'),
+                selected: _hideNoise,
+                onSelected: (v) => setState(() => _hideNoise = v),
+                tooltip: 'De prueba: los pagos que hizo alguien del equipo del panel',
+              ),
+            ),
+          ),
+          if (shown.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpace.lg),
+              child: Text('Los $hidden pagos están ocultos por el filtro.',
+                  style: AppText.small(context, color: c.inkMuted)),
+            )
+          else
+            for (final p in shown) _row(c, p),
+        ],
       ],
     );
   }

@@ -127,7 +127,7 @@ class SaleCard extends StatelessWidget {
     final isFiado = PaymentMethod.creditPart(sale.paymentMethod, sale.totalAmount, sale.paymentSplit) != 0;
     final voided = sale.isVoided;
     final meta = [
-      clockText(sale.date),
+      whenText(sale.date),
       PaymentMethod.label(sale.paymentMethod),
       if (isFiado && sale.customerName != null && sale.customerName!.trim().isNotEmpty) sale.customerName!,
     ].join(' · ');
@@ -246,7 +246,7 @@ class SaleGroupCard extends StatelessWidget {
   String _meta() {
     final customer = lines.map((l) => l.customerName ?? '').firstWhere((n) => n.trim().isNotEmpty, orElse: () => '');
     return [
-      clockText(_first.date),
+      whenText(_first.date),
       PaymentMethod.label(_first.paymentMethod),
       if (PaymentMethod.creditPart(_first.paymentMethod, _first.totalAmount, _first.paymentSplit) != 0 && customer.isNotEmpty) customer,
     ].join(' · ');

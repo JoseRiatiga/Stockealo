@@ -277,6 +277,10 @@ class _ProScreenState extends State<ProScreen> {
       plans.where((p) => p.kind == kind && p.period == (_annual ? 'year' : 'month')).firstOrNull;
 
   void _pick(ProPlan plan) {
+    if (plan.kind == 'business' && ProService.instance.status.value.services) {
+      AppToast.show(context, message: 'Tu Pro Servicios ya incluye todo lo de Pro.', type: ToastType.info);
+      return;
+    }
     setState(() => _selectedPlanId = plan.id);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
@@ -326,6 +330,7 @@ class _ProScreenState extends State<ProScreen> {
     String? button,
     VoidCallback? onChoose,
     Widget? price,
+    bool included = false,
   }) {
     final featured = badge != null;
     return Container(
@@ -378,7 +383,10 @@ class _ProScreenState extends State<ProScreen> {
           ],
           const Spacer(),
           const SizedBox(height: AppSpace.md),
-          if (current) ...[
+          // Pro Servicios trae todo Pro: la tarjeta Pro no se compra encima (24 nov)
+          if (included)
+            Text('Incluido en tu plan', textAlign: TextAlign.center, style: AppText.small(context, color: c.inkFaint))
+          else if (current) ...[
             Text('Tu plan actual', textAlign: TextAlign.center, style: AppText.small(context, color: c.inkFaint)),
             // Con precios a la vista, quien ya lo tiene lo puede renovar (se suma a lo que le queda)
             if (price != null && onChoose != null) ...[
@@ -433,6 +441,7 @@ class _ProScreenState extends State<ProScreen> {
           _planCard(
             c,
             current: current == 'business',
+            included: current == 'services',
             title: 'Pro',
             lead: 'Todo lo gratis, más:',
             tint: c.accent,
@@ -538,12 +547,11 @@ class _ProScreenState extends State<ProScreen> {
     return ValueListenableBuilder<ProStatus>(
       valueListenable: ProService.instance.status,
       builder: (context, status, _) {
-        final until = status.endsAt;
         final text = !status.active
             ? 'Este negocio usa Stockealo gratis.'
-            : status.lifetime
+            : status.lifetime && !status.services
                 ? '${status.kindLabel} permanente. ¡Gracias por apoyar a Stockealo!'
-                : '${status.kindLabel} activo hasta el ${until!.day}/${until.month}/${until.year}.';
+                : '${proUntilText(status)}.';
         return Container(
           padding: const EdgeInsets.all(AppSpace.lg),
           decoration: BoxDecoration(
@@ -559,7 +567,7 @@ class _ProScreenState extends State<ProScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(status.active ? 'Tienes Pro' : 'Stockealo Pro',
+                    Text(status.active ? 'Tienes ${status.kindLabel}' : 'Stockealo Pro',
                         style: TextStyle(fontSize: AppText.sizeHeading, fontWeight: FontWeight.w800, color: status.active ? c.onAccent : c.ink)),
                     const SizedBox(height: 2),
                     Text(text, style: TextStyle(fontSize: AppText.sizeBody, color: status.active ? c.onAccent.withValues(alpha: 0.9) : c.inkMuted)),

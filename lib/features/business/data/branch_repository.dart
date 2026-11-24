@@ -133,7 +133,9 @@ class BranchRepository extends ChangeNotifier {
 
   /// El negocio tiene más de una sede (abierta o cerrada con historial)
   bool get hasBranches => _branches.isNotEmpty;
-  bool get canSwitch => _canSwitch && openBranches.isNotEmpty;
+  /// Con sedes cerradas también: así «Todas las sedes» deja ver su historial (ventas y
+  /// cierres de caja), que con solo la Principal no se veía (recorrido del 24 nov)
+  bool get canSwitch => _canSwitch && _branches.isNotEmpty;
 
   Branch? byId(String? id) => id == null ? null : _branches.where((b) => b.id == id).firstOrNull;
 

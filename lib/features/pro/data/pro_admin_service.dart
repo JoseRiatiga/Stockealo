@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
-import 'pro_service.dart' show proKindLabel;
+import 'pro_service.dart' show proKindLabel, proPlanName;
 import '../../../core/utils/coupons.dart';
 
 DateTime? _date(Object? v) => v == null ? null : DateTime.tryParse(v as String)?.toLocal();
@@ -348,16 +348,7 @@ class AdminPayment {
 
   double get amount => amountInCents / 100;
 
-  String get planLabel {
-    final plan = proKindLabel(kind);
-    final per = switch (period) {
-      'week' => 'Semanal',
-      'month' => 'Mensual',
-      'year' => 'Anual',
-      _ => 'Permanente',
-    };
-    return '$plan · $per';
-  }
+  String get planLabel => proPlanName(kind, period);
 
   String get statusLabel => switch (status) {
         'APPROVED' => 'Aprobado',
@@ -411,13 +402,7 @@ class AdminPlan {
         active: j['active'] != false,
       );
 
-  String get name =>
-      '${proKindLabel(kind)} · ${switch (period) {
-        'week' => 'Semanal',
-        'month' => 'Mensual',
-      'year' => 'Anual',
-        _ => 'Permanente',
-      }}';
+  String get name => proPlanName(kind, period);
 }
 
 /// Datos de pago y precios de Pro
@@ -468,7 +453,14 @@ class ProAdminService {
     }
   }
 
+  /// Solo pruebas: responde las llamadas a la nube con datos de ejemplo, para dibujar las
+  /// pantallas del panel sin conexión (re-diseño del panel). Solo cuenta en modo de
+  /// desarrollo: en la web publicada (release) [kDebugMode] es falso y no se usa nunca.
+  @visibleForTesting
+  static Future<dynamic> Function(String fn, Map<String, dynamic>? params)? debugRpc;
+
   Future<dynamic> _rpc(String fn, [Map<String, dynamic>? params]) async {
+    if (kDebugMode && debugRpc != null) return debugRpc!(fn, params);
     final client = _client;
     if (client == null) throw const ProAdminException('Necesitas conexión a internet.');
     try {

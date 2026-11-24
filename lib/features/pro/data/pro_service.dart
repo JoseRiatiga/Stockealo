@@ -35,6 +35,24 @@ String proKindLabel(String? kind) => switch (kind) {
       _ => 'Pro',
     };
 
+/// «Mensual», «Anual»… de un periodo de plan
+String proPeriodLabel(String? period) => switch (period) {
+      'week' => 'Semanal',
+      'month' => 'Mensual',
+      'year' => 'Anual',
+      _ => 'Permanente',
+    };
+
+/// «Pro · Mensual»: el plan y su periodo
+String proPlanName(String? kind, String? period) => '${proKindLabel(kind)} · ${proPeriodLabel(period)}';
+
+/// El nombre legible de un id de plan («business_month_cop» → «Pro · Mensual»)
+String proPlanIdLabel(String? planId) {
+  final parts = (planId ?? '').split('_');
+  if (parts.length < 2) return planId ?? 'Pro';
+  return proPlanName(parts[0], parts[1]);
+}
+
 /// Un plan con su precio en una moneda
 class ProPlan {
   final String id;

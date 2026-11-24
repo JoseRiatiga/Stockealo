@@ -47,7 +47,9 @@ class _AdminStoresPageState extends State<AdminStoresPage> {
       loading: _loading,
       error: _error,
       empty: _stores.isEmpty,
-      emptyText: 'Ningún negocio ha creado su tienda todavía.',
+      emptyText: 'Ningún negocio ha creado su tienda todavía',
+      emptyDetail: 'Cuando alguien publique su catálogo en línea, aparece aquí con su enlace.',
+      emptyIcon: Icons.storefront_outlined,
       onRetry: _load,
     );
     return AdminPage(

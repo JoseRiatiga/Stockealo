@@ -119,7 +119,9 @@ class _AdminCouponsSectionState extends State<AdminCouponsSection> {
       loading: _loading,
       error: _error,
       empty: _coupons.isEmpty,
-      emptyText: 'Todavía no hay cupones.',
+      emptyText: 'Todavía no hay cupones',
+      emptyDetail: 'Un cupón da un descuento al pagar Pro en la app.',
+      emptyIcon: Icons.local_offer_outlined,
       onRetry: _load,
     );
     return Column(

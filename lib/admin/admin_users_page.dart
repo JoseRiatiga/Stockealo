@@ -47,7 +47,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       loading: _loading,
       error: _error,
       empty: _users.isEmpty,
-      emptyText: _search.isEmpty ? 'Todavía no hay cuentas.' : 'No hay cuentas con "$_search".',
+      emptyText: _search.isEmpty ? 'Todavía no hay cuentas' : 'No hay cuentas con «$_search»',
+      emptyDetail: _search.isEmpty ? null : 'Busca por correo, nombre o celular.',
+      emptyIcon: Icons.people_outline,
       onRetry: _load,
     );
     return AdminPage(

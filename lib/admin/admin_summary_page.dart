@@ -74,6 +74,7 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
     final s = _summary;
     final state = AdminLoadState(loading: _loading, error: _error, empty: s == null, emptyText: '', onRetry: _load);
     return AdminPage(
+      width: AdminWidth.full,
       title: 'Resumen',
       subtitle: 'Cómo va Stockealo hoy',
       onRefresh: _load,
@@ -84,11 +85,12 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
                 _alert(c, 'Faltan los datos de pago (Nequi y WhatsApp): los clientes no saben a dónde pagar Pro.',
                     'Completar', () => widget.onOpen(AdminSection.config)),
               if (s!.subscriptionsEnding7d > 0)
-                _alert(c, '${s.subscriptionsEnding7d} suscripciones vencen en los próximos 7 días.', 'Ver',
+                _alert(c, s.subscriptionsEnding7d == 1 ? '1 suscripción vence en los próximos 7 días.' : '${s.subscriptionsEnding7d} suscripciones vencen en los próximos 7 días.', 'Ver',
                     () => widget.onOpen(AdminSection.subscriptions)),
               LayoutBuilder(
                 builder: (context, box) {
-                  final columns = box.maxWidth >= 720 ? 3 : 2;
+                  // En el computador las 5 en una fila (antes 3 + 2 con un hueco)
+                  final columns = box.maxWidth >= 1100 ? 5 : (box.maxWidth >= 720 ? 3 : 2);
                   final tiles = [
                     _Tile('Cuentas', '${s.usersTotal}', '+${s.users7d} esta semana · +${s.users30d} en 30 días',
                         Icons.people_outline_outlined, () => widget.onOpen(AdminSection.users)),
@@ -115,14 +117,29 @@ class _AdminSummaryPageState extends State<AdminSummaryPage> {
                   );
                 },
               ),
-              if (_health != null)
-                AdminHealthSection(health: _health!, contacts: _contacts)
-              else if (_healthError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpace.lg),
-                  child: Text('Salud de Stockealo: $_healthError', style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkFaint)),
-                ),
-              const AdminUsageSection(),
+              LayoutBuilder(
+                builder: (context, box) {
+                  final health = _health != null
+                      ? AdminHealthSection(health: _health!, contacts: _contacts)
+                      : (_healthError != null
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: AppSpace.lg),
+                              child: Text('Salud de Stockealo: $_healthError', style: AppText.small(context, color: c.inkFaint)),
+                            )
+                          : const SizedBox.shrink());
+                  // En el computador, Salud y Uso de la app lado a lado (antes cada una cruzaba
+                  // toda la pantalla con barras de más de 1000 px)
+                  if (box.maxWidth < 1100) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [health, const AdminUsageSection()]);
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: health),
+                      const SizedBox(width: AppSpace.lg),
+                      const Expanded(child: AdminUsageSection()),
+                    ],
+                  );
+                },
+              ),
             ],
     );
   }

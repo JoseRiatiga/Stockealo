@@ -1,6 +1,6 @@
 # Plan: sedes (un negocio con varios locales)
 
-> **Estado:** pendiente, **sin aprobar**. Solo es un plan: no se toca código hasta que el dueño lo apruebe y resuelva las preguntas de la sección 9.
+> **Estado (23 nov): EN PRIORIDAD.** Las preguntas de la sección 9 están resueltas. Falta el boceto y la aprobación final; no se toca código hasta entonces.
 > Pedido del dueño el 10 nov 2026, después de publicar la 0.12.0. El mismo día eligió la **opción A** (sedes dentro del mismo negocio) y respondió dos rondas de preguntas (secciones 2 y 6). Antes de decidir cómo se entrega, quiere seguir afinando el plan.
 
 ## 1. El problema
@@ -207,15 +207,33 @@ Esto también resuelve **qué plan da sedes**: la sugerencia muestra qué planes
 - La migración deja todo en «Principal» sin perder datos.
 - Pantallas probadas a 360 px y 1200 px, en modo claro y oscuro.
 
-## 9. Preguntas que quedan
+## 9. Preguntas: todas resueltas (23 nov)
 
-1. ~~Qué planes incluyen sedes~~ **Resuelta (10 nov):** solo Pro Servicios.
-2. ~~Paquete adicional~~ **Resuelta (10 nov):** se compran de a una (+1) o varias, con descuento por cantidad.
-3. **Encargado de turno:** ¿te sirve la propuesta (encargado con hora de fin y recepción provisional «por verificar»)? ¿Qué más puede hacer el encargado: abrir y cerrar caja, anular ventas?
-4. **Ideas de la sección 5:** ¿cuáles entran?
-5. **Elegir el plan por lo que se necesita (sección 6b):** ¿se hace junto con las sedes o antes, por separado? Sirve desde ya para vender Pro Servicios.
-6. **Entrega:** se decide cuando el plan esté afinado. Etapas propuestas:
-   1. sedes, ventas, caja, equipo y encargado de turno;
-   2. stock, precios y traslados;
-   3. fiados y Servicios;
-   4. reportes y tienda.
+El dueño puso Sedes **en prioridad** el 23 nov y aceptó las recomendaciones:
+
+1. ~~Qué planes incluyen sedes~~ **Solo Pro Servicios** (10 nov).
+2. ~~Paquete adicional~~ Se compran **de a una o varias** (10 nov). **Precio (23 nov):** **$29.900 al mes cada sede extra**, o **$24.900 cada una si se compran 3 o más** en la misma compra. Pro Servicios ($79.900) incluye la Principal y 2 sedes.
+3. **Encargado de turno: SÍ.** Un cajero queda a cargo de su sede hasta una hora de fin.
+   - **Puede:** abrir y cerrar caja, confirmar traslados, recibir mercancía (recepción «por verificar»).
+   - **No puede:** ver costos ni ganancias, ni anular ventas.
+4. **Ideas (sección 5):**
+   - **Sí:** sugerir un traslado antes de pedir al proveedor (se apoya en el pedido sugerido de la 0.17.0), recoger en la sede que tiene el producto y horario por sede.
+   - **Después:** metas por sede.
+5. ~~Elegir el plan por lo que se necesita~~ **Ya existe** (PlanFinder, pantalla Pro, desde la 0.15.0). Solo hay que agregarle «Varias sedes».
+6. **Entrega: por etapas.**
+   1. **Etapa 1 (0.18.0):**
+      - sedes con la Principal automática;
+      - cambiar de sede con el selector que ya existe;
+      - stock, ventas y caja por sede;
+      - equipo por sede (cajero de una sede; traslado de cajero);
+      - reportes por sede y «Todas las sedes»;
+      - la migración deja todo en «Principal».
+   2. **Etapa 2 (0.18.1):** traslados de mercancía con confirmación, encargado de turno y sugerencia de traslado antes de pedir al proveedor.
+   3. **Etapa 3 (0.18.2):**
+      - fiados por sede, con aviso;
+      - precios por sede;
+      - Servicios por sede;
+      - tienda con stock por sede y recogida en la sede, horario por sede;
+      - compra de sedes extra.
+
+**Falta:** el boceto de cómo se ve y cómo se cambia de sede, y la aprobación final antes de programar la Etapa 1.

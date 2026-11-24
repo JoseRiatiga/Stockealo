@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../business/data/branch_repository.dart';
+import '../../../business/presentation/widgets/branch_picker_sheet.dart';
 import '../../../../core/widgets/theme_mode_button.dart';
 
 import '../../../../core/design/status_pill.dart';
@@ -125,7 +127,24 @@ class _AppMenuState extends State<AppMenu> {
             // Negocio o sede activa
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
-              child: _BusinessButton(business: widget.business, collapsed: collapsed, onTap: widget.onSelectBusiness),
+              // Con sedes (0.18.0) se elige la sede ahí mismo; «Otro negocio…» abre el de siempre
+              child: ListenableBuilder(
+                listenable: BranchRepository.instance,
+                builder: (context, _) {
+                  final branches = BranchRepository.instance;
+                  final hasBranches = branches.openBranches.isNotEmpty;
+                  return _BusinessButton(
+                    business: widget.business,
+                    collapsed: collapsed,
+                    branch: hasBranches
+                        ? (branches.viewAll.value ? 'Todas las sedes' : branches.nameOf(BranchRepository.active))
+                        : null,
+                    onTap: hasBranches
+                        ? () => BranchPickerSheet.show(context, onOtherBusiness: widget.onSelectBusiness)
+                        : widget.onSelectBusiness,
+                  );
+                },
+              ),
             ),
 
             // Lugares
@@ -219,7 +238,10 @@ class _BusinessButton extends StatelessWidget {
   final bool collapsed;
   final VoidCallback onTap;
 
-  const _BusinessButton({required this.business, required this.collapsed, required this.onTap});
+  /// Sede elegida (0.18.0); null = el negocio no tiene sedes
+  final String? branch;
+
+  const _BusinessButton({required this.business, required this.collapsed, required this.onTap, this.branch});
 
   @override
   Widget build(BuildContext context) {
@@ -237,7 +259,7 @@ class _BusinessButton extends StatelessWidget {
       message: collapsed ? (business?.name ?? 'Elegir negocio') : '',
       child: Semantics(
         button: true,
-        label: 'Negocio: ${business?.name ?? 'ninguno'}. Cambiar',
+        label: 'Negocio: ${business?.name ?? 'ninguno'}${branch == null ? '' : ', sede $branch'}. Cambiar',
         excludeSemantics: true,
         child: Material(
           color: c.surface,
@@ -260,7 +282,18 @@ class _BusinessButton extends StatelessWidget {
                               // Hasta dos renglones: el nombre del negocio se lee entero
                               Text(business?.name ?? 'Elegir negocio',
                                   maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w700)),
-                              Text('Cambiar negocio', style: AppText.caption(context)),
+                              branch == null
+                                  ? Text('Cambiar negocio', style: AppText.caption(context))
+                                  : Row(children: [
+                                      Icon(Icons.place_outlined, size: 13, color: c.accent),
+                                      const SizedBox(width: 2),
+                                      Flexible(
+                                        child: Text(branch!,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: AppText.caption(context, weight: FontWeight.w700, color: c.accent)),
+                                      ),
+                                    ]),
                             ],
                           ),
                         ),

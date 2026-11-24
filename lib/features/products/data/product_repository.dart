@@ -3,6 +3,7 @@ import '../presentation/category_icons.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../business/data/branch_repository.dart';
 import '../../../core/utils/image_helper.dart';
 import '../../../core/services/data_events.dart';
 import '../../../core/services/supabase_service.dart';
@@ -26,7 +27,14 @@ class ProductRepository {
       whereArgs: [businessId],
       orderBy: 'name ASC',
     );
-    return maps.map((map) => Product.fromMap(map)).toList();
+    final products = maps.map((map) => Product.fromMap(map)).toList();
+    if (BranchRepository.active == null) return products;
+    // Sede extra (0.18.0): el stock de esa sede; las variantes hacen falta para sumarlo
+    final variants = await _variantsFor(products.where((p) => p.hasVariants).map((p) => p.id).toList());
+    return BranchRepository.withBranchStock(
+      [for (final p in products) p.hasVariants ? p.copyWith(variants: variants[p.id] ?? const []) : p],
+      BranchRepository.active,
+    );
   }
 
   /// Búsqueda predictiva aislada por empresa (con soporte de variantes)
@@ -60,10 +68,10 @@ class ProductRepository {
     final variantsByProduct = await _variantsFor(
       products.where((p) => p.hasVariants).map((p) => p.id).toList(),
     );
-    return [
+    return BranchRepository.withBranchStock([
       for (final p in products)
         p.hasVariants ? p.copyWith(variants: variantsByProduct[p.id] ?? const []) : p,
-    ];
+    ], BranchRepository.active);
   }
 
   /// Variantes de varios productos en una sola consulta (evita una consulta por producto)
@@ -122,12 +130,22 @@ class ProductRepository {
       limit: 1,
     );
     if (maps.isEmpty) return null;
-    final product = Product.fromMap(maps.first);
+    var product = Product.fromMap(maps.first);
     if (product.hasVariants) {
       final variants = await getVariantsForProduct(product.id);
-      return product.copyWith(variants: variants);
+      product = product.copyWith(variants: variants);
     }
-    return product;
+    return (await BranchRepository.withBranchStock([product], BranchRepository.active)).first;
+  }
+
+  /// El producto con el stock de la sede Principal (lo de siempre), aunque haya otra
+  /// sede elegida: para escribir sin pisar el stock de la Principal
+  Future<Product?> getMainProductById(String id, String businessId) async {
+    final db = await _dbProvider.database;
+    final maps = await db.query('products', where: 'id = ? AND business_id = ?', whereArgs: [id, businessId], limit: 1);
+    if (maps.isEmpty) return null;
+    final product = Product.fromMap(maps.first);
+    return product.hasVariants ? product.copyWith(variants: await getVariantsForProduct(product.id)) : product;
   }
 
   /// Buscar por código de barras / QR dentro de la empresa (busca en producto y en códigos de variante)
@@ -140,12 +158,12 @@ class ProductRepository {
       limit: 1,
     );
     if (maps.isNotEmpty) {
-      final product = Product.fromMap(maps.first);
+      var product = Product.fromMap(maps.first);
       if (product.hasVariants) {
         final variants = await getVariantsForProduct(product.id);
-        return product.copyWith(variants: variants);
+        product = product.copyWith(variants: variants);
       }
-      return product;
+      return (await BranchRepository.withBranchStock([product], BranchRepository.active)).first;
     }
 
     // Si no coincide con código de producto, buscar en códigos de variantes
@@ -166,6 +184,18 @@ class ProductRepository {
   /// Insertar nuevo producto asignado a su empresa (con sus variantes si aplica)
   Future<void> insertProduct(Product product) async {
     final db = await _dbProvider.database;
+    final branch = BranchRepository.active;
+    if (branch != null) {
+      final initial = product;
+      product = product.copyWith(stock: 0, variants: [for (final v in product.variants) v.copyWith(stock: 0)]);
+      await _insertMain(db, product);
+      await _setBranchStockFrom(initial, branch, 'Inventario inicial de creación');
+      return;
+    }
+    await _insertMain(db, product);
+  }
+
+  Future<void> _insertMain(Database db, Product product) async {
     await db.transaction((txn) async {
       await txn.insert(
         'products',
@@ -215,6 +245,23 @@ class ProductRepository {
   /// Actualizar producto (y sincronizar variantes)
   Future<void> updateProduct(Product product) async {
     final db = await _dbProvider.database;
+    final branch = BranchRepository.active;
+    if (branch != null) {
+      // El formulario trae el stock y el mínimo de la sede: a la Principal se le dejan los suyos
+      final main = await getMainProductById(product.id, product.businessId);
+      if (main != null) {
+        final branchMin = product.minStock;
+        product = product.copyWith(
+          stock: main.stock,
+          minStock: main.minStock,
+          variants: [
+            for (final v in product.variants)
+              v.copyWith(stock: main.variants.where((m) => m.id == v.id).firstOrNull?.stock ?? 0),
+          ],
+        );
+        await BranchRepository.setStockMin(db, businessId: product.businessId, branchId: branch, productId: product.id, minStock: branchMin);
+      }
+    }
     final previous = await db.query(
       'products',
       columns: ['stock', 'sale_price', 'purchase_price'],
@@ -301,11 +348,67 @@ class ProductRepository {
     }
   }
 
+  /// Sede extra (0.18.0): fija el stock de [product] (y sus variantes) en [branchId],
+  /// con el movimiento en el historial, la nube y la actividad. La Principal no se toca.
+  Future<void> _setBranchStockFrom(Product product, String branchId, String reason, {Product? before}) async {
+    final db = await _dbProvider.database;
+    final withVariants = product.hasVariants && product.variants.isNotEmpty;
+    final total = withVariants ? product.variants.fold<int>(0, (s, v) => s + v.stock) : product.stock;
+    final diff = total - (before?.stock ?? 0);
+    final now = appNow().toIso8601String();
+    await db.transaction((txn) async {
+      if (withVariants) {
+        for (final v in product.variants) {
+          await BranchRepository.setStock(txn,
+              businessId: product.businessId, branchId: branchId, productId: product.id, variantId: v.id, stock: v.stock);
+        }
+      } else {
+        await BranchRepository.setStock(txn, businessId: product.businessId, branchId: branchId, productId: product.id, stock: product.stock);
+      }
+      if (diff != 0) {
+        await txn.insert('stock_movements', {
+          'id': const Uuid().v4(),
+          'business_id': product.businessId,
+          'product_id': product.id,
+          'type': diff >= 0 ? 'AJUSTE' : 'MERMA',
+          'quantity': diff.abs(),
+          'resulting_stock': total,
+          'reason': reason,
+          'date': now,
+          'branch_id': branchId,
+        });
+      }
+    });
+    if (withVariants) {
+      for (final v in product.variants) {
+        SupabaseService.instance.setBranchStockInCloud(branchId, product.id, v.id, v.stock);
+      }
+    } else {
+      SupabaseService.instance.setBranchStockInCloud(branchId, product.id, null, product.stock);
+    }
+    if (diff != 0) {
+      final why = reason.trim().isEmpty ? '' : ' · ${reason.trim()}';
+      final where = BranchRepository.instance.nameOf(branchId);
+      ActivityRepository.instance.log(
+        businessId: product.businessId,
+        action: diff < 0 ? ActivityAction.shrinkage : ActivityAction.stockAdjust,
+        summary: '${diff < 0 ? 'Dio de baja ${diff.abs()}' : 'Agregó $diff'} × ${product.name} en $where (queda $total)$why',
+        data: {'product_id': product.id, 'diff': diff, 'branch_id': branchId},
+      );
+    }
+    DataEvents.instance.productsChanged();
+  }
+
   /// Ajustar stock directamente con auditoría
   Future<void> adjustStock(String productId, String businessId, int newStock, String reason) async {
     final db = await _dbProvider.database;
     final product = await getProductById(productId, businessId);
     if (product == null) return;
+    final branch = BranchRepository.active;
+    if (branch != null) {
+      await _setBranchStockFrom(product.copyWith(stock: newStock), branch, reason, before: product);
+      return;
+    }
 
     final diff = newStock - product.stock;
     final type = diff >= 0 ? 'AJUSTE' : 'MERMA';
@@ -351,6 +454,15 @@ class ProductRepository {
   /// variante y el total del producto queda como la suma de todas.
   Future<void> adjustVariantStocks(Product product, Map<String, int> newStockByVariant, String reason) async {
     final db = await _dbProvider.database;
+    final branch = BranchRepository.active;
+    if (branch != null) {
+      final current = await getProductById(product.id, product.businessId) ?? product;
+      final updated = current.copyWith(variants: [
+        for (final v in current.variants) v.copyWith(stock: newStockByVariant[v.id] ?? v.stock),
+      ]);
+      await _setBranchStockFrom(updated, branch, reason, before: current);
+      return;
+    }
     final variants = await getVariantsForProduct(product.id);
     if (variants.isEmpty) return;
     final now = appNow().toIso8601String();

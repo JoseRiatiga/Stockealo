@@ -35,7 +35,7 @@ class RestockPlanner {
     final since = (now ?? appNow()).subtract(const Duration(days: days)).toIso8601String();
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery(
-      'SELECT product_id, variant_id, SUM(quantity) AS sold FROM sales_ok '
+      'SELECT product_id, variant_id, SUM(quantity) AS sold FROM sales_here '
       'WHERE business_id = ? AND product_id IS NOT NULL AND date >= ? GROUP BY product_id, variant_id',
       [businessId, since],
     );

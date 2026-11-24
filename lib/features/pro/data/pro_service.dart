@@ -130,7 +130,9 @@ class ProService {
   Future<ProStatus> refresh(String businessId) async {
     if (_statusBusinessId != businessId) {
       _statusBusinessId = businessId;
-      status.value = ProStatus.none;
+      // 0.18.0: sin conexión vale el último estado conocido (si no ha vencido), para que
+      // las sedes y lo de Pro no se bloqueen al abrir la app sin internet
+      status.value = await cached(businessId) ?? ProStatus.none;
     }
     final client = _client;
     if (client == null) return status.value;
@@ -173,12 +175,28 @@ class ProService {
           'active': s.active,
           'kind': s.kind,
           'ends_at': s.endsAt?.toIso8601String(),
+          'services': s.services,
           // Cuándo venció la última vez (para «Tu Pro venció el…»)
           'ended_at': s.active ? null : (before?.active == true ? before?.endsAt?.toIso8601String() : before?.endedAt?.toIso8601String()),
         }),
       );
     } catch (e) {
       debugPrint('Estado Pro sin guardar: $e');
+    }
+  }
+
+  /// El último estado Pro guardado, si sigue vigente (no venció); si no, null
+  static Future<ProStatus?> cached(String businessId, {DateTime? now}) async {
+    try {
+      final raw = await AppDatabase.instance.getSetting(_key(businessId));
+      if (raw == null) return null;
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      if (m['active'] != true) return null;
+      final ends = DateTime.tryParse('${m['ends_at']}')?.toLocal();
+      if (ends != null && !ends.isAfter(now ?? DateTime.now())) return null;
+      return ProStatus(active: true, kind: m['kind'] as String?, endsAt: ends, services: m['services'] == true);
+    } catch (_) {
+      return null;
     }
   }
 

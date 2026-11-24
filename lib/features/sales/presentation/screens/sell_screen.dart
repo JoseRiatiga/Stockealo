@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../../../products/presentation/category_icons.dart';
 import '../../../../core/utils/money_input.dart';
 import 'package:flutter/material.dart';
+import '../../../business/data/branch_repository.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/design/app_dialog.dart';
@@ -307,6 +308,11 @@ class _SellScreenState extends State<SellScreen> {
 
   Future<void> _charge({BuildContext? sheet}) async {
     if (_cart.isEmpty || _saving) return;
+    // Sedes (0.18.0): con «Todas las sedes» solo se mira; para vender hay una sede elegida
+    if (BranchRepository.instance.viewAll.value) {
+      AppToast.showWarning(context, 'Estás viendo todas las sedes. Para vender, elige una sede en el menú.');
+      return;
+    }
     final total = _cart.total;
     final method = _pay.method;
     final customer = _customer.text.trim();

@@ -33,10 +33,10 @@ abstract final class IdleProducts {
     final since = at.subtract(const Duration(days: days)).toIso8601String();
     final rows = await (await AppDatabase.instance.database).rawQuery('''
       SELECT p.id, p.name, p.stock, p.purchase_price AS cost, p.created_at,
-             (SELECT MAX(s.date) FROM sales_ok s WHERE s.product_id = p.id) AS last_sale
+             (SELECT MAX(s.date) FROM sales_here s WHERE s.product_id = p.id) AS last_sale
       FROM products p
       WHERE p.business_id = ? AND COALESCE(p.is_active, 1) = 1 AND p.stock > 0 AND p.created_at < ?
-        AND NOT EXISTS (SELECT 1 FROM sales_ok s WHERE s.product_id = p.id AND s.date >= ? AND s.quantity > 0)
+        AND NOT EXISTS (SELECT 1 FROM sales_here s WHERE s.product_id = p.id AND s.date >= ? AND s.quantity > 0)
     ''', [businessId, since, since]);
     final list = [
       for (final r in rows)

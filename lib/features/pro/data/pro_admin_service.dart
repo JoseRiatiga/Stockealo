@@ -605,6 +605,10 @@ class ProAdminService {
   Future<void> grantPro(String businessId, int? days, {String kind = 'business'}) =>
       _rpc('admin_grant_pro', {'p_business_id': businessId, 'p_days': days, 'p_kind': kind});
 
+  /// Cupos de sedes extra (0.18.0), hasta 1 año. Devuelve cuántas sedes extra puede tener
+  Future<int> grantBranchSlots(String businessId, int slots, int days) async =>
+      ((await _rpc('admin_grant_branch_slots', {'p_business_id': businessId, 'p_slots': slots, 'p_days': days})) as num).toInt();
+
   Future<void> endSubscription(String id) => _rpc('admin_end_subscription', {'p_id': id});
 
   // --- Códigos ---------------------------------------------------------------

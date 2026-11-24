@@ -11,6 +11,8 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../business/presentation/active_business_scope.dart';
 import '../../../../core/services/supabase_service.dart';
 import 'package:flutter/material.dart';
+import '../../../business/data/branch_repository.dart';
+import '../../../../core/database/app_database.dart';
 import 'package:flutter/services.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
 import '../../../products/presentation/screens/products_list_screen.dart';
@@ -115,6 +117,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     HardwareKeyboard.instance.addHandler(_onKey);
     AppPlace.request.addListener(_onPlaceRequest);
     Permissions.viewAs.addListener(_onViewAs);
+    BranchRepository.instance.current.addListener(_onBranchChanged);
     _loadNavigationContext();
     _checkAppUpdateSilently();
     // Copia diaria de los datos en el celular; sin esperar y sin estorbar si falla.
@@ -314,6 +317,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     HardwareKeyboard.instance.removeHandler(_onKey);
     AppPlace.request.removeListener(_onPlaceRequest);
     Permissions.viewAs.removeListener(_onViewAs);
+    BranchRepository.instance.current.removeListener(_onBranchChanged);
     _authChannel?.unsubscribe();
     _accessTimer?.cancel();
     _lifecycle.dispose();
@@ -343,6 +347,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
           userId: user.id,
           userEmail: user.email,
         );
+        // Sedes (0.18.0): la elegida o la de la persona; luego se ponen al día con la nube
+        await _useBranches(biz.id, role, user.email);
         // Iniciar escucha de ventas en tiempo real si hay negocio activo
         NotificationService.instance.startRealtimeSalesListening(
           businessId: biz.id,
@@ -375,6 +381,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
         });
       }
     }
+  }
+
+  /// Sedes del negocio: el cajero queda en la suya; el dueño y los administradores
+  /// retoman la que tenían elegida. Al cambiar de sede la cuenta de Vender empieza
+  /// de cero (lo de otra sede no se mezcla), igual que al cambiar de negocio.
+  Future<void> _useBranches(String businessId, String role, String email) async {
+    final branches = BranchRepository.instance;
+    String? mine;
+    try {
+      final db = await AppDatabase.instance.database;
+      final rows = await db.query('business_members',
+          columns: ['branch_id'], where: 'business_id = ? AND LOWER(email) = ?', whereArgs: [businessId, email.toLowerCase()], limit: 1);
+      mine = rows.isEmpty ? null : rows.first['branch_id'] as String?;
+    } catch (_) {}
+    await branches.use(businessId, role: role, memberBranchId: mine);
+    branches.refresh().then((_) => branches.use(businessId, role: role, memberBranchId: mine));
+  }
+
+  void _onBranchChanged() {
+    final cart = SellCart.instance;
+    if (cart.lines.isNotEmpty || cart.held.isNotEmpty) cart.reset();
+    if (mounted) setState(() {});
   }
 
   Future<void> _handleSelectBusiness() async {

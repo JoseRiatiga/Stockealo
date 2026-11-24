@@ -4,5 +4,5 @@
 /// En la web, PackageInfo lee el version.json del servidor, que es la versión
 /// publicada y no la que está corriendo; por eso el aviso de versión nueva de la
 /// web compara contra esta constante.
-const String kAppVersion = '0.17.1';
-const int kAppBuildNumber = 59;
+const String kAppVersion = '0.18.0';
+const int kAppBuildNumber = 60;

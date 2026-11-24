@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../business/data/branch_repository.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../backup/data/auto_backup_service.dart';
 import '../../../core/utils/business_clock.dart';
@@ -340,6 +341,13 @@ class GuidedImport {
     }
     final db = await AppDatabase.instance.database;
     var created = 0, updated = 0, skipped = 0;
+    // Sede elegida (0.18.0): el stock del archivo entra a esa sede; la Principal no cambia
+    final branch = BranchRepository.active;
+    final branchStock = branch == null ? null : await BranchRepository.stockIn(branch);
+    Future<void> toBranch(String productId, int stock, int? minStock) async {
+      await BranchRepository.setStock(db, businessId: businessId, branchId: branch!, productId: productId, stock: stock, minStock: minStock);
+      SupabaseService.instance.setBranchStockInCloud(branch, productId, null, stock, minStock: minStock);
+    }
     for (final r in rows) {
       if (r.name.isEmpty || r.issues.any((i) => i.startsWith('Código repetido'))) {
         skipped++;
@@ -360,16 +368,17 @@ class GuidedImport {
           continue;
         }
         final e = existing.first;
-        final current = (e['stock'] as num?)?.toInt() ?? 0;
+        final current = branch == null ? (e['stock'] as num?)?.toInt() ?? 0 : (branchStock![e['id']]?.stock ?? 0);
         final stock = r.stock == null ? current : (stockMode == StockMode.add ? current + r.stock! : r.stock!);
+        if (branch != null && (r.stock != null || r.minStock != null)) await toBranch(e['id'] as String, stock, r.minStock);
         await db.update(
           'products',
           {
             if (r.category != null) 'category': r.category,
             if (r.cost != null) 'purchase_price': r.cost,
             if (r.price != null) 'sale_price': r.price,
-            'stock': stock,
-            if (r.minStock != null) 'min_stock': r.minStock,
+            if (branch == null) 'stock': stock,
+            if (r.minStock != null && branch == null) 'min_stock': r.minStock,
             'is_active': 1,
             'updated_at': now,
           },
@@ -389,7 +398,7 @@ class GuidedImport {
           'category': r.category ?? 'General',
           'purchase_price': r.cost ?? 0,
           'sale_price': r.price ?? 0,
-          'stock': r.stock ?? 0,
+          'stock': branch == null ? r.stock ?? 0 : 0,
           'min_stock': r.minStock ?? 5,
           'photo_path': null,
           'is_active': 1,
@@ -399,6 +408,7 @@ class GuidedImport {
         };
         await db.insert('products', product);
         SupabaseService.instance.upsertProductToCloud(product);
+        if (branch != null && (r.stock ?? 0) > 0) await toBranch(product['id'] as String, r.stock!, r.minStock);
         created++;
       }
     }

@@ -5,6 +5,9 @@ class CashSession {
   final String id;
   final String businessId;
   final String openedBy;
+
+  /// Sede de la caja (0.18.0); null = Principal
+  final String? branchId;
   final DateTime openedAt;
   final double openingAmount;
   final DateTime? closedAt;
@@ -21,6 +24,7 @@ class CashSession {
     required this.id,
     required this.businessId,
     required this.openedBy,
+    this.branchId,
     required this.openedAt,
     required this.openingAmount,
     this.closedAt,
@@ -57,6 +61,7 @@ class CashSession {
         id: id,
         businessId: businessId,
         openedBy: openedBy,
+        branchId: branchId,
         openedAt: openedAt,
         openingAmount: openingAmount,
         closedAt: closedAt ?? this.closedAt,
@@ -72,6 +77,7 @@ class CashSession {
         'id': id,
         'business_id': businessId,
         'opened_by': openedBy,
+        'branch_id': branchId,
         'opened_at': openedAt.toIso8601String(),
         'opening_amount': openingAmount,
         'closed_at': closedAt?.toIso8601String(),
@@ -97,6 +103,7 @@ class CashSession {
       id: map['id'] as String,
       businessId: map['business_id'] as String,
       openedBy: map['opened_by'] as String,
+      branchId: map['branch_id'] as String?,
       openedAt: DateTime.parse(map['opened_at'] as String).toLocal(),
       openingAmount: (map['opening_amount'] as num).toDouble(),
       closedAt: map['closed_at'] != null ? DateTime.parse(map['closed_at'] as String).toLocal() : null,

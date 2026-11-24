@@ -1112,7 +1112,7 @@ class StockyAssistantService {
         COALESCE(MAX(p.name), MAX(s.product_name)) AS product_name,
         SUM(s.quantity) as qty,
         SUM(s.total) as revenue
-      FROM sales_ok s LEFT JOIN products p ON p.id = s.product_id
+      FROM sales_here s LEFT JOIN products p ON p.id = s.product_id
       WHERE s.business_id = ?
       GROUP BY CASE WHEN s.product_id IS NULL OR s.product_id = '' THEN 'n:' || s.product_name ELSE s.product_id END 
       ORDER BY qty DESC 
@@ -1169,7 +1169,7 @@ class StockyAssistantService {
       FROM products p
       WHERE p.business_id = ? AND p.is_active = 1 AND p.stock > 0
         AND p.id NOT IN (
-          SELECT DISTINCT product_id FROM sales_ok 
+          SELECT DISTINCT product_id FROM sales_here 
           WHERE business_id = ? AND date >= ? AND product_id IS NOT NULL
         )
       LIMIT 5

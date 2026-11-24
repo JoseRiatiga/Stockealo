@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../business/data/branch_repository.dart';
 import '../../../core/utils/business_clock.dart';
 import '../models/product.dart';
 import 'lots_repository.dart';
@@ -67,7 +68,11 @@ class StockCount {
 
   StockCount({required this.businessId, required this.startedAt, Map<String, CountLine>? lines}) : lines = lines ?? {};
 
-  static String draftKey(String businessId) => 'stock_count_$businessId';
+  /// Un borrador por sede (0.18.0): lo contado en una sede no se aplica a otra
+  static String draftKey(String businessId) {
+    final branch = BranchRepository.active;
+    return branch == null ? 'stock_count_$businessId' : 'stock_count_${businessId}_$branch';
+  }
 
   /// El borrador guardado en este celular, o null
   static Future<StockCount?> load(String businessId) async {

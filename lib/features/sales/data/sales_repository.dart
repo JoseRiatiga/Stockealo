@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
+import '../../business/data/branch_repository.dart';
 import '../../../core/services/data_events.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -271,6 +272,11 @@ class SalesRepository {
 
     final db = await _dbProvider.database;
     await CashRegisterRepository.instance.requireOpen(businessId);
+    // Sede de la venta (0.18.0): null = Principal, que sigue exactamente como antes
+    final branch = BranchRepository.active;
+    if (!BranchRepository.instance.activeUsable) {
+      throw Exception('Esta sede no está disponible para vender. Revisa tu plan en Stockealo Pro.');
+    }
 
     // 1. Validar stock de todos los productos y variantes antes de iniciar
     for (final item in items) {
@@ -325,6 +331,8 @@ class SalesRepository {
     final List<Sale> createdSales = [];
     final Map<String, int> stockDeltas = {};
     final Map<String, int> variantDeltas = {};
+    // Sede extra: «producto|variante» -> diferencia
+    final Map<String, int> branchDeltas = {};
     String? customerId;
     var customerIsNew = false;
 
@@ -375,6 +383,13 @@ class SalesRepository {
         final double itemProfit = itemTotal - item.totalCost;
         final String? itemSplit = amounts[li].split;
 
+        if (branch != null) {
+          // Sede extra: sale de su stock; la Principal no se toca
+          await BranchRepository.addStock(txn,
+              businessId: businessId, branchId: branch, productId: product.id, variantId: item.variant?.id, delta: -item.quantity);
+          final key = '${product.id}|${item.variant?.id ?? ''}';
+          branchDeltas[key] = (branchDeltas[key] ?? 0) - item.quantity;
+        } else {
         // Descontar stock específico de la variante si aplica. Por diferencia: la
         // variante del carrito puede traer existencias de hace rato
         if (item.variant != null) {
@@ -395,6 +410,7 @@ class SalesRepository {
           where: 'id = ? AND business_id = ?',
           whereArgs: [product.id, businessId],
         );
+        }
 
         // Movimiento en Kardex
         await txn.insert('stock_movements', {
@@ -408,6 +424,7 @@ class SalesRepository {
               ? 'Venta POS $invoiceNumber - ${item.variant!.label} ($paymentMethod)'
               : 'Venta POS $invoiceNumber ($paymentMethod)',
           'date': now.toIso8601String(),
+          'branch_id': branch,
         });
 
         // Insertar en sales
@@ -439,6 +456,7 @@ class SalesRepository {
           'delivery_status': deliveryStatus,
           'delivery_note': deliveryNote,
           'created_at': now.toIso8601String(),
+          'branch_id': branch,
           'is_synced': 0,
         });
 
@@ -477,10 +495,11 @@ class SalesRepository {
           promotionDiscount: promo == null ? 0 : item.promoDiscount,
           deliveryStatus: deliveryStatus,
           deliveryNote: deliveryNote,
+          branchId: branch,
         );
 
         createdSales.add(sale);
-        stockDeltas[product.id] = (stockDeltas[product.id] ?? 0) - item.quantity;
+        if (branch == null) stockDeltas[product.id] = (stockDeltas[product.id] ?? 0) - item.quantity;
       }
     });
 
@@ -491,6 +510,10 @@ class SalesRepository {
     }
     stockDeltas.forEach(SupabaseService.instance.adjustProductStockInCloud);
     variantDeltas.forEach(SupabaseService.instance.adjustVariantStockInCloud);
+    branchDeltas.forEach((key, delta) {
+      final parts = key.split('|');
+      SupabaseService.instance.adjustBranchStockInCloud(branch!, parts[0], parts[1].isEmpty ? null : parts[1], delta);
+    });
 
     final units = items.fold<int>(0, (sum, i) => sum + i.quantity);
     final who = customerName?.trim().isNotEmpty == true ? ' a ${customerName!.trim()}' : '';
@@ -794,8 +817,8 @@ class SalesRepository {
   Future<List<List<Sale>>> pendingDeliveries(String businessId) async {
     final db = await _dbProvider.database;
     final rows = await db.query('sales',
-        where: 'business_id = ? AND delivery_status = ? AND voided_at IS NULL',
-        whereArgs: [businessId, Sale.toDeliver],
+        where: 'business_id = ? AND delivery_status = ? AND voided_at IS NULL${BranchRepository.scope()}',
+        whereArgs: [businessId, Sale.toDeliver, ...BranchRepository.scopeArgs()],
         orderBy: 'date ASC');
     final groups = <String, List<Sale>>{};
     for (final r in rows) {
@@ -854,9 +877,10 @@ class SalesRepository {
       SELECT s.*, COALESCE(s.product_photo_path, p.photo_path) AS resolved_photo, p.name AS current_name
       FROM sales s
       LEFT JOIN products p ON s.product_id = p.id
-      WHERE s.business_id = ?
+      WHERE s.business_id = ?${BranchRepository.scope('s.branch_id')}
     ''';
-    final List<dynamic> args = [businessId];
+    // Sede elegida (0.18.0)
+    final List<dynamic> args = [businessId, ...BranchRepository.scopeArgs()];
 
     if (dateFilter != null && dateFilter.isNotEmpty) {
       sql += ' AND s.date LIKE ?';
@@ -931,6 +955,7 @@ class SalesRepository {
       deliveryNote: map['delivery_note'] as String?,
       deliveredAt: DateTime.tryParse('${map['delivered_at'] ?? ''}'),
       returnOf: map['return_of'] as String?,
+      branchId: map['branch_id'] as String?,
       currentName: map['current_name'] as String?,
     );
   }
@@ -998,9 +1023,26 @@ class SalesRepository {
         'variant_name': line.variantName,
         'return_of': line.id,
         'created_at': at.toIso8601String(),
+        // La devolución queda en la sede de la venta (0.18.0)
+        'branch_id': line.branchId,
         'is_synced': 0,
       });
-      if (restock && line.productId.isNotEmpty) {
+      if (restock && line.productId.isNotEmpty && line.branchId != null) {
+        // Sede extra: vuelve al stock de la sede de la venta
+        await BranchRepository.addStock(txn,
+            businessId: line.businessId, branchId: line.branchId!, productId: line.productId, variantId: line.variantId, delta: quantity);
+        await txn.insert('stock_movements', {
+          'id': const Uuid().v4(),
+          'business_id': line.businessId,
+          'product_id': line.productId,
+          'type': 'AJUSTE',
+          'quantity': quantity,
+          'resulting_stock': 0,
+          'reason': 'Devolución ${line.invoiceNumber ?? ''}'.trim(),
+          'date': at.toIso8601String(),
+          'branch_id': line.branchId,
+        });
+      } else if (restock && line.productId.isNotEmpty) {
         await txn.rawUpdate('UPDATE products SET stock = stock + ? WHERE id = ? AND business_id = ?',
             [quantity, line.productId, line.businessId]);
         if (line.variantId != null) {
@@ -1043,10 +1085,13 @@ class SalesRepository {
       variantName: line.variantName,
       invoiceNumber: line.invoiceNumber,
       returnOf: line.id,
+      branchId: line.branchId,
     );
     final cloud = SupabaseService.instance;
     await cloud.insertSaleToCloud({...sale.toMap(), 'customer_id': customerId, 'notes': null});
-    if (restock && line.productId.isNotEmpty) {
+    if (restock && line.productId.isNotEmpty && line.branchId != null) {
+      await cloud.adjustBranchStockInCloud(line.branchId!, line.productId, line.variantId, quantity);
+    } else if (restock && line.productId.isNotEmpty) {
       await cloud.adjustProductStockInCloud(line.productId, quantity);
       if (line.variantId != null) await cloud.adjustVariantStockInCloud(line.variantId!, quantity);
     }
@@ -1150,6 +1195,8 @@ class SalesRepository {
     final businessOf = <String, String>{};
 
     final missing = <String>{};
+    String? voidBranch;
+    final branchBack = <String, int>{};
     await db.transaction((txn) async {
       // Se leen dentro de la transacción (0.16.6): dos toques casi a la vez no anulan
       // dos veces lo mismo ni reponen el stock dos veces
@@ -1168,8 +1215,19 @@ class SalesRepository {
       // devolución ya hecha comparte el comprobante y resta. Así el stock y la deuda
       // cambian una sola vez y no dependen del orden de las filas (con el tope de deuda
       // en 0, anular la venta antes que su devolución dejaba al cliente debiendo).
+      // Sede de la venta (0.18.0): en una sede extra el stock vuelve a esa sede
+      voidBranch = lines.firstOrNull?.branchId;
+      if (voidBranch != null) {
+        for (final line in lines) {
+          if (line.productId.isEmpty || line.quantity == 0) continue;
+          await BranchRepository.addStock(txn,
+              businessId: line.businessId, branchId: voidBranch!, productId: line.productId, variantId: line.variantId, delta: line.quantity);
+          final key = '${line.productId}|${line.variantId ?? ''}';
+          branchBack[key] = (branchBack[key] ?? 0) + line.quantity;
+        }
+      }
       for (final line in lines) {
-        if (line.productId.isNotEmpty) {
+        if (line.productId.isNotEmpty && voidBranch == null) {
           stock[line.productId] = (stock[line.productId] ?? 0) + line.quantity;
           if (line.variantId != null) variants[line.variantId!] = (variants[line.variantId!] ?? 0) + line.quantity;
         }
@@ -1267,6 +1325,11 @@ class SalesRepository {
     }
     for (final e in variants.entries) {
       if (e.value != 0) await cloud.adjustVariantStockInCloud(e.key, e.value);
+    }
+    for (final e in branchBack.entries) {
+      if (e.value == 0) continue;
+      final parts = e.key.split('|');
+      await cloud.adjustBranchStockInCloud(voidBranch!, parts[0], parts[1].isEmpty ? null : parts[1], e.value);
     }
     for (final e in debts.entries) {
       await cloud.adjustCustomerDebtInCloud(e.key, -e.value);

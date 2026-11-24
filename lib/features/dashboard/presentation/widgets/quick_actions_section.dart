@@ -8,6 +8,7 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../business/models/business.dart';
 import '../../../business/presentation/screens/modules_screen.dart';
+import '../../../business/presentation/screens/branches_screen.dart';
 import '../../../home/data/app_functions.dart';
 import '../../../pro/data/pro_service.dart';
 import '../../../pro/presentation/screens/pro_screen.dart';
@@ -108,6 +109,8 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
         await AppPane.open(context, (_) => EmployeesScreen(business: biz));
       case 'roles':
         await RolesScreen.open(context, business: biz, canEdit: widget.role == Permissions.owner);
+      case 'branches':
+        await BranchesScreen.open(context, business: biz, isOwner: widget.role == Permissions.owner);
       case 'modules':
         await ModulesScreen.open(context, business: biz, canEdit: Permissions.can(widget.role, Perm.modules));
       case 'pro':

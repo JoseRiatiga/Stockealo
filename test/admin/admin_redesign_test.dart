@@ -15,6 +15,15 @@ void main() {
     expect(adminPaymentState('DECLINED', now, now: now).label, 'Rechazado');
   });
 
+  test('Pagos oculta los sin terminar y los del equipo (24 nov)', () {
+    final team = {'jose@ejemplo.com'};
+    final old = now.subtract(const Duration(days: 15));
+    expect(adminPaymentHidden('PENDING', old, 'cliente@ejemplo.com', team, now: now), isTrue);
+    expect(adminPaymentHidden('PENDING', now, 'cliente@ejemplo.com', team, now: now), isFalse);
+    expect(adminPaymentHidden('APPROVED', now, ' Jose@Ejemplo.com', team, now: now), isTrue);
+    expect(adminPaymentHidden('APPROVED', now, 'cliente@ejemplo.com', team, now: now), isFalse);
+  });
+
   test('los planes se leen como en la app', () {
     expect(proPlanIdLabel('business_month_cop'), 'Pro · Mensual');
     expect(proPlanIdLabel('services_year_cop'), 'Pro Servicios · Anual');

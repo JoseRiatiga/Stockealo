@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../../../core/services/error_reporter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/supabase_service.dart';
@@ -19,13 +21,41 @@ class ProStatus {
   /// Tiene Pro Servicios: se ve la pestaña Servicios (incluye todo lo de Pro)
   final bool services;
 
-  const ProStatus({required this.active, this.kind, this.endsAt, this.services = false});
+  /// Hasta cuándo va Pro Servicios (null = permanente o sin Pro Servicios). Con Pro y
+  /// Pro Servicios a la vez, [endsAt] es la fecha más lejana de los dos (24 nov).
+  final DateTime? servicesEndsAt;
+
+  const ProStatus({required this.active, this.kind, this.endsAt, this.services = false, this.servicesEndsAt});
 
   static const none = ProStatus(active: false);
 
   bool get lifetime => active && endsAt == null;
 
   String get kindLabel => proKindLabel(kind);
+
+  /// Cuándo vence el plan que se ve ([kindLabel]): con Pro Servicios, el suyo; null = permanente
+  DateTime? get planEndsAt => services ? servicesEndsAt : endsAt;
+
+  /// Con Pro Servicios y además Pro que sigue después (pagado aparte), hasta cuándo va
+  /// ese Pro. null = no queda Pro después de Pro Servicios.
+  DateTime? get proAfterServices {
+    final s = servicesEndsAt;
+    final e = endsAt;
+    if (!active || !services || s == null || e == null) return null;
+    return e.isAfter(s) ? e : null;
+  }
+}
+
+/// «Pro Servicios hasta el 11/12/2026 · después Pro hasta el 10/1/2027» (24 nov): el
+/// plan que se ve con su propia fecha, y el Pro que sigue después si lo hay
+String proUntilText(ProStatus s) {
+  String d(DateTime t) => '${t.day}/${t.month}/${t.year}';
+  final ends = s.planEndsAt;
+  final head = ends == null ? '${s.kindLabel} permanente' : '${s.kindLabel} hasta el ${d(ends)}';
+  final after = s.proAfterServices;
+  if (after != null) return '$head · después Pro hasta el ${d(after)}';
+  if (s.services && ends != null && s.endsAt == null) return '$head · después Pro permanente';
+  return head;
 }
 
 /// Nombre de cada plan para mostrar
@@ -144,6 +174,32 @@ class ProService {
     return client?.auth.currentSession == null ? null : client;
   }
 
+  /// El estado Pro de cualquier negocio (activo o no) sin cambiar el que ven las
+  /// pantallas: lo usa la papelera para avisar si se pierde un Pro pagado (24 nov).
+  /// Sin conexión, el último guardado; null si no se sabe.
+  Future<ProStatus?> statusOf(String businessId) async {
+    final client = _client;
+    if (client != null) {
+      try {
+        final data = await client.rpc('pro_status', params: {'p_business_id': businessId});
+        final result = _fromMap(Map<String, dynamic>.from(data as Map));
+        await _remember(businessId, result);
+        return result;
+      } catch (e) {
+        if (!isNotMember(e)) debugPrint('Estado Pro no disponible: $e');
+      }
+    }
+    return cached(businessId);
+  }
+
+  static ProStatus _fromMap(Map<String, dynamic> map) => ProStatus(
+        active: map['active'] == true,
+        kind: map['kind'] as String?,
+        endsAt: map['ends_at'] == null ? null : DateTime.tryParse(map['ends_at'] as String)?.toLocal(),
+        services: map['services'] == true,
+        servicesEndsAt: map['services_ends_at'] == null ? null : DateTime.tryParse('${map['services_ends_at']}')?.toLocal(),
+      );
+
   /// Consulta el estado Pro del negocio. Sin conexión deja el último conocido.
   Future<ProStatus> refresh(String businessId) async {
     if (_statusBusinessId != businessId) {
@@ -160,13 +216,7 @@ class ProService {
     await SupabaseService.instance.ensureFreshSession();
     try {
       final data = await client.rpc('pro_status', params: {'p_business_id': businessId});
-      final map = Map<String, dynamic>.from(data as Map);
-      final result = ProStatus(
-        active: map['active'] == true,
-        kind: map['kind'] as String?,
-        endsAt: map['ends_at'] == null ? null : DateTime.tryParse(map['ends_at'] as String)?.toLocal(),
-        services: map['services'] == true,
-      );
+      final result = _fromMap(Map<String, dynamic>.from(data as Map));
       if (_statusBusinessId == businessId) status.value = result;
       // Se recuerda por negocio: avisa cuándo vence y pausa los recordatorios sin Pro (0.15.0)
       await _remember(businessId, result);
@@ -194,6 +244,7 @@ class ProService {
           'kind': s.kind,
           'ends_at': s.endsAt?.toIso8601String(),
           'services': s.services,
+          'services_ends_at': s.servicesEndsAt?.toIso8601String(),
           // Cuándo venció la última vez (para «Tu Pro venció el…»)
           'ended_at': s.active ? null : (before?.active == true ? before?.endsAt?.toIso8601String() : before?.endedAt?.toIso8601String()),
         }),
@@ -203,16 +254,32 @@ class ProService {
     }
   }
 
+  /// El estado guardado [m], si sigue vigente en [now]; si no, null
+  @visibleForTesting
+  static ProStatus? decodeCached(Map<String, dynamic> m, {DateTime? now}) {
+    if (m['active'] != true) return null;
+    final ends = DateTime.tryParse('${m['ends_at']}')?.toLocal();
+    if (ends != null && !ends.isAfter(now ?? DateTime.now())) return null;
+    // Pro Servicios con fecha propia ya vencida y un Pro que sigue: sin conexión
+    // queda solo Pro (hallazgo de Codex, 24 nov)
+    final servicesEnds = DateTime.tryParse('${m['services_ends_at']}')?.toLocal();
+    final servicesOver = servicesEnds != null && !servicesEnds.isAfter(now ?? DateTime.now());
+    final services = m['services'] == true && !servicesOver;
+    return ProStatus(
+      active: true,
+      kind: services ? m['kind'] as String? : (m['kind'] == 'services' ? 'business' : m['kind'] as String?),
+      endsAt: ends,
+      services: services,
+      servicesEndsAt: services ? servicesEnds : null,
+    );
+  }
+
   /// El último estado Pro guardado, si sigue vigente (no venció); si no, null
   static Future<ProStatus?> cached(String businessId, {DateTime? now}) async {
     try {
       final raw = await AppDatabase.instance.getSetting(_key(businessId));
       if (raw == null) return null;
-      final m = jsonDecode(raw) as Map<String, dynamic>;
-      if (m['active'] != true) return null;
-      final ends = DateTime.tryParse('${m['ends_at']}')?.toLocal();
-      if (ends != null && !ends.isAfter(now ?? DateTime.now())) return null;
-      return ProStatus(active: true, kind: m['kind'] as String?, endsAt: ends, services: m['services'] == true);
+      return decodeCached(jsonDecode(raw) as Map<String, dynamic>, now: now);
     } catch (_) {
       return null;
     }
@@ -299,13 +366,19 @@ class ProService {
           });
       final data = Map<String, dynamic>.from(res.data as Map);
       return ProCheckout(data['reference'] as String, data['url'] as String);
-    } on FunctionException catch (e) {
+    } on FunctionException catch (e, st) {
       final code = e.details is Map ? (e.details as Map)['error']?.toString() ?? '' : '${e.details}';
+      // Fallas del servidor (no las del cliente, como un cupón vencido) van al panel
+      if (e.status >= 500 && !code.contains('maintenance')) {
+        unawaited(ErrorReporter.instance.report('pro-checkout ${e.status}: $code', st, kind: 'payment'));
+      }
       throw ProCheckoutException(checkoutErrorMessage(code));
     } on ProCheckoutException {
       rethrow;
-    } catch (e) {
+    } catch (e, st) {
+      // Sin respuesta del servidor (así se vio el bloqueo de CORS del 24 nov): al panel
       debugPrint('Pago en línea: $e');
+      unawaited(ErrorReporter.instance.report(e, st, kind: 'payment'));
       throw const ProCheckoutException('No se pudo iniciar el pago. Inténtalo de nuevo.');
     }
   }
@@ -360,6 +433,7 @@ class ProService {
     if (code.contains('currency_not_supported')) return 'El pago en línea por ahora es solo en pesos colombianos.';
     if (code.contains('payments_not_configured')) return 'El pago en línea no está disponible ahora. Usa Nequi.';
     if (code.contains('plan_not_found')) return 'Ese plan ya no está disponible.';
+    if (code.contains('included_in_plan')) return 'Tu Pro Servicios ya incluye todo lo de Pro.';
     if (code.contains('coupon_')) return CouponText.error(code);
     return 'No se pudo iniciar el pago. Inténtalo de nuevo.';
   }

@@ -7,6 +7,7 @@ import '../business_identity.dart';
 import '../active_business_scope.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../widgets/business_trash.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -168,23 +169,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AppDialog(
-title: '¿Mover a la papelera?',
-content: Text(
-          'El negocio "${_business.name}" se enviará a la papelera durante 7 días. Podrás restaurarlo o se eliminará de forma definitiva al finalizar el plazo.',
-        ),
-actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: ctx.colors.danger, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Mover a la papelera'),
-          ),
-        ],
-),
-    );
+    final confirmed = await BusinessTrash.confirmMove(context, _business);
 
     if (confirmed == true) {
       await _businessRepo.softDeleteBusiness(_business.id);

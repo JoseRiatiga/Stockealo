@@ -6,9 +6,121 @@ import '../../models/business.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/status_pill.dart';
+import '../../../pro/data/pro_service.dart';
 
 /// Papelera de negocios: restaurar, eliminar definitivamente o vaciarla.
 class BusinessTrash {
+  /// Confirmar «Mover a la papelera» (un solo lugar desde el 24 nov: «Tus negocios» y
+  /// «Tu negocio» usan esta). Pide escribir el nombre y, si el negocio tiene Pro
+  /// vigente, avisa que ese tiempo se pierde.
+  static Future<bool> confirmMove(BuildContext context, Business biz) async {
+    ProStatus? pro;
+    try {
+      pro = await ProService.instance.statusOf(biz.id);
+    } catch (_) {}
+    if (!context.mounted) return false;
+    final paidWarning = pro == null || !pro.active ? null : 'Este negocio tiene ${proUntilText(pro)}. Si lo borras, pierdes ese tiempo.';
+    final typedController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            final isMatch = typedController.text.trim() == biz.name.trim();
+            return AppDialog(
+icon: Icons.warning_amber_outlined,
+tone: AppTone.danger,
+title: '¿Mover a la papelera?',
+content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'El negocio "${biz.name}" se moverá a la papelera. Tendrás 7 días para restaurarlo antes de su eliminación definitiva.',
+                    style: TextStyle(
+                      fontSize: AppText.sizeSmall,
+                      color: dialogCtx.colors.inkMuted,
+                    ),
+                  ),
+                  if (paidWarning != null) ...[
+                    const SizedBox(height: 12),
+                    Text(paidWarning, style: TextStyle(fontSize: AppText.sizeSmall, fontWeight: FontWeight.w700, color: dialogCtx.colors.danger)),
+                  ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'Para confirmar, escribe exactamente el nombre del negocio:',
+                    style: TextStyle(
+                      fontSize: AppText.sizeCaption,
+                      fontWeight: FontWeight.bold,
+                      color: dialogCtx.colors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: dialogCtx.colors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: dialogCtx.colors.lineStrong,
+                      ),
+                    ),
+                    child: SelectableText(
+                      biz.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: dialogCtx.colors.ink,
+                        fontSize: AppText.sizeSmall,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: typedController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Escribe aquí para confirmar',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isMatch ? dialogCtx.colors.accent : dialogCtx.colors.danger,
+                          width: 1.5,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                ],
+              ),
+actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isMatch ? () => Navigator.pop(ctx, true) : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: dialogCtx.colors.danger,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: dialogCtx.colors.lineStrong,
+                    disabledForegroundColor: dialogCtx.colors.inkFaint,
+                  ),
+                  child: const Text('Eliminar y mover a papelera'),
+                ),
+              ],
+);
+          },
+        );
+      },
+    );
+
+    typedController.dispose();
+    return confirmed == true;
+  }
+
   static Future<void> show(
     BuildContext context, {
     required String userId,

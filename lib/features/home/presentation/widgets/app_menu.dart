@@ -132,7 +132,8 @@ class _AppMenuState extends State<AppMenu> {
                 listenable: BranchRepository.instance,
                 builder: (context, _) {
                   final branches = BranchRepository.instance;
-                  final hasBranches = branches.openBranches.isNotEmpty;
+                  // Con solo sedes cerradas, el dueño igual puede elegir «Todas las sedes»
+                  final hasBranches = branches.openBranches.isNotEmpty || branches.canSwitch;
                   return _BusinessButton(
                     business: widget.business,
                     collapsed: collapsed,

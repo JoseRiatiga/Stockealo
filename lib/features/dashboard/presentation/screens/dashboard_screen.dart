@@ -782,12 +782,17 @@ class _ProExpiryState extends State<_ProExpiry> {
     String? title;
     String? detail;
     var tone = AppTone.warning;
-    if (s.active && s.endsAt != null) {
-      final days = s.endsAt!.difference(now).inHours / 24;
+    // Con Pro Servicios se avisa por su propia fecha, aunque después siga un Pro (24 nov)
+    final ends = s.planEndsAt;
+    if (s.active && ends != null) {
+      final days = ends.difference(now).inHours / 24;
       if (days <= 7) {
         final n = days.ceil();
         title = n <= 1 ? 'Tu ${s.kindLabel} vence mañana' : 'Tu ${s.kindLabel} vence en $n días';
-        detail = 'Vence el ${fmt.format(s.endsAt!)}. Renuévalo para no perder la tienda en línea y lo demás de Pro.';
+        final keepsPro = s.proAfterServices != null || (s.services && s.endsAt == null);
+        detail = keepsPro
+            ? 'Vence el ${fmt.format(ends)}. Después sigues con Pro, pero sin Servicios. Renuévalo para no perderlos.'
+            : 'Vence el ${fmt.format(ends)}. Renuévalo para no perder la tienda en línea y lo demás de Pro.';
       }
     } else if (!s.active && _endedAt != null && now.difference(_endedAt!).inDays <= 15) {
       title = 'Tu Pro venció el ${fmt.format(_endedAt!)}';

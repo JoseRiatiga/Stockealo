@@ -164,7 +164,7 @@ class CashRegisterRepository {
     ActivityRepository.instance.log(
       businessId: session.businessId,
       action: 'cash_movement',
-      summary: '${m.isExit ? 'Sacó' : 'Metió'} ${CurrencyFormatter.format(amount)} de la caja: '
+      summary: '${m.isExit ? 'Sacó' : 'Metió'} ${CurrencyFormatter.format(amount)} ${m.isExit ? 'de' : 'a'} la caja: '
           '${m.reasonLabel.toLowerCase()}${m.visibleNote == null ? '' : ' (${m.visibleNote})'}',
       data: {'session_id': session.id, 'movement_id': m.id},
     );

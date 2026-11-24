@@ -117,6 +117,7 @@ class _AdminConfigPageState extends State<AdminConfigPage> {
     final c = context.colors;
     final state = AdminLoadState(loading: _loading, error: _error, empty: _config == null, emptyText: '', onRetry: _load);
     return AdminPage(
+      width: AdminWidth.form,
       title: 'Configuración',
       subtitle: 'Lo que ven los clientes en Ajustes › Stockealo Pro',
       onRefresh: _load,

@@ -47,17 +47,14 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
   }
 
   Future<void> _end(AdminSubscription s) async {
-    final ok = await showDialog<bool>(
+    final ok = await AppDialog.confirm(
       context: context,
-      builder: (ctx) => AppDialog(
+      icon: Icons.workspace_premium_outlined,
       title: '¿Terminar esta suscripción?',
-      content: Text('${s.businessName ?? s.ownerEmail} pierde ${s.kindLabel} desde ya. No se puede deshacer, '
-            'pero puedes volver a darle Pro.'),
-      actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Terminar')),
-        ],
-),
+      message: '${s.businessName ?? s.ownerEmail} pierde ${s.kindLabel} desde ya. No se puede deshacer, '
+          'pero puedes volver a darle Pro.',
+      confirmText: 'Terminar',
+      destructive: true,
     );
     if (ok != true) return;
     try {
@@ -81,7 +78,9 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
       loading: _loading,
       error: _error,
       empty: _subs.isEmpty,
-      emptyText: _onlyActive ? 'Ningún negocio tiene Pro activo.' : 'Todavía no hay suscripciones.',
+      emptyText: _onlyActive ? 'Ningún negocio tiene Pro activo' : 'Todavía no hay suscripciones',
+      emptyDetail: 'Aparecen al dar Pro, al canjear un código o al pagar en la app.',
+      emptyIcon: Icons.workspace_premium_outlined,
       onRetry: _load,
     );
     return AdminPage(

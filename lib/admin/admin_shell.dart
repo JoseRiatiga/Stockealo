@@ -76,9 +76,35 @@ class _AdminShellState extends State<AdminShell> {
     super.initState();
     // El rol decide qué botones se ven (el servidor igual lo hace cumplir)
     ProAdminService.instance.loadMe();
+    // Ctrl K en cualquier parte (prueba del 24 nov): con el atajo atado al foco, tras
+    // tocar una zona sin foco (el fondo de una lista) no hacía nada
+    HardwareKeyboard.instance.addHandler(_onKey);
   }
 
-  void _search() => AdminSearchDialog.show(context, onOpenSection: _go);
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    super.dispose();
+  }
+
+  bool _searching = false;
+
+  bool _onKey(KeyEvent e) {
+    final k = HardwareKeyboard.instance;
+    if (e is! KeyDownEvent || e.logicalKey != LogicalKeyboardKey.keyK || !(k.isControlPressed || k.isMetaPressed)) return false;
+    if (!mounted || _searching) return true;
+    _search();
+    return true;
+  }
+
+  Future<void> _search() async {
+    _searching = true;
+    try {
+      await AdminSearchDialog.show(context, onOpenSection: _go);
+    } finally {
+      _searching = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +119,7 @@ class _AdminShellState extends State<AdminShell> {
     });
 
     return CallbackShortcuts(
-      bindings: {const SingleActivator(LogicalKeyboardKey.keyK, control: true): _search},
+      bindings: const {},
       child: Focus(
         autofocus: true,
         child: Scaffold(

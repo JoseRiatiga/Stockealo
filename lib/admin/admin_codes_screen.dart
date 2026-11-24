@@ -108,15 +108,15 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
 
   /// ¿Lo compró o es un regalo? (0.17.1) Copia el mensaje que corresponde
   Future<void> _copyMessage(ProCode code) async {
-    final gift = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('¿Qué mensaje copio?'),
-        children: [
-          SimpleDialogOption(onPressed: () => Navigator.pop(ctx, false), child: const Text('Lo compró')),
-          SimpleDialogOption(onPressed: () => Navigator.pop(ctx, true), child: const Text('Es un regalo')),
-        ],
-      ),
+    final gift = await adminChoose<bool>(
+      context,
+      title: '¿Qué mensaje copio?',
+      subtitle: code.code,
+      icon: Icons.content_copy_outlined,
+      options: const [
+        AdminChoice(false, 'Lo compró', detail: 'Gracias por tu compra y cómo activarlo'),
+        AdminChoice(true, 'Es un regalo', detail: 'Te regalamos Stockealo Pro y cómo activarlo'),
+      ],
     );
     if (gift == null || !mounted) return;
     adminCopy(context, code.shareMessage(gift: gift), 'Mensaje');
@@ -161,10 +161,13 @@ class _AdminCodesPageState extends State<AdminCodesPage> {
       loading: _loading,
       error: _error,
       empty: _codes.isEmpty,
-      emptyText: _search.isEmpty ? 'Todavía no hay códigos.' : 'No hay códigos con "$_search".',
+      emptyText: _search.isEmpty ? 'Todavía no hay códigos' : 'No hay códigos con «$_search»',
+      emptyDetail: _search.isEmpty ? 'Los códigos que crees arriba aparecen aquí para copiarlos y enviarlos.' : 'Busca por el código, la nota o el correo de quien lo canjeó.',
+      emptyIcon: Icons.confirmation_number_outlined,
       onRetry: _loadCodes,
     );
     return AdminPage(
+      width: AdminWidth.form,
       title: 'Códigos',
       subtitle: 'Crea códigos Pro para entregar después de cada pago',
       onRefresh: _loadCodes,

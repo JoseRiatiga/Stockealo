@@ -82,7 +82,6 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
       ('Hicieron su primera venta', n('with_sales'), n('businesses')),
       ('Han tenido Pro', n('with_pro'), n('businesses')),
     ];
-    final top = steps.first.$2 == 0 ? 1 : steps.first.$2;
     return AdminCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,7 +104,9 @@ class _AdminUsageSectionState extends State<AdminUsageSection> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                     child: LinearProgressIndicator(
-                      value: (value / top).clamp(0.0, 1.0),
+                      // Cada paso contra su propia base (cuentas o negocios): antes todo iba contra las
+                      // cuentas y con más negocios que cuentas las barras salían llenas
+                      value: base > 0 ? (value / base).clamp(0.0, 1.0) : 0,
                       minHeight: 8,
                       color: c.accent,
                       backgroundColor: c.surfaceMuted,

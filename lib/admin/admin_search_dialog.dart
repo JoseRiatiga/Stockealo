@@ -146,7 +146,7 @@ class _AdminSearchDialogState extends State<AdminSearchDialog> {
                         Icons.confirmation_number_outlined,
                         '${k['code']}',
                         '${proKindLabel(k['kind'] as String?)} · '
-                            '${k['days'] == null ? 'permanente' : '${k['days']} días'} · ${k['uses']}/${k['max_uses']} usos'
+                            '${k['days'] == null ? 'permanente' : '${k['days']} días'} · ${_codeState(k)}'
                             '${(k['note'] ?? '').toString().isEmpty ? '' : ' · ${k['note']}'}',
                         () => adminCopy(context, '${k['code']}', 'Código'),
                       ),
@@ -168,5 +168,13 @@ class _AdminSearchDialogState extends State<AdminSearchDialog> {
       ),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))],
     );
+  }
+
+  /// «0/1 usos», o «vencido» si ya no se puede canjear (desactivar lo vence al instante)
+  static String _codeState(Map<String, dynamic> k) {
+    final expires = DateTime.tryParse('${k['expires_at'] ?? ''}');
+    if (expires != null && expires.isBefore(DateTime.now())) return 'vencido o desactivado';
+    if ((k['uses'] as num? ?? 0) >= (k['max_uses'] as num? ?? 1)) return 'usado';
+    return '${k['uses']}/${k['max_uses']} usos';
   }
 }

@@ -6,6 +6,7 @@ import '../core/design/country_flag.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/utils/countries.dart';
 import '../features/pro/data/pro_admin_service.dart';
+import 'admin_user_detail.dart';
 import 'admin_widgets.dart';
 
 /// Todos los negocios creados, solo con lo necesario para administrar Stockealo:
@@ -69,10 +70,13 @@ class _AdminBusinessesPageState extends State<AdminBusinessesPage> {
       loading: _loading && _businesses.isEmpty,
       error: _error,
       empty: visible.isEmpty,
-      emptyText: _query.isEmpty ? 'Todavía no hay negocios en la nube.' : 'Ningún negocio coincide con "$_query".',
+      emptyText: _query.isEmpty ? 'Todavía no hay negocios en la nube' : 'Ningún negocio coincide con «$_query»',
+      emptyDetail: _query.isEmpty ? 'Aparecen cuando alguien activa la nube en su negocio.' : 'Prueba con otro nombre o con el correo del dueño.',
+      emptyIcon: Icons.storefront_outlined,
       onRetry: _load,
     );
     return AdminPage(
+      width: AdminWidth.full,
       title: 'Negocios',
       subtitle: _loading && _businesses.isEmpty
           ? null
@@ -106,56 +110,85 @@ class _AdminBusinessesPageState extends State<AdminBusinessesPage> {
         const SizedBox(height: AppSpace.md),
         if (state.blocking)
           state
-        else
-          for (final b in visible)
-            AdminCard(
+        else ...[
+          // En el computador, encabezado de columnas (re-diseño del panel)
+          if (MediaQuery.sizeOf(context).width >= 900)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.xs),
               child: Row(
                 children: [
-                  if (b.country != null) ...[
-                    CountryFlag(code: b.country!, width: 26),
-                    const SizedBox(width: AppSpace.md),
-                  ] else ...[
-                    Icon(Icons.store_mall_directory_outlined, color: c.inkFaint),
-                    const SizedBox(width: AppSpace.md),
-                  ],
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(b.name,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontWeight: FontWeight.w600, color: c.ink)),
-                            ),
-                            if (b.pro) ...[
-                              const SizedBox(width: AppSpace.sm),
-                              const AdminBadge('Pro', tone: AdminTone.good),
-                            ],
-                          ],
-                        ),
-                        Text(
-                          [
-                            b.ownerEmail ?? 'sin dueño',
-                            if (b.country != null) countryByCode(b.country).name,
-                          ].join(' · '),
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (b.ownerEmail != null)
-                    IconButton(
-                      tooltip: 'Copiar correo del dueño',
-                      onPressed: () => adminCopy(context, b.ownerEmail!, 'Correo'),
-                      icon: Icon(Icons.copy_outlined, size: 18, color: c.inkMuted),
-                    ),
+                  const SizedBox(width: 26 + AppSpace.md),
+                  Expanded(flex: 3, child: Text('Negocio', style: AppText.caption(context, color: c.inkMuted))),
+                  Expanded(flex: 3, child: Text('Dueño', style: AppText.caption(context, color: c.inkMuted))),
+                  Expanded(flex: 2, child: Text('País', style: AppText.caption(context, color: c.inkMuted))),
+                  SizedBox(width: 90, child: Text('Plan', style: AppText.caption(context, color: c.inkMuted))),
+                  const SizedBox(width: 40 + 24),
                 ],
               ),
             ),
+          for (final b in visible) _row(c, b),
+        ],
       ],
+    );
+  }
+
+  /// Un negocio. Tocarlo abre la ficha de su dueño (antes la lista no hacía nada)
+  Widget _row(StockealoColors c, AdminBusiness b) {
+    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final flag = b.country != null
+        ? CountryFlag(code: b.country!, width: 26)
+        : Icon(Icons.store_mall_directory_outlined, color: c.inkFaint);
+    final plan = b.pro ? const AdminBadge('Pro', tone: AdminTone.good) : Text('Gratis', style: AppText.small(context, color: c.inkMuted));
+    final copy = b.ownerEmail == null
+        ? const SizedBox(width: 40)
+        : IconButton(
+            tooltip: 'Copiar correo del dueño',
+            onPressed: () => adminCopy(context, b.ownerEmail!, 'Correo'),
+            icon: Icon(Icons.copy_outlined, size: 18, color: c.inkMuted),
+          );
+    final open = b.ownerEmail == null ? null : () => AdminUserDetailDialog.show(context, b.ownerEmail!);
+    return AdminCard(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        onTap: open,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.md),
+          child: Row(
+            children: [
+              flag,
+              const SizedBox(width: AppSpace.md),
+              if (wide) ...[
+                Expanded(flex: 3, child: Text(b.name, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600))),
+                Expanded(flex: 3, child: Text(b.ownerEmail ?? 'sin dueño', overflow: TextOverflow.ellipsis, style: AppText.small(context, color: c.inkMuted))),
+                Expanded(
+                  flex: 2,
+                  child: Text(b.country == null ? '—' : countryByCode(b.country).name, overflow: TextOverflow.ellipsis, style: AppText.small(context, color: c.inkMuted)),
+                ),
+                SizedBox(width: 90, child: Align(alignment: Alignment.centerLeft, child: plan)),
+              ] else
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Flexible(child: Text(b.name, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600))),
+                        if (b.pro) ...[const SizedBox(width: AppSpace.sm), plan],
+                      ]),
+                      Text(
+                        [b.ownerEmail ?? 'sin dueño', if (b.country != null) countryByCode(b.country).name].join(' · '),
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.small(context, color: c.inkMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              copy,
+              Icon(Icons.chevron_right, size: 20, color: open == null ? Colors.transparent : c.inkFaint),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

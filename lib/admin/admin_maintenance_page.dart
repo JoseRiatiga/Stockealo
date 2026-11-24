@@ -101,7 +101,16 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
   }
 
   Map<String, dynamic> get _public => Map<String, dynamic>.from((_current?['public'] as Map?) ?? const {});
-  String get _state => '${_public['state'] ?? 'none'}';
+  /// 'active', 'notice', 'scheduled' o 'none'. «scheduled» (prueba del 24 nov): uno
+  /// programado que todavía no se avisa (p. ej. «Avisar al empezar») no salía en el panel
+  /// y no había cómo cancelarlo hasta que empezara.
+  String get _state {
+    final public = '${_public['state'] ?? 'none'}';
+    if (public != 'none') return public;
+    final level = (_current?['level'] as num?)?.toInt() ?? 0;
+    final ends = DateTime.tryParse('${_current?['ends_at']}');
+    return level > 0 && ends != null && ends.isAfter(DateTime.now()) ? 'scheduled' : 'none';
+  }
 
   /// Elegir fecha y hora en hora de Colombia
   Future<DateTime?> _pickColombia(DateTime current, {bool timeOnly = false}) async {
@@ -202,6 +211,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
     final owner = ProAdminService.instance.isOwner;
     final state = AdminLoadState(loading: _loading, error: _error, empty: _current == null, emptyText: '', onRetry: _load);
     return AdminPage(
+      width: AdminWidth.form,
       title: 'Mantenimiento',
       subtitle: 'Avisa, pausa la nube o cierra Stockealo mientras haces cambios',
       onRefresh: _load,
@@ -222,7 +232,8 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
   }
 
   Widget _statusCard(StockealoColors c) {
-    final p = _public;
+    // Programado sin aviso todavía: los datos vienen de la ventana, no de lo que ve la gente
+    final p = _state == 'scheduled' ? Map<String, dynamic>.from(_current!) : _public;
     final scopes = {for (final s in (p['scopes'] as List? ?? const [])) '$s'};
     final parts = [
       if (scopes.contains('app')) 'app y web',
@@ -234,6 +245,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
     final (title, tone) = switch (_state) {
       'active' => ('En mantenimiento: ${_levelName(p['level'] as int? ?? 0)}', c.warning),
       'notice' => ('Mantenimiento programado: ya se está avisando', c.info),
+      'scheduled' => ('Mantenimiento programado: todavía no se avisa', c.info),
       _ => ('Todo funcionando normal', c.success),
     };
     return AdminCard(
@@ -248,7 +260,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
                 Text(title, style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
                 if (_state != 'none')
                   Text(
-                    '$parts · ${_state == 'notice' ? 'empieza ${MaintenanceGate.when(starts)} · ' : ''}'
+                    '$parts · ${_state == 'notice' || _state == 'scheduled' ? 'empieza ${MaintenanceGate.when(starts)} · ' : ''}'
                     'termina solo ${MaintenanceGate.when(ends)}',
                     style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
                   ),
@@ -256,7 +268,7 @@ class _AdminMaintenancePageState extends State<AdminMaintenancePage> {
             ),
           ),
           if (_state != 'none' && ProAdminService.instance.isOwner)
-            FilledButton(onPressed: _end, child: const Text('Terminar ya')),
+            FilledButton(onPressed: _end, child: Text(_state == 'active' ? 'Terminar ya' : 'Cancelar')),
         ],
       ),
     );

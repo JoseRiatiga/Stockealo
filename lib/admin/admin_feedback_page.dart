@@ -141,7 +141,9 @@ class _AdminFeedbackPageState extends State<AdminFeedbackPage> {
       loading: _loading,
       error: _error,
       empty: _items.isEmpty,
-      emptyText: 'No hay mensajes con ese filtro.',
+      emptyText: 'No hay mensajes con ese filtro',
+      emptyDetail: 'Aquí llega lo que los usuarios escriben desde Ajustes › Ayuda: fallos, ideas y preguntas.',
+      emptyIcon: Icons.forum_outlined,
       onRetry: _load,
     );
     return AdminPage(

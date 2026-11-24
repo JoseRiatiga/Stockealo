@@ -121,8 +121,20 @@ void main() {
   test('el registro de acciones se lee en español', () {
     expect(
       AdminTeamPageLabels.label({'action': 'grant_pro', 'detail': {'days': 30}}),
-      'Dio Pro (30 días) a un negocio',
+      'Dio Pro 1 mes a un negocio',
     );
+    // Re-diseño del panel: dice a qué negocio, y las acciones nuevas tienen texto
+    expect(
+      AdminTeamPageLabels.label({'action': 'grant_pro', 'detail': {'days': 365, 'kind': 'services', 'business_id': 'b1'}},
+          businesses: {'b1': 'Miselanea'}),
+      'Dio Pro Servicios 1 año a Miselanea',
+    );
+    expect(
+      AdminTeamPageLabels.label({'action': 'grant_branch_slots', 'detail': {'slots': 2, 'days': 30, 'business_id': 'b1'}},
+          businesses: {'b1': 'LAVADERO'}),
+      'Dio 2 cupos de sede a LAVADERO (1 mes)',
+    );
+    expect(AdminTeamPageLabels.label({'action': 'feedback_update', 'detail': {'status': 'DESCARTADO'}}), 'Descartó un mensaje de soporte');
     expect(
       AdminTeamPageLabels.label({'action': 'set_admin', 'detail': {'email': 'ana@x.com', 'role': 'SUPPORT'}}),
       'Puso a ana@x.com como Soporte',

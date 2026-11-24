@@ -147,7 +147,9 @@ class _AdminErrorsPageState extends State<AdminErrorsPage> {
       loading: _loading,
       error: _error,
       empty: _items.isEmpty,
-      emptyText: 'Sin errores en estos días.',
+      emptyText: 'Sin errores en estos días',
+      emptyDetail: 'Si algo falla en la app, la tienda o el panel, aparece aquí.',
+      emptyIcon: Icons.check_circle_outline,
       onRetry: _load,
     );
     return AdminPage(

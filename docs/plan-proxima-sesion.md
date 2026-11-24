@@ -25,6 +25,9 @@
    - la tienda con selector de sede (stock, dirección, horario, «Cómo llegar»; recuerda la elegida);
    - un solo pago con Wompi por el plan y los cupos de sede (prorrateo por días; con menos de 7 días se suma el periodo siguiente).
    - Antes de programar: plan para aprobar y bocetos.
+   - **APROBADO 24 nov: cambio de plan Pro ↔ Pro Servicios.**
+     - Con Pro Servicios vigente, la tarjeta Pro dice «Incluido en tu plan» y no tiene botón (bloqueado también en la nube, en pro-checkout); solo se renueva Pro Servicios. Bajar a Pro, cuando se venza. Puede ir con los arreglos del panel.
+     - Con Pro vigente y compra Pro Servicios: se descuentan los días de Pro que quedan, por días (ej. 15 de 30 días = ~$12.450 menos). Va en la 0.18.2, con el mismo cálculo de los cupos.
 5. **Después:**
    - 0.18.3: traslados entre sedes y encargado de turno;
    - 0.18.4: fiados, precios y Servicios por sede;

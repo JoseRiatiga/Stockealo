@@ -34,7 +34,7 @@ const PROVIDER_TIMEOUT_MS = 15000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-stockealo-branches",
 };
 
 function json(body: unknown, status = 200): Response {

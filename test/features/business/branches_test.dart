@@ -9,6 +9,9 @@ import 'package:stockealo/features/auth/data/auth_repository.dart';
 import 'package:stockealo/features/auth/models/app_user.dart';
 import 'package:stockealo/features/business/data/branch_repository.dart';
 import 'package:stockealo/features/business/models/business.dart';
+import 'package:stockealo/features/business/models/ticket_info.dart';
+import 'package:stockealo/features/business/presentation/widgets/branch_form_dialog.dart';
+import 'package:stockealo/features/cash/data/cash_register_repository.dart';
 import 'package:stockealo/features/products/data/product_repository.dart';
 import 'package:stockealo/features/products/models/product.dart';
 import 'package:stockealo/features/sales/data/sales_repository.dart';
@@ -158,5 +161,43 @@ void main() {
     expect(await total(), 27000);
     BranchRepository.instance.setViewAll(false);
     await Future<void>.delayed(const Duration(milliseconds: 50));
+  });
+
+  test('el recibo dice la sede solo si el negocio tiene sedes (0.18.1)', () async {
+    final repo = BranchRepository.instance;
+    // Norte está abierta: la Principal también se nombra
+    expect(repo.ticketBranch(null)?.name, 'Principal');
+    expect(repo.ticketBranch(norte)?.name, 'Norte');
+    // Dirección y teléfono de la sede en lugar de los del negocio; el NIT se queda
+    const info = TicketInfo(taxId: '900', address: 'Calle 1', phone: '300');
+    final over = const TicketBranch('Norte', address: 'Carrera 9').over(info);
+    expect(over.taxId, '900');
+    expect(over.address, 'Carrera 9');
+    expect(over.phone, '300');
+  });
+
+  test('Stock muestra lo que hay en las otras sedes (0.18.1)', () async {
+    final db = await appDb.database;
+    await BranchRepository.setStock(db, businessId: businessId, branchId: norte, productId: 'sha', stock: 4);
+    // Desde la Principal se ve Norte
+    expect(await BranchRepository.instance.stockElsewhere(businessId), {'sha': 'Norte 4'});
+    // Desde Norte se ve la Principal
+    await BranchRepository.instance.choose(norte);
+    expect(await BranchRepository.instance.stockElsewhere(businessId), {'sha': 'Principal 10'});
+  });
+
+  test('con «Todas las sedes» no se abre caja (0.18.1)', () async {
+    BranchRepository.instance.setViewAll(true);
+    await expectLater(
+      CashRegisterRepository.instance.openSession(businessId: businessId, openingAmount: 0, openedBy: 'Ana'),
+      throwsA(isA<Exception>().having((e) => '$e', 'texto', contains('Elige una sede'))),
+    );
+    BranchRepository.instance.setViewAll(false);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  });
+
+  test('el nombre de una sede no se repite sin importar mayúsculas ni espacios (0.18.1)', () {
+    expect(BranchFormDialog.normalize('  Norte   Centro '), 'norte centro');
+    expect(BranchFormDialog.normalize('NORTE'), BranchFormDialog.normalize('norte'));
   });
 }

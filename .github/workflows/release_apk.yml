@@ -69,6 +69,12 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
+            ### Sedes más claras (0.18.1)
+            - El recibo y el cierre de caja dicen en qué sede se hicieron.
+            - En Stock ves cuánto hay de cada producto en tus otras sedes.
+            - Abrir una sede es más fácil, con su dirección y su teléfono.
+            - El valor del inventario se calcula a precio de costo.
+
             ### Sedes: varios locales en un negocio (0.18.0)
             - Abre sedes en Módulos: cada una con su stock, sus ventas y su caja.
             - Cambia de sede desde el botón de tu negocio en el menú.

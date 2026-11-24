@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/status_pill.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../data/branch_repository.dart';
 
@@ -9,7 +10,8 @@ import '../../data/branch_repository.dart';
 class BranchPickerSheet {
   BranchPickerSheet._();
 
-  static Future<void> show(BuildContext context, {required VoidCallback onOtherBusiness}) async {
+  /// Sin [onOtherBusiness] (desde Vender o Caja) no aparece «Otro negocio…».
+  static Future<void> show(BuildContext context, {VoidCallback? onOtherBusiness}) async {
     final repo = BranchRepository.instance;
     final cash = <String?, bool>{
       null: await BranchRepository.openCashSession(null),
@@ -35,7 +37,8 @@ class BranchPickerSheet {
           children: [
             option(
               value: 'main',
-              title: '${repo.mainName} (Principal)',
+              // 0.18.1: «Principal (Principal)» repetía el nombre; si la renombran, «Centro · Principal»
+              title: repo.mainName == BranchRepository.mainDefaultName ? repo.mainName : '${repo.mainName} · Principal',
               subtitle: cash[null] == true ? 'Caja abierta' : 'Caja cerrada',
               selected: !all && BranchRepository.active == null,
             ),
@@ -56,8 +59,10 @@ class BranchPickerSheet {
                 icon: Icons.grid_view_outlined,
               ),
             ],
-            const Divider(),
-            option(value: 'other', title: 'Otro negocio…', selected: false, icon: Icons.storefront_outlined),
+            if (onOtherBusiness != null) ...[
+              const Divider(),
+              option(value: 'other', title: 'Otro negocio…', selected: false, icon: Icons.storefront_outlined),
+            ],
           ],
         );
       },
@@ -66,7 +71,7 @@ class BranchPickerSheet {
       case null:
         return;
       case 'other':
-        onOtherBusiness();
+        onOtherBusiness?.call();
       case 'all':
         repo.setViewAll(true);
       case 'main':
@@ -76,5 +81,30 @@ class BranchPickerSheet {
         repo.setViewAll(false);
         await repo.choose(result);
     }
+  }
+}
+
+/// «Todas las sedes» es solo para mirar (0.18.1): en Vender y Caja, en vez de «Abrir
+/// caja» (que abriría la de la Principal), pide elegir una sede.
+class AllBranchesNotice extends StatelessWidget {
+  final String text;
+  const AllBranchesNotice({super.key, this.text = 'Estás viendo todas las sedes. Para vender o abrir caja, elige una sede.'});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = ToneColors.of(context, AppTone.info);
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(color: t.soft, borderRadius: BorderRadius.circular(AppRadius.control)),
+      child: Row(
+        children: [
+          Icon(Icons.grid_view_outlined, color: t.strong),
+          const SizedBox(width: AppSpace.md - 2),
+          Expanded(child: Text(text, style: AppText.body(context, weight: FontWeight.w600, color: context.colors.ink))),
+          const SizedBox(width: AppSpace.sm),
+          FilledButton(onPressed: () => BranchPickerSheet.show(context), child: const Text('Elegir sede')),
+        ],
+      ),
+    );
   }
 }

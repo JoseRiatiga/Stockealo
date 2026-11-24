@@ -11,7 +11,9 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/money_input.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../business/data/branch_repository.dart';
 import '../../../business/presentation/active_business_scope.dart';
+import '../../../business/presentation/widgets/branch_picker_sheet.dart';
 import '../../../pro/data/pro_service.dart';
 import '../../../services/data/commissions_repository.dart';
 import '../../../services/data/services_repository.dart';
@@ -81,6 +83,7 @@ SaleDocument cashTicket(CashSession s, CashSummary sum, [List<String> servicesLi
     ],
     notes: s.notes,
     closing: 'Cierre del turno',
+    branch: BranchRepository.instance.ticketBranch(s.branchId),
     stamp: diff.abs() < 1
         ? const TicketStamp('CAJA JUSTA', tone: AppTone.success)
         : TicketStamp(diff < 0 ? 'FALTAN' : 'SOBRAN', detail: money(diff.abs()), tone: diff < 0 ? AppTone.danger : AppTone.warning),
@@ -99,6 +102,7 @@ SaleDocument blindCashTicket(CashSession s) => SaleDocument(
       before: [TicketRow('Abrió', '${s.openedBy} · ${clockText(s.openedAt)}')],
       notes: s.notes,
       closing: 'Cierre del turno · arqueo ciego',
+      branch: BranchRepository.instance.ticketBranch(s.branchId),
       stamp: const TicketStamp('ENTREGADA', tone: AppTone.info),
     );
 
@@ -136,12 +140,14 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
     _load();
     DataEvents.instance.salesVersion.addListener(_load);
     DataEvents.instance.cashVersion.addListener(_load);
+    BranchRepository.instance.addListener(_load);
   }
 
   @override
   void dispose() {
     DataEvents.instance.salesVersion.removeListener(_load);
     DataEvents.instance.cashVersion.removeListener(_load);
+    BranchRepository.instance.removeListener(_load);
     super.dispose();
   }
 
@@ -358,7 +364,13 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (_open == null) _closedView() else _openView(),
+                        // «Todas las sedes» solo mira el historial (0.18.1): abrir, cerrar y mover es en una sede
+                        if (BranchRepository.instance.viewAll.value)
+                          const AllBranchesNotice(text: 'Estás viendo todas las sedes. Para abrir, cerrar o mover la caja, elige una sede.')
+                        else if (_open == null)
+                          _closedView()
+                        else
+                          _openView(),
                         const SizedBox(height: AppSpace.xl),
                         _history.isEmpty ? const SizedBox.shrink() : _historyCard(),
                       ],

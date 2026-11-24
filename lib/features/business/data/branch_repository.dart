@@ -7,6 +7,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/services/data_events.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/utils/business_clock.dart';
+import '../models/ticket_info.dart';
 import '../../products/models/product.dart';
 import '../../products/models/product_variant.dart';
 
@@ -139,7 +140,15 @@ class BranchRepository extends ChangeNotifier {
   /// «Centro», «Norte»…
   String nameOf(String? branchId) => branchId == null ? mainName : (byId(branchId)?.name ?? 'Sede');
 
-  /// Se puede vender y abrir caja en la sede elegida
+  /// La sede para el tiquete (0.18.1): null si el negocio no tiene sedes abiertas y el
+  /// tiquete es de la Principal, para que el recibo de un solo local quede como siempre
+  TicketBranch? ticketBranch(String? branchId) {
+    if (branchId == null && openBranches.isEmpty) return null;
+    final b = byId(branchId);
+    return TicketBranch(nameOf(branchId), address: b?.address, phone: b?.phone);
+  }
+
+    /// Se puede vender y abrir caja en la sede elegida
   bool get activeUsable => active == null || (byId(active)?.usable ?? false) && !(byId(active)?.isClosed ?? true);
 
   static String _choiceKey(String businessId) => 'active_branch_$businessId';
@@ -423,7 +432,33 @@ class BranchRepository extends ChangeNotifier {
     return out;
   }
 
-  /// Los productos con el stock de la sede [branchId] en vez del de la Principal.
+  /// «Principal 4 · Norte 14» (0.18.1): las unidades de cada producto en las otras sedes
+  /// abiertas, para la lista de Stock del dueño y los administradores. Solo los
+  /// productos con unidades en otra sede; vacío si el negocio no tiene sedes abiertas.
+  Future<Map<String, String>> stockElsewhere(String businessId) async {
+    if (!_canSwitch || openBranches.isEmpty) return const {};
+    final db = await AppDatabase.instance.database;
+    final parts = <String, List<String>>{};
+    void add(String product, String where, int qty) {
+      if (qty != 0) (parts[product] ??= []).add('$where $qty');
+    }
+
+    if (active != null) {
+      final rows = await db.query('products', columns: ['id', 'stock'], where: 'business_id = ?', whereArgs: [businessId]);
+      for (final r in rows) {
+        add(r['id'] as String, mainName, (r['stock'] as num?)?.toInt() ?? 0);
+      }
+    }
+    for (final b in openBranches) {
+      if (b.id == active) continue;
+      for (final e in (await stockIn(b.id)).entries) {
+        add(e.key, b.name, e.value.stock);
+      }
+    }
+    return {for (final e in parts.entries) e.key: e.value.join(' · ')};
+  }
+
+    /// Los productos con el stock de la sede [branchId] en vez del de la Principal.
   /// Sin sede (Principal) devuelve la lista tal cual.
   static Future<List<Product>> withBranchStock(List<Product> products, String? branchId) async {
     if (branchId == null || products.isEmpty) return products;

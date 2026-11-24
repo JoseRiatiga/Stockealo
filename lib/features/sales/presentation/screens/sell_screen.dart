@@ -4,6 +4,7 @@ import '../../../products/presentation/category_icons.dart';
 import '../../../../core/utils/money_input.dart';
 import 'package:flutter/material.dart';
 import '../../../business/data/branch_repository.dart';
+import '../../../business/presentation/widgets/branch_picker_sheet.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/design/app_dialog.dart';
@@ -186,6 +187,14 @@ class _SellScreenState extends State<SellScreen> {
     // Precios al por mayor solo con Pro (0.17.0)
     ProService.instance.status.addListener(_onPro);
     _onPro();
+    // Otra sede o «Todas las sedes» (0.18.1): sin el aviso de la venta de la sede anterior
+    BranchRepository.instance.addListener(_onBranch);
+  }
+
+  void _onBranch() {
+    if (!mounted) return;
+    setState(() => _last = null);
+    _load();
   }
 
   void _onPro() => _cart.setWholesale(ProService.instance.status.value.active);
@@ -198,6 +207,7 @@ class _SellScreenState extends State<SellScreen> {
     DataEvents.instance.cashVersion.removeListener(_checkCash);
     _cart.removeListener(_onCart);
     ProService.instance.status.removeListener(_onPro);
+    BranchRepository.instance.removeListener(_onBranch);
     _pay.dispose();
     _search.dispose();
     _searchFocus.dispose();
@@ -663,7 +673,10 @@ class _SellScreenState extends State<SellScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _practiceNotice(),
-              if (_cashClosed && !_cart.practice) ...[_cashNotice(), const SizedBox(height: AppSpace.md)],
+              if (BranchRepository.instance.viewAll.value && !_cart.practice)
+                ...[const AllBranchesNotice(), const SizedBox(height: AppSpace.md)]
+              else if (_cashClosed && !_cart.practice)
+                ...[_cashNotice(), const SizedBox(height: AppSpace.md)],
               if (_last != null && !wide) ...[_saleDone(), const SizedBox(height: AppSpace.md)],
               Row(
                 children: [

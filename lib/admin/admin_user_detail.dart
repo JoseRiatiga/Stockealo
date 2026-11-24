@@ -107,20 +107,42 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
     }
   }
 
-  /// Sedes (0.18.0): cupos de sedes extra para un negocio, por un mes o hasta un año
+  /// Sedes (0.18.0): cupos de sedes extra para un negocio. 0.18.1: dice cuántos tiene ya
+  /// y hasta cuándo, y no da más tiempo del que le queda al plan (el cupo vence con él).
   Future<void> _giveSlotsTo(AdminUserBusiness b) async {
+    final info = await ProAdminService.instance.branchSlots(b.id);
+    if (!mounted) return;
+    final now = DateTime.now();
+    final planEnd = b.pro ? b.proUntil : null;
+    final daysLeft = planEnd?.difference(now).inDays.clamp(1, 366);
+    int cap(int days) => daysLeft == null ? days : (days < daysLeft ? days : daysLeft);
+    String length(int days) =>
+        daysLeft != null && days >= daysLeft ? 'hasta el fin de su plan (${adminDate(planEnd)})' : (days >= 365 ? '1 año' : '1 mes');
+    final options = <(int, int)>{for (final (slots, days) in const [(1, 30), (2, 30), (3, 30), (1, 365)]) (slots, cap(days))}.toList();
+    final current = info == null
+        ? 'No se pudo leer cuántos cupos tiene.'
+        : [
+            'Puede tener ${info.allowance} ${info.allowance == 1 ? 'sede extra' : 'sedes extra'} y tiene ${info.open} ${info.open == 1 ? 'abierta' : 'abiertas'}.',
+            for (final s in info.slots) '${s.slots} ${s.slots == 1 ? 'cupo' : 'cupos'} hasta el ${adminDate(s.endsAt)}',
+          ].join('\n');
     final choice = await showDialog<(int, int)>(
       context: context,
       builder: (ctx) => SimpleDialog(
         title: Text('Cupos de sede para ${b.name}'),
         children: [
-          for (final (slots, days, label) in const [
-            (1, 30, '1 sede · 1 mes'),
-            (2, 30, '2 sedes · 1 mes'),
-            (1, 365, '1 sede · 1 año'),
-            (3, 30, '3 sedes · 1 mes'),
-          ])
-            SimpleDialogOption(onPressed: () => Navigator.pop(ctx, (slots, days)), child: Text(label)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Text(
+              b.pro ? current : 'Sin Pro activo: los cupos no cuentan hasta que tenga Pro.\n$current',
+              style: AppText.small(ctx),
+            ),
+          ),
+          const Divider(),
+          for (final (slots, days) in options)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, (slots, days)),
+              child: Text('Dar $slots ${slots == 1 ? 'sede' : 'sedes'} · ${length(days)}'),
+            ),
         ],
       ),
     );
@@ -305,11 +327,11 @@ class _AdminUserDetailDialogState extends State<AdminUserDetailDialog> {
                           ),
                           const SizedBox(width: AppSpace.sm),
                           AdminBadge(b.roleLabel),
-                          if (b.pro) ...[const SizedBox(width: 4), const AdminBadge('Pro', tone: AdminTone.good)],
+                          if (b.pro) ...[const SizedBox(width: 4), AdminBadge(b.planLabel, tone: AdminTone.good)],
                         ]),
                         Text(
                           [
-                            b.pro ? (b.proUntil == null ? 'Pro permanente' : 'Pro hasta ${adminDate(b.proUntil)}') : 'Sin Pro',
+                            b.pro ? (b.proUntil == null ? '${b.planLabel} permanente' : '${b.planLabel} hasta ${adminDate(b.proUntil)}') : 'Sin Pro',
                             if (b.storeSlug != null) 'tienda ${b.storeEnabled ? 'publicada' : 'apagada'}',
                           ].join(' · '),
                           style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkFaint),

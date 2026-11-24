@@ -126,7 +126,8 @@ void main() {
       now: closeAt,
     );
     expect(closed.difference, -5000);
-    expect(closed.closedBy, 'ana@x.com');
+    // El nombre, no el correo (0.18.1)
+    expect(closed.closedBy, 'Ana');
     expect(closed.summary['denominations'], {'20000': 2, '5000': 1});
     expect(await repo.getOpenSession(businessId), isNull);
 

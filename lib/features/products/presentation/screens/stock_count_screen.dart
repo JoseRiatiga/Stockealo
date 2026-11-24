@@ -141,7 +141,7 @@ class _StockCountScreenState extends State<StockCountScreen> {
     try {
       final changed = await count.apply();
       if (!mounted) return;
-      AppToast.showSuccess(context, changed == 0 ? 'Conteo terminado: todo cuadra.' : 'Listo: se ajustaron $changed productos.');
+      AppToast.showSuccess(context, changed == 0 ? 'Conteo terminado: todo cuadra.' : 'Listo: se ajustaron $changed ${changed == 1 ? 'producto' : 'productos'}.');
       Navigator.of(context).maybePop();
     } catch (e) {
       if (!mounted) return;
@@ -301,7 +301,7 @@ class _StockCountScreenState extends State<StockCountScreen> {
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               textAlign: TextAlign.center,
-              decoration: const InputDecoration(hintText: 'Contaste', isDense: true),
+              decoration: const InputDecoration(hintText: 'Cant.', isDense: true),
               onChanged: (t) => _onTyped(p, t, variantId),
             ),
           ),

@@ -77,6 +77,9 @@ class SaleDocument {
   /// Renglones antes de las líneas (cierre de caja: base, ventas en efectivo…)
   final List<TicketRow> before;
 
+  /// La sede, solo si el negocio tiene sedes (0.18.1)
+  final TicketBranch? branch;
+
   const SaleDocument({
     required this.title,
     required this.number,
@@ -95,7 +98,11 @@ class SaleDocument {
     this.stamp,
     this.after = const [],
     this.before = const [],
+    this.branch,
   });
+
+  /// NIT, dirección y teléfono del tiquete: los de la sede si los tiene
+  TicketInfo infoFor(TicketInfo info) => branch?.over(info) ?? info;
 
   double get subtotal => total + discount;
 
@@ -112,7 +119,8 @@ class SaleDocument {
     final b = StringBuffer()
       ..writeln('*${title.toUpperCase()}*')
       ..writeln('*$businessName*');
-    for (final l in info.headerLines) {
+    if (branch != null) b.writeln('Sede ${branch!.name}');
+    for (final l in infoFor(info).headerLines) {
       b.writeln(l);
     }
     b.writeln('N.º $number · ${isQuotation ? day.format(this.date) : date.format(this.date)}');
@@ -246,8 +254,12 @@ class TicketPaper extends StatelessWidget {
                       child: Text(business!.description!.trim(),
                           textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: mono.copyWith(color: muted)),
                     ),
-                  // NIT, dirección y teléfono del negocio (0.15.0)
-                  for (final line in TicketInfo.of(business).headerLines)
+                  // La sede (0.18.1), solo si el negocio tiene sedes
+                  if (doc.branch != null)
+                    Text('SEDE ${doc.branch!.name.toUpperCase()}',
+                        textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono.copyWith(color: ink, fontWeight: FontWeight.w700)),
+                  // NIT, dirección y teléfono del negocio (0.15.0), o los de la sede
+                  for (final line in doc.infoFor(TicketInfo.of(business)).headerLines)
                     Text(line, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: mono.copyWith(color: muted)),
                   const _Dashes(),
                   pair(doc.title.toUpperCase(), doc.number),

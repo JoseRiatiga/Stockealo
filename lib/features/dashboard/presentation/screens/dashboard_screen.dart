@@ -26,6 +26,7 @@ import '../../../team/data/team_repository.dart';
 import '../../data/home_data.dart';
 import '../widgets/attention_panel.dart';
 import '../widgets/cloud_sync_reminder.dart';
+import '../../../auth/presentation/widgets/verify_email_notice.dart';
 import '../widgets/home_sales_chart.dart';
 import '../widgets/quick_actions_section.dart';
 import '../../../../core/permissions/permissions.dart';
@@ -247,6 +248,8 @@ class _DashboardScreenState extends State<DashboardScreen> with ActiveBusinessAw
                   SizedBox(height: gap),
                 ],
                 CloudSyncReminder(key: ValueKey('cloud-${_business?.id}-$_role'), canManage: _can(Perm.cloud)),
+                // Verificar el correo (0.18.4): se puede cerrar y vuelve a los 7 días
+                const VerifyEmailNotice(dismissible: true),
                 if (_role == Permissions.owner && _business != null) _ProExpiry(business: _business!),
                 // Primeros pasos y productos quietos (0.16.0, fase 5)
                 if (_business != null && _role == Permissions.owner)

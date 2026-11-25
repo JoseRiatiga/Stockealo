@@ -31,6 +31,10 @@ class AuthRepository {
 
   AppUser? get currentUser => _currentUser;
 
+  /// Correo verificado de la sesión (0.18.4): true, false o null si no se sabe.
+  /// Lo lee el aviso «Verifica tu correo»; se borra al cerrar la sesión.
+  static final ValueNotifier<bool?> emailVerified = ValueNotifier<bool?>(null);
+
   /// Fija la sesión sin pasar por Supabase (solo pruebas)
   @visibleForTesting
   static set debugCurrentUser(AppUser? user) => _currentUser = user;
@@ -65,7 +69,75 @@ class AuthRepository {
     } catch (e) {
       throw Exception(_translateAuthError(e));
     }
+    // El código probó el correo: si la cuenta se había creado sin código (quizá por
+    // otra persona), queda verificada y se cierran sus otras sesiones
+    await _markEmailVerified();
 
+    return _finishRegistration(auth, cleanEmail, name: name, phone: phone);
+  }
+
+  /// Registro sin código (0.18.4): la nube crea la cuenta y la app entra de una vez. El
+  /// correo queda sin verificar hasta que el usuario lo verifique desde el aviso.
+  /// Devuelve null si ese correo necesita el registro con código (ya tiene cuenta o algo
+  /// le corresponde, o la nube no respondió): sigue [requestRegistrationCode].
+  Future<AppUser?> registerWithoutCode({
+    required String email,
+    required String password,
+    String? name,
+    String? phone,
+  }) async {
+    final cleanEmail = _validateEmail(email);
+    _validatePassword(password);
+    final auth = await _requireAuth();
+    final cleanName = name?.trim();
+    final cleanPhone = PhoneNumbers.toE164(phone, country: deviceCountry()) ?? phone?.trim();
+
+    final String? mode;
+    try {
+      final response = await SupabaseService.instance.client!.functions.invoke(
+        'register-account',
+        body: {
+          'email': cleanEmail,
+          'password': password,
+          if (cleanName != null && cleanName.isNotEmpty) 'name': cleanName,
+          if (cleanPhone != null && cleanPhone.isNotEmpty) 'phone': cleanPhone,
+        },
+      );
+      mode = registerModeOf(response.data);
+    } on FunctionException catch (e) {
+      final error = registerErrorOf(e.details);
+      if (error == 'weak_password') {
+        throw Exception('La contraseña es demasiado débil. Usa una más larga o menos común.');
+      }
+      if (error == 'invalid_email') throw Exception('Ingresa un correo electrónico válido.');
+      // Límite de intentos, función sin publicar o falla de la nube: con código
+      debugPrint('Registro sin código no disponible ($error): sigue con código');
+      return null;
+    } catch (e) {
+      debugPrint('Registro sin código no disponible: $e');
+      return null;
+    }
+    if (mode != 'created') return null;
+
+    try {
+      await auth.signInWithPassword(email: cleanEmail, password: password);
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
+    }
+    final user = await _finishRegistration(auth, cleanEmail, name: name, phone: phone);
+    emailVerified.value = false;
+    return user;
+  }
+
+  /// Respuesta de register-account: "created" o "code"
+  @visibleForTesting
+  static String? registerModeOf(Object? data) => data is Map ? data['mode'] as String? : null;
+
+  @visibleForTesting
+  static String? registerErrorOf(Object? details) => details is Map ? details['error'] as String? : null;
+
+  /// Crea el perfil del registro recién hecho y abre la sesión
+  Future<AppUser> _finishRegistration(GoTrueClient auth, String cleanEmail, {String? name, String? phone}) async {
     await _dbProvider.useAccount(auth.currentUser!.id, cleanEmail);
     final cleanName = name?.trim();
     // Sin prefijo, el número es del país configurado en el teléfono
@@ -143,6 +215,8 @@ class AuthRepository {
     final email = authUser?.email?.toLowerCase();
     if (authUser == null || email == null) return null;
     await _dbProvider.useAccount(authUser.id, email);
+    // Google ya probó el correo: si la cuenta se creó sin código, queda verificada
+    await _markEmailVerified();
     final meta = authUser.userMetadata ?? const {};
     final user = await _resolveAppUser(authUser, name: (meta['full_name'] ?? meta['name']) as String?);
     await _finishLogin(user);
@@ -183,6 +257,7 @@ class AuthRepository {
   /// Cierra la sesión activa
   Future<void> logout() async {
     _currentUser = null;
+    emailVerified.value = null;
     await _dbProvider.setSetting('active_user_id', null);
     StockyAssistantService.instance.clearAllConversations();
     try {
@@ -326,6 +401,68 @@ class AuthRepository {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Verificar el correo (0.18.4): las cuentas creadas sin código lo hacen desde el
+  // aviso. Quién está verificado lo decide la nube (unverified_accounts).
+  // ---------------------------------------------------------------------------
+
+  /// true si el correo de la sesión está verificado; null si no se pudo saber
+  /// (sin conexión): en ese caso no se muestra el aviso.
+  Future<bool?> isEmailVerified() async {
+    final client = SupabaseService.instance.client;
+    if (client?.auth.currentSession == null) return null;
+    try {
+      final result = await client!.rpc('my_email_verified');
+      return result is bool ? result : null;
+    } catch (e) {
+      debugPrint('No se pudo saber si el correo está verificado: $e');
+      return null;
+    }
+  }
+
+  /// Envía el código de 6 dígitos al correo de la sesión
+  Future<void> sendEmailVerificationCode() async {
+    final auth = await _requireAuth();
+    final email = auth.currentUser?.email;
+    if (email == null) throw const PasswordResetExpiredException();
+    try {
+      await auth.signInWithOtp(email: email, shouldCreateUser: false);
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
+    }
+  }
+
+  /// Verifica el código y marca el correo como verificado en la nube
+  Future<void> confirmEmailVerificationCode(String code) async {
+    final auth = await _requireAuth();
+    final email = auth.currentUser?.email;
+    if (email == null) throw const PasswordResetExpiredException();
+    try {
+      await auth.verifyOTP(email: email, token: code.trim(), type: OtpType.email);
+    } catch (e) {
+      throw Exception(_translateAuthError(e));
+    }
+    final verified = await _markEmailVerified();
+    if (verified != true) {
+      throw Exception('No pudimos guardar la verificación. Revisa tu conexión e inténtalo de nuevo.');
+    }
+  }
+
+  /// Pide a la nube que revise con qué entró esta sesión (código o Google) y, si prueba
+  /// el correo, lo marque como verificado. null si la nube no respondió.
+  Future<bool?> _markEmailVerified() async {
+    try {
+      final response = await SupabaseService.instance.client!.functions.invoke('verify-email');
+      final data = response.data;
+      final verified = data is Map ? data['verified'] == true : null;
+      if (verified == true) emailVerified.value = true;
+      return verified;
+    } catch (e) {
+      debugPrint('No se pudo marcar el correo como verificado: $e');
+      return null;
+    }
+  }
+
   /// Error de Supabase al pedir un código para un correo sin cuenta (con shouldCreateUser: false)
   @visibleForTesting
   static bool isUnknownAccountError(Object e) {
@@ -385,6 +522,9 @@ class AuthRepository {
       throw Exception(_translateAuthError(e));
     }
 
+    // La contraseña nueva ya se guardó: el correo queda verificado y se cierran las
+    // otras sesiones (si alguien había registrado este correo sin código, queda fuera)
+    await _markEmailVerified();
     await finishPasswordReset(cleanEmail);
     return true;
   }

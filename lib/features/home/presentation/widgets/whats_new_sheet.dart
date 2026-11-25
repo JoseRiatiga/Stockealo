@@ -21,6 +21,15 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.18.4',
+      title: 'Registro sin código',
+      items: [
+        'Crea tu cuenta y entra de una vez, sin esperar un código.',
+        'Verifica tu correo cuando quieras desde el aviso en Inicio o en Ajustes.',
+        'Para entrar a un negocio por invitación hay que verificar el correo primero.',
+      ],
+    ),
+    (
       version: '0.18.3',
       title: 'Sedes y un solo pago',
       items: [

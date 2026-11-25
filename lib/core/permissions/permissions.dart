@@ -256,8 +256,15 @@ class Permissions {
   /// El rol de la persona en el negocio activo (lo pone el menú principal)
   static String current = owner;
 
-  /// ¿El rol activo puede hacer esto? Tiene en cuenta «Ver como»
-  static bool mine(Perm perm) => can(viewAs.value ?? current, perm);
+  /// Encargado de turno vigente (0.18.5): hasta cuándo; null = no lo es. Lo pone ShiftLead
+  static DateTime? leadUntil;
+
+  /// ¿El rol activo puede hacer esto? Tiene en cuenta «Ver como». El encargado de
+  /// turno, mientras dure, también cierra la caja de otros (la nube lo revisa igual)
+  static bool mine(Perm perm) {
+    if (perm == Perm.cashOthers && viewAs.value == null && (leadUntil?.isAfter(DateTime.now()) ?? false)) return true;
+    return can(viewAs.value ?? current, perm);
+  }
 
   /// El límite del rol activo; null = sin límite
   static double? myLimit(RoleLimit limit) => limitOf(viewAs.value ?? current, limit);

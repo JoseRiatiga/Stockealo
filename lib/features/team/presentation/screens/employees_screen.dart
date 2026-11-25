@@ -17,6 +17,8 @@ import '../../../business/models/business.dart';
 import '../../../pro/data/pro_service.dart';
 import '../../../services/presentation/widgets/staff_section.dart';
 import '../../data/team_repository.dart';
+import '../../data/shift_lead.dart';
+import '../../data/activity_repository.dart';
 import '../../models/business_member.dart';
 import 'roles_screen.dart';
 import '../../data/roles_repository.dart';
@@ -44,6 +46,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   String? _ownerName;
   String? _ownerEmail;
 
+  /// Encargados de turno vigentes: id del miembro → hasta cuándo (0.18.5)
+  Map<String, DateTime> _leads = const {};
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +69,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     }
 
     final list = await _teamRepo.getMembers(widget.business.id);
+    _leads = BranchRepository.instance.openBranches.isEmpty ? const {} : await ShiftLead.ofBusiness(widget.business.id);
 
     // Si el usuario actual aparece en la lista de miembros, su rol explícito es la verdad absoluta
     final myMember = list.where((m) =>
@@ -853,6 +859,36 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                 ),
               ),
             ),
+          // Encargado de turno (0.18.5): el dueño o un administrador deja a cargo de la sede
+          if (!member.isOwner && member.role != 'ADMIN' && BranchRepository.instance.openBranches.isNotEmpty &&
+              (_canLead(isSelf) || _leads.containsKey(member.id)))
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpace.sm, right: AppSpace.sm),
+              child: InkWell(
+                onTap: _canLead(isSelf) ? () => _editLead(member) : null,
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+                  child: Row(
+                    children: [
+                      Icon(Icons.badge_outlined, size: 16, color: _leads.containsKey(member.id) ? c.accent : c.inkMuted),
+                      const SizedBox(width: AppSpace.sm),
+                      Expanded(
+                        child: Text(
+                          _leadText(member),
+                          style: TextStyle(
+                            fontSize: AppText.sizeCaption,
+                            color: _leads.containsKey(member.id) ? c.ink : c.inkMuted,
+                            fontWeight: _leads.containsKey(member.id) ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                      if (_canLead(isSelf)) Icon(Icons.edit_outlined, size: 16, color: c.inkFaint),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           // Horario de acceso (0.15.0, Pro Servicios): solo entra a la app en sus días y horas
           if (!member.isOwner && (canEdit || member.accessSchedule != null))
             Padding(
@@ -881,6 +917,89 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         ],
       ),
     );
+  }
+
+  bool _canLead(bool isSelf) => !isSelf && (_currentUserRole == 'OWNER' || _currentUserRole == 'ADMIN');
+
+  String _leadText(BusinessMember member) {
+    final branch = BranchRepository.instance.nameOf(member.branchId);
+    final until = _leads[member.id];
+    return until == null ? 'Dejar a cargo de $branch' : 'Encargado de $branch ${ShiftLead.describe(until)}';
+  }
+
+  /// Dejar a cargo de la sede (0.18.5): hasta una hora, hasta mañana o hasta quitarlo
+  Future<void> _editLead(BusinessMember member) async {
+    final branch = BranchRepository.instance.nameOf(member.branchId);
+    final current = _leads[member.id];
+    String picked = 'today';
+    final ok = await AppDialog.show<bool>(
+      context: context,
+      title: '${member.displayName} a cargo de $branch',
+      content: StatefulBuilder(
+        builder: (ctx, set) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+            'Mientras tanto recibe los traslados, verifica lo recibido por verificar y cierra la caja de otros. '
+            'No ve costos ni cambia precios. Se termina solo.',
+            style: TextStyle(color: ctx.colors.inkMuted),
+          ),
+          RadioGroup<String>(
+            groupValue: picked,
+            onChanged: (v) => set(() => picked = v ?? picked),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const RadioListTile<String>(value: 'today', title: Text('Hasta una hora de hoy'), contentPadding: EdgeInsets.zero),
+              const RadioListTile<String>(value: 'tomorrow', title: Text('Hasta mañana a esta hora'), contentPadding: EdgeInsets.zero),
+              const RadioListTile<String>(value: 'open', title: Text('Hasta que lo quite'), contentPadding: EdgeInsets.zero),
+              if (current != null)
+                const RadioListTile<String>(value: 'remove', title: Text('Quitarlo ahora'), contentPadding: EdgeInsets.zero),
+            ]),
+          ),
+        ]),
+      ),
+      actions: [
+        Builder(builder: (ctx) => TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar'))),
+        Builder(builder: (ctx) => FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar'))),
+      ],
+    );
+    if (ok != true || !mounted) return;
+    final now = DateTime.now();
+    DateTime? until;
+    switch (picked) {
+      case 'today':
+        final time = await showTimePicker(context: context, initialTime: const TimeOfDay(hour: 18, minute: 0), helpText: 'Hasta qué hora');
+        if (time == null || !mounted) return;
+        until = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+        if (!until.isAfter(now)) {
+          AppToast.showWarning(context, 'Esa hora ya pasó. Elige una más tarde.');
+          return;
+        }
+      case 'tomorrow':
+        until = now.add(const Duration(days: 1));
+      case 'open':
+        until = now.add(ShiftLead.untilRemoved);
+      default:
+        until = null;
+    }
+    try {
+      await ShiftLead.set(member.id, until);
+      ActivityRepository.instance.log(
+        businessId: widget.business.id,
+        action: ActivityAction.shiftLead,
+        summary: until == null
+            ? 'Quitó a ${member.displayName} como encargado de $branch'
+            : 'Dejó a ${member.displayName} a cargo de $branch ${ShiftLead.describe(until)}',
+      );
+      await _loadData();
+      if (mounted) {
+        AppToast.showSuccess(
+          context,
+          until == null
+              ? '${member.displayName} ya no es encargado.'
+              : '${member.displayName} queda a cargo de $branch ${ShiftLead.describe(until)}.',
+        );
+      }
+    } catch (e) {
+      if (mounted) AppToast.showError(context, e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   /// Trasladar a otra sede (0.18.0)

@@ -42,6 +42,19 @@ class ProductRepository {
     String query, {
     String? category,
     required String businessId,
+  }) =>
+      _search(query, category: category, businessId: businessId, branchId: BranchRepository.active);
+
+  /// Los productos con el stock de una sede cualquiera (null = Principal), no solo de
+  /// la elegida: traslados entre sedes (0.18.5)
+  Future<List<Product>> productsAt(String businessId, String? branchId) =>
+      _search('', businessId: businessId, branchId: branchId);
+
+  Future<List<Product>> _search(
+    String query, {
+    String? category,
+    required String businessId,
+    required String? branchId,
   }) async {
     final db = await _dbProvider.database;
     String whereClause = 'business_id = ? AND is_active = 1';
@@ -71,7 +84,7 @@ class ProductRepository {
     return BranchRepository.withBranchStock([
       for (final p in products)
         p.hasVariants ? p.copyWith(variants: variantsByProduct[p.id] ?? const []) : p,
-    ], BranchRepository.active);
+    ], branchId);
   }
 
   /// Variantes de varios productos en una sola consulta (evita una consulta por producto)

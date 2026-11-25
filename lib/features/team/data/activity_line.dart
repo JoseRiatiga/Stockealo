@@ -144,6 +144,9 @@ class ActivityLine {
           (Icons.group_outlined, AppTone.neutral),
         ActivityAction.authorize => (Icons.verified_user_outlined, AppTone.accent),
         ActivityAction.goalChange => (Icons.flag_outlined, AppTone.accent),
+        ActivityAction.transferSend || ActivityAction.transferReceive || ActivityAction.transferCancel =>
+          (Icons.swap_horiz_outlined, AppTone.info),
+        ActivityAction.shiftLead => (Icons.badge_outlined, AppTone.neutral),
         _ => (Icons.inventory_2_outlined, AppTone.neutral),
       };
 }

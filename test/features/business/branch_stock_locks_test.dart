@@ -13,6 +13,8 @@ void main() {
     const expected = {
       'lib/core/services/supabase_service.dart': 2,
       'lib/features/business/data/branch_repository.dart': 2,
+      // Traslados (0.18.5): solo cuando la nube ya movió el stock de la Principal
+      'lib/features/business/data/transfer_repository.dart': 2,
       'lib/features/products/data/lots_repository.dart': 2,
       'lib/features/products/data/product_repository.dart': 3,
       'lib/features/products/models/product.dart': 1,

@@ -69,6 +69,12 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
+            ### Traslados entre sedes (0.18.5)
+            - Envía mercancía de una sede a otra: queda «En camino» hasta que la reciban.
+            - Al recibir, cuenta lo que llegó; si falta algo, queda anotado con quién envió y quién recibió.
+            - Deja a un cajero a cargo de la sede por unas horas para recibir traslados y cerrar cajas.
+            - Si a una sede le falta un producto que otra tiene de sobra, la app te lo sugiere.
+
             ### Registro sin código (0.18.4)
             - Crea tu cuenta y entra de una vez, sin esperar un código.
             - Verifica tu correo cuando quieras desde el aviso en Inicio o en Ajustes.

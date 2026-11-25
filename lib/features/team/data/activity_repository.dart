@@ -37,6 +37,12 @@ abstract final class ActivityAction {
 
   /// Puso, cambió o quitó una meta de ventas (0.16.0)
   static const goalChange = 'goal_change';
+
+  /// Traslados entre sedes y encargado de turno (0.18.5)
+  static const transferSend = 'transfer_send';
+  static const transferReceive = 'transfer_receive';
+  static const transferCancel = 'transfer_cancel';
+  static const shiftLead = 'shift_lead';
 }
 
 

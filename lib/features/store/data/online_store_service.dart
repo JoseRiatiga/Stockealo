@@ -402,6 +402,10 @@ class StoreVariant {
   final String sizeName;
   final String optionName;
 
+  /// Unidades en cada sede (0.18.3); clave '' = Principal. null = el negocio no tiene
+  /// sedes. Si la tienda no muestra el stock: 0 = agotada, 1 = quedan pocas, 4 = hay.
+  final Map<String, int>? branchStock;
+
   const StoreVariant({
     required this.id,
     this.size,
@@ -414,7 +418,27 @@ class StoreVariant {
     this.imageUrl,
     this.sizeName = 'Talla',
     this.optionName = 'Color',
+    this.branchStock,
   });
+
+  /// La misma talla o color vista desde una sede: agotada o no según esa sede
+  StoreVariant inBranch(String branchId) {
+    final n = branchStock?[branchId] ?? 0;
+    return StoreVariant(
+      id: id,
+      size: size,
+      color: color,
+      hex: hex,
+      extra: extra,
+      stock: stock == null ? null : n,
+      soldOut: n <= 0,
+      few: n > 0 && n <= 3,
+      imageUrl: imageUrl,
+      sizeName: sizeName,
+      optionName: optionName,
+      branchStock: branchStock,
+    );
+  }
 
   String get label => [if (size != null) size!, if (color != null) color!].join(' · ');
 
@@ -435,7 +459,12 @@ class StoreVariant {
         imageUrl: (j['image'] as String?)?.startsWith('https://') == true ? j['image'] as String : null,
         sizeName: _clean(j['size_name']) ?? 'Talla',
         optionName: _clean(j['option_name']) ?? 'Color',
+        branchStock: parseBranchStock(j['branch_stock']),
       );
+
+  /// {'': 5, 'sede': 2} desde la nube; null si el negocio no tiene sedes
+  static Map<String, int>? parseBranchStock(Object? v) =>
+      v is Map ? {for (final e in v.entries) '${e.key}': (e.value as num?)?.toInt() ?? 0} : null;
 }
 
 /// Promoción vigente de un producto en la tienda (0.13.4)
@@ -505,6 +534,10 @@ class StoreProduct {
   /// Precio por cantidad (0.17.0): «desde 12 unidades: $1.800»
   final List<PriceTier> priceTiers;
 
+  /// Unidades en cada sede (0.18.3); clave '' = Principal. null = el negocio no tiene
+  /// sedes. Si la tienda no muestra el stock, 1 = hay y 0 = no hay.
+  final Map<String, int>? branchStock;
+
   const StoreProduct({
     required this.id,
     required this.name,
@@ -519,7 +552,33 @@ class StoreProduct {
     this.few = false,
     this.promo,
     this.priceTiers = const [],
+    this.branchStock,
   });
+
+  /// Unidades en la sede [branchId] ('' = Principal); sin sedes, el stock de siempre
+  int stockIn(String branchId) => branchStock?[branchId] ?? 0;
+
+  /// El mismo producto visto desde una sede: su stock y «quedan pocas» de esa sede
+  StoreProduct inBranch(String branchId) {
+    final n = stockIn(branchId);
+    return StoreProduct(
+      id: id,
+      name: name,
+      category: category,
+      price: price,
+      imageUrl: imageUrl,
+      description: description,
+      brand: brand,
+      stock: stock == null ? null : n,
+      oldPrice: oldPrice,
+      // Sin stock por talla en la nube vieja, las tallas quedan como vinieron
+      variants: [for (final v in variants) v.branchStock == null ? v : v.inBranch(branchId)],
+      few: n <= 3,
+      promo: promo,
+      priceTiers: priceTiers,
+      branchStock: branchStock,
+    );
+  }
 
   /// «Desde 12: $1.800 c/u · Desde 24: $1.600 c/u»
   String? tiersText(String Function(double) money) => priceTiers.isEmpty
@@ -560,11 +619,31 @@ class StoreProduct {
         few: j['few'] == true,
         promo: promo,
         priceTiers: PriceTier.parse(j['price_tiers']),
+        branchStock: StoreVariant.parseBranchStock(j['branch_stock']),
         variants: [
           for (final v in (j['variants'] as List? ?? const [])) StoreVariant.fromJson(Map<String, dynamic>.from(v as Map)),
         ],
       );
   }
+}
+
+/// Una sede en la tienda (0.18.3): la Principal tiene id ''
+class StoreBranch {
+  final String id;
+  final String name;
+  final String? address;
+  final String? phone;
+
+  const StoreBranch({required this.id, required this.name, this.address, this.phone});
+
+  bool get isMain => id.isEmpty;
+
+  factory StoreBranch.fromJson(Map<String, dynamic> j) => StoreBranch(
+        id: '${j['id'] ?? ''}',
+        name: (j['name'] as String?)?.trim().isNotEmpty == true ? (j['name'] as String).trim() : 'Principal',
+        address: (j['address'] as String?)?.trim().isEmpty == true ? null : (j['address'] as String?)?.trim(),
+        phone: (j['phone'] as String?)?.trim().isEmpty == true ? null : (j['phone'] as String?)?.trim(),
+      );
 }
 
 /// Lo que ve el comprador en stockealo.online/tienda/<slug>
@@ -598,6 +677,9 @@ class PublicStore {
   /// Zona horaria del negocio («America/Bogota»), para las horas de las citas
   final String? timeZone;
 
+  /// Sedes que venden (0.18.3), la Principal primero; vacío si el negocio no tiene
+  final List<StoreBranch> branches;
+
   const PublicStore({
     required this.slug,
     required this.whatsapp,
@@ -615,7 +697,35 @@ class PublicStore {
     this.categoryIcons = const {},
     this.address,
     this.timeZone,
+    this.branches = const [],
   });
+
+  bool get hasBranches => branches.length > 1;
+
+  /// La sede [id] o, si ya no existe, la Principal
+  StoreBranch branchOf(String? id) => branches.where((b) => b.id == id).firstOrNull ?? branches.first;
+
+  /// La tienda vista desde una sede (0.18.3): solo lo que hay en ella, con su stock
+  PublicStore inBranch(String branchId) => _copy(
+        products: [for (final p in products) if (p.stockIn(branchId) > 0) p.inBranch(branchId)],
+        address: branchOf(branchId).address ?? (branchOf(branchId).isMain ? address : null),
+      );
+
+  /// Cuántos productos no hay en [branchId] pero sí en otra sede, y en cuál hay más
+  ({int count, StoreBranch? where}) elsewhere(String branchId) {
+    final missing = products.where((p) => p.stockIn(branchId) <= 0).toList();
+    if (missing.isEmpty) return (count: 0, where: null);
+    StoreBranch? best;
+    var bestCount = 0;
+    for (final b in branches.where((b) => b.id != branchId)) {
+      final n = missing.where((p) => p.stockIn(b.id) > 0).length;
+      if (n > bestCount) {
+        best = b;
+        bestCount = n;
+      }
+    }
+    return (count: missing.length, where: best);
+  }
 
   /// La dirección, si el negocio la escribió y la muestra
   String? get shownAddress => look.address && (address ?? '').trim().isNotEmpty ? address!.trim() : null;
@@ -629,12 +739,25 @@ class PublicStore {
 
   /// La misma tienda con otro diseño (la vista previa de «Personalizar»)
   PublicStore copyWith({String? template, String? heroTitle, bool? heroPhotos, String? heroImageUrl, StoreLook? look, String? welcome}) =>
+      _copy(template: template, heroTitle: heroTitle, heroPhotos: heroPhotos, heroImageUrl: heroImageUrl, look: look, welcome: welcome);
+
+  PublicStore _copy({
+    String? template,
+    String? heroTitle,
+    bool? heroPhotos,
+    String? heroImageUrl,
+    StoreLook? look,
+    String? welcome,
+    List<StoreProduct>? products,
+    String? address,
+  }) =>
       PublicStore(
         slug: slug,
         whatsapp: whatsapp,
         businessName: businessName,
         currency: currency,
-        products: products,
+        products: products ?? this.products,
+        branches: branches,
         welcome: welcome ?? this.welcome,
         logoUrl: logoUrl,
         color: color,
@@ -644,7 +767,7 @@ class PublicStore {
         heroImageUrl: heroImageUrl ?? this.heroImageUrl,
         look: look ?? this.look,
         categoryIcons: categoryIcons,
-        address: address,
+        address: address ?? this.address,
         timeZone: timeZone,
       );
 
@@ -678,6 +801,9 @@ class PublicStore {
       look: StoreLook.fromJson(j['look']),
       address: b['address'] as String?,
       timeZone: b['time_zone'] as String?,
+      branches: [
+        for (final r in (j['branches'] as List? ?? const [])) StoreBranch.fromJson(Map<String, dynamic>.from(r as Map)),
+      ],
       categoryIcons: {
         for (final e in (j['category_icons'] as Map? ?? const {}).entries)
           if (e.value is String && (e.value as String).isNotEmpty) '${e.key}': e.value as String,
@@ -899,6 +1025,7 @@ class OnlineStoreService {
     required List<CartLine> lines,
     String? coupon,
     String Function(num)? money,
+    String? branchId,
   }) async {
     final client = _client;
     if (client == null) return (code: null, error: null);
@@ -922,6 +1049,8 @@ class OnlineStoreService {
         ],
         'p_total': lines.fold<double>(0, (s, l) => s + l.subtotal),
         if (coupon != null && coupon.isNotEmpty) 'p_coupon': CouponText.normalize(coupon),
+        // Solo con sedes (0.18.3): la nube vieja no conoce este dato
+        if (branchId != null) 'p_branch_id': branchId,
       });
       return (code: (data as Map)['code'] as String?, error: null);
     } on PostgrestException catch (e) {

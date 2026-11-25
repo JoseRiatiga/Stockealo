@@ -136,6 +136,9 @@ class _StorePageState extends State<StorePage> {
 
   /// Renglones del pedido por producto y talla o color
   final Map<String, CartLine> _cart = {};
+
+  /// Sede que mira quien compra (0.18.3); '' = Principal. Se recuerda en el navegador
+  String _branchId = '';
   final _filters = StoreFilters();
 
   /// El contexto de la plantilla (con su tema): lo que se abre encima toma sus colores
@@ -220,6 +223,7 @@ class _StorePageState extends State<StorePage> {
               ? store.copyWith(look: store.look.copyWith(featured: [shared, ...store.look.featured.where((f) => f != shared)]))
               : store;
           _maintenance = maintenance;
+          if (store != null && store.hasBranches) _branchId = store.branchOf(savedStoreBranch(slug)).id;
         });
       }
     } catch (e) {
@@ -279,6 +283,84 @@ class _StorePageState extends State<StorePage> {
     _countAdd(p);
   }
 
+  /// Cambia la sede que se mira. El pedido es de una sede: si ya hay algo en el
+  /// pedido, se pregunta antes de vaciarlo.
+  Future<void> _chooseBranch(PublicStore store, String id) async {
+    if (id == _branchId) return;
+    if (_cart.isNotEmpty) {
+      final ok = await AppDialog.confirm(
+        context: _themed ?? context,
+        title: '¿Cambiar a ${store.branchOf(id).name}?',
+        message: 'Tu pedido es de ${store.branchOf(_branchId).name}. Al cambiar de sede se vacía.',
+        confirmText: 'Cambiar',
+      );
+      if (!ok) return;
+    }
+    setState(() {
+      _cart.clear();
+      _branchId = id;
+    });
+    saveStoreBranch(store.slug, id);
+  }
+
+  /// «Estás viendo: Norte ▾», su dirección, su teléfono y «Cómo llegar» (0.18.3); si
+  /// faltan productos aquí y hay en otra sede, lo dice con un botón para cambiar
+  Widget _branchBar(BuildContext context, PublicStore store) {
+    final c = context.colors;
+    final branch = store.branchOf(_branchId);
+    final away = store.elsewhere(_branchId);
+    return Material(
+      color: c.surface,
+      child: Container(
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.line))),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.sm),
+        child: Wrap(
+          spacing: AppSpace.md,
+          runSpacing: AppSpace.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.place_outlined, size: 18, color: c.accent),
+                const SizedBox(width: AppSpace.xs),
+                Text('Estás viendo:', style: AppText.small(context, color: c.inkMuted)),
+                const SizedBox(width: AppSpace.xs),
+                DropdownButton<String>(
+                  value: branch.id,
+                  isDense: true,
+                  underline: const SizedBox.shrink(),
+                  style: AppText.small(context, weight: FontWeight.w700, color: c.ink),
+                  items: [for (final b in store.branches) DropdownMenuItem(value: b.id, child: Text(b.name))],
+                  onChanged: (id) => id == null ? null : _chooseBranch(store, id),
+                ),
+              ],
+            ),
+            if (branch.address != null)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(branch.address!, style: AppText.small(context, color: c.ink)),
+                  TextButton(
+                    onPressed: () => launchUrl(PublicStore.mapsUrl(branch.address!, businessName: store.businessName),
+                        mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank'),
+                    child: const Text('Cómo llegar'),
+                  ),
+                ],
+              ),
+            if (branch.phone != null) Text('Tel. ${branch.phone}', style: AppText.small(context, color: c.inkMuted)),
+            if (away.count > 0 && away.where != null)
+              TextButton.icon(
+                onPressed: () => _chooseBranch(store, away.where!.id),
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: Text('${away.count} ${away.count == 1 ? 'producto' : 'productos'} más en ${away.where!.name}'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Elegir talla y color: a la derecha en el computador, desde abajo en el celular
   Future<StoreVariant?> _pickVariant(StoreProduct p) => AppSidePanel.show<StoreVariant>(
         context: _themed ?? context,
@@ -290,14 +372,16 @@ class _StorePageState extends State<StorePage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    final store = _store;
-    if (store == null) {
+    final loaded = _store;
+    if (loaded == null) {
       return _MessagePage(
         text: _error ??
             (widget.slug == null ? 'Abre el enlace de la tienda que te compartieron.' : 'Esta tienda no está disponible en este momento.'),
         onRetry: _error != null ? _load : null,
       );
     }
+    // Con sedes (0.18.3) se ve lo que hay en la sede elegida, con su dirección
+    final store = loaded.hasBranches ? loaded.inBranch(_branchId) : loaded;
     // Color propio de la tienda o el del negocio; Moda siempre es oscura y las demás
     // con «Modo oscuro» (0.16.0)
     final accent = AppPalette.fromHex(store.accentHex) ?? AppPalette.brand;
@@ -328,9 +412,10 @@ class _StorePageState extends State<StorePage> {
                   content: Text('Te compartieron este producto: ${shared.name}. Va de primero.'),
                   actions: [TextButton(onPressed: () => setState(() => _sharedClosed = true), child: const Text('Entendido'))],
                 );
-          if (!notice && banner == null) return view;
+          if (!notice && banner == null && !loaded.hasBranches) return view;
           return Column(children: [
             if (notice) _MaintenanceNotice(maintenance: _maintenance),
+            if (loaded.hasBranches) _branchBar(context, loaded),
             if (banner != null) banner,
             Expanded(child: view),
           ]);
@@ -1261,6 +1346,7 @@ class _StorePageState extends State<StorePage> {
     final theme = Theme.of(ctx);
     Widget form({required bool pinned}) => _CartForm(
           store: store,
+          branchId: store.hasBranches ? _branchId : null,
           lines: () => _lines,
           onChanged: _setLine,
           storeContext: context,
@@ -1935,8 +2021,12 @@ class _CartForm extends StatefulWidget {
   /// En el celular (página completa): el total y «Hacer el pedido» quedan fijos abajo
   final bool pinnedFooter;
 
+  /// Sede del pedido (0.18.3); null = el negocio no tiene sedes
+  final String? branchId;
+
   const _CartForm({
     required this.store,
+    this.branchId,
     required this.lines,
     required this.onChanged,
     required this.storeContext,
@@ -2103,6 +2193,7 @@ class _CartFormState extends State<_CartForm> {
         lines: lines,
         coupon: _coupon?.code,
         money: _money,
+        branchId: widget.branchId,
       );
       if (!mounted) return;
       if (saved.error != null) {

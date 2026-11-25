@@ -23,3 +23,18 @@ void showCleanStoreUrl(String slug) {
     web.window.history.replaceState(null, '', '/tienda/$slug${loc.hash}');
   } catch (_) {}
 }
+
+/// La sede que eligió quien compra (0.18.3): se recuerda en este navegador
+String? savedStoreBranch(String slug) {
+  try {
+    return web.window.localStorage.getItem('store_branch_$slug');
+  } catch (_) {
+    return null;
+  }
+}
+
+void saveStoreBranch(String slug, String branchId) {
+  try {
+    web.window.localStorage.setItem('store_branch_$slug', branchId);
+  } catch (_) {}
+}

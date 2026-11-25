@@ -78,9 +78,92 @@ String proPlanName(String? kind, String? period) => '${proKindLabel(kind)} · ${
 
 /// El nombre legible de un id de plan («business_month_cop» → «Pro · Mensual»)
 String proPlanIdLabel(String? planId) {
+  // Pago de solo cupos de sede (0.18.3)
+  if (planId == branchSlotsPlanId) return 'Sedes extra';
   final parts = (planId ?? '').split('_');
   if (parts.length < 2) return planId ?? 'Pro';
   return proPlanName(parts[0], parts[1]);
+}
+
+/// plan_id de un pago que compra solo cupos de sede, sin plan (0.18.3)
+const branchSlotsPlanId = 'branch_slots';
+
+/// Precio de Pro Servicios con el descuento por lo que le queda de Pro pagado,
+/// calculado en la nube (pro_upgrade_quote, 0.18.3). Con descuento, ese Pro termina el
+/// día que se aprueba el pago.
+class UpgradeQuote {
+  /// null = se puede pagar; si no, el motivo ('upgrade_choose_year'…)
+  final String? error;
+  final double price;
+  final double credit;
+  final double amount;
+
+  const UpgradeQuote({this.error, this.price = 0, this.credit = 0, this.amount = 0});
+
+  bool get ok => error == null;
+
+  factory UpgradeQuote.fromMap(Map<String, dynamic> m) {
+    num n(String k) => (m[k] as num?) ?? 0;
+    return UpgradeQuote(
+      error: m['ok'] == true ? null : (m['error'] as String? ?? 'server_error'),
+      price: n('price').toDouble(),
+      credit: n('credit').toDouble(),
+      amount: n('amount').toDouble(),
+    );
+  }
+}
+
+/// Lo que cuestan unos cupos de sede, calculado en la nube (branch_slot_quote, 0.18.3).
+/// La app solo lo muestra: pro-checkout cobra con la misma cuenta.
+class BranchSlotQuote {
+  /// null = se puede comprar; si no, el motivo ('renew_with_plan', 'no_plan'…)
+  final String? error;
+  final int slots;
+
+  /// Cupos vigentes hoy
+  final int held;
+
+  /// Total de los cupos en pesos (sin el plan)
+  final double amount;
+
+  /// Precio de un cupo por el periodo completo
+  final double unit;
+
+  /// Solo cupos: días que faltan del plan. Con plan: días hasta el periodo nuevo en los
+  /// que se dan [gap] cupos desde hoy.
+  final int days;
+  final int gap;
+  final double gapAmount;
+  final DateTime? endsAt;
+
+  const BranchSlotQuote({
+    this.error,
+    this.slots = 0,
+    this.held = 0,
+    this.amount = 0,
+    this.unit = 0,
+    this.days = 0,
+    this.gap = 0,
+    this.gapAmount = 0,
+    this.endsAt,
+  });
+
+  bool get ok => error == null;
+
+  factory BranchSlotQuote.fromMap(Map<String, dynamic> m) {
+    num n(String k) => (m[k] as num?) ?? 0;
+    return BranchSlotQuote(
+      error: m['ok'] == true ? null : (m['error'] as String? ?? 'slots_not_allowed'),
+      slots: n('slots').toInt(),
+      held: n('held').toInt(),
+      amount: n('amount').toDouble(),
+      unit: n('unit').toDouble(),
+      days: ((m['days'] ?? m['gap_days']) as num? ?? 0).toInt(),
+      gap: n('gap').toInt(),
+      gapAmount: n('gap_amount').toDouble(),
+      endsAt: DateTime.tryParse('${m['ends_at'] ?? ''}')?.toLocal(),
+    );
+  }
 }
 
 /// Un plan con su precio en una moneda
@@ -348,7 +431,40 @@ class ProService {
   }
 
   /// Inicia el pago de un plan con Wompi: el servidor fija el precio y firma el enlace
-  Future<ProCheckout> startCheckout(String businessId, String planId, {String? coupon}) async {
+  /// Cotiza [slots] cupos de sede en la nube: con [planId] van con ese plan; con
+  /// [branchSlotsPlanId], solo cupos con el plan vigente. null si no hay conexión.
+  Future<BranchSlotQuote?> quoteSlots(String businessId, String planId, int slots) async {
+    final client = _client;
+    if (client == null) return null;
+    try {
+      final data = await client.rpc('branch_slot_quote', params: {
+        'p_business_id': businessId,
+        'p_plan_id': planId == branchSlotsPlanId ? null : planId,
+        'p_slots': slots,
+      });
+      return BranchSlotQuote.fromMap(Map<String, dynamic>.from(data as Map));
+    } catch (e) {
+      debugPrint('Cupos de sede: $e');
+      return null;
+    }
+  }
+
+  /// Precio de [planId] (Pro Servicios) con el descuento por el Pro que le queda.
+  /// null si no hay conexión.
+  Future<UpgradeQuote?> quoteUpgrade(String businessId, String planId) async {
+    final client = _client;
+    if (client == null) return null;
+    try {
+      final data = await client.rpc('pro_upgrade_quote', params: {'p_business_id': businessId, 'p_plan_id': planId});
+      return UpgradeQuote.fromMap(Map<String, dynamic>.from(data as Map));
+    } catch (e) {
+      debugPrint('Descuento por Pro: $e');
+      return null;
+    }
+  }
+
+  Future<ProCheckout> startCheckout(String businessId, String planId,
+      {String? coupon, int branchSlots = 0, bool upgrade = false}) async {
     final client = _client;
     if (client == null) throw const ProCheckoutException('Necesitas conexión a internet para pagar.');
     // Antes de cobrar: el pago se aplica a un negocio que debe existir en la nube
@@ -363,6 +479,10 @@ class ProService {
             'plan_id': planId,
             'platform': kIsWeb ? 'web' : 'app',
             if (coupon != null && coupon.isNotEmpty) 'coupon': CouponText.normalize(coupon),
+            // Solo si compra sedes: la nube vieja no lo conoce (0.18.3)
+            if (branchSlots > 0) 'branch_slots': branchSlots,
+            // Pro Servicios con el descuento por su Pro, que se corta al aprobarse
+            if (upgrade) 'upgrade': true,
           });
       final data = Map<String, dynamic>.from(res.data as Map);
       return ProCheckout(data['reference'] as String, data['url'] as String);
@@ -435,7 +555,31 @@ class ProService {
     if (code.contains('plan_not_found')) return 'Ese plan ya no está disponible.';
     if (code.contains('included_in_plan')) return 'Tu Pro Servicios ya incluye todo lo de Pro.';
     if (code.contains('coupon_')) return CouponText.error(code);
+    final upgrade = upgradeErrorMessage(code);
+    if (upgrade != null) return upgrade;
+    final slots = slotErrorMessage(code);
+    if (slots != null) return slots;
     return 'No se pudo iniciar el pago. Inténtalo de nuevo.';
+  }
+
+  /// Por qué no se puede subir a Pro Servicios con descuento (0.18.3); null si no es eso
+  static String? upgradeErrorMessage(String code) {
+    if (code.contains('upgrade_choose_year')) {
+      return 'Te queda mucho de Pro. Elige Pro Servicios anual y se descuenta todo lo que te queda.';
+    }
+    if (code.contains('upgrade_no_coupon')) return 'El cupón no se suma al descuento por tu Pro.';
+    return null;
+  }
+
+  /// Por qué no se pueden comprar sedes extra ahora (0.18.3); null si no es de cupos
+  static String? slotErrorMessage(String code) {
+    if (code.contains('renew_with_plan')) {
+      return 'A tu plan le quedan menos de 7 días. Renuévalo y agrega las sedes en el mismo pago.';
+    }
+    if (code.contains('no_plan')) return 'Las sedes extra van con un plan. Elige Pro o Pro Servicios.';
+    if (code.contains('slots_not_allowed')) return 'Las sedes extra van con Pro o Pro Servicios mensual o anual.';
+    if (code.contains('bad_slots')) return 'Elige entre 1 y 50 sedes extra.';
+    return null;
   }
 
   static const notInCloudMessage =

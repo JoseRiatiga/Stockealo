@@ -20,6 +20,50 @@ class BranchesScreen extends StatefulWidget {
 
   const BranchesScreen({super.key, required this.business, required this.isOwner});
 
+  /// Abrir una sede nueva (solo el dueño). Un solo lugar (24 nov): lo usan Módulos ›
+  /// Sedes y «＋ Abrir una sede» del menú lateral. Sin cupo libre lleva a Stockealo Pro.
+  static Future<void> createBranch(BuildContext context, Business business) async {
+    final repo = BranchRepository.instance;
+    if (repo.freeSlots == 0) {
+      final go = await AppDialog.confirm(
+        context: context,
+        title: 'Sin cupos libres',
+        message: repo.allowance == 0
+            ? 'Las sedes vienen con Stockealo Pro. Pro Servicios trae 2 sedes; con Pro, cada sede se agrega aparte.'
+            : 'Ya usas tus ${repo.allowance} cupos de sede. Agrega uno más para abrir otra.',
+        confirmText: 'Ver Stockealo Pro',
+      );
+      if (go && context.mounted) ProScreen.open(context, business);
+      return;
+    }
+    if (repo.openBranches.isEmpty) {
+      final ok = await AppDialog.confirm(
+        context: context,
+        title: 'Antes de la primera sede',
+        message: 'Pide a todo tu equipo que actualice Stockealo a la última versión. '
+            'Un celular con la app vieja solo ve y vende en la sede Principal.',
+        confirmText: 'Ya lo hicimos',
+      );
+      if (!ok || !context.mounted) return;
+    }
+    final used = repo.openBranches.length + 1;
+    final data = await BranchFormDialog.show(
+      context,
+      title: 'Nueva sede',
+      actionLabel: 'Abrir sede',
+      taken: [repo.mainName, for (final b in repo.branches) b.name],
+      country: business.country,
+      slotsNote: 'Usarás $used de ${repo.allowance} cupos de sede.',
+    );
+    if (data == null) return;
+    try {
+      await repo.create(name: data.name, address: data.address, phone: data.phone);
+      if (context.mounted) AppToast.showSuccess(context, 'Sede «${data.name}» abierta');
+    } catch (e) {
+      if (context.mounted) AppToast.showError(context, BranchRepository.friendlyError(e));
+    }
+  }
+
   static Future<void> open(BuildContext context, {required Business business, required bool isOwner}) =>
       AppPane.push(context, MaterialPageRoute(builder: (_) => BranchesScreen(business: business, isOwner: isOwner)));
 
@@ -71,39 +115,12 @@ class _BranchesScreenState extends State<BranchesScreen> {
       [if (except != '') _repo.mainName, for (final b in _repo.branches) if (b.id != except) b.name];
 
   Future<void> _create() async {
-    if (_repo.freeSlots == 0) {
-      final go = await AppDialog.confirm(
-        context: context,
-        title: 'Sin cupos libres',
-        message: _repo.allowance == 0
-            ? 'Las sedes vienen con Stockealo Pro. Pro Servicios trae 2 sedes; con Pro, cada sede se agrega aparte.'
-            : 'Ya usas tus ${_repo.allowance} cupos de sede. Pide uno más para abrir otra.',
-        confirmText: 'Ver Stockealo Pro',
-      );
-      if (go && mounted) ProScreen.open(context, widget.business);
-      return;
+    setState(() => _busy = true);
+    try {
+      await BranchesScreen.createBranch(context, widget.business);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    if (_repo.openBranches.isEmpty) {
-      final ok = await AppDialog.confirm(
-        context: context,
-        title: 'Antes de la primera sede',
-        message: 'Pide a todo tu equipo que actualice Stockealo a la última versión. '
-            'Un celular con la app vieja solo ve y vende en la sede Principal.',
-        confirmText: 'Ya lo hicimos',
-      );
-      if (!ok || !mounted) return;
-    }
-    final used = _repo.openBranches.length + 1;
-    final data = await BranchFormDialog.show(
-      context,
-      title: 'Nueva sede',
-      actionLabel: 'Abrir sede',
-      taken: _taken(),
-      country: widget.business.country,
-      slotsNote: 'Usarás $used de ${_repo.allowance} cupos de sede.',
-    );
-    if (data == null) return;
-    await _run(() => _repo.create(name: data.name, address: data.address, phone: data.phone), 'Sede «${data.name}» abierta');
   }
 
   Future<void> _edit(Branch b) async {

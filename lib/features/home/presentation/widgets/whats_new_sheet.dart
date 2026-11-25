@@ -21,6 +21,17 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.18.3',
+      title: 'Sedes y un solo pago',
+      items: [
+        'Tus sedes están en el menú lateral, debajo del negocio: cambia de sede con un toque.',
+        'La corona junto a tu nombre dice tu plan, por ejemplo «Dueño · Pro Servicios».',
+        'Tu tienda en línea deja elegir la sede y muestra el stock de cada una.',
+        'Paga tu plan y tus sedes extra en un solo pago, o agrega sedes pagando solo los días que faltan.',
+        'Si pasas de Pro a Pro Servicios, se descuenta lo que te queda de Pro.',
+      ],
+    ),
+    (
       version: '0.18.2',
       title: 'Arreglos de cuentas y planes',
       items: [

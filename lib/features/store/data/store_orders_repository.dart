@@ -1,3 +1,4 @@
+import '../../business/data/branch_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -132,6 +133,8 @@ class StoreOrdersRepository {
               'valid_until': created.add(const Duration(days: validDays)).toIso8601String(),
               'created_at': created.toIso8601String(),
               'source': Quotation.sourceStore,
+              // Sede donde se pidió (0.18.3): el pedido sale en esa sede
+              if ((o['branch_id'] as String?)?.isNotEmpty == true) 'branch_id': o['branch_id'],
             },
             conflictAlgorithm: ConflictAlgorithm.ignore,
           );
@@ -170,7 +173,12 @@ class StoreOrdersRepository {
   static String? _notes(Map<String, dynamic> o) {
     final note = (o['note'] as String?)?.trim() ?? '';
     final coupon = o['coupon_code'] as String?;
-    final parts = [if (coupon != null && coupon.isNotEmpty) 'Cupón $coupon', if (note.isNotEmpty) note];
+    final branch = (o['branch_id'] as String?)?.isNotEmpty == true ? BranchRepository.instance.nameOf(o['branch_id'] as String) : null;
+    final parts = [
+      if (branch != null) 'Pedido en $branch',
+      if (coupon != null && coupon.isNotEmpty) 'Cupón $coupon',
+      if (note.isNotEmpty) note,
+    ];
     return parts.isEmpty ? null : parts.join(' · ');
   }
 

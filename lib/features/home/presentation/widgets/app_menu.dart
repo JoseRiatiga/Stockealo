@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../business/data/branch_repository.dart';
 import '../../../business/presentation/widgets/branch_picker_sheet.dart';
+import '../../../business/presentation/screens/branches_screen.dart';
+import '../../../../core/services/data_events.dart';
+import '../../../../core/design/pro_crown.dart';
+import '../../../pro/data/pro_service.dart';
 import '../../../../core/widgets/theme_mode_button.dart';
 
 import '../../../../core/design/status_pill.dart';
@@ -134,15 +138,25 @@ class _AppMenuState extends State<AppMenu> {
                   final branches = BranchRepository.instance;
                   // Con solo sedes cerradas, el dueño igual puede elegir «Todas las sedes»
                   final hasBranches = branches.openBranches.isNotEmpty || branches.canSwitch;
-                  return _BusinessButton(
-                    business: widget.business,
-                    collapsed: collapsed,
-                    branch: hasBranches
-                        ? (branches.viewAll.value ? 'Todas las sedes' : branches.nameOf(BranchRepository.active))
-                        : null,
-                    onTap: hasBranches
-                        ? () => BranchPickerSheet.show(context, onOtherBusiness: widget.onSelectBusiness)
-                        : widget.onSelectBusiness,
+                  final isOwner = widget.userRole.toUpperCase() == 'OWNER';
+                  // 0.18.3: con el menú abierto las sedes van debajo del negocio y la
+                  // tarjeta solo cambia de negocio; cerrado (solo íconos), la hoja de siempre
+                  final showList = !collapsed && widget.business != null && (hasBranches || isOwner);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _BusinessButton(
+                        business: widget.business,
+                        collapsed: collapsed,
+                        branch: hasBranches && !showList
+                            ? (branches.viewAll.value ? 'Todas las sedes' : branches.nameOf(BranchRepository.active))
+                            : null,
+                        onTap: hasBranches && !showList
+                            ? () => BranchPickerSheet.show(context, onOtherBusiness: widget.onSelectBusiness)
+                            : widget.onSelectBusiness,
+                      ),
+                      if (showList) _BranchList(business: widget.business!, isOwner: isOwner),
+                    ],
                   );
                 },
               ),
@@ -193,7 +207,23 @@ class _AppMenuState extends State<AppMenu> {
                             children: [
                               Text(widget.userName,
                                   maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600)),
-                              Text(_roleLabel, style: AppText.caption(context)),
+                              // 0.18.3: la corona y el plan junto al rol («Dueño · Pro Servicios»)
+                              ValueListenableBuilder<ProStatus>(
+                                valueListenable: ProService.instance.status,
+                                builder: (context, pro, _) => Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        pro.active ? '$_roleLabel · ${pro.kindLabel}' : _roleLabel,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: AppText.caption(context),
+                                      ),
+                                    ),
+                                    if (pro.active) ...[const SizedBox(width: 4), const ProCrown(size: 13)],
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -355,7 +385,8 @@ class _MenuItem extends StatelessWidget {
                             place.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppText.body(context, weight: selected ? FontWeight.w600 : FontWeight.w500, color: selected ? c.onAccent : c.ink),
+                            style: AppText.body(context,
+                                weight: selected ? FontWeight.w600 : FontWeight.w500, color: selected ? c.onAccent : c.ink),
                           ),
                         ),
                         if (b != null && b.count > 0) StatusPill('${b.count}', tone: b.tone, compact: true),
@@ -367,6 +398,133 @@ class _MenuItem extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Las sedes debajo del negocio en el menú lateral (0.18.3, aprobado el 24 nov): la
+/// Principal primero, la que está en uso marcada y el estado de su caja. «Todas las
+/// sedes» para dueño y administradores; «Abrir una sede» solo para el dueño. El
+/// cajero ve su sede sin poder cambiarla. Con muchas sedes, 4 y «Ver todas».
+class _BranchList extends StatelessWidget {
+  final Business business;
+  final bool isOwner;
+
+  const _BranchList({required this.business, required this.isOwner});
+
+  static const maxShown = 4;
+
+  Future<Map<String?, bool>> _cash(BranchRepository repo) async => {
+        null: await BranchRepository.openCashSession(null),
+        for (final b in repo.openBranches) b.id: await BranchRepository.openCashSession(b.id),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final repo = BranchRepository.instance;
+    final hasBranches = repo.openBranches.isNotEmpty || repo.canSwitch;
+    final all = repo.viewAll.value;
+    return ValueListenableBuilder<int>(
+      valueListenable: DataEvents.instance.cashVersion,
+      builder: (context, _, __) => FutureBuilder<Map<String?, bool>>(
+        future: hasBranches ? _cash(repo) : Future.value(const {}),
+        builder: (context, snap) {
+          final cash = snap.data ?? const {};
+          Widget row({
+            required String label,
+            String? detail,
+            required bool selected,
+            IconData? icon,
+            Color? color,
+            VoidCallback? onTap,
+          }) =>
+              InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.control),
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
+                  child: Row(
+                    children: [
+                      Icon(icon ?? (selected ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+                          size: 16, color: color ?? (selected ? c.accent : c.inkMuted)),
+                      const SizedBox(width: AppSpace.sm),
+                      Expanded(
+                        child: Text(label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.small(context,
+                                weight: selected ? FontWeight.w700 : FontWeight.w500, color: color ?? (selected ? c.ink : c.inkMuted))),
+                      ),
+                      if (detail != null) Text(detail, style: AppText.caption(context, color: c.inkFaint)),
+                    ],
+                  ),
+                ),
+              );
+          String? cashText(String? id) => !snap.hasData ? null : (cash[id] == true ? 'Caja abierta' : 'Caja cerrada');
+          final canChoose = repo.canSwitch;
+          // El cajero ve solo su sede
+          final others = canChoose ? repo.openBranches : repo.openBranches.where((b) => b.id == BranchRepository.active).toList();
+          final shown = others.take(maxShown - 1).toList();
+          return Padding(
+            padding: const EdgeInsets.only(top: AppSpace.xs, left: AppSpace.xs),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (hasBranches) ...[
+                  if (canChoose || BranchRepository.active == null)
+                    row(
+                      label: repo.mainName,
+                      detail: cashText(null),
+                      selected: !all && BranchRepository.active == null,
+                      onTap: canChoose
+                          ? () async {
+                              repo.setViewAll(false);
+                              await repo.choose(null);
+                            }
+                          : null,
+                    ),
+                  for (final b in shown)
+                    row(
+                      label: b.name,
+                      detail: b.isInactive ? 'Inactiva' : cashText(b.id),
+                      selected: !all && BranchRepository.active == b.id,
+                      onTap: canChoose
+                          ? () async {
+                              repo.setViewAll(false);
+                              await repo.choose(b.id);
+                            }
+                          : null,
+                    ),
+                  if (others.length > shown.length)
+                    row(
+                      label: 'Ver todas (${others.length + 1})',
+                      selected: false,
+                      icon: Icons.more_horiz,
+                      onTap: () => BranchPickerSheet.show(context),
+                    ),
+                  if (canChoose)
+                    row(
+                      label: 'Todas las sedes',
+                      selected: all,
+                      icon: Icons.grid_view_outlined,
+                      color: all ? c.accent : null,
+                      onTap: () => repo.setViewAll(true),
+                    ),
+                ],
+                if (isOwner)
+                  row(
+                    label: 'Abrir una sede',
+                    selected: false,
+                    icon: Icons.add,
+                    color: c.accent,
+                    onTap: () => BranchesScreen.createBranch(context, business),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

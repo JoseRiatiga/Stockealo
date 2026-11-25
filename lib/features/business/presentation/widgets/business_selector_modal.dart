@@ -3,7 +3,11 @@ import '../business_identity.dart';
 import 'join_business_dialog.dart';
 import 'business_trash.dart';
 import 'create_business_sheet.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../../../../core/design/pro_crown.dart';
+import '../../../pro/data/pro_service.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -86,6 +90,9 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
     _loadBusinesses();
   }
 
+  /// Plan Pro de cada negocio, para la corona (0.18.3)
+  final Map<String, ProStatus?> _pro = {};
+
   Future<void> _loadBusinesses() async {
     final user = AuthRepository.instance.currentUser;
     final userEmail = user?.email ?? '';
@@ -102,8 +109,21 @@ class _BusinessSelectorModalState extends State<BusinessSelectorModal> {
       );
     }
 
+    // Plan de cada negocio (0.18.3): primero lo guardado, luego lo de la nube
+    final pro = <String, ProStatus?>{for (final biz in list) biz.id: await ProService.cached(biz.id)};
+    unawaited(Future(() async {
+      for (final biz in list) {
+        final fresh = await ProService.instance.statusOf(biz.id);
+        if (!mounted) return;
+        setState(() => _pro[biz.id] = fresh);
+      }
+    }));
+
     if (mounted) {
       setState(() {
+        _pro
+          ..clear()
+          ..addAll(pro);
         _businesses = list;
         _currentBusiness = active;
         _deletedBusinesses = deleted;
@@ -364,9 +384,18 @@ actions: [
                       style: TextStyle(fontSize: AppText.sizeTitle, fontWeight: FontWeight.w600, color: c.ink),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '$roleLabel · ${biz.currency}',
-                      style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            [roleLabel, biz.currency, if (_pro[biz.id]?.active == true) _pro[biz.id]!.kindLabel].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: AppText.sizeSmall, color: c.inkMuted),
+                          ),
+                        ),
+                        if (_pro[biz.id]?.active == true) ...[const SizedBox(width: 4), const ProCrown(size: 14)],
+                      ],
                     ),
                   ],
                 ),

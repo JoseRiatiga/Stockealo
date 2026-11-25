@@ -124,4 +124,40 @@ void main() {
     expect(after.kindLabel, 'Pro');
     expect(ProService.decodeCached(m, now: DateTime(2027, 2, 1)), isNull);
   });
+
+  // Sedes extra (0.18.3): la nube cotiza; la app solo lee y muestra
+  test('lee la cotización de sedes extra de la nube', () {
+    final q = BranchSlotQuote.fromMap({
+      'ok': true, 'slots': 2, 'held': 1, 'unit': 24900, 'amount': 62300,
+      'gap': 1, 'gap_days': 15, 'gap_amount': 12500, 'ends_at': '2027-01-10T22:46:32Z',
+    });
+    expect(q.ok, isTrue);
+    expect(q.amount, 62300);
+    expect(q.days, 15);
+    expect(q.gap, 1);
+    expect(q.endsAt, isNotNull);
+    final renew = BranchSlotQuote.fromMap({'ok': false, 'error': 'renew_with_plan', 'days': 3});
+    expect(renew.ok, isFalse);
+    expect(ProService.slotErrorMessage(renew.error!), contains('menos de 7 días'));
+  });
+
+  test('los errores de sedes extra tienen su mensaje y el pago de solo sedes su nombre', () {
+    expect(ProService.checkoutErrorMessage('renew_with_plan'), contains('Renuévalo'));
+    expect(ProService.checkoutErrorMessage('no_plan'), contains('van con un plan'));
+    expect(ProService.slotErrorMessage('otra cosa'), isNull);
+    expect(proPlanIdLabel(branchSlotsPlanId), 'Sedes extra');
+  });
+
+  // Subir a Pro Servicios (0.18.3): la nube da el descuento por el Pro que le queda
+  test('lee el descuento al subir a Pro Servicios y sus errores', () {
+    final q = UpgradeQuote.fromMap({'ok': true, 'price': 79900, 'credit': 12500, 'amount': 67400});
+    expect(q.ok, isTrue);
+    expect(q.credit, 12500);
+    expect(q.amount, 67400);
+    final year = UpgradeQuote.fromMap({'ok': false, 'error': 'upgrade_choose_year', 'credit': 200000});
+    expect(year.ok, isFalse);
+    expect(ProService.checkoutErrorMessage('upgrade_choose_year'), contains('Pro Servicios anual'));
+    expect(ProService.checkoutErrorMessage('upgrade_no_coupon'), contains('cupón no se suma'));
+    expect(ProService.upgradeErrorMessage('otra cosa'), isNull);
+  });
 }

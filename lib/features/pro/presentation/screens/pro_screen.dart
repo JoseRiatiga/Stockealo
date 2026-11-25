@@ -89,6 +89,25 @@ class _ProScreenState extends State<ProScreen> {
   String? _couponError;
   ({String code, double price, double regular, String planId})? _coupon;
 
+  /// Sedes extra (0.18.3): cuántas van con el plan elegido y su precio, que calcula la
+  /// nube. [_addSlots] / [_addQuote]: comprar solo sedes con el plan vigente.
+  int _slots = 0;
+  BranchSlotQuote? _slotQuote;
+  String? _slotQuotePlan;
+  bool _quotingSlots = false;
+  int _quoteSeq = 0;
+  int _addSlots = 1;
+  BranchSlotQuote? _addQuote;
+  bool _quotingAdd = false;
+  int _addSeq = 0;
+
+  /// Subir a Pro Servicios (0.18.3): descuento por lo que le queda de Pro pagado,
+  /// calculado en la nube para el plan [_upgradePlan]
+  UpgradeQuote? _upgrade;
+  String? _upgradePlan;
+  bool _quotingUpgrade = false;
+  int _upgradeSeq = 0;
+
   /// Cuenta administradora: puede probar Wompi con la llave de pruebas
   bool _isAdmin = false;
   String? _codeError;
@@ -99,6 +118,7 @@ class _ProScreenState extends State<ProScreen> {
       if (mounted && v != _isAdmin) setState(() => _isAdmin = v);
     });
     pro.refresh(widget.business.id);
+    _quoteAdd();
     final results = await Future.wait([pro.plans(widget.business.currency), pro.settings()]);
     return (results[0] as List<ProPlan>, results[1] as Map<String, String>);
   }
@@ -282,6 +302,8 @@ class _ProScreenState extends State<ProScreen> {
       return;
     }
     setState(() => _selectedPlanId = plan.id);
+    if (_slotsFor(plan)) _quoteSlots(plan.id, preload: true);
+    if (plan.kind == 'services') _quoteUpgrade(plan.id);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
@@ -603,6 +625,11 @@ class _ProScreenState extends State<ProScreen> {
         _section(c, 'Cómo pagar'),
         if (wompiAvailable) ...[
           _card(c, _wompiBox(c, plan, testMode: wompiKey.startsWith('pub_test_'))),
+          // Con plan vigente: sedes extra por los días que le faltan (0.18.3)
+          if (_addQuote != null && (_addQuote!.ok || _addQuote!.error == 'renew_with_plan')) ...[
+            const SizedBox(height: AppSpace.md),
+            _card(c, _addSlotsBox(c)),
+          ],
           Center(
             child: TextButton(
               onPressed: () => setState(() => _showManual = !_showManual),
@@ -710,14 +737,30 @@ class _ProScreenState extends State<ProScreen> {
             style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
           ),
           const SizedBox(height: AppSpace.md),
-          if (plan != null) _couponBox(c, plan),
-          FilledButton.icon(
-            onPressed: plan == null || _paying ? null : () => _payOnline(plan),
-            icon: _paying
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.lock_outline, size: 20),
-            label: Text(plan == null ? 'Elige un plan' : 'Pagar ${_money(_couponFor(plan)?.price ?? plan.price)} con Wompi'),
-          ),
+          if (plan != null && _slotsFor(plan)) _slotsBox(c, plan),
+          if (plan != null && plan.kind == 'services') _upgradeBox(c, plan),
+          if (plan != null && (_upgradeFor(plan)?.credit ?? 0) == 0) _couponBox(c, plan),
+          Builder(builder: (context) {
+            final total = plan == null ? null : _totalFor(plan);
+            final label = plan == null
+                ? 'Elige un plan'
+                : total == null
+                    ? 'Calculando…'
+                    : 'Pagar ${_money(total)} con Wompi';
+            return FilledButton.icon(
+              onPressed: plan == null || total == null || _paying
+                  ? null
+                  : () => _payOnline(plan.id,
+                      coupon: _hasCredit(plan) ? null : _couponFor(plan)?.code,
+                      slots: _slotsFor(plan) ? _slots : 0,
+                      upgrade: _hasCredit(plan),
+                      done: 'Listo: ya tienes ${plan.kind == 'business' ? 'Pro' : plan.kindLabel}.'),
+              icon: _paying
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.lock_outline, size: 20),
+              label: Text(label),
+            );
+          }),
         ],
       );
 
@@ -811,11 +854,15 @@ class _ProScreenState extends State<ProScreen> {
     );
   }
 
-  /// Abre el pago de Wompi y espera la confirmación del servidor
-  Future<void> _payOnline(ProPlan plan) async {
+  /// Abre el pago de Wompi y espera la confirmación del servidor. [planId] es un plan o
+  /// [branchSlotsPlanId] (solo sedes extra); [done] es el aviso al aprobarse.
+  Future<void> _payOnline(String planId,
+      {String? coupon, int slots = 0, bool upgrade = false, required String done}) async {
     setState(() => _paying = true);
     try {
-      final checkout = await ProService.instance.startCheckout(widget.business.id, plan.id, coupon: _couponFor(plan)?.code);
+      final checkout =
+          await ProService.instance.startCheckout(widget.business.id, planId,
+          coupon: coupon, branchSlots: slots, upgrade: upgrade);
       final opened = await launchUrl(Uri.parse(checkout.url), mode: LaunchMode.externalApplication);
       if (!mounted) return;
       if (!opened) {
@@ -826,13 +873,232 @@ class _ProScreenState extends State<ProScreen> {
       if (!mounted) return;
       if (approved == true) {
         await ProService.instance.refresh(widget.business.id);
-        if (mounted) AppToast.showSuccess(context, 'Listo: ya tienes ${plan.kind == 'business' ? 'Pro' : plan.kindLabel}.');
+        _quoteAdd();
+        if (mounted) AppToast.showSuccess(context, done);
       }
     } on ProCheckoutException catch (e) {
       if (mounted) AppToast.showError(context, e.message);
     } finally {
       if (mounted) setState(() => _paying = false);
     }
+  }
+
+  /// Las sedes extra van con Pro o Pro Servicios, mensual o anual
+  bool _slotsFor(ProPlan plan) =>
+      (plan.kind == 'business' || plan.kind == 'services') && (plan.period == 'month' || plan.period == 'year');
+
+  /// Cotiza en la nube las sedes extra del plan elegido. Con [preload] trae marcadas las
+  /// que tiene hoy, para que al renovar no se le venzan sin darse cuenta.
+  Future<void> _quoteSlots(String planId, {bool preload = false}) async {
+    final seq = ++_quoteSeq;
+    setState(() => _quotingSlots = true);
+    var q = await ProService.instance.quoteSlots(widget.business.id, planId, preload ? 0 : _slots);
+    if (preload && seq == _quoteSeq) {
+      _slots = q != null && q.ok ? q.held : 0;
+      if (_slots > 0) q = await ProService.instance.quoteSlots(widget.business.id, planId, _slots);
+    }
+    if (!mounted || seq != _quoteSeq) return;
+    setState(() {
+      _slotQuote = q;
+      _slotQuotePlan = planId;
+      _quotingSlots = false;
+    });
+  }
+
+  void _setSlots(ProPlan plan, int n) {
+    setState(() => _slots = n.clamp(0, 50));
+    _quoteSlots(plan.id);
+  }
+
+  /// Solo sedes extra con el plan vigente: días que faltan del plan
+  Future<void> _quoteAdd() async {
+    final seq = ++_addSeq;
+    if (mounted) setState(() => _quotingAdd = true);
+    final q = await ProService.instance.quoteSlots(widget.business.id, branchSlotsPlanId, _addSlots);
+    if (mounted && seq == _addSeq) {
+      setState(() {
+        _addQuote = q;
+        _quotingAdd = false;
+      });
+    }
+  }
+
+  String _date(DateTime d) => '${d.day}/${d.month}/${d.year}';
+
+  /// «[ − ] 2 [ + ]»
+  Widget _stepper(StockealoColors c, int value, ValueChanged<int> onChanged, {int min = 0}) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'Quitar una',
+            onPressed: value > min ? () => onChanged(value - 1) : null,
+            icon: const Icon(Icons.remove_circle_outline),
+          ),
+          SizedBox(
+            width: 28,
+            child: Text('$value', textAlign: TextAlign.center, style: AppText.amount(context, size: 18, weight: FontWeight.w800)),
+          ),
+          IconButton(
+            tooltip: 'Agregar una',
+            onPressed: value < 50 ? () => onChanged(value + 1) : null,
+            icon: const Icon(Icons.add_circle_outline),
+          ),
+        ],
+      );
+
+  /// «Sedes extra − n +» debajo del plan elegido, con su precio (punto 3 del plan 0.18.3)
+  Widget _slotsBox(StockealoColors c, ProPlan plan) {
+    final q = _slotQuotePlan == plan.id ? _slotQuote : null;
+    final included = plan.kind == 'services' ? 'Incluye la Principal y 2 sedes' : 'Incluye solo la Principal';
+    final per = plan.period == 'year' ? 'al año' : 'al mes';
+    String detail() {
+      final parts = ['$_slots × ${_money(q!.unit)} $per'];
+      if (q.gap > 0) {
+        final who = q.gap == 1 ? 'una sede' : '${q.gap} sedes';
+        parts.add('y $who desde hoy hasta que empiece el plan nuevo (${q.days} días, ${_money(q.gapAmount)})');
+      }
+      return parts.join(' ');
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpace.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Sedes extra', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+                    Text(included, style: AppText.caption(context, color: c.inkMuted)),
+                  ],
+                ),
+              ),
+              _stepper(c, _slots, (n) => _setSlots(plan, n)),
+            ],
+          ),
+          if (_slots > 0 && q != null && q.ok)
+            Text(detail(), style: AppText.caption(context, color: c.inkMuted))
+          else if (_slots > 0 && q != null && !q.ok)
+            Text(ProService.slotErrorMessage(q.error!) ?? 'No se pueden agregar sedes a este plan.',
+                style: AppText.caption(context, color: c.danger)),
+        ],
+      ),
+    );
+  }
+
+  /// Total a pagar del plan elegido: el plan (con cupón) más sus sedes extra; null si
+  /// las sedes aún se están cotizando o no se pueden comprar
+  double? _totalFor(ProPlan plan) {
+    if (plan.kind == 'services') {
+      final u = _upgradeFor(plan);
+      if (_quotingUpgrade || (u != null && !u.ok)) return null;
+    }
+    final base = _hasCredit(plan) ? _upgradeFor(plan)!.amount : _couponFor(plan)?.price ?? plan.price;
+    if (_slots == 0 || !_slotsFor(plan)) return base;
+    final q = _slotQuotePlan == plan.id ? _slotQuote : null;
+    if (_quotingSlots || q == null || !q.ok) return null;
+    return base + q.amount;
+  }
+
+  UpgradeQuote? _upgradeFor(ProPlan plan) => _upgradePlan == plan.id ? _upgrade : null;
+
+  /// Pro Servicios con descuento por su Pro: no lleva cupón y ese Pro termina hoy
+  bool _hasCredit(ProPlan plan) {
+    final u = _upgradeFor(plan);
+    return u != null && u.ok && u.credit > 0;
+  }
+
+  Future<void> _quoteUpgrade(String planId) async {
+    final seq = ++_upgradeSeq;
+    setState(() => _quotingUpgrade = true);
+    final q = await ProService.instance.quoteUpgrade(widget.business.id, planId);
+    if (!mounted || seq != _upgradeSeq) return;
+    setState(() {
+      _upgrade = q;
+      _upgradePlan = planId;
+      _quotingUpgrade = false;
+    });
+  }
+
+  /// «Descuento por tu Pro: −$X» al pasar de Pro a Pro Servicios (punto 4 del plan 0.18.3)
+  Widget _upgradeBox(StockealoColors c, ProPlan plan) {
+    final u = _upgradeFor(plan);
+    if (u == null || (u.ok && u.credit == 0)) return const SizedBox.shrink();
+    if (!u.ok) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpace.md),
+        child: Text(ProService.upgradeErrorMessage(u.error!) ?? 'No se pudo calcular el descuento por tu Pro.',
+            style: AppText.caption(context, color: c.danger)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpace.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.local_offer_outlined, size: 18, color: c.success),
+          const SizedBox(width: AppSpace.sm),
+          Expanded(
+            child: Text(
+              'Descuento por lo que te queda de Pro: −${_money(u.credit)}. '
+              'Al aprobarse el pago tu Pro termina hoy y sigues con Pro Servicios, que trae todo lo de Pro.',
+              style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.ink),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// «Agregar sedes a tu plan»: solo sedes, pagando los días que le faltan al plan
+  Widget _addSlotsBox(StockealoColors c) {
+    final q = _addQuote;
+    final renew = q?.error == 'renew_with_plan';
+    final until = q?.endsAt != null ? ' (hasta el ${_date(q!.endsAt!)})' : '';
+    final howMany = _addSlots == 1 ? 'una sede extra' : '$_addSlots sedes extra';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.storefront_outlined, color: c.accent),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(child: Text('Agregar sedes a tu plan', style: TextStyle(fontWeight: FontWeight.w700, color: c.ink))),
+          ],
+        ),
+        const SizedBox(height: AppSpace.xs),
+        Text(
+          renew
+              ? ProService.slotErrorMessage(q!.error!)!
+              : 'Pagas solo los días que le faltan a tu plan$until. Las sedes vencen con el plan y se renuevan juntas.',
+          style: TextStyle(fontSize: AppText.sizeBody, height: 1.4, color: c.inkMuted),
+        ),
+        if (!renew) ...[
+          const SizedBox(height: AppSpace.sm),
+          Row(
+            children: [
+              Expanded(child: Text('Sedes extra', style: TextStyle(fontWeight: FontWeight.w600, color: c.ink))),
+              _stepper(c, _addSlots, (n) {
+                setState(() => _addSlots = n);
+                _quoteAdd();
+              }, min: 1),
+            ],
+          ),
+          if (q != null && q.ok) Text('${q.days} días de $howMany', style: AppText.caption(context, color: c.inkMuted)),
+          const SizedBox(height: AppSpace.md),
+          FilledButton.icon(
+            onPressed: _paying || _quotingAdd || q == null || !q.ok
+                ? null
+                : () => _payOnline(branchSlotsPlanId, slots: _addSlots, done: 'Listo: ya tienes $howMany.'),
+            icon: const Icon(Icons.lock_outline, size: 20),
+            label: Text(q != null && q.ok && !_quotingAdd ? 'Pagar ${_money(q.amount)} con Wompi' : 'Calculando…'),
+          ),
+        ],
+      ],
+    );
   }
 
   /// Número a la vista con botón para copiarlo (WhatsApp de Stockealo)

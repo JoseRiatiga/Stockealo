@@ -69,6 +69,12 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
+            ### Arreglos y avisos (0.18.6)
+            - En el computador, los avisos ya no tapan la pantalla: salen centrados y más angostos.
+            - Si tu sesión se cierra, la app te avisa para que vuelvas a entrar sin perder nada.
+            - La caja muestra el nombre de quien cerró, no su correo.
+            - Arreglos de textos en los traslados.
+
             ### Traslados entre sedes (0.18.5)
             - Envía mercancía de una sede a otra: queda «En camino» hasta que la reciban.
             - Al recibir, cuenta lo que llegó; si falta algo, queda anotado con quién envió y quién recibió.

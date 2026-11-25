@@ -9,6 +9,9 @@ import '../../../core/utils/business_clock.dart';
 import '../../products/models/product.dart';
 import 'branch_repository.dart';
 
+/// «1 unidad», «3 unidades» (0.18.6)
+String unitsText(int n) => '$n ${n == 1 ? 'unidad' : 'unidades'}';
+
 /// Estados de un traslado (0.18.5, docs/plan-0.18.5-traslados.md)
 abstract final class TransferStatus {
   static const inTransit = 'IN_TRANSIT';

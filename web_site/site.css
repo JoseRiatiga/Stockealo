@@ -17,19 +17,19 @@
   --radius: 16px;
   --radius-sm: 12px;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0E1013;
-    --surface: #16191E;
-    --surface-muted: #1E2228;
-    --line: #262A31;
-    --line-strong: #343943;
-    --ink: #F2F4F7;
-    --ink-muted: #A3AAB8;
-    --accent: #5CC497;
-    --on-accent: #10261C;
-    --accent-soft: #17291F;
-  }
+/* Oscuro solo si la persona lo elige con el botón (theme.js); por defecto, claro */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0E1013;
+  --surface: #16191E;
+  --surface-muted: #1E2228;
+  --line: #262A31;
+  --line-strong: #343943;
+  --ink: #F2F4F7;
+  --ink-muted: #A3AAB8;
+  --accent: #5CC497;
+  --on-accent: #10261C;
+  --accent-soft: #17291F;
 }
 
 * { box-sizing: border-box; }
@@ -103,7 +103,7 @@ h3 { font-size: 17px; margin: 0 0 6px; }
 .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent);
          font-size: 12px; font-weight: 700; }
 .badge.gold { background: color-mix(in srgb, var(--gold) 18%, transparent); color: #8A5300; }
-@media (prefers-color-scheme: dark) { .badge.gold { color: var(--gold); } }
+[data-theme="dark"] .badge.gold { color: var(--gold); }
 .tabs { display: inline-flex; background: var(--surface-muted); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px; gap: 4px;
         margin-bottom: 16px; }
 .tabs button { border: 0; background: transparent; color: var(--ink-muted); font: inherit; font-weight: 700; padding: 8px 16px;

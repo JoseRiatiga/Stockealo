@@ -117,6 +117,9 @@ class TeamRepository {
       }
     }
 
+    // 0.18.4: la nube no deja entrar por invitación a un correo sin verificar
+    if (await _emailUnverified(cleanEmail)) throw Exception(unverifiedInviteMessage);
+
     final memberName = linkedUserName ?? cleanEmail.split('@').first;
     final member = BusinessMember(
       id: const Uuid().v4(),
@@ -141,6 +144,21 @@ class TeamRepository {
     );
 
     return member;
+  }
+
+  static const unverifiedInviteMessage =
+      'Esa persona debe verificar su correo en Stockealo antes de entrar a tu negocio. '
+      'Pídele que abra la app y toque «Verificar» en Inicio o en Ajustes.';
+
+  /// Sin conexión no se sabe: la nube lo vuelve a revisar al subir el cambio
+  Future<bool> _emailUnverified(String email) async {
+    try {
+      final result = await SupabaseService.instance.client?.rpc('member_email_unverified', params: {'p_email': email});
+      return result == true;
+    } catch (e) {
+      debugPrint('No se pudo revisar si el correo está verificado: $e');
+      return false;
+    }
   }
 
   /// Cambia el rol de un miembro

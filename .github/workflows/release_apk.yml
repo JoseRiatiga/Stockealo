@@ -69,6 +69,11 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
+            ### Registro sin código (0.18.4)
+            - Crea tu cuenta y entra de una vez, sin esperar un código.
+            - Verifica tu correo cuando quieras desde el aviso en Inicio o en Ajustes.
+            - Para entrar a un negocio por invitación hay que verificar el correo primero.
+
             ### Sedes y un solo pago (0.18.3)
             - Tus sedes están en el menú lateral, debajo del negocio: cambia de sede con un toque.
             - La corona junto a tu nombre dice tu plan, por ejemplo «Dueño · Pro Servicios».

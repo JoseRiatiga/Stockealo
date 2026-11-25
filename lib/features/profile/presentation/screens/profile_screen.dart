@@ -17,6 +17,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/utils/image_helper.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../auth/presentation/widgets/verify_email_notice.dart';
 import '../../../auth/models/app_user.dart';
 import '../../../business/data/business_repository.dart';
 import '../../../dashboard/data/first_sale.dart';
@@ -866,6 +867,8 @@ actions: [
                         ),
                       ),
                     _profileGroup(c),
+                    // Mientras el correo no esté verificado (0.18.4)
+                    const VerifyEmailNotice(),
                     // Tu negocio a un toque (0.12.0). El modo oscuro vive en Personalización › Apariencia
                     SettingsGroup(label: 'Tu negocio', children: [
                       if (_activeBusiness != null) ...[

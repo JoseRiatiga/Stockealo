@@ -210,20 +210,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       if (_isRegisterMode) {
-        await _authRepo.requestRegistrationCode(email);
-        if (!mounted) return;
-        final code = await _askVerificationCode(email);
-        if (code == null) {
-          setState(() => _mascotState = StockyState.idle);
-          return;
-        }
-        await _authRepo.completeRegistration(
+        // 0.18.4: entra sin código; el correo se verifica después desde el aviso.
+        // Si el correo ya tiene cuenta o algo le corresponde, la nube pide el código.
+        final user = await _authRepo.registerWithoutCode(
           email: email,
-          code: code,
           password: password,
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
         );
+        if (user == null) {
+          await _authRepo.requestRegistrationCode(email);
+          if (!mounted) return;
+          final code = await _askVerificationCode(email);
+          if (code == null) {
+            setState(() => _mascotState = StockyState.idle);
+            return;
+          }
+          await _authRepo.completeRegistration(
+            email: email,
+            code: code,
+            password: password,
+            name: _nameController.text.trim(),
+            phone: _phoneController.text.trim(),
+          );
+        }
       } else {
         await _authRepo.login(email, password);
       }

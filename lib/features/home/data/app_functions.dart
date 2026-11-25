@@ -104,6 +104,9 @@ const kAppFunctions = <AppFunction>[
       keywords: ['sede', 'sedes', 'local', 'sucursal', 'locales', 'punto'], perm: Perm.modules),
   AppFunction(id: 'pro', title: 'Stockealo Pro', where: 'Ajustes › Stockealo Pro', tab: 3, icon: Icons.workspace_premium_outlined,
       keywords: ['pro', 'plan', 'codigo', 'canjear', 'suscripcion', 'cupon pro']),
+  // Verificar el correo (0.18.4): el aviso vive en Ajustes mientras falte
+  AppFunction(id: 'verify_email', title: 'Verificar correo', where: 'Ajustes › Verifica tu correo', tab: 3,
+      icon: Icons.mark_email_read_outlined, keywords: ['verificar', 'correo', 'codigo', 'confirmar', 'email', 'otp']),
   AppFunction(id: 'appearance', title: 'Apariencia', where: 'Ajustes › Apariencia', tab: 3, icon: Icons.palette_outlined,
       keywords: ['oscuro', 'claro', 'color', 'tema', 'letra', 'apariencia']),
   AppFunction(id: 'cloud', title: 'Nube y respaldo', where: 'Ajustes › Nube y respaldo', tab: 3, icon: Icons.cloud_outlined,

@@ -12,6 +12,8 @@ import '../../../business/presentation/active_business_scope.dart';
 import '../../../../core/services/supabase_service.dart';
 import 'package:flutter/material.dart';
 import '../../../business/data/branch_repository.dart';
+import '../../../business/data/transfer_repository.dart';
+import '../../../team/data/shift_lead.dart';
 import '../../../../core/database/app_database.dart';
 import 'package:flutter/services.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
@@ -396,10 +398,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
       mine = rows.isEmpty ? null : rows.first['branch_id'] as String?;
     } catch (_) {}
     await branches.use(businessId, role: role, memberBranchId: mine);
-    branches.refresh().then((_) => branches.use(businessId, role: role, memberBranchId: mine));
+    // Encargado de turno y traslados que llegan (0.18.5): los dice la nube
+    ShiftLead.clear();
+    ShiftLead.load(businessId, email);
+    branches.refresh().then((_) async {
+      await branches.use(businessId, role: role, memberBranchId: mine);
+      await TransferRepository.instance.refreshIncoming(businessId);
+    });
   }
 
   void _onBranchChanged() {
+    final biz = _activeBusiness;
+    if (biz != null) TransferRepository.instance.refreshIncoming(biz.id);
     final cart = SellCart.instance;
     if (cart.lines.isNotEmpty || cart.held.isNotEmpty) cart.reset();
     if (mounted) setState(() {});

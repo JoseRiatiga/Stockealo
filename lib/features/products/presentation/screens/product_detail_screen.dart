@@ -20,6 +20,10 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../../core/permissions/permission_guard.dart';
+import '../../../business/data/branch_repository.dart';
+import '../../../business/data/transfer_repository.dart';
+import '../../../business/presentation/screens/new_transfer_screen.dart';
+import '../../../business/presentation/screens/transfers_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -45,6 +49,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _checkRole();
     // La lista no trae las variantes: se cargan aquí para ver tallas y colores
     _refreshProduct();
+    _loadInTransit();
   }
 
   Future<void> _checkRole() async {
@@ -483,17 +488,62 @@ actions: [
   /// «Ajustar stock físico». Vender ya está junto al stock: aquí no se repite
   /// (0.16.7, hallazgo 9: «Vender» y «Registrar venta» hacían lo mismo)
   Widget _buildQuickActionsCard() {
+    final branches = BranchRepository.instance;
+    final canTransfer = branches.openBranches.isNotEmpty && branches.activeUsable && TransfersScreen.canSend() && _product.stock > 0;
     return _card(
       padding: const EdgeInsets.all(14),
-      child: SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: _showAdjustStockDialog,
-          icon: const Icon(Icons.tune_outlined, size: 17),
-          label: const Text('Ajustar stock físico'),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OutlinedButton.icon(
+            onPressed: _showAdjustStockDialog,
+            icon: const Icon(Icons.tune_outlined, size: 17),
+            label: const Text('Ajustar stock físico'),
+          ),
+          // Traslados entre sedes (0.18.5)
+          if (canTransfer) ...[
+            const SizedBox(height: AppSpace.sm),
+            OutlinedButton.icon(
+              onPressed: _sendToBranch,
+              icon: const Icon(Icons.swap_horiz_outlined, size: 17),
+              label: const Text('Enviar a otra sede'),
+            ),
+          ],
+          for (final line in _inTransit)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpace.sm),
+              child: Text(line, style: AppText.small(context, color: context.colors.inkMuted)),
+            ),
+        ],
       ),
     );
+  }
+
+  /// «3 en camino a Norte» (0.18.5)
+  List<String> _inTransit = const [];
+
+  Future<void> _loadInTransit() async {
+    if (BranchRepository.instance.openBranches.isEmpty) return;
+    try {
+      final all = await TransferRepository.instance.list(_product.businessId);
+      final lines = TransferRepository.inTransitFrom(all, BranchRepository.active)[_product.id] ?? const [];
+      if (mounted) setState(() => _inTransit = lines);
+    } catch (_) {
+      // Sin conexión no se muestra
+    }
+  }
+
+  Future<void> _sendToBranch() async {
+    final sent = await NewTransferScreen.open(
+      context,
+      businessId: _product.businessId,
+      fromBranchId: BranchRepository.active,
+      preset: _product.hasVariants && _product.variants.isNotEmpty ? const [] : [(product: _product, quantity: 1)],
+    );
+    if (sent == true && mounted) {
+      await _refreshProduct();
+      await _loadInTransit();
+    }
   }
 
   Widget _buildHeaderBlock() {

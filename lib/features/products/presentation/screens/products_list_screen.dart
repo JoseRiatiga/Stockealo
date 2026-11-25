@@ -41,6 +41,7 @@ import '../widgets/lots_widgets.dart';
 import '../widgets/idle_products_alert.dart';
 import '../../../home/navigation/app_pane.dart';
 import 'stock_count_screen.dart';
+import '../../../business/presentation/widgets/transfers_entry.dart';
 
 /// Productos (el catálogo) y, en [ProductsListMode.stock], el lugar Stock: la
 /// misma lista ordenada con lo agotado y lo bajo arriba, el aviso del proveedor que pasa
@@ -486,6 +487,17 @@ class _ProductsListScreenState extends State<ProductsListScreen> with ActiveBusi
                           IdleProductsAlert(key: ValueKey('idle-${_activeBusiness!.id}'), business: _activeBusiness!),
                         ],
                       ),
+                    ),
+                  ),
+
+                // Traslados entre sedes (0.18.5): lo ve todo el equipo (el cajero recibe)
+                if (_stockMode && _activeBusiness != null)
+                  SliverToBoxAdapter(
+                    child: TransfersEntry(
+                      key: ValueKey('transfers-${_activeBusiness!.id}'),
+                      business: _activeBusiness!,
+                      padding: EdgeInsets.fromLTRB(hPadding, AppSpace.md, hPadding, 0),
+                      onChanged: () => _loadData(silent: true),
                     ),
                   ),
 

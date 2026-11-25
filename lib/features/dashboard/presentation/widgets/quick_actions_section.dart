@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../../business/presentation/screens/transfers_screen.dart';
 
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/status_pill.dart';
@@ -97,6 +98,8 @@ class _QuickActionsSectionState extends State<QuickActionsSection> {
         await CatalogGeneratorModal.show(context: context, business: biz);
       case 'promotions':
         await PromotionsScreen.open(context, business: biz);
+      case 'transfers':
+        await TransfersScreen.open(context, biz);
       case 'stock_count':
         await AppPane.open(context, (_) => StockCountScreen(business: biz));
       case 'restock_order':

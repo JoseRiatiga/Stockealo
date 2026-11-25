@@ -17,6 +17,9 @@ enum _ActivityFilter {
     ActivityAction.shrinkage,
     ActivityAction.purchase,
     ActivityAction.supplierChange,
+    ActivityAction.transferSend,
+    ActivityAction.transferReceive,
+    ActivityAction.transferCancel,
   }),
   money('Fiados y caja', {
     ActivityAction.debtPayment,
@@ -32,6 +35,7 @@ enum _ActivityFilter {
     ActivityAction.memberRemove,
     ActivityAction.roleChange,
     ActivityAction.authorize,
+    ActivityAction.shiftLead,
   });
 
   final String label;

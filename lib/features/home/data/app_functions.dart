@@ -70,6 +70,9 @@ const kAppFunctions = <AppFunction>[
   AppFunction(id: 'stock', title: 'Stock por reponer', where: 'Stock', tab: 8, icon: Icons.layers_outlined,
       keywords: ['stock', 'reponer', 'agotado', 'falta', 'minimo', 'pedir', 'faltante']),
   // 0.17.0: conteo de inventario (bloque C) y pedido sugerido (bloque D)
+  // Traslados entre sedes (0.18.5): solo con sedes; se abre desde Stock
+  AppFunction(id: 'transfers', title: 'Traslados', where: 'Stock › Traslados', tab: 8, icon: Icons.swap_horiz_outlined,
+      keywords: ['traslado', 'trasladar', 'enviar', 'sede', 'mover', 'recibir', 'mercancia']),
   AppFunction(id: 'stock_count', title: 'Contar inventario', where: 'Stock › Contar inventario', tab: 8,
       icon: Icons.fact_check_outlined, keywords: ['contar', 'conteo', 'inventario', 'fisico', 'diferencia', 'cuadrar'],
       perm: Perm.stockAdjust),

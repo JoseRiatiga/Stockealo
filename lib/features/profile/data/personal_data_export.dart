@@ -1,3 +1,4 @@
+import '../../business/data/transfer_repository.dart';
 import 'dart:io';
 
 import 'package:excel/excel.dart';
@@ -85,6 +86,30 @@ class PersonalDataExport {
         final sheet = (labels[table] ?? table).substring(0, (labels[table] ?? table).length.clamp(0, 31));
         _write(excel[sheet], rows, counts, sheet);
       }
+      // Traslados entre sedes (0.18.5): viven en la nube; sin conexión no se incluyen
+      final transfers = <Map<String, Object?>>[];
+      for (final id in businessIds) {
+        try {
+          for (final t in await TransferRepository.instance.list(id)) {
+            for (final l in t.lines) {
+              transfers.add({
+                'business_id': id,
+                'id': t.id,
+                'from_branch_id': t.fromBranchId,
+                'to_branch_id': t.toBranchId,
+                'status': t.status,
+                'sent_at': t.sentAt.toIso8601String(),
+                'sent_by': t.sentByName ?? t.sentByEmail,
+                'received_by': t.receivedByName,
+                'product': l.label,
+                'sent': l.sent,
+                'received': l.received,
+              });
+            }
+          }
+        } catch (_) {}
+      }
+      if (transfers.isNotEmpty) _write(excel['Traslados'], transfers, counts, 'Traslados');
     }
     final bytes = excel.encode();
     if (bytes == null) throw Exception('No se pudo generar el archivo de Excel.');

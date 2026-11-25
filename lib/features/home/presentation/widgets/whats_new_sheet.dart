@@ -21,6 +21,16 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.18.5',
+      title: 'Traslados entre sedes',
+      items: [
+        'Envía mercancía de una sede a otra: queda «En camino» hasta que la reciban.',
+        'Al recibir, cuenta lo que llegó; si falta algo, queda anotado con quién envió y quién recibió.',
+        'Deja a un cajero a cargo de la sede por unas horas para recibir traslados y cerrar cajas.',
+        'Si a una sede le falta un producto que otra tiene de sobra, la app te lo sugiere.',
+      ],
+    ),
+    (
       version: '0.18.4',
       title: 'Registro sin código',
       items: [

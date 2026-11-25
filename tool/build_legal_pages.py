@@ -75,6 +75,7 @@ PAGE = """<!doctype html>
   <title>{page_title} · Stockealo</title>
   <meta name="description" content="{page_title} de Stockealo, la app de inventario y ventas para negocios pequeños.">
   <link rel="icon" href="/favicon.png">
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/site.css">
 </head>
 <body>

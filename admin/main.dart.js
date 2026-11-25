@@ -35298,11 +35298,14 @@ break A}if("month"===a){s="Mensual"
 break A}if("year"===a){s="Anual"
 break A}s="Permanente"
 break A}return s},
-bp7(a){var s,r=a==null,q=(r?"":a).split("_")
-if(q.length<2)return r?"Pro":a
-r=q[0]
-s=q[1]
-return A.jf(r)+" \xb7 "+A.aUH(s)},
+bp7(a){var s,r,q
+if(a==="branch_slots")return"Sedes extra"
+s=a==null
+r=(s?"":a).split("_")
+if(r.length<2)return s?"Pro":a
+s=r[0]
+q=r[1]
+return A.jf(s)+" \xb7 "+A.aUH(q)},
 bnr(a){switch(a.a){case 0:return B.wI
 case 2:return B.SW
 case 1:return B.SV
@@ -118911,7 +118914,7 @@ h=k.length>500?B.c.a5(k,0,500):k
 if(j==null)g=null
 else g=j.length>4000?B.c.a5(j,0,4000):j
 f=t.z
-m=A.a4(["p_app",d,"p_version","0.18.2+62","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
+m=A.a4(["p_app",d,"p_version","0.18.3+63","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
 l=null
 p=4
 s=l!=null?7:9

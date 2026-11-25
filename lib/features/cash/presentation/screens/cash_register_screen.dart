@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../team/data/person_names.dart';
 import '../../../../core/utils/clock_text.dart';
 import '../../../../core/design/qty_stepper.dart';
 import 'package:intl/intl.dart';
@@ -65,9 +66,9 @@ SaleDocument cashTicket(CashSession s, CashSummary sum, [List<String> servicesLi
     lines: const [],
     total: s.countedAmount ?? 0,
     totalLabel: 'Contado',
-    sellerName: s.closedBy ?? s.openedBy,
+    sellerName: PersonNames.display(s.closedBy ?? s.openedBy),
     before: [
-      TicketRow('Abrió', '${s.openedBy} · ${clockText(s.openedAt)}'),
+      TicketRow('Abrió', '${PersonNames.display(s.openedBy)} · ${clockText(s.openedAt)}'),
       TicketRow('Base', money(sum.openingAmount)),
       for (final e in sum.byMethod.entries) TicketRow(CashRegisterRepository.methodLabel(e.key), money(e.value)),
       if (sum.tipsIn > 0) TicketRow('Propinas en efectivo', money(sum.tipsIn)),
@@ -98,8 +99,8 @@ SaleDocument blindCashTicket(CashSession s) => SaleDocument(
       lines: const [],
       total: s.countedAmount ?? 0,
       totalLabel: 'Contado',
-      sellerName: s.closedBy ?? s.openedBy,
-      before: [TicketRow('Abrió', '${s.openedBy} · ${clockText(s.openedAt)}')],
+      sellerName: PersonNames.display(s.closedBy ?? s.openedBy),
+      before: [TicketRow('Abrió', '${PersonNames.display(s.openedBy)} · ${clockText(s.openedAt)}')],
       notes: s.notes,
       closing: 'Cierre del turno · arqueo ciego',
       branch: BranchRepository.instance.ticketBranch(s.branchId),
@@ -152,6 +153,7 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
   }
 
   Future<void> _load() async {
+    await PersonNames.load(widget.businessId);
     final open = await _repo.getOpenSession(widget.businessId);
     final summary = open != null ? await _repo.summarize(open) : null;
     final moves = open != null ? await _repo.movements(open) : const <CashMovement>[];
@@ -325,7 +327,7 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
         headlineTone: AppTone.info,
         subline: 'Contaste ${CurrencyFormatter.format(closed.countedAmount ?? 0)}',
         text: '$businessName\nCierre de caja\nContado: ${CurrencyFormatter.format(closed.countedAmount ?? 0)}'
-            '${closed.closedBy != null ? '\nCerró: ${closed.closedBy}' : ''}',
+            '${closed.closedBy != null ? '\nCerró: ${PersonNames.display(closed.closedBy)}' : ''}',
       );
       return;
     }
@@ -469,7 +471,7 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
               children: [
                 const StatusPill('Caja abierta', tone: AppTone.success, dot: true),
                 const Spacer(),
-                Text('Desde las ${_hour(session.openedAt)} · ${session.openedBy}', style: AppText.small(context)),
+                Text('Desde las ${_hour(session.openedAt)} · ${PersonNames.display(session.openedBy)}', style: AppText.small(context)),
               ],
             ),
             const SizedBox(height: AppSpace.lg),
@@ -666,7 +668,7 @@ class _CashRegisterScreenState extends State<CashRegisterScreen> {
                         style: AppText.body(context, weight: FontWeight.w600)),
                     Text(
                       '${_blind ? '' : 'Esperado ${CurrencyFormatter.format(s.expectedAmount ?? 0)} · '}Contado ${CurrencyFormatter.format(s.countedAmount ?? 0)}'
-                      '${s.closedBy != null ? ' · ${s.closedBy}' : ''}${s.notes != null ? '\n${s.notes}' : ''}',
+                      '${s.closedBy != null ? ' · ${PersonNames.display(s.closedBy)}' : ''}${s.notes != null ? '\n${s.notes}' : ''}',
                       style: AppText.small(context),
                     ),
                   ],

@@ -51,7 +51,7 @@ import '../../../services/data/appointments_repository.dart';
 import '../../../services/models/service_template.dart';
 import '../../../team/data/roles_repository.dart';
 import '../../../../core/permissions/permissions.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthState, RealtimeChannel;
 import '../../../team/presentation/widgets/authorization_gate.dart';
 import '../../../team/data/authorization_service.dart';
 import '../../../services/models/work_schedule.dart';
@@ -79,6 +79,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   @override
   void onActiveBusinessChanged() => _loadNavigationContext();
 
+  /// Al abrir o volver a la app: la persona está adentro pero la nube ya no tiene su
+  /// sesión (venció y no se pudo renovar). Sin internet la sesión sigue guardada, así
+  /// que esto no salta por falta de conexión.
+  void _checkSessionGone() {
+    final client = SupabaseService.instance.client;
+    if (client != null && client.auth.currentSession == null && _authRepo.currentUser != null &&
+        !SupabaseService.intentionalSignOut) {
+      _showSessionClosed();
+    }
+  }
+
+  /// «Tu sesión se cerró»: lo guardado en el celular se queda y sube al volver a entrar
+  Future<void> _showSessionClosed() async {
+    if (_sessionNoticeShown || !mounted) return;
+    _sessionNoticeShown = true;
+    await AppDialog.show<void>(
+      context: context,
+      barrierDismissible: false,
+      icon: Icons.lock_clock_outlined,
+      title: 'Tu sesión se cerró',
+      content: const Text(
+        'Vuelve a entrar para guardar tus cambios en la nube. Lo que hiciste en este equipo no se pierde: '
+        'sube cuando entres con tu cuenta.',
+      ),
+      actions: [
+        Builder(builder: (ctx) => FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Entrar'))),
+      ],
+    );
+    if (!mounted) return;
+    AppPane.clear();
+    widget.onLogout();
+  }
+
   /// Cerrar sesión pregunta antes (0.16.1), desde el menú, Ajustes o fuera de horario
   Future<void> _logout() async {
     if (await LogoutConfirm.ask(context)) {
@@ -101,6 +134,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
   String get _userRole => Permissions.viewAs.value ?? _realRole;
 
   late final AppLifecycleListener _lifecycle;
+
+  /// Sesión cerrada por la nube (0.18.6): se avisa una sola vez y se vuelve a entrar
+  StreamSubscription<AuthState>? _sessionSub;
+  bool _sessionNoticeShown = false;
 
   /// Web: revisa cada cierto tiempo si se publicó una versión nueva
   Timer? _webUpdateTimer;
@@ -126,7 +163,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     // También al volver a la app, por si quedó abierta varios días
     AutoBackupService.instance.runIfDue();
     _refreshPhoneAlerts();
+    _sessionSub = SupabaseService.instance.client?.auth.onAuthStateChange.listen((state) {
+      if (AuthRepository.sessionClosedByCloud(state.event, appLoggedIn: _authRepo.currentUser != null)) {
+        _showSessionClosed();
+      }
+    });
+    _checkSessionGone();
     _lifecycle = AppLifecycleListener(onResume: () {
+      _checkSessionGone();
       AutoBackupService.instance.runIfDue();
       _refreshPhoneAlerts();
       _pullOrders();
@@ -321,6 +365,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Active
     Permissions.viewAs.removeListener(_onViewAs);
     BranchRepository.instance.current.removeListener(_onBranchChanged);
     _authChannel?.unsubscribe();
+    _sessionSub?.cancel();
     _accessTimer?.cancel();
     _lifecycle.dispose();
     _webUpdateTimer?.cancel();

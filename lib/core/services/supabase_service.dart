@@ -1198,6 +1198,10 @@ class SupabaseService {
   /// Espera a que terminen las escrituras lanzadas sin esperar. Las pruebas lo usan
   /// antes de cerrar o borrar la base local, que esas escrituras todavía leen, y el
   /// estado Pro, para no preguntar por un negocio que todavía no llega a la nube.
+  /// La app misma cerró la sesión (borrar la cuenta): no es la nube la que la cerró.
+  /// Se vuelve a false al entrar (0.18.6)
+  static bool intentionalSignOut = false;
+
   Future<void> waitForPendingWrites() => Future.wait(_pendingWrites.toList());
 
   Future<void> _write(String operation, Map<String, dynamic> payload) {
@@ -2335,7 +2339,9 @@ class SupabaseService {
     await db.delete('users');
     await db.delete('app_settings');
 
-    // Cerrar la sesión local (el usuario de Auth ya no existe en el servidor)
+    // Cerrar la sesión local (el usuario de Auth ya no existe en el servidor). Es a
+    // propósito: el aviso «Tu sesión se cerró» no debe salir (Codex, 25 nov)
+    intentionalSignOut = true;
     try {
       await client?.auth.signOut();
     } catch (_) {}

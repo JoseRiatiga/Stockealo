@@ -10,6 +10,7 @@ import 'package:stockealo/features/business/models/business.dart';
 import 'package:stockealo/features/home/navigation/app_places.dart';
 import 'package:stockealo/features/home/presentation/widgets/app_header_bar.dart';
 import 'package:stockealo/features/home/presentation/widgets/app_menu.dart';
+import 'package:stockealo/features/pro/data/pro_service.dart';
 
 /// El marco de la app (menú y encabezado) en el computador y en el celular, en
 /// claro y en oscuro. Con PREVIEW_OUT=<carpeta> guarda una imagen de cada uno.
@@ -173,5 +174,25 @@ void main() {
     expect(find.text('Tienda en línea'), findsNothing);
     expect(find.text('Reportes'), findsNothing);
     expect(find.text('Servicios'), findsNothing);
+  });
+
+  // 0.18.6: «Dueño · Pro Ser…» se cortaba junto a «Salir»: el plan va en su línea
+  testWidgets('el plan se ve completo junto a «Salir»', (tester) async {
+    await tester.runAsync(_loadInter);
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    ProService.instance.status.value = const ProStatus(active: true, kind: 'services', services: true);
+    addTearDown(() => ProService.instance.status.value = ProStatus.none);
+
+    final key = GlobalKey();
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.build(Brightness.light),
+      home: Scaffold(body: Row(children: [RepaintBoundary(key: key, child: _menu()), const Expanded(child: SizedBox())])),
+    ));
+    await tester.pumpAndSettle();
+    _expectWhole(tester, 'Pro Servicios');
+    _expectWhole(tester, 'Dueño');
+    await _save(tester, key, 'menu_pie_pro');
   });
 }

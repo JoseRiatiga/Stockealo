@@ -463,6 +463,12 @@ class AuthRepository {
     }
   }
 
+  /// La nube cerró la sesión por su cuenta (0.18.6): Supabase avisa «signedOut» y la
+  /// persona sigue adentro en la app. Si la cerró ella con «Salir», [logout] ya borró
+  /// el usuario antes, así que no cuenta.
+  static bool sessionClosedByCloud(AuthChangeEvent event, {required bool appLoggedIn}) =>
+      event == AuthChangeEvent.signedOut && appLoggedIn && !SupabaseService.intentionalSignOut;
+
   /// Error de Supabase al pedir un código para un correo sin cuenta (con shouldCreateUser: false)
   @visibleForTesting
   static bool isUnknownAccountError(Object e) {
@@ -643,6 +649,7 @@ class AuthRepository {
     );
 
     _currentUser = user;
+    SupabaseService.intentionalSignOut = false;
     await _dbProvider.setSetting('active_user_id', user.id);
 
     // Descargar empresas, productos, categorías y datos asociados desde la nube

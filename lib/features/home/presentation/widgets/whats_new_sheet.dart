@@ -21,6 +21,16 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.18.6',
+      title: 'Arreglos y avisos',
+      items: [
+        'En el computador, los avisos ya no tapan la pantalla: salen centrados y más angostos.',
+        'Si tu sesión se cierra, la app te avisa para que vuelvas a entrar sin perder nada.',
+        'La caja muestra el nombre de quien cerró, no su correo.',
+        'Arreglos de textos en los traslados y en el menú: tu plan se ve completo.',
+      ],
+    ),
+    (
       version: '0.18.5',
       title: 'Traslados entre sedes',
       items: [

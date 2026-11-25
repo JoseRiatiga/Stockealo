@@ -92,7 +92,9 @@ class _TransfersScreenState extends State<TransfersScreen> {
     final ok = await AppDialog.confirm(
       context: context,
       title: 'Cancelar el traslado',
-      message: 'Las ${t.units} unidades vuelven a ${_branches.nameOf(t.fromBranchId)}.',
+      message: t.units == 1
+          ? 'La unidad vuelve a ${_branches.nameOf(t.fromBranchId)}.'
+          : 'Las ${t.units} unidades vuelven a ${_branches.nameOf(t.fromBranchId)}.',
       confirmText: 'Cancelar el traslado',
       cancelText: 'Volver',
       destructive: true,
@@ -104,10 +106,15 @@ class _TransfersScreenState extends State<TransfersScreen> {
       ActivityRepository.instance.log(
         businessId: t.businessId,
         action: ActivityAction.transferCancel,
-        summary: 'Canceló el traslado de ${t.units} unidades a ${_branches.nameOf(t.toBranchId)}',
+        summary: 'Canceló el traslado de ${unitsText(t.units)} a ${_branches.nameOf(t.toBranchId)}',
         data: {'transfer_id': t.id},
       );
-      if (mounted) AppToast.showSuccess(context, 'Traslado cancelado: las unidades volvieron a ${_branches.nameOf(t.fromBranchId)}.');
+      if (mounted) {
+        AppToast.showSuccess(
+          context,
+          'Traslado cancelado: ${t.units == 1 ? 'la unidad volvió' : 'las unidades volvieron'} a ${_branches.nameOf(t.fromBranchId)}.',
+        );
+      }
       await _load();
     } catch (e) {
       if (mounted) AppToast.showError(context, TransferRepository.friendlyError(e));
@@ -283,8 +290,8 @@ class _TransfersScreenState extends State<TransfersScreen> {
   }
 
   static String _summary(StockTransfer t) {
-    if (t.lines.length == 1) return '${t.lines.first.label} · ${t.units} ${t.units == 1 ? 'unidad' : 'unidades'}';
-    return '${t.lines.length} productos · ${t.units} unidades';
+    if (t.lines.length == 1) return '${t.lines.first.label} · ${unitsText(t.units)}';
+    return '${t.lines.length} productos · ${unitsText(t.units)}';
   }
 
   static String _when(DateTime d) {
@@ -350,7 +357,7 @@ class _ReceiveTransferScreenState extends State<ReceiveTransferScreen> {
         businessId: t.businessId,
         action: ActivityAction.transferReceive,
         summary: [
-          'Recibió $_total de ${t.units} unidades desde $from',
+          'Recibió $_total de ${unitsText(t.units)} desde $from',
           if (_missing > 0) '(faltaron $_missing)',
           if (ShiftLead.active && !TransfersScreen.isManager) 'como encargado',
           if (!done) 'por verificar',
@@ -360,7 +367,9 @@ class _ReceiveTransferScreenState extends State<ReceiveTransferScreen> {
       if (!mounted) return;
       AppToast.showSuccess(
         context,
-        done ? 'Listo: $_total unidades entraron al stock.' : 'Recibido por verificar: las unidades ya se pueden vender.',
+        done
+            ? 'Listo: ${unitsText(_total)} ${_total == 1 ? 'entró' : 'entraron'} al stock.'
+            : 'Recibido por verificar: ya se puede vender.',
       );
       Navigator.pop(context, true);
     } catch (e) {
@@ -423,13 +432,13 @@ class _ReceiveTransferScreenState extends State<ReceiveTransferScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(children: [
-                      Expanded(child: Text('Llegan $_total de ${t.units}', style: AppText.body(context))),
+                      Expanded(child: Text('${_total == 1 ? 'Llega' : 'Llegan'} $_total de ${t.units}', style: AppText.body(context))),
                       if (_missing > 0) Text('Falta $_missing', style: AppText.body(context, weight: FontWeight.w700, color: c.danger)),
                     ]),
                     const SizedBox(height: AppSpace.sm),
                     FilledButton(
                       onPressed: _saving ? null : _save,
-                      child: Text(_saving ? 'Guardando…' : provisional ? 'Recibir provisionalmente' : 'Recibir $_total unidades'),
+                      child: Text(_saving ? 'Guardando…' : provisional ? 'Recibir provisionalmente' : 'Recibir ${unitsText(_total)}'),
                     ),
                   ],
                 ),

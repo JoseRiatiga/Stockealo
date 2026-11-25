@@ -207,22 +207,28 @@ class _AppMenuState extends State<AppMenu> {
                             children: [
                               Text(widget.userName,
                                   maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.body(context, weight: FontWeight.w600)),
-                              // 0.18.3: la corona y el plan junto al rol («Dueño · Pro Servicios»)
+                              // 0.18.3: el rol y el plan con su corona. 0.18.6: el plan va en
+                              // su propia línea, con la corona delante; junto a «Salir» no
+                              // cabía y se cortaba en «Dueño · Pro Ser…»
+                              Text(_roleLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption(context)),
                               ValueListenableBuilder<ProStatus>(
                                 valueListenable: ProService.instance.status,
-                                builder: (context, pro, _) => Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        pro.active ? '$_roleLabel · ${pro.kindLabel}' : _roleLabel,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: AppText.caption(context),
+                                builder: (context, pro, _) => !pro.active
+                                    ? const SizedBox.shrink()
+                                    : Row(
+                                        children: [
+                                          const ProCrown(size: 13),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              pro.kindLabel,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: AppText.caption(context, weight: FontWeight.w600),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                    if (pro.active) ...[const SizedBox(width: 4), const ProCrown(size: 13)],
-                                  ],
-                                ),
                               ),
                             ],
                           ),

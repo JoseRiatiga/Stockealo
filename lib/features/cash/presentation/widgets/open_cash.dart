@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../team/data/person_names.dart';
 import '../../../../core/utils/clock_text.dart';
 import '../../../../core/utils/money_input.dart';
 
@@ -137,7 +138,7 @@ class _OpenCashFormState extends State<OpenCashForm> {
                 const SizedBox(width: AppSpace.sm),
                 Expanded(
                   child: Text(
-                    'Al cerrar, ${_last!.closedBy ?? _last!.openedBy} contó ${CurrencyFormatter.format(last)}. '
+                    'Al cerrar, ${PersonNames.display(_last!.closedBy ?? _last!.openedBy)} contó ${CurrencyFormatter.format(last)}. '
                     'Si hoy empiezas con ${CurrencyFormatter.format(_amount)}, hay ${CurrencyFormatter.format(diff.abs())} '
                     'de diferencia.',
                     style: AppText.small(context, color: c.ink),

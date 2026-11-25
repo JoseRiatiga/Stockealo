@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_tokens.dart';
@@ -49,7 +51,7 @@ class AppToast {
           elevation: 0,
           backgroundColor: c.toast,
           behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
+          margin: AppToast.marginFor(MediaQuery.sizeOf(context).width),
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.md),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
           duration: duration,
@@ -80,6 +82,16 @@ class AppToast {
         ),
       );
     } catch (_) {}
+  }
+
+  /// Ancho máximo del aviso en pantallas anchas (0.18.6): centrado abajo, para que no
+  /// tape botones como «Cobrar». En el celular va a lo ancho, como siempre.
+  static const maxWidth = 420.0;
+  static const wideFrom = 600.0;
+
+  static EdgeInsets marginFor(double screenWidth) {
+    final side = screenWidth >= wideFrom ? math.max(AppSpace.lg, (screenWidth - maxWidth) / 2) : AppSpace.lg;
+    return EdgeInsets.fromLTRB(side, 0, side, AppSpace.lg);
   }
 
   /// Aviso de éxito

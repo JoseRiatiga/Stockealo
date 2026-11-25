@@ -171,7 +171,7 @@ class _NewTransferScreenState extends State<NewTransferScreen> {
         summary: 'Envió $names de ${_branches.nameOf(widget.fromBranchId)} a ${_branches.nameOf(to)}',
       );
       if (!mounted) return;
-      AppToast.showSuccess(context, 'Enviado: $_units unidades van en camino a ${_branches.nameOf(to)}.');
+      AppToast.showSuccess(context, 'Enviado: ${unitsText(_units)} ${_units == 1 ? 'va' : 'van'} en camino a ${_branches.nameOf(to)}.');
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -358,7 +358,7 @@ class _NewTransferScreenState extends State<NewTransferScreen> {
         children: [
           Row(children: [
             Expanded(child: Text('$n ${n == 1 ? 'producto' : 'productos'}', style: AppText.body(context, color: c.inkMuted))),
-            Text('$_units ${_units == 1 ? 'unidad' : 'unidades'}', style: AppText.body(context, weight: FontWeight.w700)),
+            Text(unitsText(_units), style: AppText.body(context, weight: FontWeight.w700)),
           ]),
           const SizedBox(height: AppSpace.sm),
           FilledButton(

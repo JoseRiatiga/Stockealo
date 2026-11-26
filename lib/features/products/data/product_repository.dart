@@ -100,7 +100,7 @@ class ProductRepository {
         'product_variants',
         where: 'product_id IN (${List.filled(batch.length, '?').join(', ')})',
         whereArgs: batch,
-        orderBy: 'created_at ASC',
+        orderBy: ProductVariant.orderBy,
       );
       for (final row in rows) {
         final variant = ProductVariant.fromMap(row);
@@ -117,7 +117,7 @@ class ProductRepository {
       'product_variants',
       where: 'product_id = ?',
       whereArgs: [productId],
-      orderBy: 'created_at ASC',
+      orderBy: ProductVariant.orderBy,
     );
     return maps.map((m) => ProductVariant.fromMap(m)).toList();
   }

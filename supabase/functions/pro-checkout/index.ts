@@ -24,7 +24,8 @@
 // Con la llave de pruebas (pub_test_) solo pueden pagar las cuentas de app_admins.
 //
 // Secretos: WOMPI_INTEGRITY_SECRET
-// Ajustes (pro_settings): wompi_public_key
+// Ajustes (pro_settings): wompi_public_key, show_pricing (0.18.7: con los precios ocultos
+//   no se cobra, salvo a los administradores, que prueban antes de mostrarlos)
 // Mantenimiento (get_maintenance): con "payments" activo en nivel 2 o 3 responde { error: "maintenance" }
 // Variables provistas por Supabase: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
@@ -99,6 +100,14 @@ Deno.serve(async (req) => {
   if (m?.state === "active" && (m.level ?? 0) >= 2 && (m.scopes ?? []).includes("payments")) {
     const { data: isAdminRow } = await admin.from("app_admins").select("email").ilike("email", emailPattern).maybeSingle();
     if (!isAdminRow) return json({ error: "maintenance" }, 503);
+  }
+
+  // Precios ocultos (show_pricing distinto de 'on'): la app no muestra planes ni
+  // precios, así que tampoco se cobra (0.18.7). Los administradores sí, para probar.
+  const { data: pricing } = await admin.from("pro_settings").select("value").eq("key", "show_pricing").maybeSingle();
+  if ((pricing?.value as string | null)?.trim() !== "on") {
+    const { data: isAdminRow } = await admin.from("app_admins").select("email").ilike("email", emailPattern).maybeSingle();
+    if (!isAdminRow) return json({ error: "pricing_off" }, 503);
   }
 
   const { data: planRow } = slotsOnly ? { data: null } : await admin

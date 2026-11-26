@@ -113,6 +113,33 @@ class UpgradeQuote {
   }
 }
 
+/// Precio de una sede extra para un plan (0.18.7: se muestra en la comparación de
+/// planes). Sale de la misma tabla que usa la portada; desde [bulkFrom] sedes, cada
+/// una cuesta el precio por cantidad.
+class SlotPrice {
+  final double month;
+  final double year;
+  final double bulkMonth;
+  final double bulkYear;
+  final int bulkFrom;
+
+  const SlotPrice({required this.month, required this.year, required this.bulkMonth, required this.bulkYear, required this.bulkFrom});
+
+  factory SlotPrice.fromMap(Map<String, dynamic> m) {
+    double n(String k) => ((m[k] as num?) ?? 0).toDouble();
+    return SlotPrice(
+      month: n('month'),
+      year: n('year'),
+      bulkMonth: n('bulk_month'),
+      bulkYear: n('bulk_year'),
+      bulkFrom: (m['bulk_from'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  double price({required bool yearly}) => yearly ? year : month;
+  double bulk({required bool yearly}) => yearly ? bulkYear : bulkMonth;
+}
+
 /// Lo que cuestan unos cupos de sede, calculado en la nube (branch_slot_quote, 0.18.3).
 /// La app solo lo muestra: pro-checkout cobra con la misma cuenta.
 class BranchSlotQuote {
@@ -449,6 +476,24 @@ class ProService {
     }
   }
 
+  /// Precio de una sede extra por plan ('business', 'services'). Vacío si los precios
+  /// están ocultos o no hay conexión. Lo lee de public_landing (la misma de la portada)
+  Future<Map<String, SlotPrice>> slotPrices() async {
+    final client = _client;
+    if (client == null) return const {};
+    try {
+      final data = await client.rpc('public_landing');
+      final list = (data is Map ? data['slot_prices'] : null) as List? ?? const [];
+      return {
+        for (final row in list)
+          if (row is Map && row['kind'] is String) row['kind'] as String: SlotPrice.fromMap(Map<String, dynamic>.from(row)),
+      };
+    } catch (e) {
+      debugPrint('Precios de sedes: $e');
+      return const {};
+    }
+  }
+
   /// Precio de [planId] (Pro Servicios) con el descuento por el Pro que le queda.
   /// null si no hay conexión.
   Future<UpgradeQuote?> quoteUpgrade(String businessId, String planId) async {
@@ -489,7 +534,7 @@ class ProService {
     } on FunctionException catch (e, st) {
       final code = e.details is Map ? (e.details as Map)['error']?.toString() ?? '' : '${e.details}';
       // Fallas del servidor (no las del cliente, como un cupón vencido) van al panel
-      if (e.status >= 500 && !code.contains('maintenance')) {
+      if (e.status >= 500 && !code.contains('maintenance') && !code.contains('pricing_off')) {
         unawaited(ErrorReporter.instance.report('pro-checkout ${e.status}: $code', st, kind: 'payment'));
       }
       throw ProCheckoutException(checkoutErrorMessage(code));
@@ -549,6 +594,8 @@ class ProService {
   @visibleForTesting
   static String checkoutErrorMessage(String code) {
     if (code.contains('maintenance')) return 'Los pagos están en pausa por mantenimiento. Inténtalo en un rato.';
+    // 0.18.7: con los precios ocultos la nube no cobra
+    if (code.contains('pricing_off')) return 'Por ahora no se puede comprar Pro en línea.';
     if (code.contains('not_allowed')) return 'Solo el dueño o un administrador del negocio puede comprar Pro.';
     if (code.contains('currency_not_supported')) return 'El pago en línea por ahora es solo en pesos colombianos.';
     if (code.contains('payments_not_configured')) return 'El pago en línea no está disponible ahora. Usa Nequi.';

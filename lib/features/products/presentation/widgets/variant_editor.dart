@@ -10,6 +10,7 @@ import '../../models/product_variant.dart';
 import 'photo_color_picker.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/qty_stepper.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../data/product_image_service.dart';
 import 'package:image_picker/image_picker.dart';
@@ -209,7 +210,8 @@ class VariantEditorController extends ChangeNotifier {
           if (cell != null) _cells[cellKey(s, c.name)] = cell;
         }
       }
-      sizes.add(s);
+      // 0.18.7: si es una talla conocida, entra en su lugar y no al final
+      sizes.insert(SizeOrder.insertIndex(sizes, s), s);
     }
     notifyListeners();
   }
@@ -217,6 +219,15 @@ class VariantEditorController extends ChangeNotifier {
   void removeSize(String size) {
     sizes.remove(size);
     _colorsBySize.remove(_sizeKey(size));
+    notifyListeners();
+  }
+
+  /// Mueve una talla a otra posición (0.18.7: arrastrar en «Existencias»). Las
+  /// tallas de arriba siguen el mismo orden porque son la misma lista.
+  void moveSize(int from, int to) {
+    if (from < 0 || from >= sizes.length) return;
+    final s = sizes.removeAt(from);
+    sizes.insert(to.clamp(0, sizes.length), s);
     notifyListeners();
   }
 
@@ -324,8 +335,9 @@ class VariantEditorController extends ChangeNotifier {
   }
 
   List<ProductVariant> build({required String businessId, required String productId, required DateTime now}) {
+    final list = combos;
     return [
-      for (final c in combos)
+      for (final (i, c) in list.indexed)
         ProductVariant(
           id: cellFor(c.key).id,
           businessId: businessId,
@@ -340,6 +352,8 @@ class VariantEditorController extends ChangeNotifier {
           imageUrl: usesColor ? c.color?.imageUrl : null,
           skuOrBarcode: (cellFor(c.key).barcode ?? '').trim().isEmpty ? null : cellFor(c.key).barcode!.trim(),
           stock: cellFor(c.key).value.clamp(0, 1 << 30),
+          // 0.18.7: el orden que se ve en el formulario (tallas arrastradas)
+          sortOrder: i,
           createdAt: now,
           updatedAt: now,
         ),
@@ -670,12 +684,20 @@ class _VariantEditorState extends State<VariantEditor> {
             spacing: 4,
             runSpacing: 4,
             children: [
-              for (final p in VariantPreset.all)
+              for (final p in VariantPreset.all) ...[
                 ActionChip(
                   visualDensity: VisualDensity.compact,
                   label: Text(p.label, style: const TextStyle(fontSize: AppText.sizeCaption)),
                   onPressed: () => ctrl.applyPreset(p),
                 ),
+                // 0.18.7: pantalón por número, pregunta para quién es
+                if (identical(p, VariantPreset.clothes))
+                  ActionChip(
+                    visualDensity: VisualDensity.compact,
+                    label: const Text('Pantalón', style: TextStyle(fontSize: AppText.sizeCaption)),
+                    onPressed: _pickPants,
+                  ),
+              ],
             ],
           ),
           const SizedBox(height: AppSpace.sm),
@@ -724,12 +746,15 @@ class _VariantEditorState extends State<VariantEditor> {
                     decoration: const InputDecoration(hintText: '0', isDense: true),
                   ),
                 ),
-                TextButton(
-                  onPressed: () {
-                    final v = int.tryParse(_fillInput.text.trim());
-                    if (v != null) ctrl.fillAll(v);
-                  },
-                  child: const Text('Llenar todas'),
+                // Con letra grande en un celular angosto se acorta en vez de salirse
+                Flexible(
+                  child: TextButton(
+                    onPressed: () {
+                      final v = int.tryParse(_fillInput.text.trim());
+                      if (v != null) ctrl.fillAll(v);
+                    },
+                    child: const Text('Llenar todas', overflow: TextOverflow.ellipsis, maxLines: 1),
+                  ),
                 ),
               ],
             ],
@@ -743,8 +768,41 @@ class _VariantEditorState extends State<VariantEditor> {
           if (ctrl.sizes.isEmpty)
             // Sin tallas: el producto puede variar solo por color
             _sizeBlock(c, '')
-          else
-            for (final s in ctrl.sizes) _sizeBlock(c, s),
+          else if (ctrl.sizes.length == 1)
+            _sizeBlock(c, ctrl.sizes.first)
+          else ...[
+            // 0.18.7: mantener presionada una talla y moverla; las de arriba siguen
+            // el mismo orden (es la misma lista)
+            Text(
+              'Mantén presionada una ${label.toLowerCase()} para moverla',
+              style: TextStyle(fontSize: AppText.sizeCaption, color: c.inkMuted),
+            ),
+            const SizedBox(height: 4),
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              onReorderItem: (from, to) {
+                HapticFeedback.selectionClick();
+                ctrl.moveSize(from, to);
+              },
+              onReorderStart: (_) => HapticFeedback.mediumImpact(),
+              proxyDecorator: (child, _, animation) => AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) => Material(
+                  color: c.surfaceMuted,
+                  elevation: 8 * animation.value,
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                  child: child,
+                ),
+                child: child,
+              ),
+              children: [
+                for (final (i, s) in ctrl.sizes.indexed)
+                  KeyedSubtree(key: ValueKey('size-${s.toLowerCase()}'), child: _sizeBlock(c, s, index: i)),
+              ],
+            ),
+          ],
           if (ctrl.combos.isNotEmpty) ...[
             const SizedBox(height: AppSpace.sm),
             _totals(c),
@@ -869,9 +927,39 @@ class _VariantEditorState extends State<VariantEditor> {
   }
 
   /// Una talla: su encabezado con "+ Color" y sus filas de existencias
-  Widget _sizeBlock(StockealoColors c, String size) {
+  /// «Pantalón»: hombre, dama o niños (tallas por número)
+  Future<void> _pickPants() async {
+    final picked = await AppSheet.show<VariantPreset>(
+      context: context,
+      title: 'Tallas de pantalón',
+      subtitle: 'Después puedes agregar o quitar tallas',
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final p in VariantPreset.pants)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(p.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(p.values.join(', ')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pop(ctx, p),
+            ),
+        ],
+      ),
+    );
+    if (picked != null) ctrl.applyPreset(picked);
+  }
+
+  /// Un bloque de talla en «Existencias». Con [index] se puede mover: dejando
+  /// presionado el nombre (celular y computador) o arrastrando los puntitos.
+  Widget _sizeBlock(StockealoColors c, String size, {int? index}) {
     final colors = ctrl.colorsOf(size);
     final title = size.isEmpty ? ctrl.secondPlural : '${ctrl.attributeName} $size';
+    final titleText = Text(
+      title,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w700, color: c.ink),
+    );
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpace.sm),
       padding: const EdgeInsets.fromLTRB(AppSpace.sm + 2, 4, 4, AppSpace.sm),
@@ -884,13 +972,30 @@ class _VariantEditorState extends State<VariantEditor> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: AppText.sizeBody, fontWeight: FontWeight.w700, color: c.ink),
+              if (index == null)
+                Expanded(child: titleText)
+              else ...[
+                ReorderableDragStartListener(
+                  index: index,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Tooltip(
+                      message: 'Arrastra para mover la ${ctrl.attributeName.toLowerCase()} $size',
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Icon(Icons.drag_indicator, size: 20, color: c.inkMuted),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: ReorderableDelayedDragStartListener(
+                    index: index,
+                    child: Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: titleText),
+                  ),
+                ),
+              ],
               TextButton.icon(
                 onPressed: () => _addColor(size),
                 icon: const Icon(Icons.add_outlined, size: 18),
@@ -935,10 +1040,10 @@ class _VariantEditorState extends State<VariantEditor> {
         borderRadius: BorderRadius.circular(AppRadius.control),
         border: Border.all(color: c.line),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: color == null
+      // En pantallas angostas (o con letra grande) los botones bajan a una segunda
+      // línea para que la fila no se salga del borde (0.18.7, revisión de Codex)
+      child: LayoutBuilder(builder: (context, box) {
+        final name = color == null
                 ? Text(
                     'Sin ${ctrl.secondName.toLowerCase()}',
                     style: TextStyle(fontSize: AppText.sizeBody, color: c.inkMuted),
@@ -964,23 +1069,29 @@ class _VariantEditorState extends State<VariantEditor> {
                         ],
                       ),
                     ),
-                  ),
-          ),
-          SizedBox(
-            width: 68,
-            child: Tooltip(
-              message: cell.existing ? 'Se cambia con «Ajustar stock físico» en el detalle' : '',
-              child: TextField(
-                controller: cell.stock,
-                readOnly: cell.existing,
-                enabled: !cell.existing,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                textAlign: TextAlign.center,
-                decoration: const InputDecoration(isDense: true, hintText: '0'),
+                  );
+        final controls = <Widget>[
+          // 0.18.7: − y + para sumar de a uno; el número se sigue escribiendo. Las
+          // ya guardadas no: su cantidad se cambia con «Ajustar stock físico».
+          if (cell.existing)
+            SizedBox(
+              width: 68,
+              child: Tooltip(
+                message: 'Se cambia con «Ajustar stock físico» en el detalle',
+                child: TextField(
+                  controller: cell.stock,
+                  readOnly: true,
+                  enabled: false,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(isDense: true, hintText: '0'),
+                ),
               ),
+            )
+          else
+            QtyStepper.field(
+              controller: cell.stock,
+              label: color == null ? 'Existencias de ${ctrl.attributeName.toLowerCase()} $size' : 'Existencias de ${color.name}, $size',
             ),
-          ),
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: hasCode ? 'Código: ${cell.barcode}' : 'Escanear código',
@@ -997,8 +1108,20 @@ class _VariantEditorState extends State<VariantEditor> {
             icon: Icon(Icons.close_outlined, size: 18, color: c.inkMuted),
             onPressed: () => ctrl.removeCombo(key),
           ),
-        ],
-      ),
+        ];
+        // − número + (134) y los dos íconos (~80), con la letra del sistema
+        final needs = (134 + 80) * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0) + 90;
+        if (box.maxWidth >= needs) {
+          return Row(children: [Expanded(child: name), ...controls]);
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            name,
+            Wrap(alignment: WrapAlignment.end, crossAxisAlignment: WrapCrossAlignment.center, children: controls),
+          ],
+        );
+      }),
     );
   }
 

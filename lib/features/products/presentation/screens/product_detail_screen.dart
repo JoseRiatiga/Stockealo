@@ -18,6 +18,7 @@ import '../../../sales/presentation/screens/sell_screen.dart';
 import '../../../home/navigation/app_places.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/content_width.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../../core/permissions/permission_guard.dart';
 import '../../../business/data/branch_repository.dart';
@@ -334,14 +335,16 @@ actions: [
             ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1040),
-          child: SingleChildScrollView(
+      // 0.18.7: el scroll ocupa todo el ancho (rueda del mouse en cualquier lado) y
+      // el contenido queda en la columna de 1040
+      body: LayoutBuilder(
+        builder: (context, box) {
+          final side = ContentWidth.gutter(box.maxWidth, 1040);
+          return SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
+              AppSpace.lg + side,
               AppSpace.lg,
-              AppSpace.lg,
-              AppSpace.lg,
+              AppSpace.lg + side,
               MediaQuery.of(context).padding.bottom + 28,
             ),
             child: isWide
@@ -388,8 +391,8 @@ actions: [
                       ],
                     ],
                   ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

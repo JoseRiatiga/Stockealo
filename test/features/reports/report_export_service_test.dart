@@ -20,7 +20,8 @@ Future<Database> _db() async {
   await db.execute('''CREATE TABLE products (id TEXT PRIMARY KEY, business_id TEXT, code TEXT, name TEXT, category TEXT,
     purchase_price REAL, sale_price REAL, stock INTEGER, min_stock INTEGER, is_active INTEGER, has_variants INTEGER)''');
   await db.execute('''CREATE TABLE product_variants (id TEXT PRIMARY KEY, business_id TEXT, product_id TEXT,
-    attribute_value TEXT, attribute2_value TEXT, sku_or_barcode TEXT, stock INTEGER, additional_price REAL)''');
+    attribute_value TEXT, attribute2_value TEXT, sku_or_barcode TEXT, stock INTEGER, additional_price REAL,
+    sort_order INTEGER, created_at TEXT)''');
   await db.execute('''CREATE TABLE sales (id TEXT PRIMARY KEY, business_id TEXT, product_name TEXT, variant_name TEXT,
     quantity INTEGER, total REAL, total_cost REAL, net_profit REAL, payment_method TEXT, customer_name TEXT,
     seller_name TEXT, invoice_number TEXT, date TEXT, voided_at TEXT)''');

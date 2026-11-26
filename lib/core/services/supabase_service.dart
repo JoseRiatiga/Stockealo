@@ -866,6 +866,7 @@ class SupabaseService {
               'sku_or_barcode': row['sku_or_barcode'],
               'stock': (row['stock'] as num?)?.toInt() ?? 0,
               'additional_price': (row['additional_price'] as num?)?.toDouble() ?? 0.0,
+              'sort_order': (row['sort_order'] as num?)?.toInt(),
               'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
               'updated_at': row['updated_at'] ?? DateTime.now().toIso8601String(),
               'is_synced': 1,

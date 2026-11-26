@@ -10,6 +10,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../business/models/business.dart';
+import '../../products/models/product_variant.dart';
 import '../../services/models/commission_models.dart';
 import '../../services/models/service_models.dart';
 import '../../team/data/team_repository.dart';
@@ -418,7 +419,7 @@ class ReportExportService {
     ]));
     final products = await db.query('products',
         where: 'business_id = ? AND is_active = 1', whereArgs: [b.id], orderBy: 'name COLLATE NOCASE ASC');
-    final variants = await db.query('product_variants', where: 'business_id = ?', whereArgs: [b.id]);
+    final variants = await db.query('product_variants', where: 'business_id = ?', whereArgs: [b.id], orderBy: ProductVariant.orderBy);
     final byProduct = <String, List<Map<String, Object?>>>{};
     for (final v in variants) {
       byProduct.putIfAbsent(v['product_id'] as String, () => []).add(v);

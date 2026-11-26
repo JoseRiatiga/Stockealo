@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/design/app_card.dart';
+import '../../../../core/design/content_width.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../home/navigation/app_pane.dart';
@@ -190,16 +191,18 @@ class _NewTransferScreenState extends State<NewTransferScreen> {
     return Scaffold(
       backgroundColor: c.paper,
       appBar: AppBar(title: const Text('Nuevo traslado')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: _loading
+      // 0.18.7: la lista ocupa todo el ancho (scroll en cualquier lado) y el
+      // contenido queda en la columna de 720
+      body: LayoutBuilder(
+        builder: (context, box) {
+          final side = ContentWidth.gutter(box.maxWidth);
+          return _loading
               ? const Center(child: CircularProgressIndicator())
               : Column(
                   children: [
                     Expanded(
                       child: ListView(
-                        padding: const EdgeInsets.all(AppSpace.lg),
+                        padding: EdgeInsets.symmetric(horizontal: AppSpace.lg + side, vertical: AppSpace.lg),
                         children: [
                           AppCard(
                             child: Row(children: [
@@ -273,10 +276,10 @@ class _NewTransferScreenState extends State<NewTransferScreen> {
                         ],
                       ),
                     ),
-                    _bottomBar(over.isNotEmpty),
+                    _bottomBar(over.isNotEmpty, side),
                   ],
-                ),
-        ),
+                );
+        },
       ),
     );
   }
@@ -346,13 +349,13 @@ class _NewTransferScreenState extends State<NewTransferScreen> {
     );
   }
 
-  Widget _bottomBar(bool blocked) {
+  Widget _bottomBar(bool blocked, double side) {
     final c = context.colors;
     final n = _lines.length;
     final to = _to == _none ? null : _branches.nameOf(_to);
     return Container(
       decoration: BoxDecoration(color: c.surface, border: Border(top: BorderSide(color: c.line))),
-      padding: EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, AppSpace.md + MediaQuery.paddingOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(AppSpace.lg + side, AppSpace.md, AppSpace.lg + side, AppSpace.md + MediaQuery.paddingOf(context).bottom),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

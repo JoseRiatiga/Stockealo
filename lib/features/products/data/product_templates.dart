@@ -24,8 +24,64 @@ class VariantPreset {
     secondName: 'Sabor',
   );
 
+  /// Pantalón (0.18.7): las tallas van por número y cambian según para quién es.
+  /// El botón «Pantalón» pregunta cuál.
+  static const pantsMen = VariantPreset(label: 'Hombre', attributeName: 'Talla', values: ['28', '30', '32', '34', '36', '38']);
+  static const pantsWomen =
+      VariantPreset(label: 'Dama', attributeName: 'Talla', values: ['4', '6', '8', '10', '12', '14', '16']);
+  static const pantsKids =
+      VariantPreset(label: 'Niños', attributeName: 'Talla', values: ['2', '4', '6', '8', '10', '12', '14', '16']);
+  static const pants = [pantsMen, pantsWomen, pantsKids];
+
   /// Los botones rápidos del editor de variantes, para cualquier negocio
+  /// («Pantalón» va aparte, después de «Ropa», porque pregunta antes)
   static const all = [clothes, shoes, bottles, nicotine];
+}
+
+/// Dónde va una talla nueva (0.18.7): si es conocida, en su lugar y no al final.
+/// Se olvidó la S y se agrega después de M y L → queda antes de la M. Con números
+/// igual (el 30 entre el 28 y el 32). Si la lista mezcla cosas que no se conocen
+/// («Única», «32 largo») o la talla nueva no se conoce, va al final como antes.
+abstract final class SizeOrder {
+  /// Tallas en letra, de la más pequeña a la más grande
+  static const letters = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
+
+  static const _aliases = {'XXXL': '3XL', 'XXXXL': '4XL', '2XL': 'XXL', '2XS': 'XXS'};
+
+  /// Puesto de una talla en letra, o null si no lo es
+  static int? letterRank(String size) {
+    final s = size.trim().toUpperCase();
+    final i = letters.indexOf(_aliases[s] ?? s);
+    return i < 0 ? null : i;
+  }
+
+  /// Valor de una talla en número («32», «7,5»), o null si no lo es
+  static double? numberValue(String size) {
+    final s = size.trim().replaceAll(',', '.');
+    if (!RegExp(r'^\d+(\.\d+)?$').hasMatch(s)) return null;
+    return double.tryParse(s);
+  }
+
+  /// Posición donde se inserta [size] en [current]: antes de la primera talla más
+  /// grande. Solo si todas las de la lista son del mismo tipo que la nueva (letras
+  /// o números); si no, al final.
+  static int insertIndex(List<String> current, String size) {
+    final letter = letterRank(size);
+    if (letter != null) {
+      final ranks = current.map(letterRank).toList();
+      if (ranks.any((r) => r == null)) return current.length;
+      final i = ranks.indexWhere((r) => r! > letter);
+      return i < 0 ? current.length : i;
+    }
+    final number = numberValue(size);
+    if (number != null) {
+      final values = current.map(numberValue).toList();
+      if (values.any((v) => v == null)) return current.length;
+      final i = values.indexWhere((v) => v! > number);
+      return i < 0 ? current.length : i;
+    }
+    return current.length;
+  }
 }
 
 /// Plantilla de productos de un tipo de negocio (0.16.0, fase 2a, punto 16): carga

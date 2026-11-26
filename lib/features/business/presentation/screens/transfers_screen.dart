@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/design/app_card.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/content_width.dart';
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -41,6 +42,9 @@ enum _Tab { incoming, sent, history }
 class _TransfersScreenState extends State<TransfersScreen> {
   final _repo = TransferRepository.instance;
   final _branches = BranchRepository.instance;
+
+  /// Lo que sobra a cada lado en pantallas anchas (lo pone el LayoutBuilder del cuerpo)
+  double _side = 0;
   List<StockTransfer> _all = const [];
   bool _loading = true;
   String? _error;
@@ -158,21 +162,23 @@ class _TransfersScreenState extends State<TransfersScreen> {
             ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: Column(
+      // 0.18.7: listas a todo el ancho (scroll con la rueda en cualquier lado); lo
+      // demás queda en la columna de 720
+      body: LayoutBuilder(
+        builder: (context, box) {
+          _side = ContentWidth.gutter(box.maxWidth);
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.sm, AppSpace.lg, 0),
+                padding: EdgeInsets.fromLTRB(AppSpace.lg + _side, AppSpace.sm, AppSpace.lg + _side, 0),
                 child: Text('${widget.business.name} · ${_branches.nameOf(_here)}', style: AppText.small(context, color: c.inkMuted)),
               ),
               SizedBox(
                 height: 56,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.sm),
+                  padding: EdgeInsets.symmetric(horizontal: AppSpace.lg + _side, vertical: AppSpace.sm),
                   children: [
                     _chip(_Tab.incoming, 'Te llegan · ${incoming.length}'),
                     _chip(_Tab.sent, 'Enviados · ${sent.length}'),
@@ -182,8 +188,8 @@ class _TransfersScreenState extends State<TransfersScreen> {
               ),
               Expanded(child: _body(shown)),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -219,7 +225,7 @@ class _TransfersScreenState extends State<TransfersScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.xl),
+        padding: EdgeInsets.fromLTRB(AppSpace.lg + _side, 0, AppSpace.lg + _side, AppSpace.xl),
         itemCount: shown.length,
         itemBuilder: (_, i) => _card(shown[i]),
       ),
@@ -388,14 +394,14 @@ class _ReceiveTransferScreenState extends State<ReceiveTransferScreen> {
     return Scaffold(
       backgroundColor: c.paper,
       appBar: AppBar(title: Text('Recibir desde ${BranchRepository.instance.nameOf(t.fromBranchId)}')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: Column(
+      body: LayoutBuilder(
+        builder: (context, box) {
+          final side = ContentWidth.gutter(box.maxWidth);
+          return Column(
             children: [
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.all(AppSpace.lg),
+                  padding: EdgeInsets.symmetric(horizontal: AppSpace.lg + side, vertical: AppSpace.lg),
                   children: [
                     Text('Envió ${t.sentByName ?? t.sentByEmail}. Cuenta lo que llegó; si llegó menos, cambia el número.',
                         style: AppText.body(context, color: c.inkMuted)),
@@ -427,7 +433,7 @@ class _ReceiveTransferScreenState extends State<ReceiveTransferScreen> {
               ),
               Container(
                 decoration: BoxDecoration(color: c.surface, border: Border(top: BorderSide(color: c.line))),
-                padding: EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, AppSpace.md + MediaQuery.paddingOf(context).bottom),
+                padding: EdgeInsets.fromLTRB(AppSpace.lg + side, AppSpace.md, AppSpace.lg + side, AppSpace.md + MediaQuery.paddingOf(context).bottom),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -444,8 +450,8 @@ class _ReceiveTransferScreenState extends State<ReceiveTransferScreen> {
                 ),
               ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }

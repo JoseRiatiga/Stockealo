@@ -105763,7 +105763,7 @@ h=k.length>500?B.c.a4(k,0,500):k
 if(j==null)g=null
 else g=j.length>4000?B.c.a4(j,0,4000):j
 f=t.z
-m=A.ab(["p_app",d,"p_version","0.18.6+66","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
+m=A.ab(["p_app",d,"p_version","0.18.7+67","p_platform",c,"p_kind",a1,"p_fingerprint",i,"p_message",h,"p_stack",g],t.N,f)
 l=null
 p=4
 s=l!=null?7:9

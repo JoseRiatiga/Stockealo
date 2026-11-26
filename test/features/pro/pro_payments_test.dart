@@ -16,6 +16,7 @@ void main() {
     expect(ProService.checkoutErrorMessage('not_allowed'), contains('dueño'));
     expect(ProService.checkoutErrorMessage('currency_not_supported'), contains('pesos colombianos'));
     expect(ProService.checkoutErrorMessage('payments_not_configured'), contains('Nequi'));
+    expect(ProService.checkoutErrorMessage('pricing_off'), contains('no se puede comprar'));
     expect(ProService.checkoutErrorMessage('otra cosa'), contains('Inténtalo de nuevo'));
   });
 

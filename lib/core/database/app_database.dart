@@ -18,7 +18,7 @@ const String _ownerAuthIdKey = 'db_owner_auth_id';
 const String _ownerEmailKey = 'db_owner_email';
 
 class AppDatabase {
-  static const int _schemaVersion = 33;
+  static const int _schemaVersion = 34;
 
   static final AppDatabase instance = AppDatabase._init();
   static Database? _database;
@@ -591,10 +591,16 @@ class AppDatabase {
     if (oldVersion < 31 && newVersion >= 31) await categoryIconsV31(db);
     if (oldVersion < 32 && newVersion >= 32) await priceTiersV32(db);
     if (oldVersion < 33 && newVersion >= 33) await branchesV33(db);
+    if (oldVersion < 34 && newVersion >= 34) await variantOrderV34(db);
   }
 
   /// 0.18.0, sedes (docs/plan-sedes.md): las columnas de hoy siguen siendo de la sede
   /// Principal; branch_id vacío = Principal. branch_stock guarda solo las sedes extra.
+  /// 0.18.7: orden de las tallas. null = por created_at, como hasta hoy
+  static Future<void> variantOrderV34(Database db) async {
+    await _addColumnIfMissing(db, 'product_variants', 'sort_order', 'INTEGER');
+  }
+
   static Future<void> branchesV33(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS branches (
@@ -1159,6 +1165,7 @@ class AppDatabase {
     await businessTimeZoneV30(db);
     await priceTiersV32(db);
     await branchesV33(db);
+    await variantOrderV34(db);
 
     // NOTA: NO se inserta ninguna empresa ni categoría por defecto.
     // El usuario crea todo desde cero.

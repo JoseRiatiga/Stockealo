@@ -29,6 +29,7 @@ import '../../../team/data/team_repository.dart';
 import '../../../../core/codes/code_reader.dart';
 import '../../../../core/codes/barcode_check.dart';
 import '../../../../core/design/app_dialog.dart';
+import '../../../../core/design/content_width.dart';
 import '../../../../core/permissions/permissions.dart';
 import '../../data/pricing.dart';
 import '../widgets/lots_widgets.dart';
@@ -535,13 +536,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: Form(
+          // 0.18.7: la lista ocupa todo el ancho (scroll con la rueda en cualquier
+          // lado) y el formulario queda en la columna de 720
+          : LayoutBuilder(
+              builder: (context, box) => Form(
                   key: _formKey,
                   child: ListView(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.symmetric(horizontal: 20 + ContentWidth.gutter(box.maxWidth), vertical: 20),
                 children: [
                   // 1. Selector de Foto
                   Center(
@@ -1084,7 +1085,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
                 ],
               ),
-            ),
             ),
             ),
     );

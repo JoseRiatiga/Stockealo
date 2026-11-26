@@ -21,6 +21,17 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.18.7',
+      title: 'Tallas más fáciles',
+      items: [
+        'Ordena las tallas: mantén presionada una en «Existencias» y muévela; las de arriba siguen el mismo orden.',
+        'La talla que se te olvidó entra sola en su lugar: la S antes de la M, el 30 entre el 28 y el 32.',
+        'Botón «Pantalón» con las tallas por número de hombre, dama o niños.',
+        'Botones − y + en la cantidad de cada talla; el número también se puede escribir.',
+        'En el computador, el scroll funciona en toda la pantalla, no solo en el centro.',
+      ],
+    ),
+    (
       version: '0.18.6',
       title: 'Arreglos y avisos',
       items: [

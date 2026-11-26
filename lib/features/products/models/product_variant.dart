@@ -18,11 +18,19 @@ class ProductVariant {
   final String? skuOrBarcode;
   final int stock;
   final double additionalPrice;
+
+  /// Posición en su producto (0.18.7): las tallas se ordenan arrastrando.
+  /// null = las guardadas antes, que siguen por fecha de creación
+  final int? sortOrder;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isSynced;
 
   static const multicolor = 'multi';
+
+  /// Orden de las variantes en las consultas (0.18.7): el que eligió la persona y,
+  /// para las de antes (sin orden), por fecha de creación
+  static const orderBy = 'sort_order IS NULL, sort_order ASC, created_at ASC';
 
   ProductVariant({
     required this.id,
@@ -38,6 +46,7 @@ class ProductVariant {
     this.skuOrBarcode,
     this.stock = 0,
     this.additionalPrice = 0.0,
+    this.sortOrder,
     required this.createdAt,
     required this.updatedAt,
     this.isSynced = false,
@@ -71,6 +80,7 @@ class ProductVariant {
       'sku_or_barcode': skuOrBarcode,
       'stock': stock,
       'additional_price': additionalPrice,
+      'sort_order': sortOrder,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'is_synced': isSynced ? 1 : 0,
@@ -92,6 +102,7 @@ class ProductVariant {
         'sku_or_barcode': _blankToNull(m['sku_or_barcode']),
         'stock': (m['stock'] as num?)?.toInt() ?? 0,
         'additional_price': (m['additional_price'] as num?)?.toDouble() ?? 0.0,
+        'sort_order': (m['sort_order'] as num?)?.toInt(),
         'created_at': m['created_at'],
         'updated_at': m['updated_at'],
       };
@@ -126,6 +137,7 @@ class ProductVariant {
       skuOrBarcode: map['sku_or_barcode'] as String?,
       stock: (map['stock'] as num?)?.toInt() ?? 0,
       additionalPrice: (map['additional_price'] as num?)?.toDouble() ?? 0.0,
+      sortOrder: (map['sort_order'] as num?)?.toInt(),
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
       isSynced: (map['is_synced'] as int?) == 1,
@@ -148,6 +160,7 @@ class ProductVariant {
     String? skuOrBarcode,
     int? stock,
     double? additionalPrice,
+    int? sortOrder,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isSynced,
@@ -166,6 +179,7 @@ class ProductVariant {
       skuOrBarcode: skuOrBarcode ?? this.skuOrBarcode,
       stock: stock ?? this.stock,
       additionalPrice: additionalPrice ?? this.additionalPrice,
+      sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isSynced: isSynced ?? this.isSynced,

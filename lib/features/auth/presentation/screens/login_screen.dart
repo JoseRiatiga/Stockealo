@@ -20,6 +20,9 @@ class LoginScreen extends StatefulWidget {
 
   const LoginScreen({super.key, required this.onLoginSuccess});
 
+  /// La dirección pide empezar en «Crear cuenta» (`?crear=1`, desde la portada)
+  static bool opensOnRegister(Uri uri) => uri.queryParameters['crear'] == '1';
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -42,7 +45,9 @@ class _LoginScreenState extends State<LoginScreen> {
   StockyState _mascotState = StockyState.idle;
   double _mascotLookProgress = 0.0;
 
-  bool _isRegisterMode = false;
+  /// 0.18.7: los botones «Crear cuenta» de la portada abren /app/?crear=1 y la app
+  /// empieza en «Crear cuenta» en vez de «Ingresar»
+  bool _isRegisterMode = LoginScreen.opensOnRegister(Uri.base);
 
   /// Entrar con Google (0.16.0): la sesión llega por aquí cuando Google vuelve a la app
   StreamSubscription<AuthState>? _oauthSub;

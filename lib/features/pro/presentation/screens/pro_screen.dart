@@ -45,6 +45,9 @@ const freeBenefits = [
 const proServicesBenefits = [
   (Icons.view_kanban_outlined, 'Módulo Servicios', 'Tablero de trabajos, cola por orden de llegada y asistencia del equipo.'),
   (Icons.groups_outlined, 'Empleados sin límite', 'Gratis y con Pro son hasta 3.'),
+  // 0.18.7: lo de las sedes también va en Pro Servicios
+  (Icons.storefront_outlined, 'Principal + 2 sedes incluidas', 'Cada sede con su stock y su caja; puedes sumar más sedes.'),
+  (Icons.swap_horiz_outlined, 'Traslados entre sedes', 'Envía mercancía de una sede a otra y recíbela contando lo que llegó.'),
   (Icons.payments_outlined, 'Comisiones y liquidaciones', 'Lo que gana cada empleado por servicio, para pagar por día, semana o mes.'),
   (Icons.event_available_outlined, 'Agenda y reservas en línea', 'Tus clientes reservan desde tu tienda con la hora de tu negocio.'),
   (Icons.schedule_outlined, 'Horario de acceso', 'Cada persona entra a la app solo en sus días y horas.'),
@@ -112,6 +115,9 @@ class _ProScreenState extends State<ProScreen> {
   bool _isAdmin = false;
   String? _codeError;
 
+  /// Precio de las sedes extra por plan (0.18.7), para la comparación
+  Map<String, SlotPrice> _slotPrices = const {};
+
   Future<(List<ProPlan>, Map<String, String>)> _load() async {
     final pro = ProService.instance;
     ProAdminService.instance.isAdmin().then((v) {
@@ -119,6 +125,9 @@ class _ProScreenState extends State<ProScreen> {
     });
     pro.refresh(widget.business.id);
     _quoteAdd();
+    pro.slotPrices().then((v) {
+      if (mounted && v.isNotEmpty) setState(() => _slotPrices = v);
+    });
     final results = await Future.wait([pro.plans(widget.business.currency), pro.settings()]);
     return (results[0] as List<ProPlan>, results[1] as Map<String, String>);
   }
@@ -335,6 +344,15 @@ class _ProScreenState extends State<ProScreen> {
               : 'Se renueva cada mes',
           style: AppText.caption(context, color: c.inkMuted),
         ),
+        // 0.18.7: lo que cuesta cada sede extra con este plan
+        if (_slotPrices[plan.kind] case final slot? when slot.price(yearly: yearly) > 0) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Sede extra: ${_money(slot.price(yearly: yearly))} ${yearly ? 'al año' : 'al mes'}'
+            '${slot.bulkFrom > 1 && slot.bulk(yearly: yearly) > 0 ? ' · desde ${slot.bulkFrom}, ${_money(slot.bulk(yearly: yearly))} cada una' : ''}',
+            style: AppText.caption(context, color: c.inkMuted),
+          ),
+        ],
       ],
     );
   }

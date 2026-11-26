@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../core/design/app_dialog.dart';
+import '../core/design/content_width.dart';
 import '../core/design/status_pill.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/utils/clock_text.dart';
@@ -92,9 +93,13 @@ class AdminPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final width = MediaQuery.of(context).size.width;
+    // 0.18.7: la lista ocupa todo el ancho y el relleno de los costados es parte de
+    // ella, así la rueda del mouse funciona también fuera de la columna central.
+    return LayoutBuilder(builder: (context, box) {
+    final edge = box.maxWidth >= 900 ? AppSpace.xl : AppSpace.lg;
+    final side = edge + ContentWidth.gutter(box.maxWidth, width.max);
     final list = ListView(
-      padding: EdgeInsets.fromLTRB(width >= 900 ? AppSpace.xl : AppSpace.lg, AppSpace.xl, width >= 900 ? AppSpace.xl : AppSpace.lg, AppSpace.xxl),
+      padding: EdgeInsets.fromLTRB(side, AppSpace.xl, side, AppSpace.xxl),
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,13 +126,8 @@ class AdminPage extends StatelessWidget {
         ...children,
       ],
     );
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: this.width.max),
-        child: onRefresh == null ? list : RefreshIndicator(onRefresh: onRefresh!, child: list),
-      ),
-    );
+    return onRefresh == null ? list : RefreshIndicator(onRefresh: onRefresh!, child: list);
+    });
   }
 }
 

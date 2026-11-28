@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/utils/app_clipboard.dart';
 import '../../../../core/design/pro_crown.dart';
 import '../../../../core/design/content_width.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -704,10 +704,7 @@ class _ProScreenState extends State<ProScreen> {
                             ),
                           ),
                           TextButton.icon(
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: nequi));
-                              AppToast.showSuccess(context, 'Número de Nequi copiado');
-                            },
+                            onPressed: () => AppClipboard.copy(context, nequi, message: 'Número de Nequi copiado'),
                             icon: const Icon(Icons.copy_outlined, size: 18),
                             label: const Text('Copiar'),
                           ),
@@ -1134,10 +1131,7 @@ class _ProScreenState extends State<ProScreen> {
               ),
             ),
             TextButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: number));
-                AppToast.showSuccess(context, copied);
-              },
+              onPressed: () => AppClipboard.copy(context, number, message: copied),
               icon: const Icon(Icons.copy_outlined, size: 18),
               label: const Text('Copiar'),
             ),

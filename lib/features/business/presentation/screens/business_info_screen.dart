@@ -1,3 +1,4 @@
+import '../../../../core/utils/app_clipboard.dart';
 import '../../../../core/design/country_flag.dart';
 import '../widgets/create_business_sheet.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -8,7 +9,6 @@ import '../active_business_scope.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../widgets/business_trash.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/auth_repository.dart';
@@ -198,8 +198,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
       };
 
   void _copyBusinessId() {
-    Clipboard.setData(ClipboardData(text: _business.id));
-    AppToast.show(context, message: 'ID copiado', type: ToastType.info);
+    AppClipboard.copy(context, _business.id, message: 'ID copiado');
   }
 
   @override

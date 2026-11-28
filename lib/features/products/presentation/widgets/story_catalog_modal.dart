@@ -1,7 +1,7 @@
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../../../../core/utils/app_clipboard.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/share_images.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -180,8 +180,7 @@ class _StoryCatalogModalState extends State<StoryCatalogModal> {
   }
 
   Future<void> _copyCaption() async {
-    await Clipboard.setData(ClipboardData(text: _caption));
-    if (mounted) AppToast.show(context, message: 'Texto copiado', type: ToastType.success);
+    await AppClipboard.copy(context, _caption, message: 'Texto copiado');
   }
 
   @override

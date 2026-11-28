@@ -41,18 +41,18 @@ jobs:
       # stockealo.online/tienda/<nombre> → tienda en línea de un negocio (lib/main_store.dart)
       - name: Build Web (app)
         run: |
-          flutter build web --base-href "/app/" --release
+          flutter build web --base-href "/app/" --release --source-maps
           mkdir -p build/site
           mv build/web build/site/app
 
       - name: Build Web (admin)
         run: |
-          flutter build web -t lib/main_admin.dart --base-href "/admin/" --release --pwa-strategy=none
+          flutter build web -t lib/main_admin.dart --base-href "/admin/" --release --pwa-strategy=none --source-maps
           mv build/web build/site/admin
 
       - name: Build Web (tienda)
         run: |
-          flutter build web -t lib/main_store.dart --base-href "/tienda/" --release --pwa-strategy=none
+          flutter build web -t lib/main_store.dart --base-href "/tienda/" --release --pwa-strategy=none --source-maps
           mv build/web build/site/tienda
 
       # Página principal, páginas de regreso de Wompi y Términos/Privacidad (generados
@@ -62,6 +62,25 @@ jobs:
           python3 tool/build_legal_pages.py web_site
           cp -r web_site/. build/site/
           touch build/site/.nojekyll
+
+      # 0.18.8: mapas del código de cada versión, para traducir un error del panel
+      # (main.dart.js:67719) a la línea de Dart. No van a la página pública: quedan
+      # como archivo de esta ejecución en GitHub Actions (90 días). main.dart.js no se
+      # toca (el modo sin conexión lo guarda por su huella); su referencia al mapa solo
+      # da un 404 si alguien abre las herramientas del navegador.
+      - name: Keep source maps out of the site
+        run: |
+          for app in app admin tienda; do
+            mkdir -p "build/maps/$app"
+            find "build/site/$app" -name '*.map' -exec mv {} "build/maps/$app/" \;
+          done
+
+      - name: Upload source maps
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-source-maps-${{ github.sha }}
+          path: build/maps
+          retention-days: 90
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3

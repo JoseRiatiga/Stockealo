@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/app_clipboard.dart';
 import '../../../business/data/branch_repository.dart';
-import 'package:flutter/services.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/database/app_database.dart';
@@ -510,14 +510,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                     IconButton(
                       icon: Icon(Icons.copy_outlined, size: 20, color: c.success),
                       tooltip: 'Copiar código',
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: inviteCode));
-                        AppToast.showSuccess(
-                          context,
-                          'Código $inviteCode copiado.',
-                          title: 'Código copiado',
-                        );
-                      },
+                      onPressed: () => AppClipboard.copy(
+                        context,
+                        inviteCode,
+                        message: 'Código $inviteCode copiado.',
+                        title: 'Código copiado',
+                      ),
                     ),
                   ],
                 ),

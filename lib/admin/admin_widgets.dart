@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../core/utils/app_clipboard.dart';
 import '../core/design/app_dialog.dart';
 import '../core/design/content_width.dart';
 import '../core/design/status_pill.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/utils/clock_text.dart';
-import '../core/widgets/app_toast.dart';
 
 /// Piezas comunes de las secciones del panel de administrador
 
@@ -50,10 +49,8 @@ String adminInitials(String? name, String email) {
   return (words.first[0] + (words.length > 1 ? words.last[0] : '')).toUpperCase();
 }
 
-Future<void> adminCopy(BuildContext context, String text, String label) async {
-  await Clipboard.setData(ClipboardData(text: text));
-  if (context.mounted) AppToast.show(context, message: '$label copiado', type: ToastType.success);
-}
+Future<void> adminCopy(BuildContext context, String text, String label) =>
+    AppClipboard.copy(context, text, message: '$label copiado');
 
 /// Qué tan ancha es una sección en el computador (re-diseño del panel: antes todo se
 /// estiraba hasta 1200 px y los botones quedaban lejos de su renglón)

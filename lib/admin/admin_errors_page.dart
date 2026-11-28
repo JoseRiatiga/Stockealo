@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../core/utils/app_clipboard.dart';
 import '../core/design/app_dialog.dart';
 import '../core/design/filter_tabs.dart';
 import '../core/design/status_pill.dart';
 import '../core/services/supabase_service.dart';
 import '../core/theme/app_tokens.dart';
-import '../core/widgets/app_toast.dart';
 import 'admin_widgets.dart';
 
 /// Un error agrupado: el mismo mensaje y el mismo lugar
@@ -130,10 +129,7 @@ class _AdminErrorsPageState extends State<AdminErrorsPage> {
               OutlinedButton.icon(
                 icon: const Icon(Icons.copy_outlined, size: 18),
                 label: const Text('Copiar para revisarlo'),
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: '${g.message}\n\n${g.stack}'));
-                  if (ctx.mounted) AppToast.show(ctx, message: 'Copiado', type: ToastType.success);
-                },
+                onPressed: () => AppClipboard.copy(ctx, '${g.message}\n\n${g.stack}', message: 'Copiado'),
               ),
             ],
           ],

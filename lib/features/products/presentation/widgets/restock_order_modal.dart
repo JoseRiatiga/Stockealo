@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/utils/app_clipboard.dart';
 import '../../../../core/design/color_swatch_dot.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -450,9 +451,8 @@ actions: [
   }
 
   void _copyOrderText() {
-    Clipboard.setData(ClipboardData(text: _buildOrderText()));
     _saveOrder();
-    AppToast.showSuccess(context, 'Pedido copiado.');
+    AppClipboard.copy(context, _buildOrderText(), message: 'Pedido copiado.');
   }
 
   @override

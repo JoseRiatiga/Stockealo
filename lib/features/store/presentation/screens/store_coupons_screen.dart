@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/utils/app_clipboard.dart';
 import '../../../../core/design/app_card.dart';
 import '../../../../core/design/app_dialog.dart';
 import '../../../../core/design/filter_tabs.dart';
@@ -201,10 +202,7 @@ class _StoreCouponsScreenState extends State<StoreCouponsScreen> {
                   label: const Text('Compartir cupón'),
                 ),
                 TextButton.icon(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: k.code));
-                    AppToast.showSuccess(context, 'Código copiado.');
-                  },
+                  onPressed: () => AppClipboard.copy(context, k.code, message: 'Código copiado.'),
                   icon: const Icon(Icons.copy_outlined, size: 18),
                   label: const Text('Copiar'),
                 ),

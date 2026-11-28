@@ -541,15 +541,20 @@ actions: [
     if (_isManualSyncing) return;
     setState(() => _isManualSyncing = true);
 
+    // 0.18.8: primero sube lo que le falta a la nube (sin pisar lo que ya está) y
+    // después baja lo de la nube, así este equipo queda con los cambios de los otros.
+    // Antes solo subía, y su copia vieja reemplazaba roles, ventas y datos del negocio.
     final res = await _supabase.syncToCloud();
+    final user = _user;
+    final down = res.success && user != null ? await _supabase.syncFromCloud(user.id, user.email) : res;
 
     if (!mounted) return;
     setState(() => _isManualSyncing = false);
 
-    if (res.success) {
+    if (res.success && down.success) {
       AppToast.show(context, message: 'Respaldo al día: ${res.productsCount} productos y ${res.salesCount} ventas.', type: ToastType.success);
     } else {
-      AppToast.show(context, message: res.errorMessage ?? syncFailedMessage, type: ToastType.warning);
+      AppToast.show(context, message: (res.success ? down : res).errorMessage ?? syncFailedMessage, type: ToastType.warning);
     }
   }
 

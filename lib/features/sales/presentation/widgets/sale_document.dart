@@ -4,10 +4,10 @@ import 'dart:ui' as ui;
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/utils/app_clipboard.dart';
 import '../../../../core/design/status_pill.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/utils/clock_text.dart';
@@ -536,8 +536,7 @@ class _TicketViewerState extends State<TicketViewer> with SingleTickerProviderSt
   }
 
   void _copyText() {
-    Clipboard.setData(ClipboardData(text: _text));
-    AppToast.showSuccess(context, 'Texto copiado');
+    AppClipboard.copy(context, _text, message: 'Texto copiado');
   }
 
   @override

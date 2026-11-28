@@ -21,6 +21,15 @@ class WhatsNewSheet {
   /// La más nueva primero. Al publicar, se agrega aquí la versión nueva.
   static const entries = <WhatsNewEntry>[
     (
+      version: '0.18.8',
+      title: 'Tus cambios se respetan en todos tus equipos',
+      items: [
+        'Si cambias un permiso, una venta o los datos del negocio en un equipo, otro equipo con datos viejos ya no lo devuelve a como estaba.',
+        '«Sincronizar ahora» sube lo que falta y trae lo último de la nube.',
+        'Si el navegador no deja copiar, la app te avisa para que lo copies a mano.',
+      ],
+    ),
+    (
       version: '0.18.7',
       title: 'Tallas más fáciles',
       items: [

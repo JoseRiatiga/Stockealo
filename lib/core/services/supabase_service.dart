@@ -163,8 +163,17 @@ class SupabaseService {
   /// Activa o desactiva la sincronización en la nube
   Future<void> setCloudSyncEnabled(bool enabled) async {
     if (cloudSyncForced && !enabled) return;
+    // 0.18.8: al encender la nube después de trabajar sin ella, lo que se cambió en
+    // ese tiempo no pasó por la cola. La primera subida completa manda entonces la
+    // copia de este equipo tal cual (como antes); las siguientes ya no pisan nada.
+    final wasOn = cloudSyncForced || await AppDatabase.instance.getSetting('cloud_sync_enabled') == 'true';
+    if (enabled && !wasOn) await AppDatabase.instance.setSetting(pushLocalOnceKey, '1');
     await AppDatabase.instance.setSetting('cloud_sync_enabled', enabled ? 'true' : 'false');
   }
+
+  /// Hay cambios hechos con la nube apagada: la próxima subida completa los manda
+  /// aunque la fila ya esté en la nube (0.18.8)
+  static const pushLocalOnceKey = 'cloud_push_local_once';
 
   /// Sincroniza todos los datos locales de SQLite hacia Supabase
   Future<SyncResult> syncToCloud() async {
@@ -192,6 +201,12 @@ class SupabaseService {
       }
 
       final db = await AppDatabase.instance.database;
+
+      // 0.18.8: la subida completa solo crea lo que falta en la nube (onlyMissing).
+      // Excepción: la primera después de encender la nube, cuando este equipo tiene
+      // cambios que nunca pasaron por la cola.
+      final pushLocal = await AppDatabase.instance.getSetting(pushLocalOnceKey) == '1';
+      final onlyMissing = !pushLocal;
 
       // Solo se suben filas de negocios donde la cuenta es miembro, y según su rol:
       // con RLS, una sola fila no permitida haría fallar el lote completo.
@@ -264,12 +279,24 @@ class SupabaseService {
           'created_at': b['created_at'],
         }).toList();
 
+        // 0.18.8: lo que ya está en la nube no se pisa con la copia de este equipo, que
+        // puede estar vieja (un nombre, color o zona horaria cambiado en otro equipo se
+        // perdía). Los cambios llegan por la cola. Solo los que faltaban se suben
+        // completos: create_business_with_owner los crea solo con nombre y tipo.
+        final ids = [for (final b in localBusinesses) b['id'] as String];
+        final inCloud = await _existingIds(client!, 'businesses', ids);
+
         // Con RLS un negocio nuevo no puede crearse con upsert: primero se asegura
         // en el servidor que exista con su dueño (no hace nada si ya existe)
-        for (final b in localBusinesses.where((b) => ownedIds.contains(b['id']))) {
+        for (final b in localBusinesses.where((b) => ownedIds.contains(b['id']) && !inCloud.contains(b['id']))) {
           await _createBusinessWithOwner(client!, b);
         }
-        await _upsertGrouped(client!, 'businesses', formattedBusinesses);
+        // Solo los propios: uno ajeno que no se ve (acceso quitado, copia vieja) no se
+        // puede crear desde aquí y su fila haría fallar toda la subida
+        final toSend = formattedBusinesses
+            .where((b) => (pushLocal && inCloud.contains(b['id'])) || (!inCloud.contains(b['id']) && ownedIds.contains(b['id'])))
+            .toList();
+        if (toSend.isNotEmpty) await _upsertGrouped(client!, 'businesses', toSend);
       }
 
       // 1.1 Sincronizar Categories
@@ -287,8 +314,11 @@ class SupabaseService {
               };
           final withIcon = [for (final c in localCategories) if ((c['icon'] as String? ?? '').isNotEmpty) row(c, icon: true)];
           final withoutIcon = [for (final c in localCategories) if ((c['icon'] as String? ?? '').isEmpty) row(c)];
-          if (withIcon.isNotEmpty) await client!.from('categories').upsert(withIcon, onConflict: 'id');
-          if (withoutIcon.isNotEmpty) await client!.from('categories').upsert(withoutIcon, onConflict: 'id');
+          // 0.18.8: solo las que faltan; un nombre o ícono cambiado en otro equipo se respeta
+          if (withIcon.isNotEmpty) await client!.from('categories').upsert(withIcon, onConflict: 'id', ignoreDuplicates: onlyMissing);
+          if (withoutIcon.isNotEmpty) {
+            await client!.from('categories').upsert(withoutIcon, onConflict: 'id', ignoreDuplicates: onlyMissing);
+          }
         }
       } catch (e) {
         debugPrint('Nota: error o tabla categories no configurada en Supabase: $e');
@@ -316,9 +346,12 @@ class SupabaseService {
             };
           }).toList();
 
+          // 0.18.8: solo las personas que faltan. Antes el rol de este equipo pisaba el de
+          // la nube: un permiso quitado desde otro equipo volvía con su copia vieja.
           await client!.from('business_members').upsert(
             formattedMembers,
             onConflict: 'id',
+            ignoreDuplicates: onlyMissing,
           );
           localMembersCount = formattedMembers.length;
         }
@@ -457,7 +490,9 @@ class SupabaseService {
         }).toList();
 
         try {
-          await _upsertGrouped(client!, 'sales', formattedSales);
+          // 0.18.8: solo las ventas que faltan; una entrega, anulación o cambio de pago
+          // hecho en otro equipo no vuelve atrás con la copia de este
+          await _upsertGrouped(client!, 'sales', formattedSales, ignoreDuplicates: onlyMissing);
         } catch (e) {
           if (e.toString().contains('product_name') ||
               e.toString().contains('customer_name') ||
@@ -476,13 +511,14 @@ class SupabaseService {
               _saleV13Columns.forEach(copy.remove);
               return copy;
             }).toList();
-            await _upsertGrouped(client!, 'sales', fallbackSales);
+            await _upsertGrouped(client!, 'sales', fallbackSales, ignoreDuplicates: onlyMissing);
           } else {
             rethrow;
           }
         }
       }
 
+      if (pushLocal) await AppDatabase.instance.setSetting(pushLocalOnceKey, null);
       return SyncResult(
         success: true,
         businessesCount: localBusinesses.length,
@@ -1554,6 +1590,20 @@ class SupabaseService {
       groups.putIfAbsent(key, () => []).add(r);
     }
     return groups.values.toList();
+  }
+
+  /// Cuáles de [ids] ya existen en [table] en la nube (0.18.8: la subida completa no
+  /// pisa lo que ya está). En tandas, para no pasar del largo de la dirección.
+  static Future<Set<String>> _existingIds(SupabaseClient db, String table, List<String> ids) async {
+    final found = <String>{};
+    for (var i = 0; i < ids.length; i += 100) {
+      final batch = ids.sublist(i, (i + 100).clamp(0, ids.length));
+      final rows = await db.from(table).select('id').inFilter('id', batch);
+      for (final r in rows) {
+        found.add(r['id'] as String);
+      }
+    }
+    return found;
   }
 
   static Future<void> _upsertGrouped(SupabaseClient db, String table, List<Map<String, dynamic>> rows,

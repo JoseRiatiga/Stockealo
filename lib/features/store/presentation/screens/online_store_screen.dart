@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/app_clipboard.dart';
 import '../../../business/models/ticket_info.dart';
 import '../../../dashboard/presentation/widgets/stocky_floating_button.dart';
-import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -737,8 +737,7 @@ class _OnlineStoreScreenState extends State<OnlineStoreScreen> {
   }
 
   Future<void> _copyLink(String url) async {
-    await Clipboard.setData(ClipboardData(text: url));
-    if (mounted) AppToast.show(context, message: 'Enlace copiado', type: ToastType.success);
+    await AppClipboard.copy(context, url, message: 'Enlace copiado');
   }
 
   @override

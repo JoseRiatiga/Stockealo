@@ -69,6 +69,11 @@ jobs:
           body: |
             ## Novedades de la versión ${{ github.ref_name }}
 
+            ### Tus cambios se respetan en todos tus equipos (0.18.8)
+            - Si cambias un permiso, una venta o los datos del negocio en un equipo, otro equipo con datos viejos ya no lo devuelve a como estaba.
+            - «Sincronizar ahora» sube lo que falta y trae lo último de la nube.
+            - Si el navegador no deja copiar, la app te avisa para que lo copies a mano.
+
             ### Tallas más fáciles (0.18.7)
             - Ordena las tallas: mantén presionada una en «Existencias» y muévela; las de arriba siguen el mismo orden.
             - La talla que se te olvidó entra sola en su lugar: la S antes de la M, el 30 entre el 28 y el 32.
